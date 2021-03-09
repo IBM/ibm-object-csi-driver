@@ -16,10 +16,7 @@ import (
 	libMetrics "github.com/IBM/ibmcloud-volume-interface/lib/metrics"
 	csiConfig "github.com/IBM/satellite-object-storage-plugin/config"
 	driver "github.com/IBM/satellite-object-storage-plugin/pkg/driver"
-	"github.ibm.com/alchemy-containers/ibm-csi-common/pkg/utils"
-	//"github.com/ctrox/csi-s3/pkg/s3"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.ibm.com/alchemy-containers/ibm-csi-common/pkg/metrics"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -92,7 +89,8 @@ func handle(logger *zap.Logger) {
 		logger.Fatal("CSI driver vendorVersion must be set at compile time")
 	}
 	logger.Info("S3 driver version", zap.Reflect("DriverVersion", vendorVersion))
-	logger.Info("Controller Mutex Lock enabled", zap.Bool("LockEnabled", *utils.LockEnabled))
+	// TODO
+	//logger.Info("Controller Mutex Lock enabled", zap.Bool("LockEnabled", *utils.LockEnabled))
 
 	csiDriver, err := driver.Setups3Driver(logger, csiConfig.CSIPluginGithubName, vendorVersion)
 	if err != nil {
@@ -116,6 +114,7 @@ func serveMetrics() {
 		err := http.ListenAndServe(*metricsAddress, nil)
 		fileLogger.Error("Failed to start metrics service:", zap.Error(err))
 	}()
-	metrics.RegisterAll(csiConfig.CSIPluginGithubName)
+	// TODO
+	//metrics.RegisterAll(csiConfig.CSIPluginGithubName)
 	libMetrics.RegisterAll()
 }

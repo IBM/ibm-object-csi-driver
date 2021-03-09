@@ -12,6 +12,7 @@
 package driver
 
 import (
+	"errors"
 	fakemounter "github.com/IBM/satellite-object-storage-plugin/pkg/driver/fake/mounter"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
@@ -30,7 +31,12 @@ const errorDeviceInfo = "/for/errordevicepath"
 const errorBlockDevice = "/for/errorblock"
 const notBlockDevice = "/for/notblocktest"
 
-var unmountSuccess = func(target string) error { return nil }
+var (
+	unmountSuccess            = func(target string) error { return nil }
+	unmountFailure            = func(target string) error { return errors.New("") }
+	checkMountFailure         = func(target string) (bool, error) { return false, errors.New("") }
+	checkMountFailureNotMount = func(target string) (bool, error) { return false, nil }
+)
 
 func TestNodePublishVolume(t *testing.T) {
 	newmounter = fakemounter.NewMounter
@@ -301,4 +307,107 @@ func TestNodeExpandVolume(t *testing.T) {
 	icDriver := inits3Driver(t)
 	_, err := icDriver.ns.NodeExpandVolume(context.Background(), &csi.NodeExpandVolumeRequest{})
 	assert.NotNil(t, err)
+}
+
+func TestNodeUnpublishVolumeUnMountFail(t *testing.T) {
+	fuseunmount = unmountFailure
+	testCases := []struct {
+		name       string
+		req        *csi.NodeUnpublishVolumeRequest
+		expErrCode codes.Code
+	}{
+		{
+			name: "Unmount failure",
+			req: &csi.NodeUnpublishVolumeRequest{
+				VolumeId:   defaultVolumeID,
+				TargetPath: defaultStagingPath,
+			},
+			expErrCode: codes.Internal,
+		},
+	}
+
+	icDriver := inits3Driver(t)
+	for _, tc := range testCases {
+		t.Logf("Test case: %s", tc.name)
+		_, err := icDriver.ns.NodeUnpublishVolume(context.Background(), tc.req)
+		if err != nil {
+			serverError, ok := status.FromError(err)
+			if !ok {
+				t.Fatalf("Could not get error status code from err: %v", err)
+			}
+			if serverError.Code() != tc.expErrCode {
+				t.Fatalf("Expected error code: %v, got: %v. err : %v", tc.expErrCode, serverError.Code(), err)
+			}
+			continue
+		}
+		if tc.expErrCode != codes.OK {
+			t.Fatalf("Expected error: %v, got no error", tc.expErrCode)
+		}
+	}
+}
+
+func TestNodePublishVolumeCheckMountFail(t *testing.T) {
+	checkMountpoint = checkMountFailure
+	testCases := []struct {
+		name       string
+		req        *csi.NodePublishVolumeRequest
+		expErrCode codes.Code
+	}{
+		{
+			name: "checkMount failure",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:          defaultVolumeID,
+				TargetPath:        defaultTargetPath,
+				StagingTargetPath: defaultStagingPath,
+				VolumeCapability:  stdVolCap[0],
+			},
+			expErrCode: codes.Internal,
+		},
+	}
+
+	icDriver := inits3Driver(t)
+	for _, tc := range testCases {
+		t.Logf("Test case: %s", tc.name)
+		_, err := icDriver.ns.NodePublishVolume(context.Background(), tc.req)
+		if err != nil {
+			serverError, ok := status.FromError(err)
+			if !ok {
+				t.Fatalf("Could not get error status code from err: %v", err)
+			}
+			if serverError.Code() != tc.expErrCode {
+				t.Fatalf("Expected error code: %v, got: %v. err : %v", tc.expErrCode, serverError.Code(), err)
+			}
+			continue
+		}
+		if tc.expErrCode != codes.OK {
+			t.Fatalf("Expected error: %v, got no error", tc.expErrCode)
+		}
+	}
+}
+
+func TestNodePublishVolumeCheckMountIsNotMountFail(t *testing.T) {
+	checkMountpoint = checkMountFailureNotMount
+	testCases := []struct {
+		name       string
+		req        *csi.NodePublishVolumeRequest
+		expErrCode error
+	}{
+		{
+			name: "checkMount failure - not a mount point",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:          defaultVolumeID,
+				TargetPath:        defaultTargetPath,
+				StagingTargetPath: defaultStagingPath,
+				VolumeCapability:  stdVolCap[0],
+			},
+			expErrCode: nil,
+		},
+	}
+
+	icDriver := inits3Driver(t)
+	for _, tc := range testCases {
+		t.Logf("Test case: %s", tc.name)
+		_, err := icDriver.ns.NodePublishVolume(context.Background(), tc.req)
+		assert.Nil(t, err)
+	}
 }

@@ -14,20 +14,15 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
-	"github.com/IBM/ibmcloud-volume-interface/lib/provider"
 	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	csicommon "github.com/kubernetes-csi/drivers/pkg/csi-common"
-	commonError "github.ibm.com/alchemy-containers/ibm-csi-common/pkg/messages"
-	"github.ibm.com/alchemy-containers/ibm-csi-common/pkg/metrics"
-	"github.ibm.com/alchemy-containers/ibm-csi-common/pkg/utils"
-	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"io"
+	"k8s.io/klog/v2"
 	"strings"
-	"time"
 )
 
 const (
@@ -41,22 +36,16 @@ type controllerServer struct {
 	*s3Driver
 }
 
-func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	ctxLogger, requestID := utils.GetContextLogger(ctx, false)
-	// populate requestID in the context
-	_ = context.WithValue(ctx, provider.RequestID, requestID)
+var getVolByName = getVolumeByName
 
-	ctxLogger.Info("CSIControllerServer-ControllerPublishVolume", zap.Reflect("Request", *req))
-	return nil, commonError.GetCSIError(ctxLogger, commonError.MethodUnimplemented, requestID, nil, "ControllerPublishVolume")
+func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+	klog.Infof("CSIControllerServer-ControllerPublishVolume | Request: %v", *req)
+	return nil, status.Error(codes.Unimplemented, "ControllerPublishVolume")
 }
 
 func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
-	ctxLogger, requestID := utils.GetContextLogger(ctx, false)
-	// populate requestID in the context
-	_ = context.WithValue(ctx, provider.RequestID, requestID)
-
-	ctxLogger.Info("CSIControllerServer-ControllerUnPublishVolume", zap.Reflect("Request", *req))
-	return nil, commonError.GetCSIError(ctxLogger, commonError.MethodUnimplemented, requestID, nil, "ControllerUnPublishVolume")
+	klog.Infof("CSIControllerServer-ControllerUnPublishVolume | Request: %v", *req)
+	return nil, status.Error(codes.Unimplemented, "ControllerUnpublishVolume")
 }
 
 func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
@@ -71,37 +60,33 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		secretKey  string
 		authType   string
 	)
-	ctxLogger, requestID := utils.GetContextLogger(ctx, false)
-	// populate requestID in the context
-	ctx = context.WithValue(ctx, provider.RequestID, requestID)
-	ctxLogger.Info("CSIControllerServer-CreateVolume... ", zap.Reflect("Request", *req))
-	defer metrics.UpdateDurationFromStart(ctxLogger, "CreateVolume", time.Now())
+	klog.Infof("CSIControllerServer-CreateVolume... | Request: %v", *req)
 
 	volumeName := sanitizeVolumeID(req.GetName())
 	volumeID := volumeName
 
 	if err := cs.Driver.ValidateControllerServiceRequest(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME); err != nil {
-		ctxLogger.Info("invalid create volume req:", zap.Reflect("Request", *req))
+		klog.Infof("Invalid create volume req: %v", *req)
 		return nil, err
 	}
 
 	// Check arguments
 	if len(volumeID) == 0 {
-		return nil, commonError.GetCSIError(ctxLogger, commonError.MissingVolumeName, requestID, nil)
+		return nil, status.Error(codes.InvalidArgument, "Name missing in request")
 	}
 	caps := req.GetVolumeCapabilities()
 	if caps == nil {
-		return nil, commonError.GetCSIError(ctxLogger, commonError.NoVolumeCapabilities, requestID, nil)
+		return nil, status.Error(codes.InvalidArgument, "Volume Capabilities missing in request")
 	}
 	for _, cap := range caps {
 		if cap.GetBlock() != nil {
-			return nil, commonError.GetCSIError(ctxLogger, commonError.VolumeCapabilitiesNotSupported, requestID, nil)
+			return nil, status.Error(codes.InvalidArgument, "Block Volume not supported")
 		}
 	}
 	// Check for already existing volume name
-	if _, err := getVolumeByName(req.GetName()); err == nil {
-		ctxLogger.Info("Volume already exists", zap.Reflect("ExistingVolume", req.GetName()))
-		return nil, commonError.GetCSIError(ctxLogger, commonError.VolumeAlreadyExists, requestID, err, req.GetName())
+	if _, err := getVolByName(req.GetName()); err == nil {
+		klog.Infof("Volume already exists %v", req.GetName())
+		return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("Volume with the same name: %s exist", req.GetName()))
 	}
 
 	// Check for maximum available capacity
@@ -110,7 +95,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, status.Errorf(codes.OutOfRange, fmt.Sprintf("Requested capacity %d exceeds maximum allowed %d", capacity, maxStorageCapacity))
 	}
 
-	ctxLogger.Info("Got a request to create volume:", zap.Reflect("volumeID", volumeID))
+	klog.Infof("Got a request to create volume: %s", volumeID)
 	clinetCreds := &s3client.S3Credentials{}
 	params := req.GetParameters()
 	secretMap := req.GetSecrets()
@@ -142,12 +127,12 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	//(client *s3Client) InitSession(endpoint string, class string, creds *s3Credentials)
 	if err := cs.s3Driver.s3client.InitSession(endPoint, regnClass, clinetCreds); err != nil {
-		ctxLogger.Error("CreateVolume Unable to initialize backend S3 Client")
+		klog.Error("CreateVolume Unable to initialize backend S3 Client")
 		return nil, status.Error(codes.PermissionDenied, "Unable to initialize backend S3 Clinet")
 	}
 
 	if err := cs.s3Driver.s3client.CheckBucketAccess(bucketName); err != nil {
-		ctxLogger.Error("CreateVolume Unable to access the bucket:", zap.Error(err))
+		klog.Error("CreateVolume Unable to access the bucket: %v", err)
 		return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to to access the bucket: %v", bucketName))
 	}
 
@@ -156,7 +141,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	params["bucket-name"] = bucketName
 	params["obj-path"] = objPath
 
-	ctxLogger.Info("create volume:", zap.Reflect("volumeID", volumeID))
+	klog.Infof("create volume: %v", volumeID)
 
 	s3Vol := s3Volume{}
 	s3Vol.VolName = volumeName
@@ -176,24 +161,20 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 }
 
 func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	ctxLogger, requestID := utils.GetContextLogger(ctx, false)
-	// populate requestID in the context
-	ctx = context.WithValue(ctx, provider.RequestID, requestID)
-	defer metrics.UpdateDurationFromStart(ctxLogger, "DeleteVolume", time.Now())
-	ctxLogger.Info("CSIControllerServer-DeleteVolume... ", zap.Reflect("Request", *req))
+	klog.Infof("CSIControllerServer-DeleteVolume... %v", *req)
 
 	// Validate arguments
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
-		return nil, commonError.GetCSIError(ctxLogger, commonError.EmptyVolumeID, requestID, nil)
+		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 
 	if err := cs.Driver.ValidateControllerServiceRequest(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME); err != nil {
-		ctxLogger.Info("Invalid delete volume req", zap.Reflect("Request", *req))
+		klog.Infof("Invalid delete volume req %v", *req)
 		return nil, err
 	}
-	ctxLogger.Info("Deleting volume", zap.Reflect("VolumeID", volumeID))
-	ctxLogger.Info("deleting volume", zap.Reflect("volumeID", volumeID))
+	klog.Infof("Deleting volume %v", volumeID)
+	klog.Infof("deleting volume %v", volumeID)
 	//path := provisionRoot + volumeID
 	//os.RemoveAll(path)
 	delete(s3CosVolumes, volumeID)
@@ -201,19 +182,16 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 }
 
 func (cs *controllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
-	ctxLogger, requestID := utils.GetContextLogger(ctx, false)
-	// populate requestID in the context
-	ctx = context.WithValue(ctx, provider.RequestID, requestID)
-	ctxLogger.Info("CSIControllerServer-ValidateVolumeCapabilities", zap.Reflect("Request", *req))
+	klog.Infof("CSIControllerServer-ValidateVolumeCapabilities | Request: %v", *req)
 
 	// Validate Arguments
 	if req.GetVolumeCapabilities() == nil || len(req.GetVolumeCapabilities()) == 0 {
-		return nil, commonError.GetCSIError(ctxLogger, commonError.NoVolumeCapabilities, requestID, nil)
+		return nil, status.Error(codes.InvalidArgument, "Volume capabilities missing in request")
 	}
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
-		return nil, commonError.GetCSIError(ctxLogger, commonError.EmptyVolumeID, requestID, nil)
+		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 
 	if _, ok := s3CosVolumes[req.GetVolumeId()]; !ok {
@@ -224,43 +202,24 @@ func (cs *controllerServer) ValidateVolumeCapabilities(ctx context.Context, req 
 }
 
 func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
-	ctxLogger, requestID := utils.GetContextLogger(ctx, false)
-	// populate requestID in the context
-	_ = context.WithValue(ctx, provider.RequestID, requestID)
 
-	ctxLogger.Info("CSIControllerServer-CreateSnapshot", zap.Reflect("Request", *req))
-
-	return nil, commonError.GetCSIError(ctxLogger, commonError.MethodUnimplemented, requestID, nil, "CreateSnapshot")
+	return nil, status.Error(codes.Unimplemented, "")
 
 }
 
 func (cs *controllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
-	ctxLogger, requestID := utils.GetContextLogger(ctx, false)
-	// populate requestID in the context
-	_ = context.WithValue(ctx, provider.RequestID, requestID)
 
-	ctxLogger.Info("CSIControllerServer-DeleteSnapshot", zap.Reflect("Request", *req))
-
-	return nil, commonError.GetCSIError(ctxLogger, commonError.MethodUnimplemented, requestID, nil, "DeleteSnapshot")
+	return nil, status.Error(codes.Unimplemented, "DeleteSnapshot")
 }
 
 func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
-	ctxLogger, requestID := utils.GetContextLogger(ctx, false)
-	// populate requestID in the context
-	_ = context.WithValue(ctx, provider.RequestID, requestID)
 
-	ctxLogger.Info("CSIControllerServer-ListSnapshots", zap.Reflect("Request", *req))
-
-	return nil, commonError.GetCSIError(ctxLogger, commonError.MethodUnimplemented, requestID, nil, "ListSnapshots")
+	return nil, status.Error(codes.Unimplemented, "ListSnapshots")
 }
 
 func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
-	ctxLogger, requestID := utils.GetContextLogger(ctx, false)
-	// populate requestID in the context
-	_ = context.WithValue(ctx, provider.RequestID, requestID)
 
-	ctxLogger.Info("CSIControllerServer-ControllerExpandVolume", zap.Reflect("Request", *req))
-	return nil, commonError.GetCSIError(ctxLogger, commonError.MethodUnimplemented, requestID, nil, "ControllerExpandVolume")
+	return nil, status.Error(codes.Unimplemented, "ControllerExpandVolume")
 }
 
 func sanitizeVolumeID(volumeID string) string {
@@ -275,20 +234,12 @@ func sanitizeVolumeID(volumeID string) string {
 
 // GetCapacity ...
 func (csiCS *controllerServer) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
-	ctxLogger, requestID := utils.GetContextLogger(ctx, false)
-	// populate requestID in the context
-	_ = context.WithValue(ctx, provider.RequestID, requestID)
 
-	ctxLogger.Info("CSIControllerServer-GetCapacity", zap.Reflect("Request", *req))
-	return nil, commonError.GetCSIError(ctxLogger, commonError.MethodUnimplemented, requestID, nil, "GetCapacity")
+	return nil, status.Error(codes.Unimplemented, "GetCapacity")
 }
 
 //ListVolumes
 func (csiCS *controllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
-	ctxLogger, requestID := utils.GetContextLogger(ctx, false)
-	// populate requestID in the context
-	_ = context.WithValue(ctx, provider.RequestID, requestID)
 
-	ctxLogger.Info("CSIControllerServer-ListVolumes", zap.Reflect("Request", *req))
-	return nil, commonError.GetCSIError(ctxLogger, commonError.MethodUnimplemented, requestID, nil, "ListVolumes")
+	return nil, status.Error(codes.Unimplemented, "ListVolumes")
 }

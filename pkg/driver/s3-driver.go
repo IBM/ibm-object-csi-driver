@@ -17,7 +17,6 @@ import (
 	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	csicommon "github.com/kubernetes-csi/drivers/pkg/csi-common"
-	commonError "github.ibm.com/alchemy-containers/ibm-csi-common/pkg/messages"
 	"go.uber.org/zap"
 )
 
@@ -79,7 +78,6 @@ func Setups3Driver(lgr *zap.Logger, name, vendorVersion string) (*s3Driver, erro
 	}
 
 	// Setup messaging
-	commonError.MessagesEn = commonError.InitMessages()
 
 	csiDriver.name = name
 	csiDriver.vendorVersion = vendorVersion

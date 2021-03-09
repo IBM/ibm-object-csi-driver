@@ -11,11 +11,42 @@
 package driver
 
 import (
-	"testing"
-
+	"bytes"
 	"github.com/stretchr/testify/assert"
-	cloudProvider "github.ibm.com/alchemy-containers/ibm-csi-common/pkg/ibmcloudprovider"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"testing"
 )
+
+// GetTestLogger ...
+func GetTestLogger(t *testing.T) (logger *zap.Logger, teardown func()) {
+
+	atom := zap.NewAtomicLevel()
+	atom.SetLevel(zap.DebugLevel)
+
+	encoderCfg := zap.NewProductionEncoderConfig()
+	encoderCfg.TimeKey = "timestamp"
+	encoderCfg.EncodeTime = zapcore.ISO8601TimeEncoder
+
+	buf := &bytes.Buffer{}
+
+	logger = zap.New(
+		zapcore.NewCore(
+			zapcore.NewJSONEncoder(encoderCfg),
+			zapcore.AddSync(buf),
+			atom,
+		),
+		zap.AddCaller(),
+	)
+
+	teardown = func() {
+		_ = logger.Sync()
+		if t.Failed() {
+			t.Log(buf)
+		}
+	}
+	return
+}
 
 func inits3Driver(t *testing.T) *s3Driver {
 	vendorVersion := "test-vendor-version-1.1.2"
@@ -25,7 +56,7 @@ func inits3Driver(t *testing.T) *s3Driver {
 	nodeID := "test-nodeID"
 
 	// Creating test logger
-	logger, teardown := cloudProvider.GetTestLogger(t)
+	logger, teardown := GetTestLogger(t)
 	defer teardown()
 
 	// Setup the IBM CSI driver
@@ -51,7 +82,7 @@ func TestSetups3Driver(t *testing.T) {
 	// Creating test logger
 	vendorVersion := "test-vendor-version-1.1.2"
 	name := ""
-	logger, teardown := cloudProvider.GetTestLogger(t)
+	logger, teardown := GetTestLogger(t)
 	defer teardown()
 
 	// Failed setting up driver, name  nil
