@@ -12,10 +12,10 @@ package driver
 import (
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	csicommon "github.com/kubernetes-csi/drivers/pkg/csi-common"
-	commonError "github.ibm.com/alchemy-containers/ibm-csi-common/pkg/messages"
-	"github.ibm.com/alchemy-containers/ibm-csi-common/pkg/utils"
-	"go.uber.org/zap"
 	"golang.org/x/net/context"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"k8s.io/klog/v2"
 )
 
 type identityServer struct {
@@ -25,11 +25,9 @@ type identityServer struct {
 
 // GetPluginInfo ...
 func (csiIdentity *identityServer) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
-	ctxLogger, requestID := utils.GetContextLogger(ctx, false)
-	ctxLogger.Info("identityServer-GetPluginInfo...", zap.Reflect("Request", *req))
-
+	klog.Infof("identityServer-GetPluginInfo... | Request: %v", *req)
 	if csiIdentity.s3Driver == nil {
-		return nil, commonError.GetCSIError(ctxLogger, commonError.DriverNotConfigured, requestID, nil)
+		return nil, status.Error(codes.InvalidArgument, "Driver not configured")
 	}
 
 	return &csi.GetPluginInfoResponse{
@@ -40,9 +38,7 @@ func (csiIdentity *identityServer) GetPluginInfo(ctx context.Context, req *csi.G
 
 // GetPluginCapabilities ...
 func (csiIdentity *identityServer) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
-	ctxLogger, _ := utils.GetContextLogger(ctx, false)
-	ctxLogger.Info("identityServer-GetPluginCapabilities...", zap.Reflect("Request", *req))
-
+	klog.Infof("identityServer-GetPluginCapabilities...| Request %v", *req)
 	return &csi.GetPluginCapabilitiesResponse{
 		Capabilities: []*csi.PluginCapability{
 			{
@@ -72,7 +68,6 @@ func (csiIdentity *identityServer) GetPluginCapabilities(ctx context.Context, re
 
 // Probe ...
 func (csiIdentity *identityServer) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
-	ctxLogger, _ := utils.GetContextLogger(ctx, false)
-	ctxLogger.Info("identityServer-Probe...", zap.Reflect("Request", *req))
+	klog.Infof("identityServer-Probe... Request %v", *req)
 	return &csi.ProbeResponse{}, nil
 }
