@@ -33,7 +33,7 @@ const (
 type s3Driver struct {
 	name     string
 	driver   *csicommon.CSIDriver
-	s3client s3client.S3Client
+	s3client s3client.ObjectStorageSession
 	endpoint string
 
 	ids           *identityServer
@@ -116,7 +116,7 @@ func (csiDriver *s3Driver) NewS3CosDriver(nodeID string, endpoint string) (*s3Dr
 		csiDriver.logger.Error("Failed to initialize CSI Driver")
 		return nil, errors.New("failed to initialize CSI Driver")
 	}
-	s3client, err := s3client.NewS3Client("awss3")
+	s3client, err := s3client.NewS3Client()
 	if err != nil {
 		return nil, err
 	}

@@ -26,9 +26,9 @@ import (
 )
 
 const (
-	// PublishInfoRequestID ...
 	PublishInfoRequestID = "request-id"
 	maxStorageCapacity   = gib
+	defaultIAMEndPoint   = "https://iam.bluemix.net"
 )
 
 type controllerServer struct {
@@ -38,43 +38,67 @@ type controllerServer struct {
 
 var getVolByName = getVolumeByName
 
-func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	klog.Infof("CSIControllerServer-ControllerPublishVolume | Request: %v", *req)
-	return nil, status.Error(codes.Unimplemented, "ControllerPublishVolume")
-}
+func (cs *controllerServer) getCredentials(secretMap map[string]string) (*s3client.ObjectStorageCredentials, error) {
+	var (
+		accessKey         string
+		secretKey         string
+		apiKey            string
+		serviceInstanceID string
+		err error
+		authType string
+	)
 
-func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
-	klog.Infof("CSIControllerServer-ControllerUnPublishVolume | Request: %v", *req)
-	return nil, status.Error(codes.Unimplemented, "ControllerUnpublishVolume")
+	apiKey = secretMap["api-key"]
+	if apiKey == "" {
+		authType = "hmac"
+		accessKey = secretMap["access-key"]
+		if accessKey == "" {
+			return nil, status.Error(codes.Unauthenticated, fmt.Sprintf("Valid access credentials are not provided in the secret| access-key missing"))
+		}
+
+		secretKey = secretMap["secret-key"]
+		if secretKey == "" {
+			return nil, status.Error(codes.Unauthenticated, fmt.Sprintf("Valid access credentials are not provided in the secret| secret-key missing"))
+		}
+	} else {
+		authType = "iam"
+		serviceInstanceID = secretMap["service-id"]
+		if serviceInstanceID == "" {
+			return nil, status.Error(codes.Unauthenticated, fmt.Sprintf("Valid access credentials are not provided in the secret| serviceInstanceID  missing"))
+		}
+	}
+
+	return &s3client.ObjectStorageCredentials{
+		AuthType:          authType,
+		AccessKey:         accessKey,
+		SecretKey:         secretKey,
+		APIKey:            apiKey,
+		ServiceInstanceID: serviceInstanceID,
+	}, nil
+
 }
 
 func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	var (
-		val        string
-		check      bool
+		bucketName string
 		endPoint   string
 		regnClass  string
-		bucketName string
 		objPath    string
-		accessKey  string
-		secretKey  string
-		authType   string
 	)
 	klog.Infof("CSIControllerServer-CreateVolume... | Request: %v", *req)
 
 	volumeName := sanitizeVolumeID(req.GetName())
 	volumeID := volumeName
+	caps := req.GetVolumeCapabilities()
 
 	if err := cs.Driver.ValidateControllerServiceRequest(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME); err != nil {
 		klog.Infof("Invalid create volume req: %v", *req)
 		return nil, err
 	}
 
-	// Check arguments
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Name missing in request")
 	}
-	caps := req.GetVolumeCapabilities()
 	if caps == nil {
 		return nil, status.Error(codes.InvalidArgument, "Volume Capabilities missing in request")
 	}
@@ -83,6 +107,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 			return nil, status.Error(codes.InvalidArgument, "Block Volume not supported")
 		}
 	}
+
 	// Check for already existing volume name
 	if _, err := getVolByName(req.GetName()); err == nil {
 		klog.Infof("Volume already exists %v", req.GetName())
@@ -96,50 +121,44 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	klog.Infof("Got a request to create volume: %s", volumeID)
-	clinetCreds := &s3client.S3Credentials{}
+
 	params := req.GetParameters()
 	secretMap := req.GetSecrets()
 	fmt.Println("CreateVolume Parameters:\n\t", params)
 	fmt.Println("CreateVolume Secrets:\n\t", secretMap)
 
-	if val, check := secretMap["cos-endpoint"]; check {
-		endPoint = val
+	creds, err := cs.getCredentials(req.GetSecrets())
+	if err != nil {
+		return nil, fmt.Errorf("cannot get credentials: %v", err)
 	}
-	if val, check = secretMap["regn-class"]; check {
-		regnClass = val
-	}
-	if val, check = secretMap["bucket-name"]; check {
-		bucketName = val
-	}
-	if val, check = secretMap["obj-path"]; check {
-		objPath = val
-	}
-	if val, check = secretMap["access-key"]; check {
-		accessKey = val
-		authType = "hmac"
-	}
-	if val, check = secretMap["secret-key"]; check {
-		secretKey = val
+	bucketName = secretMap["bucket-name"]
+
+	if bucketName == "" {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Bucket name is empty"))
 	}
 
-	//(cred *S3Credentials) SetCreds(authtype string, accesskey string, secretkey string, apikey string,  svcid string, iamep string) {
-	clinetCreds.SetCreds(authType, accessKey, secretKey, "", "", "")
+	endPoint = secretMap["cos-endpoint"]
+	regnClass = secretMap["regn-class"]
+	sess := s3client.COSSessionFactory.NewObjectStorageSession(endPoint, regnClass, creds)
 
-	//(client *s3Client) InitSession(endpoint string, class string, creds *s3Credentials)
-	if err := cs.s3Driver.s3client.InitSession(endPoint, regnClass, clinetCreds); err != nil {
-		klog.Error("CreateVolume Unable to initialize backend S3 Client")
-		return nil, status.Error(codes.PermissionDenied, "Unable to initialize backend S3 Clinet")
+	msg, err := sess.CreateBucket(bucketName)
+	if msg != "" {
+		klog.Infof("Info:Create Volume module:", msg)
+	}
+	if err != nil {
+		klog.Error("CreateVolume: Unable to create the bucket: %v", err)
+		return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to create the bucket: %v", bucketName))
 	}
 
-	if err := cs.s3Driver.s3client.CheckBucketAccess(bucketName); err != nil {
-		klog.Error("CreateVolume Unable to access the bucket: %v", err)
-		return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to to access the bucket: %v", bucketName))
+	if err := sess.CheckBucketAccess(bucketName); err != nil {
+		klog.Error("CreateVolume: Unable to access the bucket: %v", err)
+		return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to access the bucket: %v", bucketName))
 	}
 
 	params["cos-endpoint"] = endPoint
 	params["regn-class"] = regnClass
 	params["bucket-name"] = bucketName
-	params["obj-path"] = objPath
+	params["obj-path"] = secretMap["obj-path"]
 
 	klog.Infof("create volume: %v", volumeID)
 
@@ -163,7 +182,6 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	klog.Infof("CSIControllerServer-DeleteVolume... %v", *req)
 
-	// Validate arguments
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
@@ -175,8 +193,6 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	}
 	klog.Infof("Deleting volume %v", volumeID)
 	klog.Infof("deleting volume %v", volumeID)
-	//path := provisionRoot + volumeID
-	//os.RemoveAll(path)
 	delete(s3CosVolumes, volumeID)
 	return &csi.DeleteVolumeResponse{}, nil
 }
@@ -242,4 +258,16 @@ func (csiCS *controllerServer) GetCapacity(ctx context.Context, req *csi.GetCapa
 func (csiCS *controllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
 
 	return nil, status.Error(codes.Unimplemented, "ListVolumes")
+}
+
+//ControllerPublishVolume
+func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+	klog.Infof("CSIControllerServer-ControllerPublishVolume | Request: %v", *req)
+	return nil, status.Error(codes.Unimplemented, "ControllerPublishVolume")
+}
+
+//ControllerUnpublishVolume
+func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
+	klog.Infof("CSIControllerServer-ControllerUnPublishVolume | Request: %v", *req)
+	return nil, status.Error(codes.Unimplemented, "ControllerUnpublishVolume")
 }
