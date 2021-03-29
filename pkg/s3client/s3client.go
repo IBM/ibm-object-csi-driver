@@ -38,13 +38,6 @@ type ObjectStorageCredentials struct {
 	IAMEndpoint string
 }
 
-// ObjectStorageSessionFactory is an interface of an object store session factory
-type ObjectStorageSessionFactory interface {
-
-	// NewObjectStorageBackend method creates a new object store session
-	NewObjectStorageSession(endpoint, region string, creds *ObjectStorageCredentials) ObjectStorageSession
-}
-
 // ObjectStorageSession is an interface of an object store session
 type ObjectStorageSession interface {
 
@@ -62,7 +55,7 @@ type ObjectStorageSession interface {
 }
 
 // COSSessionFactory represents a COS (S3) session factory
-type COSSessionFactory struct{}
+//type COSSessionFactory struct{}
 
 // COSSession represents a COS (S3) session
 type COSSession struct {
@@ -162,7 +155,7 @@ func NewS3Client() (ObjectStorageSession, error) {
 }
 
 // NewObjectStorageSession method creates a new object store session
-func (s *COSSessionFactory) NewObjectStorageSession(endpoint, region string, creds *ObjectStorageCredentials) ObjectStorageSession {
+func NewObjectStorageSession(endpoint, region string, creds *ObjectStorageCredentials) ObjectStorageSession {
 	var sdkCreds *credentials.Credentials
 	if creds.AuthType == "iam" {
 		sdkCreds = ibmiam.NewStaticCredentials(aws.NewConfig(), creds.APIKey, creds.ServiceInstanceID, creds.IAMEndpoint)

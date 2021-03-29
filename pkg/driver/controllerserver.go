@@ -44,8 +44,7 @@ func (cs *controllerServer) getCredentials(secretMap map[string]string) (*s3clie
 		secretKey         string
 		apiKey            string
 		serviceInstanceID string
-		err error
-		authType string
+		authType          string
 	)
 
 	apiKey = secretMap["api-key"]
@@ -83,7 +82,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		bucketName string
 		endPoint   string
 		regnClass  string
-		objPath    string
+		//objPath    string
 	)
 	klog.Infof("CSIControllerServer-CreateVolume... | Request: %v", *req)
 
@@ -139,7 +138,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	endPoint = secretMap["cos-endpoint"]
 	regnClass = secretMap["regn-class"]
-	sess := s3client.COSSessionFactory.NewObjectStorageSession(endPoint, regnClass, creds)
+	sess := s3client.NewObjectStorageSession(endPoint, regnClass, creds)
 
 	msg, err := sess.CreateBucket(bucketName)
 	if msg != "" {
@@ -193,6 +192,24 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	}
 	klog.Infof("Deleting volume %v", volumeID)
 	klog.Infof("deleting volume %v", volumeID)
+	secretMap := req.GetSecrets()
+	fmt.Println("DeleteVolume Secrets:\n\t", secretMap)
+
+	creds, err := cs.getCredentials(req.GetSecrets())
+	if err != nil {
+		return nil, fmt.Errorf("cannot get credentials: %v", err)
+	}
+	bucketName := secretMap["bucket-name"]
+
+	if bucketName == "" {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Bucket name is empty"))
+	}
+
+	endPoint := secretMap["cos-endpoint"]
+	regnClass := secretMap["regn-class"]
+	sess := s3client.NewObjectStorageSession(endPoint, regnClass, creds)
+	sess.DeleteBucket(bucketName)
+
 	delete(s3CosVolumes, volumeID)
 	return &csi.DeleteVolumeResponse{}, nil
 }
