@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"github.com/IBM/satellite-object-storage-plugin/pkg/mounter"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	csicommon "github.com/kubernetes-csi/drivers/pkg/csi-common"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -24,7 +23,6 @@ import (
 )
 
 type nodeServer struct {
-	*csicommon.DefaultNodeServer
 	mux sync.Mutex
 	*s3Driver
 }
@@ -34,6 +32,10 @@ var (
 	newmounter      = mounter.NewMounter
 	fuseunmount     = mounter.FuseUnmount
 	checkMountpoint = checkMount
+	// nodeCaps represents the capability of node service.
+	nodeCaps = []csi.NodeServiceCapability_RPC_Type{
+		csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
+	}
 )
 
 func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
@@ -192,19 +194,19 @@ func (ns *nodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 // NodeGetCapabilities returns the supported capabilities of the node server
 func (ns *nodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
 	// currently there is a single NodeServer capability according to the spec
-	nscap := &csi.NodeServiceCapability{
-		Type: &csi.NodeServiceCapability_Rpc{
-			Rpc: &csi.NodeServiceCapability_RPC{
-				Type: csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
+	klog.V(4).Infof("NodeGetCapabilities: called with args %+v", *req)
+	var caps []*csi.NodeServiceCapability
+	for _, cap := range nodeCaps {
+		c := &csi.NodeServiceCapability{
+			Type: &csi.NodeServiceCapability_Rpc{
+				Rpc: &csi.NodeServiceCapability_RPC{
+					Type: cap,
+				},
 			},
-		},
+		}
+		caps = append(caps, c)
 	}
-
-	return &csi.NodeGetCapabilitiesResponse{
-		Capabilities: []*csi.NodeServiceCapability{
-			nscap,
-		},
-	}, nil
+	return &csi.NodeGetCapabilitiesResponse{Capabilities: caps}, nil
 }
 
 func (ns *nodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
@@ -224,4 +226,16 @@ func checkMount(targetPath string) (bool, error) {
 		}
 	}
 	return notMnt, nil
+}
+
+func (d *nodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+	klog.V(4).Infof("NodeGetInfo: called with args %+v", *req)
+	return &csi.NodeGetInfoResponse{}, status.Error(codes.Unimplemented, "NodeGetInfo is not implemented")
+
+}
+
+func (d *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+	klog.V(4).Infof("NodeGetVolumeStats: called with args %+v", *req)
+	return &csi.NodeGetVolumeStatsResponse{}, status.Error(codes.Unimplemented, "NodeGetVolumeStats is not implemented")
+
 }

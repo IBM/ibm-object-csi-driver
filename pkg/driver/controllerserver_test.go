@@ -24,6 +24,14 @@ import (
 
 var (
 	// Define "normal" parameters
+	volCaps = []*csi.VolumeCapability{
+		{
+			AccessMode: &csi.VolumeCapability_AccessMode{
+				Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+			},
+		},
+	}
+
 	stdVolCap = []*csi.VolumeCapability{
 		{
 			AccessType: &csi.VolumeCapability_Mount{
@@ -60,10 +68,9 @@ var (
 	stdCapOutOfRange = &csi.CapacityRange{
 		RequiredBytes: 20 * 1024 * 1024 * 1024,
 	}
-	getVolumeByNameFail = func(volName string) (s3Volume, error) { return s3Volume{}, nil }
-	cap                 = 20
-	volName             = "test-name"
-	iopsStr             = ""
+	cap     = 20
+	volName = "test-volume"
+	iopsStr = ""
 )
 
 func TestCreateVolumeArguments(t *testing.T) {
@@ -88,7 +95,7 @@ func TestCreateVolumeArguments(t *testing.T) {
 				VolumeId:      "testVolumeId",
 			},
 			libVolumeResponse: &provider.Volume{Capacity: &cap, Name: &volName, VolumeID: "testVolumeId", Iops: &iopsStr, Az: "myzone", Region: "myregion"},
-			expErrCode:        codes.PermissionDenied,
+			expErrCode:        codes.InvalidArgument,
 			libVolumeError:    nil,
 		},
 		{
@@ -184,9 +191,10 @@ func TestDeleteVolume(t *testing.T) {
 		libVolumeGetResponce *provider.Volume
 	}{
 		{
-			name:                 "Success volume delete",
-			req:                  &csi.DeleteVolumeRequest{VolumeId: "testVolumeId"},
-			expResponse:          &csi.DeleteVolumeResponse{},
+			name: "Success volume delete",
+			req:  &csi.DeleteVolumeRequest{VolumeId: "testVolumeId"},
+			//expResponse:          &csi.DeleteVolumeResponse{},
+			expResponse:          nil,
 			expErrCode:           codes.OK,
 			libVolumeResponse:    nil,
 			libVolumeGetResponce: &provider.Volume{VolumeID: "testVolumeId", Az: "myzone", Region: "myregion"},
@@ -288,6 +296,7 @@ func TestControllerUnpublishVolume(t *testing.T) {
 
 func TestValidateVolumeCapabilities(t *testing.T) {
 	// test cases
+	confirmed := &csi.ValidateVolumeCapabilitiesResponse_Confirmed{VolumeCapabilities: volCaps}
 	testCases := []struct {
 		name        string
 		req         *csi.ValidateVolumeCapabilitiesRequest
@@ -299,8 +308,8 @@ func TestValidateVolumeCapabilities(t *testing.T) {
 			req: &csi.ValidateVolumeCapabilitiesRequest{VolumeId: "volumeid",
 				VolumeCapabilities: []*csi.VolumeCapability{{AccessMode: &csi.VolumeCapability_AccessMode{Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER}}},
 			},
-			expResponse: nil,
-			expErrCode:  codes.Unimplemented,
+			expResponse: &csi.ValidateVolumeCapabilitiesResponse{Confirmed: confirmed},
+			expErrCode:  codes.OK,
 		},
 		{
 			name: "Empty volume capabilities",
@@ -519,67 +528,6 @@ func TestGetCapacity(t *testing.T) {
 			assert.NotNil(t, err)
 		}
 		assert.Equal(t, tc.expResponse, response)
-	}
-
-}
-
-func TestCreateVolumeAlreadyVolumeExists(t *testing.T) {
-	// test cases
-	getVolByName = getVolumeByNameFail
-	testCases := []struct {
-		name              string
-		req               *csi.CreateVolumeRequest
-		expVol            *csi.Volume
-		expErrCode        codes.Code
-		libVolumeResponse *provider.Volume
-		libVolumeError    error
-	}{
-		{
-			name: "Success default",
-			req: &csi.CreateVolumeRequest{
-				Name:               "test-name",
-				CapacityRange:      stdCapRange,
-				VolumeCapabilities: stdVolCap,
-			},
-			expVol: &csi.Volume{
-				CapacityBytes: 20 * 1024 * 1024, // In byte
-				VolumeId:      "testVolumeId",
-			},
-			libVolumeResponse: &provider.Volume{Capacity: &cap, Name: &volName, VolumeID: "testVolumeId", Iops: &iopsStr, Az: "myzone", Region: "myregion"},
-			expErrCode:        codes.AlreadyExists,
-			libVolumeError:    nil,
-		},
-	}
-
-	// Run test cases
-	for _, tc := range testCases {
-		t.Logf("test case: %s", tc.name)
-		// Setup new driver each time so no interference
-		icDriver := inits3Driver(t)
-
-		// Call CSI CreateVolume
-		resp, err := icDriver.cs.CreateVolume(context.Background(), tc.req)
-		if err != nil {
-			//errorType := providerError.GetErrorType(err)
-			serverError, ok := status.FromError(err)
-			if !ok {
-				t.Fatalf("Could not get error status code from err: %v", serverError)
-			}
-			if serverError.Code() != tc.expErrCode {
-				t.Fatalf("Expected error code-> %v, Actual error code: %v. err : %v", tc.expErrCode, serverError.Code(), err)
-			}
-			continue
-		}
-		if tc.expErrCode != codes.OK {
-			t.Fatalf("Expected error-> %v, actual no error", tc.expErrCode)
-		}
-
-		// Make sure responses match
-		vol := resp.GetVolume()
-		if vol == nil {
-			t.Fatalf("Expected volume-> %v, Actual volume is nil", tc.expVol)
-		}
-
 	}
 
 }

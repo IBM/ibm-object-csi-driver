@@ -16,7 +16,6 @@ import (
 	"fmt"
 	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	csicommon "github.com/kubernetes-csi/drivers/pkg/csi-common"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -32,11 +31,24 @@ const (
 )
 
 type controllerServer struct {
-	*csicommon.DefaultControllerServer
 	*s3Driver
 }
 
-var getVolByName = getVolumeByName
+var (
+	// volumeCaps represents how the volume could be accessed.
+	// It is SINGLE_NODE_WRITER since EBS volume could only be
+	// attached to a single node at any given time.
+	volumeCaps = []csi.VolumeCapability_AccessMode{
+		{
+			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+		},
+	}
+
+	// controllerCaps represents the capability of controller service
+	controllerCaps = []csi.ControllerServiceCapability_RPC_Type{
+		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
+	}
+)
 
 func (cs *controllerServer) getCredentials(secretMap map[string]string) (*s3client.ObjectStorageCredentials, error) {
 	var (
@@ -90,11 +102,6 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	volumeID := volumeName
 	caps := req.GetVolumeCapabilities()
 
-	if err := cs.Driver.ValidateControllerServiceRequest(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME); err != nil {
-		klog.Infof("Invalid create volume req: %v", *req)
-		return nil, err
-	}
-
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Name missing in request")
 	}
@@ -107,16 +114,10 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		}
 	}
 
-	// Check for already existing volume name
-	if _, err := getVolByName(req.GetName()); err == nil {
-		klog.Infof("Volume already exists %v", req.GetName())
-		return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("Volume with the same name: %s exist", req.GetName()))
-	}
-
 	// Check for maximum available capacity
 	capacity := int64(req.GetCapacityRange().GetRequiredBytes())
 	if capacity >= maxStorageCapacity {
-		return nil, status.Errorf(codes.OutOfRange, fmt.Sprintf("Requested capacity %d exceeds maximum allowed %d", capacity, maxStorageCapacity))
+		return nil, status.Error(codes.OutOfRange, fmt.Sprintf("Requested capacity %d exceeds maximum allowed %d", capacity, maxStorageCapacity))
 	}
 
 	klog.Infof("Got a request to create volume: %s", volumeID)
@@ -128,7 +129,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	creds, err := cs.getCredentials(req.GetSecrets())
 	if err != nil {
-		return nil, fmt.Errorf("cannot get credentials: %v", err)
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
 	}
 	bucketName = secretMap["bucket-name"]
 
@@ -161,12 +162,6 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	klog.Infof("create volume: %v", volumeID)
 
-	s3Vol := s3Volume{}
-	s3Vol.VolName = volumeName
-	s3Vol.VolID = volumeID
-	s3Vol.VolSize = capacity
-	s3CosVolumes[volumeID] = s3Vol
-
 	//COS Endpoint, bucket, access keys will be stored in the csiProvisionerSecretName
 	//The other tunables will be SC Parameters like ibm.io/multireq-max and other
 	return &csi.CreateVolumeResponse{
@@ -186,10 +181,6 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 
-	if err := cs.Driver.ValidateControllerServiceRequest(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME); err != nil {
-		klog.Infof("Invalid delete volume req %v", *req)
-		return nil, err
-	}
 	klog.Infof("Deleting volume %v", volumeID)
 	klog.Infof("deleting volume %v", volumeID)
 	secretMap := req.GetSecrets()
@@ -210,28 +201,50 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	sess := s3client.NewObjectStorageSession(endPoint, regnClass, creds)
 	sess.DeleteBucket(bucketName)
 
-	delete(s3CosVolumes, volumeID)
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
 func (cs *controllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
-	klog.Infof("CSIControllerServer-ValidateVolumeCapabilities | Request: %v", *req)
-
+	klog.V(4).Infof("ValidateVolumeCapabilities: called with args %+v", *req)
 	// Validate Arguments
-	if req.GetVolumeCapabilities() == nil || len(req.GetVolumeCapabilities()) == 0 {
+
+	volumeID := req.GetVolumeId()
+	volCaps := req.GetVolumeCapabilities()
+	if len(volCaps) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume capabilities missing in request")
 	}
 
-	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 
-	if _, ok := s3CosVolumes[req.GetVolumeId()]; !ok {
-		return nil, status.Error(codes.NotFound, "Volume does not exist")
+	var confirmed *csi.ValidateVolumeCapabilitiesResponse_Confirmed
+	if isValidVolumeCapabilities(volCaps) {
+		confirmed = &csi.ValidateVolumeCapabilitiesResponse_Confirmed{VolumeCapabilities: volCaps}
 	}
-	return cs.DefaultControllerServer.ValidateVolumeCapabilities(ctx, req)
+	return &csi.ValidateVolumeCapabilitiesResponse{
+		Confirmed: confirmed,
+	}, nil
 
+}
+
+func isValidVolumeCapabilities(volCaps []*csi.VolumeCapability) bool {
+	hasSupport := func(cap *csi.VolumeCapability) bool {
+		for _, c := range volumeCaps {
+			if c.GetMode() == cap.AccessMode.GetMode() {
+				return true
+			}
+		}
+		return false
+	}
+
+	foundAll := true
+	for _, c := range volCaps {
+		if !hasSupport(c) {
+			foundAll = false
+		}
+	}
+	return foundAll
 }
 
 func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
@@ -287,4 +300,20 @@ func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
 	klog.Infof("CSIControllerServer-ControllerUnPublishVolume | Request: %v", *req)
 	return nil, status.Error(codes.Unimplemented, "ControllerUnpublishVolume")
+}
+
+func (d *controllerServer) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
+	klog.V(4).Infof("ControllerGetCapabilities: called with args %+v", *req)
+	var caps []*csi.ControllerServiceCapability
+	for _, cap := range controllerCaps {
+		c := &csi.ControllerServiceCapability{
+			Type: &csi.ControllerServiceCapability_Rpc{
+				Rpc: &csi.ControllerServiceCapability_RPC{
+					Type: cap,
+				},
+			},
+		}
+		caps = append(caps, c)
+	}
+	return &csi.ControllerGetCapabilitiesResponse{Capabilities: caps}, nil
 }
