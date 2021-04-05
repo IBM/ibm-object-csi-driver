@@ -32,15 +32,14 @@ const (
 
 type controllerServer struct {
 	*s3Driver
+	newSession s3client.ObjectStorageSessionFactory
 }
 
 var (
 	// volumeCaps represents how the volume could be accessed.
-	// It is SINGLE_NODE_WRITER since EBS volume could only be
-	// attached to a single node at any given time.
 	volumeCaps = []csi.VolumeCapability_AccessMode{
 		{
-			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+			Mode: csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
 		},
 	}
 
@@ -139,7 +138,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	endPoint = secretMap["cos-endpoint"]
 	regnClass = secretMap["regn-class"]
-	sess := s3client.NewObjectStorageSession(endPoint, regnClass, creds)
+	sess := cs.newSession.NewObjectStorageSession(endPoint, regnClass, creds)
 
 	msg, err := sess.CreateBucket(bucketName)
 	if msg != "" {
@@ -198,7 +197,7 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 
 	endPoint := secretMap["cos-endpoint"]
 	regnClass := secretMap["regn-class"]
-	sess := s3client.NewObjectStorageSession(endPoint, regnClass, creds)
+	sess := cs.newSession.NewObjectStorageSession(endPoint, regnClass, creds)
 	sess.DeleteBucket(bucketName)
 
 	return &csi.DeleteVolumeResponse{}, nil

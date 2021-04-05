@@ -27,7 +27,7 @@ var (
 	volCaps = []*csi.VolumeCapability{
 		{
 			AccessMode: &csi.VolumeCapability_AccessMode{
-				Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+				Mode: csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
 			},
 		},
 	}
@@ -38,7 +38,7 @@ var (
 				Mount: &csi.VolumeCapability_MountVolume{FsType: "ext2"},
 			},
 			AccessMode: &csi.VolumeCapability_AccessMode{
-				Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+				Mode: csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
 			},
 		},
 	}
@@ -58,7 +58,7 @@ var (
 				Block: &csi.VolumeCapability_BlockVolume{},
 			},
 			AccessMode: &csi.VolumeCapability_AccessMode{
-				Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+				Mode: csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
 			},
 		},
 	}
@@ -306,7 +306,7 @@ func TestValidateVolumeCapabilities(t *testing.T) {
 		{
 			name: "Success validate volume capabilities",
 			req: &csi.ValidateVolumeCapabilitiesRequest{VolumeId: "volumeid",
-				VolumeCapabilities: []*csi.VolumeCapability{{AccessMode: &csi.VolumeCapability_AccessMode{Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER}}},
+				VolumeCapabilities: []*csi.VolumeCapability{{AccessMode: &csi.VolumeCapability_AccessMode{Mode: csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER}}},
 			},
 			expResponse: &csi.ValidateVolumeCapabilitiesResponse{Confirmed: confirmed},
 			expErrCode:  codes.OK,
@@ -322,7 +322,7 @@ func TestValidateVolumeCapabilities(t *testing.T) {
 		{
 			name: "Empty volume ID",
 			req: &csi.ValidateVolumeCapabilitiesRequest{VolumeId: "",
-				VolumeCapabilities: []*csi.VolumeCapability{{AccessMode: &csi.VolumeCapability_AccessMode{Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER}}},
+				VolumeCapabilities: []*csi.VolumeCapability{{AccessMode: &csi.VolumeCapability_AccessMode{Mode: csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER}}},
 			},
 			expResponse: nil,
 			expErrCode:  codes.InvalidArgument,

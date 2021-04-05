@@ -101,6 +101,9 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	if val, check = secretMap["secret-key"]; check {
 		secretKey = val
 	}
+
+	//TODO: IAM Implementation for above code snippet
+
 	fmt.Println("CreateVolume VolumeContext:\n\t", attrib)
 	fmt.Println("CreateVolume Secrets:\n\t", secretMap)
 
