@@ -18,10 +18,11 @@ require (
 	github.com/mitchellh/go-ps v0.0.0-20170309133038-4fdf99ab2936
 	github.com/prometheus/client_golang v1.9.0
 	github.com/stretchr/testify v1.6.1
-	github.ibm.com/alchemy-containers/ibm-csi-common v1.0.0-beta08
 	go.uber.org/zap v1.16.0
 	golang.org/x/net v0.0.0-20200707034311-ab3426394381
 	google.golang.org/grpc v1.27.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
+	k8s.io/klog/v2 v2.8.0
 	k8s.io/kubernetes v1.14.2
+	k8s.io/utils v0.0.0-20210305010621-2afb4311ab10 // indirect
 )
