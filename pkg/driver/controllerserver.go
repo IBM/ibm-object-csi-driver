@@ -36,7 +36,6 @@ type controllerServer struct {
 	*s3Driver
 }
 
-var getVolByName = getVolumeByName
 
 func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 	klog.Infof("CSIControllerServer-ControllerPublishVolume | Request: %v", *req)
@@ -82,11 +81,6 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		if cap.GetBlock() != nil {
 			return nil, status.Error(codes.InvalidArgument, "Block Volume not supported")
 		}
-	}
-	// Check for already existing volume name
-	if _, err := getVolByName(req.GetName()); err == nil {
-		klog.Infof("Volume already exists %v", req.GetName())
-		return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("Volume with the same name: %s exist", req.GetName()))
 	}
 
 	// Check for maximum available capacity
@@ -143,12 +137,6 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	klog.Infof("create volume: %v", volumeID)
 
-	s3Vol := s3Volume{}
-	s3Vol.VolName = volumeName
-	s3Vol.VolID = volumeID
-	s3Vol.VolSize = capacity
-	s3CosVolumes[volumeID] = s3Vol
-
 	//COS Endpoint, bucket, access keys will be stored in the csiProvisionerSecretName
 	//The other tunables will be SC Parameters like ibm.io/multireq-max and other
 	return &csi.CreateVolumeResponse{
@@ -177,7 +165,6 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	klog.Infof("deleting volume %v", volumeID)
 	//path := provisionRoot + volumeID
 	//os.RemoveAll(path)
-	delete(s3CosVolumes, volumeID)
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
@@ -194,9 +181,6 @@ func (cs *controllerServer) ValidateVolumeCapabilities(ctx context.Context, req 
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 
-	if _, ok := s3CosVolumes[req.GetVolumeId()]; !ok {
-		return nil, status.Error(codes.NotFound, "Volume does not exist")
-	}
 	return cs.DefaultControllerServer.ValidateVolumeCapabilities(ctx, req)
 
 }

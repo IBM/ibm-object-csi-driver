@@ -47,27 +47,6 @@ type s3Driver struct {
 	nscap []*csi.NodeServiceCapability
 }
 
-type s3Volume struct {
-	VolName string `json:"volName"`
-	VolID   string `json:"volID"`
-	VolSize int64  `json:"volSize"`
-	VolPath string `json:"volPath"`
-}
-
-type s3VolumeSnapshot struct {
-	Name      string `json:"name"`
-	Id        string `json:"id"`
-	VolID     string `json:"volID"`
-	Path      string `json:"path"`
-	CreateAt  int64  `json:"createAt"`
-	SizeBytes int64  `json:"sizeBytes"`
-}
-
-var (
-	s3CosVolumes         map[string]s3Volume
-	s3CosVolumeSnapshots map[string]s3VolumeSnapshot
-)
-
 func Setups3Driver(lgr *zap.Logger, name, vendorVersion string) (*s3Driver, error) {
 	csiDriver := &s3Driver{}
 	csiDriver.logger = lgr
@@ -147,11 +126,3 @@ func (s3 *s3Driver) Run() {
 	s.Wait()
 }
 
-func getVolumeByName(volName string) (s3Volume, error) {
-	for _, s3CosVol := range s3CosVolumes {
-		if s3CosVol.VolName == volName {
-			return s3CosVol, nil
-		}
-	}
-	return s3Volume{}, fmt.Errorf("volume name %s does not exit in the volumes list", volName)
-}

@@ -10,6 +10,7 @@ replace (
 
 require (
 	github.com/IBM/ibm-cos-sdk-go v1.6.0
+	github.com/IBM/ibmcloud-storage-volume-lib v0.0.2
 	github.com/IBM/ibmcloud-volume-interface v1.0.0-beta4
 	github.com/container-storage-interface/spec v1.2.0
 	github.com/ctrox/csi-s3 v1.1.1
