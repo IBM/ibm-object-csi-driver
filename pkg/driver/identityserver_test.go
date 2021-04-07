@@ -31,7 +31,7 @@ func TestGetPluginInfo(t *testing.T) {
 
 	icDriver := inits3Driver(t)
 	if icDriver == nil {
-		t.Fatalf("Failed to setup IBM CSI Driver")
+		t.Fatalf("Failed to setup CSI Driver")
 	}
 	// Get the plugin response by using driver
 	resp, err := icDriver.ids.GetPluginInfo(context.Background(), &csi.GetPluginInfoRequest{})
@@ -58,7 +58,7 @@ func TestGetPluginInfo(t *testing.T) {
 func TestGetPluginCapabilities(t *testing.T) {
 	icDriver := inits3Driver(t)
 	if icDriver == nil {
-		t.Fatalf("Failed to setup IBM CSI Driver")
+		t.Fatalf("Failed to setup CSI Driver")
 	}
 
 	resp, err := icDriver.ids.GetPluginCapabilities(context.Background(), &csi.GetPluginCapabilitiesRequest{})
@@ -79,7 +79,7 @@ func TestGetPluginCapabilities(t *testing.T) {
 func TestProbe(t *testing.T) {
 	icDriver := inits3Driver(t)
 	if icDriver == nil {
-		t.Fatalf("Failed to setup IBM CSI Driver")
+		t.Fatalf("Failed to setup CSI Driver")
 	}
 
 	_, err := icDriver.ids.Probe(context.Background(), &csi.ProbeRequest{})

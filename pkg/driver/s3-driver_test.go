@@ -64,10 +64,10 @@ func inits3Driver(t *testing.T) *s3Driver {
 	logger, teardown := GetTestLogger(t)
 	defer teardown()
 
-	// Setup the IBM CSI driver
+	// Setup the CSI driver
 	icDriver, err := Setups3Driver(logger, driver, vendorVersion)
 	if err != nil {
-		t.Fatalf("Failed to setup IBM CSI Driver: %v", err)
+		t.Fatalf("Failed to setup CSI Driver: %v", err)
 	}
 
 	icsDriver, err := icDriver.NewS3CosDriver(nodeID, endpoint)

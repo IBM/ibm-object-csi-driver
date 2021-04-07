@@ -61,7 +61,7 @@ func Setups3Driver(lgr *zap.Logger, name, vendorVersion string) (*s3Driver, erro
 	csiDriver.name = name
 	csiDriver.vendorVersion = vendorVersion
 
-	csiDriver.logger.Info("Successfully setup IBM CSI driver")
+	csiDriver.logger.Info("Successfully setup CSI driver")
 	return csiDriver, nil
 }
 
