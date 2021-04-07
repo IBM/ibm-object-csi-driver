@@ -13,6 +13,7 @@ package s3client
 import (
 	"fmt"
 	"github.com/IBM/ibm-cos-sdk-go/aws"
+	"github.com/IBM/ibm-cos-sdk-go/aws/awserr"
 	"github.com/IBM/ibm-cos-sdk-go/aws/credentials"
 	"github.com/IBM/ibm-cos-sdk-go/aws/credentials/ibmiam"
 	"github.com/IBM/ibm-cos-sdk-go/aws/session"
@@ -21,25 +22,54 @@ import (
 	"strings"
 )
 
-type S3Credentials struct {
-	authType    string
-	accessKey   string
-	secretKey   string
-	apiKey      string
-	svcInstID   string
-	iamEndpoint string
+// ObjectStorageCredentials holds credentials for accessing an object storage service
+type ObjectStorageCredentials struct {
+	//AuthType
+	AuthType string
+	// AccessKey is the account identifier in AWS authentication
+	AccessKey string
+	// SecretKey is the "password" in AWS authentication
+	SecretKey string
+	// APIKey is the "password" in IBM IAM authentication
+	APIKey string
+	// ServiceInstanceID is the account identifier in IBM IAM authentication
+	ServiceInstanceID string
+	//IAMEndpoint ...
+	IAMEndpoint string
 }
 
-//S3 Client Interface
-type S3Client interface {
-	InitSession(endpoint string, class string, creds *S3Credentials) error
+// ObjectStorageSession is an interface of an object store session
+type ObjectStorageSession interface {
+
+	// CheckBucketAccess method check that a bucket can be accessed
 	CheckBucketAccess(bucket string) error
+
+	// CheckObjectPathExistence method checks that object-path exists inside bucket
 	CheckObjectPathExistence(bucket, objectpath string) (bool, error)
+
+	// CreateBucket methods creates a new bucket
 	CreateBucket(bucket string) (string, error)
+
+	// DeleteBucket methods deletes a bucket (with all of its objects)
 	DeleteBucket(bucket string) error
 }
 
-type s3IbmApi interface {
+// COSSessionFactory represents a COS (S3) session factory
+type COSSessionFactory struct{}
+
+// ObjectStorageSessionFactory is an interface of an object store session factory
+type ObjectStorageSessionFactory interface {
+
+	// NewObjectStorageBackend method creates a new object store session
+	NewObjectStorageSession(endpoint, region string, creds *ObjectStorageCredentials) ObjectStorageSession
+}
+
+// COSSession represents a COS (S3) session
+type COSSession struct {
+	svc s3API
+}
+
+type s3API interface {
 	HeadBucket(input *s3.HeadBucketInput) (*s3.HeadBucketOutput, error)
 	CreateBucket(input *s3.CreateBucketInput) (*s3.CreateBucketOutput, error)
 	ListObjects(input *s3.ListObjectsInput) (*s3.ListObjectsOutput, error)
@@ -48,38 +78,19 @@ type s3IbmApi interface {
 	DeleteBucket(input *s3.DeleteBucketInput) (*s3.DeleteBucketOutput, error)
 }
 
-func (cred *S3Credentials) SetCreds(authtype string, accesskey string, secretkey string, apikey string, svcid string, iamep string) {
-	cred.authType = authtype
-	cred.accessKey = accesskey
-	cred.secretKey = secretkey
-	cred.apiKey = apikey
-	cred.svcInstID = svcid
-	cred.iamEndpoint = iamep
-}
-
-const (
-	awsS3Type = "awss3"
-)
-
-//IBMS3Client Implements s3Client
-type IbmS3Client struct {
-	s3ApiCred *credentials.Credentials
-	s3API     s3IbmApi
-}
-
-func (client *IbmS3Client) CheckBucketAccess(bucket string) error {
-	_, err := client.s3API.HeadBucket(&s3.HeadBucketInput{
+func (s *COSSession) CheckBucketAccess(bucket string) error {
+	_, err := s.svc.HeadBucket(&s3.HeadBucketInput{
 		Bucket: aws.String(bucket),
 	})
 	return err
 }
 
-func (client *IbmS3Client) CheckObjectPathExistence(bucket string, objectpath string) (bool, error) {
+func (s *COSSession) CheckObjectPathExistence(bucket string, objectpath string) (bool, error) {
 	glog.Infof("CheckObjectPathExistence args:\n\tsbucket: <%s>\n\tobjectpath: <%s>", bucket, objectpath)
 	if strings.HasPrefix(objectpath, "/") {
 		objectpath = strings.TrimPrefix(objectpath, "/")
 	}
-	resp, err := client.s3API.ListObjectsV2(&s3.ListObjectsV2Input{
+	resp, err := s.svc.ListObjectsV2(&s3.ListObjectsV2Input{
 		Bucket:  aws.String(bucket),
 		MaxKeys: aws.Int64(1),
 		Prefix:  aws.String(objectpath),
@@ -97,45 +108,75 @@ func (client *IbmS3Client) CheckObjectPathExistence(bucket string, objectpath st
 	return false, nil
 }
 
-func (client *IbmS3Client) CreateBucket(bucket string) (string, error) {
+func (s *COSSession) CreateBucket(bucket string) (string, error) {
+	_, err := s.svc.CreateBucket(&s3.CreateBucketInput{
+		Bucket: aws.String(bucket),
+	})
+
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "BucketAlreadyOwnedByYou" {
+			glog.Warning(fmt.Sprintf("bucket '%s' already exists", bucket))
+			return fmt.Sprintf("bucket '%s' already exists", bucket), nil
+		}
+		return "", err
+	}
+
 	return "", nil
 }
 
-func (client *IbmS3Client) DeleteBucket(bucket string) error {
-	return nil
+func (s *COSSession) DeleteBucket(bucket string) error {
+	resp, err := s.svc.ListObjects(&s3.ListObjectsInput{
+		Bucket: aws.String(bucket),
+	})
+
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "NoSuchBucket" {
+			glog.Warning(fmt.Sprintf("bucket %s is already deleted", bucket))
+			return nil
+		}
+
+		return fmt.Errorf("cannot list bucket '%s': %v", bucket, err)
+	}
+
+	for _, key := range resp.Contents {
+		_, err = s.svc.DeleteObject(&s3.DeleteObjectInput{
+			Bucket: aws.String(bucket),
+			Key:    key.Key,
+		})
+
+		if err != nil {
+			return fmt.Errorf("cannot delete object %s/%s: %v", bucket, *key.Key, err)
+		}
+	}
+
+	_, err = s.svc.DeleteBucket(&s3.DeleteBucketInput{
+		Bucket: aws.String(bucket),
+	})
+
+	return err
 }
 
-func NewS3Client(client string) (S3Client, error) {
-	glog.Infof("NewS3Client args: :\n\tclient: <%s>", client)
-	switch client {
-	case awsS3Type:
-		return new(IbmS3Client), nil
-	default:
-		return new(IbmS3Client), nil
-	}
+func NewS3Client() (ObjectStorageSession, error) {
+	glog.Infof("NewS3Client")
+	return new(COSSession), nil
 }
 
-func (client *IbmS3Client) InitSession(endpoint string, class string, creds *S3Credentials) error {
-	glog.Infof("AWSS3Client args:\n\tendpoint: <%s>\n\tclass: <%s>", endpoint, class)
-	if creds.authType == "hmac" {
-		client.s3ApiCred = credentials.NewStaticCredentials(creds.accessKey, creds.secretKey, "")
+// NewObjectStorageSession method creates a new object store session
+func (s *COSSessionFactory) NewObjectStorageSession(endpoint, region string, creds *ObjectStorageCredentials) ObjectStorageSession {
+	var sdkCreds *credentials.Credentials
+	if creds.AuthType == "iam" {
+		sdkCreds = ibmiam.NewStaticCredentials(aws.NewConfig(), creds.APIKey, creds.ServiceInstanceID, creds.IAMEndpoint)
+	} else {
+		sdkCreds = credentials.NewStaticCredentials(creds.AccessKey, creds.SecretKey, "")
 	}
-	if creds.authType == "iam" {
-		client.s3ApiCred = ibmiam.NewStaticCredentials(aws.NewConfig(), creds.iamEndpoint, creds.apiKey, creds.svcInstID)
-	}
-
-	//session.New Deprecated use session.NewSession
-	//https://docs.aws.amazon.com/sdk-for-go/api/aws/session/#NewSession
-	//https://docs.aws.amazon.com/sdk-for-go/api/aws/session/#Must
-	sessn := session.Must(session.NewSession(&aws.Config{
+	sess := session.Must(session.NewSession(&aws.Config{
 		S3ForcePathStyle: aws.Bool(true),
 		Endpoint:         aws.String(endpoint),
-		Credentials:      client.s3ApiCred,
-		Region:           aws.String(class),
+		Credentials:      sdkCreds,
+		Region:           aws.String(region),
 	}))
 
-	//https://docs.aws.amazon.com/sdk-for-go/api/service/s3/#New
-	client.s3API = s3.New(sessn)
-
-	return nil
+	return &COSSession{
+		svc: s3.New(sess),
+	}
 }

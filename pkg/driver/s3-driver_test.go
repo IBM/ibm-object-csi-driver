@@ -78,7 +78,6 @@ func TestSetups3Driver(t *testing.T) {
 	driver := inits3Driver(t)
 	assert.NotNil(t, driver)
 
-	// common code
 	// Creating test logger
 	vendorVersion := "test-vendor-version-1.1.2"
 	name := ""
