@@ -32,7 +32,7 @@ import (
 const (
 	PublishInfoRequestID = "request-id"
 	maxStorageCapacity   = gib
-	defaultIAMEndPoint   = "https://iam.bluemix.net"
+	defaultIAMEndPoint   = "https://iam.cloud.ibm.com"
 )
 
 type controllerServer struct {
@@ -61,8 +61,13 @@ func (cs *controllerServer) getCredentials(secretMap map[string]string) (*s3clie
 		apiKey            string
 		serviceInstanceID string
 		authType          string
+		iamEndpoint       string
 	)
 
+	iamEndpoint =  secretMap["iam-endpoint"]
+	if iamEndpoint == "" {
+		iamEndpoint = defaultIAMEndPoint
+	}
 	apiKey = secretMap["api-key"]
 	if apiKey == "" {
 		authType = "hmac"
@@ -88,7 +93,7 @@ func (cs *controllerServer) getCredentials(secretMap map[string]string) (*s3clie
 		AccessKey:         accessKey,
 		SecretKey:         secretKey,
 		APIKey:            apiKey,
-		ServiceInstanceID: serviceInstanceID,
+		IAMEndpoint      : iamEndpoint,
 	}, nil
 
 }
@@ -97,7 +102,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	var (
 		bucketName string
 		endPoint   string
-		regnClass  string
+		locationConstraint  string
 		//objPath    string
 	)
 	klog.Infof("CSIControllerServer-CreateVolume... | Request: %v", *req)
@@ -140,10 +145,15 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	if bucketName == "" {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Bucket name is empty"))
 	}
-
 	endPoint = secretMap["cos-endpoint"]
-	regnClass = secretMap["regn-class"]
-	sess := cs.newSession.NewObjectStorageSession(endPoint, regnClass, creds)
+	if endPoint == "" {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("No endpoint value provided"))
+	}
+	locationConstraint = secretMap["location-constraint"]
+	if locationConstraint == "" {
+                return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("No locationConstraint value provided"))
+        }
+	sess := cs.newSession.NewObjectStorageSession(endPoint, locationConstraint, creds)
 
 	msg, err := sess.CreateBucket(bucketName)
 	if msg != "" {
@@ -158,9 +168,8 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		klog.Error("CreateVolume: Unable to access the bucket: %v", err)
 		return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to access the bucket: %v", bucketName))
 	}
-
 	params["cos-endpoint"] = endPoint
-	params["regn-class"] = regnClass
+	params["location-constraint"] = locationConstraint
 	params["bucket-name"] = bucketName
 	params["obj-path"] = secretMap["obj-path"]
 
@@ -184,7 +193,6 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
-
 	klog.Infof("Deleting volume %v", volumeID)
 	klog.Infof("deleting volume %v", volumeID)
 	secretMap := req.GetSecrets()
@@ -201,8 +209,8 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	}
 
 	endPoint := secretMap["cos-endpoint"]
-	regnClass := secretMap["regn-class"]
-	sess := cs.newSession.NewObjectStorageSession(endPoint, regnClass, creds)
+	locationConstraint := secretMap["location-constraint"]
+	sess := cs.newSession.NewObjectStorageSession(endPoint, locationConstraint, creds)
 	sess.DeleteBucket(bucketName)
 
 	return &csi.DeleteVolumeResponse{}, nil
