@@ -1,22 +1,25 @@
-/*******************************************************************************
- * IBM Confidential
- * OCO Source Materials
- * IBM Cloud Container Service, 5737-D43
- * (C) Copyright IBM Corp. 2019, 2020 All Rights Reserved.
- * The source code for this program is not  published or otherwise divested of
- * its trade secrets, irrespective of what has been deposited with
- * the U.S. Copyright Office.
- ******************************************************************************/
-
+/**
+ * Copyright 2021 IBM Corp.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 //Package driver ...
 package driver
 
 import (
-	"errors"
 	"fmt"
 	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	csicommon "github.com/kubernetes-csi/drivers/pkg/csi-common"
 	"go.uber.org/zap"
 )
 
@@ -32,8 +35,7 @@ const (
 
 type s3Driver struct {
 	name     string
-	driver   *csicommon.CSIDriver
-	s3client s3client.S3Client
+	s3client s3client.ObjectStorageSession
 	endpoint string
 
 	ids           *identityServer
@@ -56,61 +58,44 @@ func Setups3Driver(lgr *zap.Logger, name, vendorVersion string) (*s3Driver, erro
 		return nil, fmt.Errorf("driver name missing")
 	}
 
-	// Setup messaging
-
 	csiDriver.name = name
 	csiDriver.vendorVersion = vendorVersion
 
-	csiDriver.logger.Info("Successfully setup IBM CSI driver")
+	csiDriver.logger.Info("Successfully setup CSI driver")
 	return csiDriver, nil
 }
 
-func (s3 *s3Driver) newIdentityServer(d *csicommon.CSIDriver) *identityServer {
-	s3.logger.Info("-newIdentityServer-")
+func newIdentityServer(d *s3Driver) *identityServer {
 	return &identityServer{
-		DefaultIdentityServer: csicommon.NewDefaultIdentityServer(d),
-		s3Driver:              s3,
+		s3Driver: d,
 	}
 }
 
-func (s3 *s3Driver) newControllerServer(d *csicommon.CSIDriver) *controllerServer {
-	s3.logger.Info("-newControllerServer-")
+func newControllerServer(d *s3Driver) *controllerServer {
 	return &controllerServer{
-		DefaultControllerServer: csicommon.NewDefaultControllerServer(d),
-		s3Driver:                s3,
+		s3Driver: d,
 	}
 }
 
-func (s3 *s3Driver) newNodeServer(d *csicommon.CSIDriver) *nodeServer {
-	s3.logger.Info("-newNodeServer-")
+func newNodeServer(d *s3Driver) *nodeServer {
 	return &nodeServer{
-		DefaultNodeServer: csicommon.NewDefaultNodeServer(d),
-		s3Driver:          s3,
+		s3Driver: d,
 	}
 }
 
 func (csiDriver *s3Driver) NewS3CosDriver(nodeID string, endpoint string) (*s3Driver, error) {
-	driver := csicommon.NewCSIDriver(csiDriver.name, csiDriver.vendorVersion, nodeID)
-	if driver == nil {
-		csiDriver.logger.Error("Failed to initialize CSI Driver")
-		return nil, errors.New("failed to initialize CSI Driver")
-	}
-	s3client, err := s3client.NewS3Client("awss3")
+	s3client, err := s3client.NewS3Client()
 	if err != nil {
 		return nil, err
 	}
 
 	csiDriver.endpoint = endpoint
-	csiDriver.driver = driver
 	csiDriver.s3client = s3client
 
-	csiDriver.driver.AddControllerServiceCapabilities([]csi.ControllerServiceCapability_RPC_Type{csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME})
-	csiDriver.driver.AddVolumeCapabilityAccessModes([]csi.VolumeCapability_AccessMode_Mode{csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER})
-
 	// Create GRPC servers
-	csiDriver.ids = csiDriver.newIdentityServer(csiDriver.driver)
-	csiDriver.ns = csiDriver.newNodeServer(csiDriver.driver)
-	csiDriver.cs = csiDriver.newControllerServer(csiDriver.driver)
+	csiDriver.ids = newIdentityServer(csiDriver)
+	csiDriver.ns = newNodeServer(csiDriver)
+	csiDriver.cs = newControllerServer(csiDriver)
 
 	return csiDriver, nil
 }
@@ -121,7 +106,7 @@ func (s3 *s3Driver) Run() {
 	s3.logger.Info("Version:", zap.Reflect("Driver Version", s3.vendorVersion))
 	// Initialize default library driver
 
-	s := csicommon.NewNonBlockingGRPCServer()
+	s := NewNonBlockingGRPCServer(s3.logger)
 	s.Start(s3.endpoint, s3.ids, s3.cs, s3.ns)
 	s.Wait()
 }

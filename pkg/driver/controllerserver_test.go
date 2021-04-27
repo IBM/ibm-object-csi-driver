@@ -1,12 +1,18 @@
-/*******************************************************************************
- * IBM Confidential
- * OCO Source Materials
- * IBM Cloud Container Service, 5737-D43
- * (C) Copyright IBM Corp. 2019, 2020 All Rights Reserved.
- * The source code for this program is not  published or otherwise divested of
- * its trade secrets, irrespective of what has been deposited with
- * the U.S. Copyright Office.
- ******************************************************************************/
+/**
+ * Copyright 2021 IBM Corp.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 //Package driver ...
 package driver
@@ -24,13 +30,21 @@ import (
 
 var (
 	// Define "normal" parameters
+	volCaps = []*csi.VolumeCapability{
+		{
+			AccessMode: &csi.VolumeCapability_AccessMode{
+				Mode: csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
+			},
+		},
+	}
+
 	stdVolCap = []*csi.VolumeCapability{
 		{
 			AccessType: &csi.VolumeCapability_Mount{
 				Mount: &csi.VolumeCapability_MountVolume{FsType: "ext2"},
 			},
 			AccessMode: &csi.VolumeCapability_AccessMode{
-				Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+				Mode: csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
 			},
 		},
 	}
@@ -50,7 +64,7 @@ var (
 				Block: &csi.VolumeCapability_BlockVolume{},
 			},
 			AccessMode: &csi.VolumeCapability_AccessMode{
-				Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+				Mode: csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
 			},
 		},
 	}
@@ -60,9 +74,9 @@ var (
 	stdCapOutOfRange = &csi.CapacityRange{
 		RequiredBytes: 20 * 1024 * 1024 * 1024,
 	}
-	cap                 = 20
-	volName             = "test-name"
-	iopsStr             = ""
+	cap     = 20
+	volName = "test-volume"
+	iopsStr = ""
 )
 
 func TestCreateVolumeArguments(t *testing.T) {
@@ -87,7 +101,7 @@ func TestCreateVolumeArguments(t *testing.T) {
 				VolumeId:      "testVolumeId",
 			},
 			libVolumeResponse: &provider.Volume{Capacity: &cap, Name: &volName, VolumeID: "testVolumeId", Iops: &iopsStr, Az: "myzone", Region: "myregion"},
-			expErrCode:        codes.PermissionDenied,
+			expErrCode:        codes.InvalidArgument,
 			libVolumeError:    nil,
 		},
 		{
@@ -183,9 +197,10 @@ func TestDeleteVolume(t *testing.T) {
 		libVolumeGetResponce *provider.Volume
 	}{
 		{
-			name:                 "Success volume delete",
-			req:                  &csi.DeleteVolumeRequest{VolumeId: "testVolumeId"},
-			expResponse:          &csi.DeleteVolumeResponse{},
+			name: "Success volume delete",
+			req:  &csi.DeleteVolumeRequest{VolumeId: "testVolumeId"},
+			//expResponse:          &csi.DeleteVolumeResponse{},
+			expResponse:          nil,
 			expErrCode:           codes.OK,
 			libVolumeResponse:    nil,
 			libVolumeGetResponce: &provider.Volume{VolumeID: "testVolumeId", Az: "myzone", Region: "myregion"},
@@ -287,6 +302,7 @@ func TestControllerUnpublishVolume(t *testing.T) {
 
 func TestValidateVolumeCapabilities(t *testing.T) {
 	// test cases
+	confirmed := &csi.ValidateVolumeCapabilitiesResponse_Confirmed{VolumeCapabilities: volCaps}
 	testCases := []struct {
 		name        string
 		req         *csi.ValidateVolumeCapabilitiesRequest
@@ -296,10 +312,10 @@ func TestValidateVolumeCapabilities(t *testing.T) {
 		{
 			name: "Success validate volume capabilities",
 			req: &csi.ValidateVolumeCapabilitiesRequest{VolumeId: "volumeid",
-				VolumeCapabilities: []*csi.VolumeCapability{{AccessMode: &csi.VolumeCapability_AccessMode{Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER}}},
+				VolumeCapabilities: []*csi.VolumeCapability{{AccessMode: &csi.VolumeCapability_AccessMode{Mode: csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER}}},
 			},
-			expResponse: nil,
-			expErrCode:  codes.Unimplemented,
+			expResponse: &csi.ValidateVolumeCapabilitiesResponse{Confirmed: confirmed},
+			expErrCode:  codes.OK,
 		},
 		{
 			name: "Empty volume capabilities",
@@ -312,7 +328,7 @@ func TestValidateVolumeCapabilities(t *testing.T) {
 		{
 			name: "Empty volume ID",
 			req: &csi.ValidateVolumeCapabilitiesRequest{VolumeId: "",
-				VolumeCapabilities: []*csi.VolumeCapability{{AccessMode: &csi.VolumeCapability_AccessMode{Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER}}},
+				VolumeCapabilities: []*csi.VolumeCapability{{AccessMode: &csi.VolumeCapability_AccessMode{Mode: csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER}}},
 			},
 			expResponse: nil,
 			expErrCode:  codes.InvalidArgument,
@@ -521,4 +537,3 @@ func TestGetCapacity(t *testing.T) {
 	}
 
 }
-
