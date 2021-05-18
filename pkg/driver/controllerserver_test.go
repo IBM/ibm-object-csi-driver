@@ -14,19 +14,29 @@
  * limitations under the License.
  */
 
-//Package driver ...
+ //Package driver ...
 package driver
 
 import (
 	providerError "github.com/IBM/ibmcloud-storage-volume-lib/lib/utils"
 	"github.com/IBM/ibmcloud-volume-interface/lib/provider"
+	fakeclient "github.com/IBM/satellite-object-storage-plugin/pkg/driver/fake/s3client"
+	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"reflect"
 	"testing"
 )
+
+func getCustomControllerServer(csiDriver *s3Driver, factory s3client.ObjectStorageSessionFactory) *controllerServer {
+	return &controllerServer{
+		s3Driver:   csiDriver,
+		newSession: factory,
+	}
+}
 
 var (
 	// Define "normal" parameters
@@ -95,13 +105,19 @@ func TestCreateVolumeArguments(t *testing.T) {
 				Name:               volName,
 				CapacityRange:      stdCapRange,
 				VolumeCapabilities: stdVolCap,
+				Secrets: map[string]string{"access-key": "xxx",
+					"secret-key":   "yyy",
+					"bucket-name":  "test-bucket",
+					"location-constraint":   "test-region",
+					"cos-endpoint": "test-endpoint",
+				},
 			},
 			expVol: &csi.Volume{
 				CapacityBytes: 20 * 1024 * 1024, // In byte
 				VolumeId:      "testVolumeId",
 			},
 			libVolumeResponse: &provider.Volume{Capacity: &cap, Name: &volName, VolumeID: "testVolumeId", Iops: &iopsStr, Az: "myzone", Region: "myregion"},
-			expErrCode:        codes.InvalidArgument,
+			expErrCode:        codes.OK,
 			libVolumeError:    nil,
 		},
 		{
@@ -152,6 +168,69 @@ func TestCreateVolumeArguments(t *testing.T) {
 			expErrCode:        codes.OutOfRange,
 			libVolumeError:    nil,
 		},
+		{
+			name: "Empty Secret Key",
+			req: &csi.CreateVolumeRequest{
+				Name:               volName,
+				CapacityRange:      stdCapRange,
+				VolumeCapabilities: stdVolCap,
+				Secrets: map[string]string{"access-key": "xxx",
+					"secret-key":   "",
+					"bucket-name":  "test-bucket",
+					"location-constraint":   "test-region",
+					"cos-endpoint": "test-endpoint",
+				},
+			},
+			expVol: &csi.Volume{
+				CapacityBytes: 20 * 1024 * 1024, // In byte
+				VolumeId:      "testVolumeId",
+			},
+			libVolumeResponse: &provider.Volume{Capacity: &cap, Name: &volName, VolumeID: "testVolumeId", Iops: &iopsStr, Az: "myzone", Region: "myregion"},
+			expErrCode:        codes.InvalidArgument,
+			libVolumeError:    nil,
+		},
+		{
+			name: "Empty Bucket Name",
+			req: &csi.CreateVolumeRequest{
+				Name:               volName,
+				CapacityRange:      stdCapRange,
+				VolumeCapabilities: stdVolCap,
+				Secrets: map[string]string{"access-key": "xxx",
+					"secret-key":   "xxx",
+					"bucket-name":  "",
+					"location-constraint":   "test-region",
+					"cos-endpoint": "test-endpoint",
+				},
+			},
+			expVol: &csi.Volume{
+				CapacityBytes: 20 * 1024 * 1024, // In byte
+				VolumeId:      "testVolumeId",
+			},
+			libVolumeResponse: &provider.Volume{Capacity: &cap, Name: &volName, VolumeID: "testVolumeId", Iops: &iopsStr, Az: "myzone", Region: "myregion"},
+			expErrCode:        codes.InvalidArgument,
+			libVolumeError:    nil,
+		},
+		{
+			name: "Empty Access Key",
+			req: &csi.CreateVolumeRequest{
+				Name:               volName,
+				CapacityRange:      stdCapRange,
+				VolumeCapabilities: stdVolCap,
+				Secrets: map[string]string{"access-key": "",
+					"secret-key":   "xxx",
+					"bucket-name":  "test-bucket",
+					"location-constraint":   "test-region",
+					"cos-endpoint": "test-endpoint",
+				},
+			},
+			expVol: &csi.Volume{
+				CapacityBytes: 20 * 1024 * 1024, // In byte
+				VolumeId:      "testVolumeId",
+			},
+			libVolumeResponse: &provider.Volume{Capacity: &cap, Name: &volName, VolumeID: "testVolumeId", Iops: &iopsStr, Az: "myzone", Region: "myregion"},
+			expErrCode:        codes.InvalidArgument,
+			libVolumeError:    nil,
+		},
 	}
 
 	// Run test cases
@@ -159,9 +238,10 @@ func TestCreateVolumeArguments(t *testing.T) {
 		t.Logf("test case: %s", tc.name)
 		// Setup new driver each time so no interference
 		icDriver := inits3Driver(t)
+		cs := getCustomControllerServer(icDriver, &fakeclient.ObjectStorageSessionFactory{})
 
 		// Call CSI CreateVolume
-		resp, err := icDriver.cs.CreateVolume(context.Background(), tc.req)
+		resp, err := cs.CreateVolume(context.Background(), tc.req)
 		if err != nil {
 			//errorType := providerError.GetErrorType(err)
 			serverError, ok := status.FromError(err)
@@ -198,9 +278,15 @@ func TestDeleteVolume(t *testing.T) {
 	}{
 		{
 			name: "Success volume delete",
-			req:  &csi.DeleteVolumeRequest{VolumeId: "testVolumeId"},
-			//expResponse:          &csi.DeleteVolumeResponse{},
-			expResponse:          nil,
+			req: &csi.DeleteVolumeRequest{VolumeId: "testVolumeId",
+				Secrets: map[string]string{"access-key": "xxx",
+					"secret-key":   "xxx",
+					"bucket-name":  "test-bucket",
+					"location-constraint":   "test-region",
+					"cos-endpoint": "test-endpoint",
+				},
+			},
+			expResponse:          &csi.DeleteVolumeResponse{},
 			expErrCode:           codes.OK,
 			libVolumeResponse:    nil,
 			libVolumeGetResponce: &provider.Volume{VolumeID: "testVolumeId", Az: "myzone", Region: "myregion"},
@@ -221,6 +307,38 @@ func TestDeleteVolume(t *testing.T) {
 			libVolumeResponse:    providerError.Message{Code: "FailedToDeleteVolume", Description: "Volume deletion failed", Type: providerError.DeletionFailed},
 			libVolumeGetResponce: &provider.Volume{VolumeID: "testVolumeId", Az: "myzone", Region: "myregion"},
 		},
+		{
+			name: "Empty bucket name",
+			req: &csi.DeleteVolumeRequest{VolumeId: "testVolumeId",
+				Secrets: map[string]string{"access-key": "xxx",
+					"secret-key":   "xxx",
+					"bucket-name":  "",
+					"location-constraint":   "test-region",
+					"cos-endpoint": "test-endpoint",
+				},
+			},
+			//expResponse:          &csi.DeleteVolumeResponse{},
+			expResponse:          nil,
+			expErrCode:           codes.OK,
+			libVolumeResponse:    nil,
+			libVolumeGetResponce: &provider.Volume{VolumeID: "testVolumeId", Az: "myzone", Region: "myregion"},
+		},
+		{
+			name: "Empty service instance id",
+			req: &csi.DeleteVolumeRequest{VolumeId: "testVolumeId",
+				Secrets: map[string]string{"api-key": "xxx",
+					"s-id":         "",
+					"bucket-name":  "",
+					"location-constraint":   "test-region",
+					"cos-endpoint": "test-endpoint",
+				},
+			},
+			//expResponse:          &csi.DeleteVolumeResponse{},
+			expResponse:          nil,
+			expErrCode:           codes.InvalidArgument,
+			libVolumeResponse:    nil,
+			libVolumeGetResponce: &provider.Volume{VolumeID: "testVolumeId", Az: "myzone", Region: "myregion"},
+		},
 	}
 
 	// Run test cases
@@ -228,8 +346,8 @@ func TestDeleteVolume(t *testing.T) {
 		t.Logf("test case: %s", tc.name)
 		// Setup new driver each time so no interference
 		icDriver := inits3Driver(t)
-
-		response, err := icDriver.cs.DeleteVolume(context.Background(), tc.req)
+		cs := getCustomControllerServer(icDriver, &fakeclient.ObjectStorageSessionFactory{})
+		response, err := cs.DeleteVolume(context.Background(), tc.req)
 		if tc.expErrCode != codes.OK {
 			t.Logf("Error code")
 			assert.NotNil(t, err)
@@ -536,4 +654,43 @@ func TestGetCapacity(t *testing.T) {
 		assert.Equal(t, tc.expResponse, response)
 	}
 
+}
+
+func TestControllerGetCapabilities(t *testing.T) {
+	// test cases
+	testCases := []struct {
+		name        string
+		req         *csi.ControllerGetCapabilitiesRequest
+		expResponse *csi.ControllerGetCapabilitiesResponse
+		expErrCode  codes.Code
+	}{
+		{
+			name: "Success controller get capabilities",
+			req:  &csi.ControllerGetCapabilitiesRequest{},
+			expResponse: &csi.ControllerGetCapabilitiesResponse{
+				Capabilities: []*csi.ControllerServiceCapability{
+					{Type: &csi.ControllerServiceCapability_Rpc{Rpc: &csi.ControllerServiceCapability_RPC{Type: csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME}}},
+				},
+			},
+			expErrCode: codes.OK,
+		},
+	}
+
+	// Run test cases
+	for _, tc := range testCases {
+		t.Logf("test case: %s", tc.name)
+		// Setup new driver each time so no interference
+		icDriver := inits3Driver(t)
+
+		// Call CSI CreateVolume
+		response, err := icDriver.cs.ControllerGetCapabilities(context.Background(), tc.req)
+		if tc.expErrCode != codes.OK {
+			t.Logf("Error code")
+			assert.NotNil(t, err)
+		}
+
+		if !reflect.DeepEqual(response, tc.expResponse) {
+			assert.Equal(t, tc.expResponse, response)
+		}
+	}
 }
