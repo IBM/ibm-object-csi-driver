@@ -1,0 +1,3 @@
+[submodule "release-tools"]
+	path = release-tools
+	url = https://github.com/kubernetes-csi/csi-release-tools.git
