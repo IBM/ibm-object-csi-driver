@@ -329,3 +329,8 @@ func (d *controllerServer) ControllerGetCapabilities(ctx context.Context, req *c
 	}
 	return &csi.ControllerGetCapabilitiesResponse{Capabilities: caps}, nil
 }
+
+
+func (d *controllerServer) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "ControllerUnpublishVolume")
+}
