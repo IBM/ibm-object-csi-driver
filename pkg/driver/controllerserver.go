@@ -168,10 +168,10 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		klog.Error("CreateVolume: Unable to access the bucket: %v", err)
 		return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to access the bucket: %v", bucketName))
 	}
-	params["cos-endpoint"] = endPoint
+	/*params["cos-endpoint"] = endPoint
 	params["location-constraint"] = locationConstraint
 	params["bucket-name"] = bucketName
-	params["obj-path"] = secretMap["obj-path"]
+	params["obj-path"] = secretMap["obj-path"]*/
 
 	klog.Infof("create volume: %v", volumeID)
 
@@ -328,4 +328,9 @@ func (d *controllerServer) ControllerGetCapabilities(ctx context.Context, req *c
 		caps = append(caps, c)
 	}
 	return &csi.ControllerGetCapabilitiesResponse{Capabilities: caps}, nil
+}
+
+
+func (d *controllerServer) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "ControllerUnpublishVolume")
 }

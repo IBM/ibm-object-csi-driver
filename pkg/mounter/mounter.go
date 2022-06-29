@@ -2,7 +2,7 @@ package mounter
 
 import (
 	"fmt"
-	"k8s.io/kubernetes/pkg/util/mount"
+	mount "k8s.io/mount-utils"
 	"os/exec"
 	"time"
 )
