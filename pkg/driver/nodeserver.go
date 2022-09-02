@@ -23,14 +23,31 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/volume/util/fs"
 	mount "k8s.io/mount-utils"
 	"os"
 	"sync"
 )
 
+const (
+	DefaultVolumesPerNode = 4
+)
+
 type nodeServer struct {
 	mux sync.Mutex
 	*s3Driver
+	Stats  statsUtils
+	NodeID string
+}
+
+type statsUtils interface {
+	FSInfo(path string) (int64, int64, int64, int64, int64, int64, error)
+	IsBlockDevice(devicePath string) (bool, error)
+	DeviceInfo(devicePath string) (int64, error)
+	IsDevicePathNotExist(devicePath string) bool
+}
+
+type VolumeStatsUtils struct {
 }
 
 var (
@@ -237,14 +254,52 @@ func checkMount(targetPath string) (bool, error) {
 	return notMnt, nil
 }
 
-func (d *nodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+func (ns *nodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	klog.V(4).Infof("NodeGetInfo: called with args %+v", *req)
-	return &csi.NodeGetInfoResponse{}, status.Error(codes.Unimplemented, "NodeGetInfo is not implemented")
+
+	resp := &csi.NodeGetInfoResponse{
+		NodeId:            ns.NodeID,
+		MaxVolumesPerNode: DefaultVolumesPerNode,
+	}
+	return resp, nil
 
 }
 
-func (d *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-	klog.V(4).Infof("NodeGetVolumeStats: called with args %+v", *req)
-	return &csi.NodeGetVolumeStatsResponse{}, status.Error(codes.Unimplemented, "NodeGetVolumeStats is not implemented")
+func (ns *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
 
+	klog.V(1).Infof("NodeGetVolumeStats: called with args %+v", *req)
+
+	if req.VolumePath == "" {
+		return nil, status.Error(codes.NotFound, "Path Doesn't exist")
+	}
+
+	available, capacity, usage, inodes, inodesFree, inodesUsed, err := ns.Stats.FSInfo(req.VolumePath)
+
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &csi.NodeGetVolumeStatsResponse{
+		Usage: []*csi.VolumeUsage{
+			{
+				Available: available,
+				Total:     capacity,
+				Used:      usage,
+				Unit:      csi.VolumeUsage_BYTES,
+			},
+			{
+				Available: inodesFree,
+				Total:     inodes,
+				Used:      inodesUsed,
+				Unit:      csi.VolumeUsage_INODES,
+			},
+		},
+	}
+
+	return resp, nil
+
+}
+
+func (su *VolumeStatsUtils) FSInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
+	return fs.Info(path)
 }

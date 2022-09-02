@@ -53,10 +53,11 @@ func Setups3Driver(lgr *zap.Logger, name, vendorVersion string) (*s3Driver, erro
 	csiDriver := &s3Driver{}
 	csiDriver.logger = lgr
 	csiDriver.logger.Info("S3CSIDriver-SetupS3CSIDriver setting up S3 CSI Driver...")
-
+	fmt.Println(name)
 	if name == "" {
 		return nil, fmt.Errorf("driver name missing")
 	}
+	fmt.Println(name)
 
 	csiDriver.name = name
 	csiDriver.vendorVersion = vendorVersion
@@ -77,9 +78,10 @@ func newControllerServer(d *s3Driver) *controllerServer {
 	}
 }
 
-func newNodeServer(d *s3Driver) *nodeServer {
+func newNodeServer(d *s3Driver, nodeID string) *nodeServer {
 	return &nodeServer{
 		s3Driver: d,
+		NodeID:   nodeID,
 	}
 }
 
@@ -94,7 +96,7 @@ func (csiDriver *s3Driver) NewS3CosDriver(nodeID string, endpoint string) (*s3Dr
 
 	// Create GRPC servers
 	csiDriver.ids = newIdentityServer(csiDriver)
-	csiDriver.ns = newNodeServer(csiDriver)
+	csiDriver.ns = newNodeServer(csiDriver, nodeID)
 	csiDriver.cs = newControllerServer(csiDriver)
 
 	return csiDriver, nil
@@ -110,4 +112,3 @@ func (s3 *s3Driver) Run() {
 	s.Start(s3.endpoint, s3.ids, s3.cs, s3.ns)
 	s.Wait()
 }
-

@@ -80,7 +80,7 @@ spec:
             capabilities:
               add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
-          image: nkkashyap/cos-csi-s3-driver:v0.0.1alpha
+          image: ibm/satellite-object-storage-plugin
           args:
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--nodeid=$(KUBE_NODE_NAME)"
@@ -94,7 +94,7 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
-          imagePullPolicy: Always
+          imagePullPolicy: Never
           securityContext:
             privileged: true
           volumeMounts:

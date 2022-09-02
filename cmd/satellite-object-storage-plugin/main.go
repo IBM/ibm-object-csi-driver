@@ -19,6 +19,12 @@ package main
 
 import (
 	"flag"
+	"log"
+	"math/rand"
+	"net/http"
+	"os"
+	"time"
+
 	libMetrics "github.com/IBM/ibmcloud-volume-interface/lib/metrics"
 	csiConfig "github.com/IBM/satellite-object-storage-plugin/config"
 	driver "github.com/IBM/satellite-object-storage-plugin/pkg/driver"
@@ -26,11 +32,6 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
-	"log"
-	"math/rand"
-	"net/http"
-	"os"
-	"time"
 )
 
 var (
@@ -39,7 +40,7 @@ var (
 	fileLogger     *zap.Logger
 	logfile        = flag.String("log", "", "log file")
 	metricsAddress = flag.String("metrics-address", "0.0.0.0:9080", "Metrics address")
-	vendorVersion  string
+	// vendorVersion  string
 )
 
 func getFromEnv(key string, defaultVal string) string {
@@ -91,14 +92,14 @@ func main() {
 }
 
 func handle(logger *zap.Logger) {
-	if vendorVersion == "" {
-		logger.Fatal("CSI driver vendorVersion must be set at compile time")
-	}
-	logger.Info("S3 driver version", zap.Reflect("DriverVersion", vendorVersion))
+	// if *vendorVersion == "" {
+	// 	logger.Fatal("CSI driver vendorVersion must be set at compile time")
+	// }
+	// logger.Info("S3 driver version", zap.Reflect("DriverVersion", vendorVersion))
 	// TODO
 	//logger.Info("Controller Mutex Lock enabled", zap.Bool("LockEnabled", *utils.LockEnabled))
 
-	csiDriver, err := driver.Setups3Driver(logger, csiConfig.CSIPluginGithubName, vendorVersion)
+	csiDriver, err := driver.Setups3Driver(logger, csiConfig.CSIPluginGithubName, csiConfig.VendorVersion)
 	if err != nil {
 		log.Fatal(err)
 		os.Exit(1)

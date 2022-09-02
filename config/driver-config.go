@@ -21,4 +21,5 @@ const (
 
 	// CSIPluginGithubName ...
 	CSIPluginGithubName = "satellite-object-storage-plugin"
+	VendorVersion       = "1.1.2"
 )

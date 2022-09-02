@@ -64,7 +64,7 @@ func (cs *controllerServer) getCredentials(secretMap map[string]string) (*s3clie
 		iamEndpoint       string
 	)
 
-	iamEndpoint =  secretMap["iam-endpoint"]
+	iamEndpoint = secretMap["iam-endpoint"]
 	if iamEndpoint == "" {
 		iamEndpoint = defaultIAMEndPoint
 	}
@@ -89,20 +89,20 @@ func (cs *controllerServer) getCredentials(secretMap map[string]string) (*s3clie
 	}
 
 	return &s3client.ObjectStorageCredentials{
-		AuthType:          authType,
-		AccessKey:         accessKey,
-		SecretKey:         secretKey,
-		APIKey:            apiKey,
-		IAMEndpoint      : iamEndpoint,
+		AuthType:    authType,
+		AccessKey:   accessKey,
+		SecretKey:   secretKey,
+		APIKey:      apiKey,
+		IAMEndpoint: iamEndpoint,
 	}, nil
 
 }
 
 func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	var (
-		bucketName string
-		endPoint   string
-		locationConstraint  string
+		bucketName         string
+		endPoint           string
+		locationConstraint string
 		//objPath    string
 	)
 	klog.Infof("CSIControllerServer-CreateVolume... | Request: %v", *req)
@@ -151,8 +151,8 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 	locationConstraint = secretMap["location-constraint"]
 	if locationConstraint == "" {
-                return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("No locationConstraint value provided"))
-        }
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("No locationConstraint value provided"))
+	}
 	sess := cs.newSession.NewObjectStorageSession(endPoint, locationConstraint, creds)
 
 	msg, err := sess.CreateBucket(bucketName)
@@ -329,7 +329,6 @@ func (d *controllerServer) ControllerGetCapabilities(ctx context.Context, req *c
 	}
 	return &csi.ControllerGetCapabilitiesResponse{Capabilities: caps}, nil
 }
-
 
 func (d *controllerServer) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "ControllerUnpublishVolume")
