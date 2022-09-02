@@ -87,7 +87,7 @@ spec:
             - mountPath: /csi
               name: socket-dir
         - name: csi-s3-provisioner
-          image: nkkashyap/cos-csi-s3-driver:v0.0.1alpha
+          image: ibm/satellite-object-storage-plugin
           args:
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--nodeid=$(NODE_ID)"
@@ -100,7 +100,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-          imagePullPolicy: "Always"
+          imagePullPolicy: "Never"
           volumeMounts:
             - mountPath: /csi
               name: socket-dir
