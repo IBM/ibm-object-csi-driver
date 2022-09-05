@@ -38,6 +38,7 @@ const (
 type controllerServer struct {
 	*s3Driver
 	newSession s3client.ObjectStorageSessionFactory
+	cosSession s3client.COSSessionFactory
 }
 
 var (
@@ -134,6 +135,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	params := req.GetParameters()
 	secretMap := req.GetSecrets()
 	fmt.Println("CreateVolume Parameters:\n\t", params)
+	//TODO: get rid of this call since it is exposing secrets
 	fmt.Println("CreateVolume Secrets:\n\t", secretMap)
 
 	creds, err := cs.getCredentials(req.GetSecrets())
@@ -153,7 +155,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	if locationConstraint == "" {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("No locationConstraint value provided"))
 	}
-	sess := cs.newSession.NewObjectStorageSession(endPoint, locationConstraint, creds)
+	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds)
 
 	msg, err := sess.CreateBucket(bucketName)
 	if msg != "" {
@@ -196,6 +198,7 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	klog.Infof("Deleting volume %v", volumeID)
 	klog.Infof("deleting volume %v", volumeID)
 	secretMap := req.GetSecrets()
+	//TODO: get rid of this call since it is exposing secrets
 	fmt.Println("DeleteVolume Secrets:\n\t", secretMap)
 
 	creds, err := cs.getCredentials(req.GetSecrets())
@@ -210,7 +213,7 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 
 	endPoint := secretMap["cos-endpoint"]
 	locationConstraint := secretMap["location-constraint"]
-	sess := cs.newSession.NewObjectStorageSession(endPoint, locationConstraint, creds)
+	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds)
 	sess.DeleteBucket(bucketName)
 
 	return &csi.DeleteVolumeResponse{}, nil
