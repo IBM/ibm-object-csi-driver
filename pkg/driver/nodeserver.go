@@ -17,20 +17,37 @@ package driver
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/IBM/satellite-object-storage-plugin/pkg/mounter"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/util/mount"
-	"os"
-	"sync"
+	"k8s.io/kubernetes/pkg/volume/util/fs"
+	mount "k8s.io/mount-utils"
 )
 
+const (
+	DefaultVolumesPerNode = 4
+)
+
+// Implements Node Server csi.NodeServer
 type nodeServer struct {
-	mux sync.Mutex
 	*s3Driver
+	Stats  statsUtils
+	NodeID string
+}
+
+type statsUtils interface {
+	FSInfo(path string) (int64, int64, int64, int64, int64, int64, error)
+	IsBlockDevice(devicePath string) (bool, error)
+	DeviceInfo(devicePath string) (int64, error)
+	IsDevicePathNotExist(devicePath string) bool
+}
+
+type VolumeStatsUtils struct {
 }
 
 var (
@@ -44,6 +61,41 @@ var (
 	}
 )
 
+func (ns *nodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
+	klog.V(2).Infof("CSINodeServer-NodeStageVolume: Request %v", *req)
+
+	volumeID := req.GetVolumeId()
+	stagingTargetPath := req.GetStagingTargetPath()
+
+	// Check arguments
+	if len(volumeID) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
+	}
+
+	if len(stagingTargetPath) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
+	}
+
+	return &csi.NodeStageVolumeResponse{}, nil
+}
+
+func (ns *nodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
+	klog.V(2).Infof("CSINodeServer-NodeUnstageVolume: Request %v", *req)
+
+	volumeID := req.GetVolumeId()
+	stagingTargetPath := req.GetStagingTargetPath()
+
+	// Check arguments
+	if len(volumeID) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
+	}
+	if len(stagingTargetPath) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
+	}
+
+	return &csi.NodeUnstageVolumeResponse{}, nil
+}
+
 func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	var (
 		val       string
@@ -51,11 +103,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		accessKey string
 		secretKey string
 	)
-
-	klog.Infof("CSINodeServer-NodePublishVolume...| Request %v", *req)
-
-	ns.mux.Lock()
-	defer ns.mux.Unlock()
+	klog.V(2).Infof("CSINodeServer-NodePublishVolume: Request %v", *req)
 
 	volumeID := req.GetVolumeId()
 
@@ -66,12 +114,6 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	targetPath := req.GetTargetPath()
 	if len(targetPath) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
-	}
-
-	stagingTargetPath := req.GetStagingTargetPath()
-
-	if len(stagingTargetPath) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "Staging Target path missing in request")
 	}
 
 	// Check arguments
@@ -97,7 +139,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	attrib := req.GetVolumeContext()
 	mountFlags := req.GetVolumeCapability().GetMount().GetMountFlags()
 
-	klog.Infof("target %v\ndevice %v\nreadonly %v\nvolumeId %v\nattributes %v\nmountflags %v\n",
+	klog.V(2).Infof("target %v\ndevice %v\nreadonly %v\nvolumeId %v\nattributes %v\nmountflags %v\n",
 		targetPath, deviceID, readOnly, volumeID, attrib, mountFlags)
 
 	secretMap := req.GetSecrets()
@@ -132,9 +174,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 }
 
 func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
-	klog.Infof("CSINodeServer-NodeUnpublishVolume...| Request: %v", *req)
-	ns.mux.Lock()
-	defer ns.mux.Unlock()
+	klog.V(2).Infof("CSINodeServer-NodeUnpublishVolume: Request: %v", *req)
 
 	volumeID := req.GetVolumeId()
 	targetPath := req.GetTargetPath()
@@ -156,54 +196,47 @@ func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
-func (ns *nodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	klog.Infof("CSINodeServer-NodeStageVolume... | Request %v", *req)
+func (ns *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+	klog.V(2).Infof("NodeGetVolumeStats: Request: %+v", *req)
 
-	ns.mux.Lock()
-	defer ns.mux.Unlock()
-
-	volumeID := req.GetVolumeId()
-	stagingTargetPath := req.GetStagingTargetPath()
-
-	// Check arguments
-	if len(volumeID) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
+	if req.VolumePath == "" {
+		return nil, status.Error(codes.NotFound, "Path Doesn't exist")
 	}
 
-	if len(stagingTargetPath) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
+	available, capacity, usage, inodes, inodesFree, inodesUsed, err := ns.Stats.FSInfo(req.VolumePath)
+
+	if err != nil {
+		return nil, err
 	}
 
-	if req.VolumeCapability == nil {
-		return nil, status.Error(codes.InvalidArgument, "NodeStageVolume Volume Capability must be provided")
+	resp := &csi.NodeGetVolumeStatsResponse{
+		Usage: []*csi.VolumeUsage{
+			{
+				Available: available,
+				Total:     capacity,
+				Used:      usage,
+				Unit:      csi.VolumeUsage_BYTES,
+			},
+			{
+				Available: inodesFree,
+				Total:     inodes,
+				Used:      inodesUsed,
+				Unit:      csi.VolumeUsage_INODES,
+			},
+		},
 	}
 
-	return &csi.NodeStageVolumeResponse{}, nil
+	return resp, nil
 }
 
-func (ns *nodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-	klog.V(2).Infof("CSINodeServer-NodeUnstageVolume ... | Request %v", *req)
-	ns.mux.Lock()
-	defer ns.mux.Unlock()
-
-	volumeID := req.GetVolumeId()
-	stagingTargetPath := req.GetStagingTargetPath()
-
-	// Check arguments
-	if len(volumeID) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
-	}
-	if len(stagingTargetPath) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
-	}
-	klog.Infof("Unmounting staging target path %s", stagingTargetPath)
-	return &csi.NodeUnstageVolumeResponse{}, nil
+func (ns *nodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
+	return &csi.NodeExpandVolumeResponse{}, status.Error(codes.Unimplemented, "NodeExpandVolume is not implemented")
 }
 
 // NodeGetCapabilities returns the supported capabilities of the node server
 func (ns *nodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
 	// currently there is a single NodeServer capability according to the spec
-	klog.V(4).Infof("NodeGetCapabilities: called with args %+v", *req)
+	klog.V(2).Infof("NodeGetCapabilities: Request: %+v", *req)
 	var caps []*csi.NodeServiceCapability
 	for _, cap := range nodeCaps {
 		c := &csi.NodeServiceCapability{
@@ -216,10 +249,6 @@ func (ns *nodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 		caps = append(caps, c)
 	}
 	return &csi.NodeGetCapabilitiesResponse{Capabilities: caps}, nil
-}
-
-func (ns *nodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
-	return &csi.NodeExpandVolumeResponse{}, status.Error(codes.Unimplemented, "NodeExpandVolume is not implemented")
 }
 
 func checkMount(targetPath string) (bool, error) {
@@ -237,14 +266,17 @@ func checkMount(targetPath string) (bool, error) {
 	return notMnt, nil
 }
 
-func (d *nodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
-	klog.V(4).Infof("NodeGetInfo: called with args %+v", *req)
-	return &csi.NodeGetInfoResponse{}, status.Error(codes.Unimplemented, "NodeGetInfo is not implemented")
+func (ns *nodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+	klog.V(3).Infof("NodeGetInfo: called with args %+v", *req)
+
+	resp := &csi.NodeGetInfoResponse{
+		NodeId:            ns.NodeID,
+		MaxVolumesPerNode: DefaultVolumesPerNode,
+	}
+	return resp, nil
 
 }
 
-func (d *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-	klog.V(4).Infof("NodeGetVolumeStats: called with args %+v", *req)
-	return &csi.NodeGetVolumeStatsResponse{}, status.Error(codes.Unimplemented, "NodeGetVolumeStats is not implemented")
-
+func (su *VolumeStatsUtils) FSInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
+	return fs.Info(path)
 }

@@ -23,26 +23,27 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// Implements Identity Sever csi.IdentityServe
 type identityServer struct {
 	*s3Driver
 }
 
 // GetPluginInfo ...
 func (csiIdentity *identityServer) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
-	klog.Infof("identityServer-GetPluginInfo... | Request: %v", *req)
+	klog.V(3).Infof("identityServer-GetPluginInfo: Request: %v", *req)
 	if csiIdentity.s3Driver == nil {
 		return nil, status.Error(codes.InvalidArgument, "Driver not configured")
 	}
 
 	return &csi.GetPluginInfoResponse{
 		Name:          csiIdentity.s3Driver.name,
-		VendorVersion: csiIdentity.s3Driver.vendorVersion,
+		VendorVersion: csiIdentity.s3Driver.version,
 	}, nil
 }
 
 // GetPluginCapabilities ...
 func (csiIdentity *identityServer) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
-	klog.Infof("identityServer-GetPluginCapabilities...| Request %v", *req)
+	klog.V(3).Infof("identityServer-GetPluginCapabilities: Request %v", *req)
 	return &csi.GetPluginCapabilitiesResponse{
 		Capabilities: []*csi.PluginCapability{
 			{
@@ -72,6 +73,6 @@ func (csiIdentity *identityServer) GetPluginCapabilities(ctx context.Context, re
 
 // Probe ...
 func (csiIdentity *identityServer) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
-	klog.Infof("identityServer-Probe... Request %v", *req)
+	klog.V(3).Infof("identityServer-Probe: Request %v", *req)
 	return &csi.ProbeResponse{}, nil
 }

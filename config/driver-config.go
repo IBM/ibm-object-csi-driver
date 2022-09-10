@@ -21,4 +21,6 @@ const (
 
 	// CSIPluginGithubName ...
 	CSIPluginGithubName = "satellite-object-storage-plugin"
+	CSIDriverName       = "cos.s3.csi.ibm.io"
+	VendorVersion       = "1.1.2"
 )

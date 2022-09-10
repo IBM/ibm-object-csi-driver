@@ -16,8 +16,8 @@
 package fake
 
 import (
-	"fmt"
 	"github.com/IBM/satellite-object-storage-plugin/pkg/mounter"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -30,8 +30,8 @@ const (
 
 //func newS3fsMounter(bucket string, objpath string, endpoint string, region string, keys string)
 func NewMounter(mounter string, bucket string, objpath string, endpoint string, region string, keys string) (mounter.Mounter, error) {
-	fmt.Sprint("-NewMounter-")
-	fmt.Sprintf("NewMounter args:\n\tmounter: <%s>\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>", mounter, bucket, objpath, endpoint, region)
+	klog.Info("-NewMounter-")
+	klog.Infof("NewMounter args:\n\tmounter: <%s>\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>", mounter, bucket, objpath, endpoint, region)
 	switch mounter {
 	case s3fsMounterType:
 		return fakenewS3fsMounter(bucket, objpath, endpoint, region, keys)

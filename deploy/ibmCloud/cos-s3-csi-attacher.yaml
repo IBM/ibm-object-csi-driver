@@ -2,12 +2,12 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: csi-attacher
+  name: cos-s3-csi-attacher
 ---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: csi-attacher-role
+  name: cos-s3-csi-attacher-role
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
@@ -28,25 +28,25 @@ rules:
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: csi-attacher-rolebind
+  name: cos-s3-csi-attacher-rolebind
 subjects:
   - kind: ServiceAccount
-    name: csi-attacher
+    name: cos-s3-csi-attacher
     namespace: default
 roleRef:
   kind: ClusterRole
-  name: csi-attacher-role
+  name: cos-s3-csi-attacher-role
   apiGroup: rbac.authorization.k8s.io
 ---
 kind: Service
 apiVersion: v1
 metadata:
-  name: cos-csi-s3-attacher
+  name: cos-s3-csi-attacher
   labels:
-    app: cos-csi-s3-attacher
+    app: cos-s3-csi-attacher
 spec:
   selector:
-    app: cos-csi-s3-attacher
+    app: cos-s3-csi-attacher
   ports:
     - name: dummy
       port: 12345
@@ -55,24 +55,22 @@ spec:
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
-  name: cos-csi-s3-attacher
+  name: cos-s3-csi-attacher
 spec:
-  serviceName: "cos-csi-s3-attacher"
+  serviceName: "cos-s3-csi-attacher"
   replicas: 1
   selector:
     matchLabels:
-      app: cos-csi-s3-attacher
+      app: cos-s3-csi-attacher
   template:
     metadata:
       labels:
-        app: cos-csi-s3-attacher
+        app: cos-s3-csi-attacher
     spec:
       serviceAccountName: csi-attacher
       containers:
         - name: csi-attacher
-          # https://github.com/kubernetes-csi/external-attacher/releases/tag/v1.0.1
-          # docker pull quay.io/k8scsi/csi-attacher:v1.0.1
-          image: gcr.io/gke-release/csi-attacher:v1.0.1-gke.0
+          image: image-registry.openshift-image-registry.svc:5000/default/csi-attacher:v3.2.1
           args:
             - --v=5
             - --csi-address=$(ADDRESS)
@@ -85,6 +83,6 @@ spec:
             name: socket-dir
       volumes:
         - hostPath:
-            path: /var/lib/kubelet/plugins/csi-s3-driver
+            path: /var/data/kubelet/csi-plugins/cos.s3.csi.ibm.io
             type: DirectoryOrCreate
           name: socket-dir

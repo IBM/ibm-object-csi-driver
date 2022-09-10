@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/mitchellh/go-ps"
-	"k8s.io/kubernetes/pkg/util/mount"
+	mount "k8s.io/mount-utils"
 
-	"github.com/golang/glog"
+	"k8s.io/klog/v2"
 )
 
 func waitForProcess(p *os.Process, backoff int) error {
@@ -22,21 +22,21 @@ func waitForProcess(p *os.Process, backoff int) error {
 	}
 	cmdLine, err := getCmdLine(p.Pid)
 	if err != nil {
-		glog.Warningf("Error checking cmdline of PID %v, assuming it is dead: %s", p.Pid, err)
+		klog.Warningf("Error checking cmdline of PID %v, assuming it is dead: %s", p.Pid, err)
 		return nil
 	}
 	if cmdLine == "" {
 		// ignore defunct processes
 		// TODO: debug why this happens in the first place
 		// seems to only happen on k8s, not on local docker
-		glog.Warning("Fuse process seems dead, returning")
+		klog.Warning("Fuse process seems dead, returning")
 		return nil
 	}
 	if err := p.Signal(syscall.Signal(0)); err != nil {
-		glog.Warningf("Fuse process does not seem active or we are unprivileged: %s", err)
+		klog.Warningf("Fuse process does not seem active or we are unprivileged: %s", err)
 		return nil
 	}
-	glog.Infof("Fuse process with PID %v still active, waiting...", p.Pid)
+	klog.Infof("Fuse process with PID %v still active, waiting...", p.Pid)
 	time.Sleep(time.Duration(backoff*100) * time.Millisecond)
 	return waitForProcess(p, backoff+1)
 }
@@ -45,7 +45,7 @@ func waitForMount(path string, timeout time.Duration) error {
 	var elapsed time.Duration
 	var interval = 10 * time.Millisecond
 	for {
-		notMount, err := mount.New("").IsNotMountPoint(path)
+		notMount, err := mount.New("").IsLikelyNotMountPoint(path)
 		if err != nil {
 			return err
 		}
@@ -67,11 +67,11 @@ func findFuseMountProcess(path string) (*os.Process, error) {
 	for _, p := range processes {
 		cmdLine, err := getCmdLine(p.Pid())
 		if err != nil {
-			glog.Errorf("Unable to get cmdline of PID %v: %s", p.Pid(), err)
+			klog.Errorf("Unable to get cmdline of PID %v: %s", p.Pid(), err)
 			continue
 		}
 		if strings.Contains(cmdLine, path) {
-			glog.Infof("Found matching pid %v on path %s", p.Pid(), path)
+			klog.Infof("Found matching pid %v on path %s", p.Pid(), path)
 			return os.FindProcess(p.Pid())
 		}
 	}

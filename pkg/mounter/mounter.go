@@ -2,9 +2,11 @@ package mounter
 
 import (
 	"fmt"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"os/exec"
 	"time"
+
+	"k8s.io/klog/v2"
+	mount "k8s.io/mount-utils"
 )
 
 type Mounter interface {
@@ -27,8 +29,8 @@ const (
 
 //func newS3fsMounter(bucket string, objpath string, endpoint string, region string, keys string)
 func NewMounter(mounter string, bucket string, objpath string, endpoint string, region string, keys string) (Mounter, error) {
-	fmt.Sprint("-NewMounter-")
-	fmt.Sprintf("NewMounter args:\n\tmounter: <%s>\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>", mounter, bucket, objpath, endpoint, region)
+	klog.Info("-NewMounter-")
+	klog.Infof("NewMounter args:\n\tmounter: <%s>\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>", mounter, bucket, objpath, endpoint, region)
 	switch mounter {
 	case s3fsMounterType:
 		return newS3fsMounter(bucket, objpath, endpoint, region, keys)
@@ -39,12 +41,12 @@ func NewMounter(mounter string, bucket string, objpath string, endpoint string, 
 }
 
 func fuseMount(path string, comm string, args []string) error {
-	fmt.Sprint("-fuseMount-")
-	fmt.Sprintf("fuseMount args:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%s>", path, comm, args)
+	klog.Info("-fuseMount-")
+	klog.Infof("fuseMount args:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%s>", path, comm, args)
 	out, err := command(comm, args...).CombinedOutput()
 
 	if err != nil {
-		fmt.Sprintf("fuseMount: cmd failed: <%s>\nargs: <%s>\noutput: <%s>", comm, args, out)
+		klog.Infof("fuseMount: cmd failed: <%s>\nargs: <%s>\noutput: <%s>", comm, args, out)
 		return fmt.Errorf("fuseMount: cmd failed: %s\nargs: %s\noutput: %s", comm, args, out)
 	}
 
@@ -58,13 +60,13 @@ func FuseUnmount(path string) error {
 	// as fuse quits immediately, we will try to wait until the process is done
 	process, err := findFuseMountProcess(path)
 	if err != nil {
-		fmt.Sprintf("Error getting PID of fuse mount: %s", err)
+		klog.Infof("Error getting PID of fuse mount: %s", err)
 		return nil
 	}
 	if process == nil {
-		fmt.Sprintf("Unable to find PID of fuse mount %s, it must have finished already", path)
+		klog.Infof("Unable to find PID of fuse mount %s, it must have finished already", path)
 		return nil
 	}
-	fmt.Sprintf("Found fuse pid %v of mount %s, checking if it still runs", process.Pid, path)
+	klog.Infof("Found fuse pid %v of mount %s, checking if it still runs", process.Pid, path)
 	return waitForProcess(process, 1)
 }

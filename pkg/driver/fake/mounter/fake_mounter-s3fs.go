@@ -17,7 +17,7 @@ package fake
 
 import (
 	"github.com/IBM/satellite-object-storage-plugin/pkg/mounter"
-	"github.com/golang/glog"
+	"k8s.io/klog/v2"
 )
 
 // Mounter interface defined in mounter.go
@@ -31,8 +31,8 @@ type fakes3fsMounter struct {
 }
 
 func fakenewS3fsMounter(bucket string, objpath string, endpoint string, region string, keys string) (mounter.Mounter, error) {
-	glog.Infof("-newS3fsMounter-")
-	glog.Infof("newS3fsMounter args:\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>\n\tkeys: <%s>", bucket, objpath, endpoint, region, keys)
+	klog.Infof("-newS3fsMounter-")
+	klog.Infof("newS3fsMounter args:\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>\n\tkeys: <%s>", bucket, objpath, endpoint, region, keys)
 	return &fakes3fsMounter{
 		bucketName: bucket,
 		objPath:    objpath,
@@ -43,12 +43,12 @@ func fakenewS3fsMounter(bucket string, objpath string, endpoint string, region s
 }
 
 func (s3fs *fakes3fsMounter) Stage(stageTarget string) error {
-	glog.Infof("-S3FSMounter Stage-")
+	klog.Infof("-S3FSMounter Stage-")
 	return nil
 }
 
 func (s3fs *fakes3fsMounter) Unstage(stageTarget string) error {
-	glog.Infof("-S3FSMounter Unstage-")
+	klog.Infof("-S3FSMounter Unstage-")
 	return nil
 }
 

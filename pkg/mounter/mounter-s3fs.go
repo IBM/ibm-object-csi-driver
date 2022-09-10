@@ -4,10 +4,11 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"github.com/golang/glog"
 	"os"
 	"path"
 	"syscall"
+
+	"k8s.io/klog/v2"
 )
 
 // Mounter interface defined in mounter.go
@@ -27,8 +28,8 @@ const (
 )
 
 func newS3fsMounter(bucket string, objpath string, endpoint string, region string, keys string) (Mounter, error) {
-	glog.Infof("-newS3fsMounter-")
-	glog.Infof("newS3fsMounter args:\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>\n\tkeys: <%s>", bucket, objpath, endpoint, region, keys)
+	klog.Info("-newS3fsMounter-")
+	klog.Infof("newS3fsMounter args:\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>\n\tkeys: <%s>", bucket, objpath, endpoint, region, keys)
 	return &s3fsMounter{
 		bucketName: bucket,
 		objPath:    objpath,
@@ -39,38 +40,38 @@ func newS3fsMounter(bucket string, objpath string, endpoint string, region strin
 }
 
 func (s3fs *s3fsMounter) Stage(stageTarget string) error {
-	glog.Infof("-S3FSMounter Stage-")
+	klog.Info("-S3FSMounter Stage-")
 	return nil
 }
 
 func (s3fs *s3fsMounter) Unstage(stageTarget string) error {
-	glog.Infof("-S3FSMounter Unstage-")
+	klog.Info("-S3FSMounter Unstage-")
 	return nil
 }
 
 func (s3fs *s3fsMounter) Mount(source string, target string) error {
-	glog.Infof("-S3FSMounter Mount-")
-	glog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
+	klog.Info("-S3FSMounter Mount-")
+	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
 	var bucketName string
 	var pathExist bool
 	var err error
 	metaPath := path.Join(metaRoot, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 
 	if pathExist, err = checkPath(metaPath); err != nil {
-		glog.Errorf("S3FSMounter Mount: Cannot stat directory %s: %v", metaPath, err)
+		klog.Errorf("S3FSMounter Mount: Cannot stat directory %s: %v", metaPath, err)
 		return fmt.Errorf("S3FSMounter Mount: Cannot stat directory %s: %v", metaPath, err)
 	}
 
 	if !pathExist {
 		if err = os.MkdirAll(metaPath, 0755); err != nil {
-			glog.Errorf("S3FSMounter Mount: Cannot create directory %s: %v", metaPath, err)
+			klog.Errorf("S3FSMounter Mount: Cannot create directory %s: %v", metaPath, err)
 			return fmt.Errorf("S3FSMounter Mount: Cannot create directory %s: %v", metaPath, err)
 		}
 	}
 
 	passwdFile := path.Join(metaPath, passFile)
 	if err = writes3fsPass(passwdFile, s3fs.accessKeys); err != nil {
-		glog.Errorf("S3FSMounter Mount: Cannot create file %s: %v", passwdFile, err)
+		klog.Errorf("S3FSMounter Mount: Cannot create file %s: %v", passwdFile, err)
 		return fmt.Errorf("S3FSMounter Mount: Cannot create file %s: %v", passwdFile, err)
 	}
 
@@ -95,7 +96,7 @@ func (s3fs *s3fsMounter) Mount(source string, target string) error {
 }
 
 func (s3fs *s3fsMounter) Unmount(target string) error {
-	glog.Infof("-S3FSMounter Unmount-")
+	klog.Info("-S3FSMounter Unmount-")
 	metaPath := path.Join(metaRoot, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 	os.RemoveAll(metaPath)
 
