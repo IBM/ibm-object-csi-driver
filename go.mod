@@ -14,8 +14,6 @@ require (
 	go.uber.org/zap v1.21.0
 	golang.org/x/net v0.0.0-20220624214902-1bab6f366d9e
 	google.golang.org/grpc v1.47.0
-	gopkg.in/natefinch/lumberjack.v2 v2.0.0
-	k8s.io/klog v1.0.0
 	k8s.io/klog/v2 v2.70.0
 	k8s.io/kubernetes v1.21.0
 	k8s.io/mount-utils v0.24.2

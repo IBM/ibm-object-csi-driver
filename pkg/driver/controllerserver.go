@@ -19,14 +19,15 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
+	"io"
+	"strings"
+
 	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"io"
 	"k8s.io/klog/v2"
-	"strings"
 )
 
 const (
@@ -35,6 +36,7 @@ const (
 	defaultIAMEndPoint   = "https://iam.cloud.ibm.com"
 )
 
+// Implements Controller csi.ControllerServer
 type controllerServer struct {
 	*s3Driver
 	newSession s3client.ObjectStorageSessionFactory
@@ -106,7 +108,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		locationConstraint string
 		//objPath    string
 	)
-	klog.Infof("CSIControllerServer-CreateVolume... | Request: %v", *req)
+	klog.V(3).Infof("CSIControllerServer-CreateVolume: Request: %v", *req)
 
 	volumeName := sanitizeVolumeID(req.GetName())
 	volumeID := volumeName
@@ -162,12 +164,12 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		klog.Infof("Info:Create Volume module:", msg)
 	}
 	if err != nil {
-		klog.Error("CreateVolume: Unable to create the bucket: %v", err)
+		klog.Errorf("CreateVolume: Unable to create the bucket: %v", err)
 		return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to create the bucket: %v", bucketName))
 	}
 
 	if err := sess.CheckBucketAccess(bucketName); err != nil {
-		klog.Error("CreateVolume: Unable to access the bucket: %v", err)
+		klog.Errorf("CreateVolume: Unable to access the bucket: %v", err)
 		return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to access the bucket: %v", bucketName))
 	}
 	/*params["cos-endpoint"] = endPoint
@@ -189,7 +191,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 }
 
 func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	klog.Infof("CSIControllerServer-DeleteVolume... %v", *req)
+	klog.V(3).Infof("CSIControllerServer-DeleteVolume: Request: %v", *req)
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
@@ -199,7 +201,7 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	klog.Infof("deleting volume %v", volumeID)
 	secretMap := req.GetSecrets()
 	//TODO: get rid of this call since it is exposing secrets
-	fmt.Println("DeleteVolume Secrets:\n\t", secretMap)
+	//fmt.Println("DeleteVolume Secrets:\n\t", secretMap)
 
 	creds, err := cs.getCredentials(req.GetSecrets())
 	if err != nil {
@@ -219,8 +221,20 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
+//ControllerPublishVolume
+func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+	klog.V(3).Infof("CSIControllerServer-ControllerPublishVolume: Request: %v", *req)
+	return nil, status.Error(codes.Unimplemented, "ControllerPublishVolume")
+}
+
+//ControllerUnpublishVolume
+func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
+	klog.V(3).Infof("CSIControllerServer-ControllerUnPublishVolume: Request: %v", *req)
+	return nil, status.Error(codes.Unimplemented, "ControllerUnpublishVolume")
+}
+
 func (cs *controllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
-	klog.V(4).Infof("ValidateVolumeCapabilities: called with args %+v", *req)
+	klog.V(3).Infof("ValidateVolumeCapabilities: Request: %+v", *req)
 	// Validate Arguments
 
 	volumeID := req.GetVolumeId()
@@ -262,63 +276,20 @@ func isValidVolumeCapabilities(volCaps []*csi.VolumeCapability) bool {
 	return foundAll
 }
 
-func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
-
-	return nil, status.Error(codes.Unimplemented, "")
-
-}
-
-func (cs *controllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
-
-	return nil, status.Error(codes.Unimplemented, "DeleteSnapshot")
-}
-
-func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
-
-	return nil, status.Error(codes.Unimplemented, "ListSnapshots")
-}
-
-func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
-
-	return nil, status.Error(codes.Unimplemented, "ControllerExpandVolume")
-}
-
-func sanitizeVolumeID(volumeID string) string {
-	volumeID = strings.ToLower(volumeID)
-	if len(volumeID) > 63 {
-		h := sha1.New()
-		io.WriteString(h, volumeID)
-		volumeID = hex.EncodeToString(h.Sum(nil))
-	}
-	return volumeID
-}
-
-// GetCapacity ...
-func (csiCS *controllerServer) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
-
-	return nil, status.Error(codes.Unimplemented, "GetCapacity")
-}
-
 //ListVolumes
-func (csiCS *controllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
-
+func (cs *controllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
+	klog.V(3).Infof("ListVolumes: Request: %+v", *req)
 	return nil, status.Error(codes.Unimplemented, "ListVolumes")
 }
 
-//ControllerPublishVolume
-func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	klog.Infof("CSIControllerServer-ControllerPublishVolume | Request: %v", *req)
-	return nil, status.Error(codes.Unimplemented, "ControllerPublishVolume")
+// GetCapacity ...
+func (cs *controllerServer) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
+	klog.V(3).Infof("GetCapacity: Request: %+v", *req)
+	return nil, status.Error(codes.Unimplemented, "GetCapacity")
 }
 
-//ControllerUnpublishVolume
-func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
-	klog.Infof("CSIControllerServer-ControllerUnPublishVolume | Request: %v", *req)
-	return nil, status.Error(codes.Unimplemented, "ControllerUnpublishVolume")
-}
-
-func (d *controllerServer) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
-	klog.V(4).Infof("ControllerGetCapabilities: called with args %+v", *req)
+func (cs *controllerServer) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
+	klog.V(3).Infof("ControllerGetCapabilities: Request: %+v", *req)
 	var caps []*csi.ControllerServiceCapability
 	for _, cap := range controllerCaps {
 		c := &csi.ControllerServiceCapability{
@@ -333,6 +304,38 @@ func (d *controllerServer) ControllerGetCapabilities(ctx context.Context, req *c
 	return &csi.ControllerGetCapabilitiesResponse{Capabilities: caps}, nil
 }
 
-func (d *controllerServer) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "ControllerUnpublishVolume")
+func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
+	klog.V(3).Infof("CreateSnapshot: Request: %+v", *req)
+	return nil, status.Error(codes.Unimplemented, "")
+
+}
+
+func (cs *controllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
+	klog.V(3).Infof("DeleteSnapshot: called with args %+v", *req)
+	return nil, status.Error(codes.Unimplemented, "DeleteSnapshot")
+}
+
+func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
+	klog.V(3).Infof("ListSnapshots: called with args %+v", *req)
+	return nil, status.Error(codes.Unimplemented, "ListSnapshots")
+}
+
+func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
+	klog.V(3).Infof("ControllerExpandVolume: called with args %+v", *req)
+	return nil, status.Error(codes.Unimplemented, "ControllerExpandVolume")
+}
+
+func (cs *controllerServer) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
+	klog.V(3).Infof("ControllerGetVolume: called with args %+v", *req)
+	return nil, status.Error(codes.Unimplemented, "")
+}
+
+func sanitizeVolumeID(volumeID string) string {
+	volumeID = strings.ToLower(volumeID)
+	if len(volumeID) > 63 {
+		h := sha1.New()
+		io.WriteString(h, volumeID)
+		volumeID = hex.EncodeToString(h.Sum(nil))
+	}
+	return volumeID
 }

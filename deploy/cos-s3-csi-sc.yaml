@@ -2,8 +2,8 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: cos-csi-s3-sc-v3
-provisioner: cos-csi-s3-driver
+  name: cos-s3-csi-sc
+provisioner: cos.s3.csi.ibm.io
 parameters:
   mounter: "s3fs"
   client: "awss3"

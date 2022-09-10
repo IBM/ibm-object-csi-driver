@@ -26,7 +26,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // NonBlockingGRPCServer Defines Non blocking GRPC server interfaces
@@ -41,16 +41,17 @@ type NonBlockingGRPCServer interface {
 	ForceStop()
 }
 
-// NewNonBlockingGRPCServer ...
-func NewNonBlockingGRPCServer(logger *zap.Logger) NonBlockingGRPCServer {
-	return &nonBlockingGRPCServer{logger: logger}
-}
-
 // nonBlockingGRPCServer server
 type nonBlockingGRPCServer struct {
 	wg     sync.WaitGroup
 	server *grpc.Server
+	mode   string
 	logger *zap.Logger
+}
+
+// NewNonBlockingGRPCServer ...
+func NewNonBlockingGRPCServer(mode string, logger *zap.Logger) NonBlockingGRPCServer {
+	return &nonBlockingGRPCServer{mode: mode, logger: logger}
 }
 
 // Start ...
@@ -77,7 +78,7 @@ func (s *nonBlockingGRPCServer) ForceStop() {
 
 // Setup ...
 func (s *nonBlockingGRPCServer) Setup(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) (net.Listener, error) {
-	s.logger.Info("nonBlockingGRPCServer-Setup...", zap.Reflect("Endpoint", endpoint))
+	s.logger.Info("nonBlockingGRPCServer-Setup", zap.Reflect("Endpoint", endpoint))
 
 	opts := []grpc.ServerOption{
 		grpc.UnaryInterceptor(logGRPC),
@@ -86,7 +87,7 @@ func (s *nonBlockingGRPCServer) Setup(endpoint string, ids csi.IdentityServer, c
 	u, err := url.Parse(endpoint)
 
 	if err != nil {
-		msg := "Failed to parse endpoint"
+		msg := "failed to parse endpoint"
 		s.logger.Error(msg, zap.Error(err))
 		return nil, err
 	}
@@ -95,22 +96,22 @@ func (s *nonBlockingGRPCServer) Setup(endpoint string, ids csi.IdentityServer, c
 	if u.Scheme == "unix" {
 		addr = u.Path
 		if err := os.Remove(addr); err != nil && !os.IsNotExist(err) {
-			s.logger.Error("Failed to remove", zap.Reflect("addr", addr), zap.Error(err))
+			s.logger.Error("failed to remove", zap.Reflect("addr", addr), zap.Error(err))
 			return nil, err
 		}
 	} else if u.Scheme == "tcp" {
 		addr = u.Host
 	} else {
-		msg := "Endpoint scheme not supported"
+		msg := "endpoint scheme not supported"
 		s.logger.Error(msg, zap.Reflect("Scheme", u.Scheme))
 		return nil, errors.New(msg)
 	}
 
-	s.logger.Info("Start listening GRPC Server", zap.Reflect("Scheme", u.Scheme), zap.Reflect("Addr", addr))
+	s.logger.Info("start listening GRPC server", zap.Reflect("Scheme", u.Scheme), zap.Reflect("Addr", addr))
 
 	listener, err := net.Listen(u.Scheme, addr)
 	if err != nil {
-		msg := "Failed to listen GRPC Server"
+		msg := "failed to listen GRPC server"
 		s.logger.Error(msg, zap.Reflect("Error", err))
 		return nil, errors.New(msg)
 	}
@@ -118,13 +119,14 @@ func (s *nonBlockingGRPCServer) Setup(endpoint string, ids csi.IdentityServer, c
 	server := grpc.NewServer(opts...)
 	s.server = server
 
-	if ids != nil {
-		csi.RegisterIdentityServer(s.server, ids)
-	}
-	if cs != nil {
+	csi.RegisterIdentityServer(s.server, ids)
+
+	if s.mode == "controller" {
+		klog.V(3).Info("--Starting server in controller mode--")
 		csi.RegisterControllerServer(s.server, cs)
 	}
-	if ns != nil {
+	if s.mode == "node" {
+		klog.V(3).Info("--Starting server in node server mode--")
 		csi.RegisterNodeServer(s.server, ns)
 	}
 	return listener, nil
@@ -132,15 +134,15 @@ func (s *nonBlockingGRPCServer) Setup(endpoint string, ids csi.IdentityServer, c
 
 // serve ...
 func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) {
-	s.logger.Info("nonBlockingGRPCServer-serve...", zap.Reflect("Endpoint", endpoint))
+	s.logger.Info("nonBlockingGRPCServer-server", zap.Reflect("Endpoint", endpoint))
 	//! Setup
 	listener, err := s.Setup(endpoint, ids, cs, ns)
 	if err != nil {
-		s.logger.Fatal("Failed to setup GRPC Server", zap.Error(err))
+		s.logger.Fatal("failed to setup GRPC Server", zap.Error(err))
 	}
-	s.logger.Info("Listening GRPC server for connections", zap.Reflect("Addr", listener.Addr()))
+	s.logger.Info("listening GRPC server for connections", zap.Reflect("Addr", listener.Addr().String()))
 	if err := s.server.Serve(listener); err != nil {
-		s.logger.Info("Failed to serve", zap.Error(err))
+		s.logger.Info("failed to serve", zap.Error(err))
 	}
 }
 

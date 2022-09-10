@@ -19,10 +19,11 @@ package main
 
 import (
 	"flag"
-	"log"
 	"math/rand"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	libMetrics "github.com/IBM/ibmcloud-volume-interface/lib/metrics"
@@ -31,95 +32,98 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"gopkg.in/natefinch/lumberjack.v2"
+	"k8s.io/klog/v2"
 )
 
-var (
-	endpoint       = flag.String("endpoint", "unix:/tmp/csi.sock", "CSI endpoint")
-	nodeID         = flag.String("nodeid", "", "node id")
-	fileLogger     *zap.Logger
-	logfile        = flag.String("log", "", "log file")
-	metricsAddress = flag.String("metrics-address", "0.0.0.0:9080", "Metrics address")
-	// vendorVersion  string
-)
+// Options is the combined set of options for all operating modes.
+type Options struct {
+	ServerMode     string
+	Endpoint       string
+	NodeID         string
+	MetricsAddress string
+}
 
-func getFromEnv(key string, defaultVal string) string {
-	value := os.Getenv(key)
-	if value == "" && defaultVal != "" {
-		value = defaultVal
-	} else {
-		value = "/var/log/satellite-obj-storage.log"
+func getOptions() *Options {
+	var (
+		endpoint       = flag.String("endpoint", "unix:/tmp/csi.sock", "CSI endpoint")
+		serverMode     = flag.String("servermode", "controller", "Server Mode node/controller")
+		nodeID         = flag.String("nodeid", "host01", "node id")
+		metricsAddress = flag.String("metrics-address", "0.0.0.0:9080", "Metrics address")
+	)
+	flag.Set("logtostderr", "true")
+	flag.Parse()
+	return &Options{
+		ServerMode:     *serverMode,
+		Endpoint:       *endpoint,
+		NodeID:         *nodeID,
+		MetricsAddress: *metricsAddress,
 	}
-	return value
 }
 
 func getZapLogger() *zap.Logger {
-	logfilepath := getFromEnv("SATOBJLOGFILE", *logfile)
-
-	lumberjackLogger := &lumberjack.Logger{
-		Filename:   logfilepath,
-		MaxSize:    100, //MB
-		MaxBackups: 10,  //Maximum number of backup
-		MaxAge:     60,  //Days
-	}
-
-	prodConf := zap.NewProductionEncoderConfig()
-	prodConf.EncodeTime = zapcore.ISO8601TimeEncoder
-	encoder := zapcore.NewJSONEncoder(prodConf)
-
-	zapsync := zapcore.AddSync(lumberjackLogger)
-
-	loglevel := zap.NewAtomicLevelAt(zapcore.InfoLevel)
-
-	loggercore := zapcore.NewCore(encoder, zapsync, loglevel)
-
-	logger := zap.New(loggercore)
+	prodConf := zap.NewProductionConfig()
+	prodConf.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	logger, _ := prodConf.Build()
 	logger.Named("SatelliteObjStoragePlugin")
 
 	return logger
 }
+func getEnv(key string) string {
+	return os.Getenv(strings.ToUpper(key))
+}
 
-func init() {
-	flag.Set("logtostderr", "true")
-	fileLogger = getZapLogger()
+func getConfigBool(envKey string, defaultConf bool, logger zap.Logger) bool {
+	if val := getEnv(envKey); val != "" {
+		if envBool, err := strconv.ParseBool(val); err == nil {
+			return envBool
+		}
+		logger.Error("error parsing env val to bool", zap.String("env", envKey))
+	}
+	return defaultConf
 }
 
 func main() {
-	flag.Parse()
+	klog.InitFlags(nil)
+	defer klog.Flush()
+
+	logger := getZapLogger()
+	loggerLevel := zap.NewAtomicLevel()
+	options := getOptions()
+
+	klog.V(1).Info("Starting Server...")
+
+	debugTrace := getConfigBool("DEBUG_TRACE", false, *logger)
+	if debugTrace {
+		loggerLevel.SetLevel(zap.DebugLevel)
+	}
+
 	rand.Seed(time.Now().UnixNano())
-	handle(fileLogger)
+	serverSetup(options, logger)
 	os.Exit(0)
 }
 
-func handle(logger *zap.Logger) {
-	// if *vendorVersion == "" {
-	// 	logger.Fatal("CSI driver vendorVersion must be set at compile time")
-	// }
-	// logger.Info("S3 driver version", zap.Reflect("DriverVersion", vendorVersion))
-	// TODO
-	//logger.Info("Controller Mutex Lock enabled", zap.Bool("LockEnabled", *utils.LockEnabled))
-
-	csiDriver, err := driver.Setups3Driver(logger, csiConfig.CSIPluginGithubName, csiConfig.VendorVersion)
+func serverSetup(options *Options, logger *zap.Logger) {
+	csiDriver, err := driver.Setups3Driver(options.ServerMode, csiConfig.CSIDriverName, csiConfig.VendorVersion, logger)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal("Failed to setup s3 driver", zap.Error(err))
 		os.Exit(1)
 	}
-	S3CSIDriver, err := csiDriver.NewS3CosDriver(*nodeID, *endpoint)
+	S3CSIDriver, err := csiDriver.NewS3CosDriver(options.NodeID, options.Endpoint)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal("Failed in initialize s3 COS driver", zap.Error(err))
 		os.Exit(1)
 	}
-	serveMetrics()
+	serveMetrics(options.MetricsAddress, logger)
 	S3CSIDriver.Run()
 }
 
-func serveMetrics() {
-	fileLogger.Info("Starting metrics endpoint")
+func serveMetrics(metricsAddress string, logger *zap.Logger) {
+	logger.Info("starting metrics endpoint")
 	go func() {
 		http.Handle("/metrics", promhttp.Handler())
 		//http.Handle("/health-check", healthCheck)
-		err := http.ListenAndServe(*metricsAddress, nil)
-		fileLogger.Error("Failed to start metrics service:", zap.Error(err))
+		err := http.ListenAndServe(metricsAddress, nil)
+		logger.Error("failed to start metrics service:", zap.Error(err))
 	}()
 	// TODO
 	//metrics.RegisterAll(csiConfig.CSIPluginGithubName)

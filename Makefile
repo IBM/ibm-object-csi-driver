@@ -14,10 +14,14 @@ IMAGE_NAME=$(REGISTRY_NAME)/$*
 
 ARCH := $(if $(GOARCH),$(GOARCH),$(shell go env GOARCH))
 
+buildlocal:
+	mkdir -p bin
+	CGO_ENABLED=0 go build -a -ldflags '-X main.version=$(REV) -extldflags "-static"' -o ./bin/$* ./cmd/satellite-object-storage-plugin/$*
 
 build-%:
 	mkdir -p bin
 	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-X main.version=$(REV) -extldflags "-static"' -o ./bin/$* ./cmd/$*
+	
 	if [ "$$ARCH" = "amd64" ]; then \
 		CGO_ENABLED=0 GOOS=windows go build -a -ldflags '-X main.version=$(REV) -extldflags "-static"' -o ./bin/$*.exe ./cmd/$* ; \
 		CGO_ENABLED=0 GOOS=linux GOARCH=ppc64le go build -a -ldflags '-X main.version=$(REV) -extldflags "-static"' -o ./bin/$*-ppc64le ./cmd/$* ; \

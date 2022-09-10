@@ -17,14 +17,15 @@ package s3client
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/IBM/ibm-cos-sdk-go/aws"
 	"github.com/IBM/ibm-cos-sdk-go/aws/awserr"
 	"github.com/IBM/ibm-cos-sdk-go/aws/credentials"
 	"github.com/IBM/ibm-cos-sdk-go/aws/credentials/ibmiam"
 	"github.com/IBM/ibm-cos-sdk-go/aws/session"
 	"github.com/IBM/ibm-cos-sdk-go/service/s3"
-	"github.com/golang/glog"
-	"strings"
+	"go.uber.org/zap"
 )
 
 // ObjectStorageCredentials holds credentials for accessing an object storage service
@@ -71,7 +72,8 @@ type ObjectStorageSessionFactory interface {
 
 // COSSession represents a COS (S3) session
 type COSSession struct {
-	svc s3API
+	logger *zap.Logger
+	svc    s3API
 }
 
 type s3API interface {
@@ -91,7 +93,7 @@ func (s *COSSession) CheckBucketAccess(bucket string) error {
 }
 
 func (s *COSSession) CheckObjectPathExistence(bucket string, objectpath string) (bool, error) {
-	glog.Infof("CheckObjectPathExistence args:\n\tsbucket: <%s>\n\tobjectpath: <%s>", bucket, objectpath)
+	s.logger.Info("CheckObjectPathExistence args", zap.String("bucket", bucket), zap.String("objectpath", objectpath))
 	if strings.HasPrefix(objectpath, "/") {
 		objectpath = strings.TrimPrefix(objectpath, "/")
 	}
@@ -101,8 +103,8 @@ func (s *COSSession) CheckObjectPathExistence(bucket string, objectpath string) 
 		Prefix:  aws.String(objectpath),
 	})
 	if err != nil {
-		glog.Errorf("Cannot list bucket %s", bucket)
-		return false, fmt.Errorf("Cannot list bucket '%s': %v", bucket, err)
+		s.logger.Error("cannot list bucket", zap.String("bucket", bucket))
+		return false, fmt.Errorf("cannot list bucket '%s': %v", bucket, err)
 	}
 	if len(resp.Contents) == 1 {
 		object := *(resp.Contents[0].Key)
@@ -119,8 +121,13 @@ func (s *COSSession) CreateBucket(bucket string) (string, error) {
 	})
 
 	if err != nil {
+		// TODO
+		// CreateVolume: Unable to create the bucket: %BucketAlreadyExists:
+		// The requested bucket name is not available. The bucket namespace is shared by all users of the system.
+		// Please select a different name and try again.
+
 		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "BucketAlreadyOwnedByYou" {
-			glog.Warning(fmt.Sprintf("bucket '%s' already exists", bucket))
+			s.logger.Warn("bucket already exists", zap.String("bucket", bucket))
 			return fmt.Sprintf("bucket '%s' already exists", bucket), nil
 		}
 		return "", err
@@ -136,7 +143,7 @@ func (s *COSSession) DeleteBucket(bucket string) error {
 
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "NoSuchBucket" {
-			glog.Warning(fmt.Sprintf("bucket %s is already deleted", bucket))
+			s.logger.Warn("bucket already deleted", zap.String("bucket", bucket))
 			return nil
 		}
 
@@ -161,9 +168,11 @@ func (s *COSSession) DeleteBucket(bucket string) error {
 	return err
 }
 
-func NewS3Client() (ObjectStorageSession, error) {
-	glog.Infof("NewS3Client")
-	return new(COSSession), nil
+func NewS3Client(lgr *zap.Logger) (ObjectStorageSession, error) {
+	cosSession := new(COSSession)
+	cosSession.logger = lgr
+	lgr.Info("--NewS3Client--")
+	return cosSession, nil
 }
 
 // NewObjectStorageSession method creates a new object store session
