@@ -23,6 +23,8 @@ import (
 	"testing"
 )
 
+const defaultMode = "controller"
+
 // GetTestLogger ...
 func GetTestLogger(t *testing.T) (logger *zap.Logger, teardown func()) {
 
@@ -65,7 +67,7 @@ func inits3Driver(t *testing.T) *s3Driver {
 	defer teardown()
 
 	// Setup the CSI driver
-	icDriver, err := Setups3Driver(logger, driver, vendorVersion)
+	icDriver, err := Setups3Driver(defaultMode, driver, vendorVersion, logger)
 	if err != nil {
 		t.Fatalf("Failed to setup CSI Driver: %v", err)
 	}
@@ -90,6 +92,6 @@ func TestSetups3Driver(t *testing.T) {
 	defer teardown()
 
 	// Failed setting up driver, name  nil
-	_, err := Setups3Driver(logger, name, vendorVersion)
+	_, err := Setups3Driver(defaultMode, name, vendorVersion, logger)
 	assert.NotNil(t, err)
 }
