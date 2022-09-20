@@ -28,8 +28,7 @@ build-%:
 	fi
 
 container-%: build-%
-	docker build -t $*:latest -f $(shell if [ -e ./cmd/$*/Dockerfile ]; then echo ./cmd/$*/Dockerfile; else echo Dockerfile; fi) --label revision=$(REV) .
-
+	docker build --build-arg RHSM_PASS=$(RHSM_PASS) --build-arg RHSM_USER=$(RHSM_USER) -t $*:latest -f $(shell if [ -e ./cmd/$*/Dockerfile ]; then echo ./cmd/$*/Dockerfile; else echo Dockerfile; fi) --label revision=$(REV) .
 build: $(CMDS:%=build-%)
 container: $(CMDS:%=container-%)
 
