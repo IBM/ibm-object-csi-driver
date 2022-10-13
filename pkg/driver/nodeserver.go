@@ -157,8 +157,8 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 
 	//func newMounter(mounter string, bucket string, objpath string, endpoint string, region string, keys string) (Mounter, error) {
 	if mounterObj, err = newmounter("s3fs",
-		attrib["bucket-name"], attrib["obj-path"],
-		attrib["cos-endpoint"], attrib["regn-class"],
+		secretMap["bucket-name"], secretMap["obj-path"],
+		secretMap["cos-endpoint"], secretMap["regn-class"],
 		fmt.Sprintf("%s:%s", accessKey, secretKey)); err != nil {
 		return nil, err
 	}
@@ -169,7 +169,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return nil, err
 	}
 
-	klog.Infof("s3: bucket %s successfuly mounted to %s", attrib["bucket-name"], targetPath)
+	klog.Infof("s3: bucket %s successfuly mounted to %s", secretMap["bucket-name"], targetPath)
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
@@ -189,6 +189,9 @@ func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	klog.Infof("Unmounting  target path %s", targetPath)
 
 	if err := fuseunmount(targetPath); err != nil {
+
+		//TODO: Need to handle the case with non existing mount separately - https://github.com/IBM/satellite-object-storage-plugin/issues/46
+		klog.Infof("UNMOUNT ERROR: %v", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	klog.Infof("Successfully unmounted  target path %s", targetPath)
@@ -203,7 +206,9 @@ func (ns *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 		return nil, status.Error(codes.NotFound, "Path Doesn't exist")
 	}
 
-	available, capacity, usage, inodes, inodesFree, inodesUsed, err := ns.Stats.FSInfo(req.VolumePath)
+	klog.V(2).Info("NodeGetVolumeStats: Start getting Stats")
+	//  Making direct call to fs library for the sake of simplicity. That way we don't need to initialize VolumeStatsUtils. If there is a need for VolumeStatsUtils to grow bigger then we can use it
+	available, capacity, usage, inodes, inodesFree, inodesUsed, err := fs.Info(req.VolumePath)
 
 	if err != nil {
 		return nil, err
