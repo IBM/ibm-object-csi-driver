@@ -2,10 +2,9 @@ package mounter
 
 import (
 	"fmt"
-	"os/exec"
-
 	"k8s.io/klog/v2"
-	mount "k8s.io/mount-utils"
+	"os/exec"
+	"syscall"
 )
 
 type Mounter interface {
@@ -16,6 +15,7 @@ type Mounter interface {
 }
 
 var (
+	unmount = syscall.Unmount
 	command = exec.Command
 )
 
@@ -26,7 +26,7 @@ const (
 	mounterTypeKey    = "mounter"
 )
 
-//func newS3fsMounter(bucket string, objpath string, endpoint string, region string, keys string)
+// func newS3fsMounter(bucket string, objpath string, endpoint string, region string, keys string)
 func NewMounter(mounter string, bucket string, objpath string, endpoint string, region string, keys string) (Mounter, error) {
 	klog.Info("-NewMounter-")
 	klog.Infof("NewMounter args:\n\tmounter: <%s>\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>", mounter, bucket, objpath, endpoint, region)
@@ -56,8 +56,20 @@ func fuseMount(path string, comm string, args []string) error {
 }
 
 func FuseUnmount(path string) error {
-	if err := mount.New("").Unmount(path); err != nil {
-		return err
+	// directory exists
+	isMount, checkMountErr := isMountpoint(path)
+	if isMount || checkMountErr != nil {
+		klog.Infof("isMountpoint  %v", isMount)
+		err := unmount(path, syscall.MNT_DETACH)
+		if err != nil && checkMountErr == nil {
+			klog.Errorf("Cannot unmount. Trying force unmount %s", err)
+			//Do force unmount
+			err = unmount(path, syscall.MNT_FORCE)
+			if err != nil {
+				klog.Errorf("Cannot force unmount %s", err)
+				return fmt.Errorf("cannot force unmount %s: %v", path, err)
+			}
+		}
 	}
 	// as fuse quits immediately, we will try to wait until the process is done
 	process, err := findFuseMountProcess(path)
