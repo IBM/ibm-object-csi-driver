@@ -3,10 +3,10 @@ package mounter
 import (
 	"fmt"
 	"os/exec"
-	"time"
+	// "time"
+	"syscall"
 
 	"k8s.io/klog/v2"
-	mount "k8s.io/mount-utils"
 )
 
 type Mounter interface {
@@ -18,6 +18,7 @@ type Mounter interface {
 
 var (
 	command = exec.Command
+	unmount = syscall.Unmount
 )
 
 const (
@@ -27,7 +28,7 @@ const (
 	mounterTypeKey    = "mounter"
 )
 
-//func newS3fsMounter(bucket string, objpath string, endpoint string, region string, keys string)
+// func newS3fsMounter(bucket string, objpath string, endpoint string, region string, keys string)
 func NewMounter(mounter string, bucket string, objpath string, endpoint string, region string, keys string) (Mounter, error) {
 	klog.Info("-NewMounter-")
 	klog.Infof("NewMounter args:\n\tmounter: <%s>\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>", mounter, bucket, objpath, endpoint, region)
@@ -49,13 +50,30 @@ func fuseMount(path string, comm string, args []string) error {
 		klog.Infof("fuseMount: cmd failed: <%s>\nargs: <%s>\noutput: <%s>", comm, args, out)
 		return fmt.Errorf("fuseMount: cmd failed: %s\nargs: %s\noutput: %s", comm, args, out)
 	}
+	// TODO: need to debug waitForMount; disabling it for time being - https://github.com/IBM/satellite-object-storage-plugin/issues/45
+	return nil
 
-	return waitForMount(path, 10*time.Second)
+	// return waitForMount(path, 10*time.Second)
+
 }
 
 func FuseUnmount(path string) error {
-	if err := mount.New("").Unmount(path); err != nil {
-		return err
+	// directory exists
+	isMount, checkMountErr := isMountpoint(path)
+	if isMount || checkMountErr != nil {
+		klog.Infof("Calling unmount %s", path)
+		klog.Infof("isMountpoint  %v", isMount)
+		klog.Infof("Error while checking isMountpoint  %s", checkMountErr)
+		err := unmount(path, syscall.MNT_DETACH)
+		if err != nil && checkMountErr == nil {
+			klog.Errorf("Cannot unmount. Trying force unmount %s", err)
+			//Do force unmount
+			err = unmount(path, syscall.MNT_FORCE)
+			if err != nil {
+				klog.Errorf("Cannot force unmount %s", err)
+				return fmt.Errorf("cannot force unmount %s: %v", path, err)
+			}
+		}
 	}
 	// as fuse quits immediately, we will try to wait until the process is done
 	process, err := findFuseMountProcess(path)
