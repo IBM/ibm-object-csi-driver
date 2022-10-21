@@ -50,9 +50,6 @@ func fuseMount(path string, comm string, args []string) error {
 		return fmt.Errorf("fuseMount: cmd failed: %s\nargs: %s\noutput: %s", comm, args, out)
 	}
 
-	// TODO: need to debug waitForMount; disabling it for time being - https://github.com/IBM/satellite-object-storage-plugin/issues/45
-	//return nil
-
 	return waitForMount(path, 10*time.Second)
 }
 
