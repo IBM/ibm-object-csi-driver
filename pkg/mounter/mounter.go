@@ -5,6 +5,7 @@ import (
 	"k8s.io/klog/v2"
 	"os/exec"
 	"syscall"
+	"time"
 )
 
 type Mounter interface {
@@ -50,9 +51,9 @@ func fuseMount(path string, comm string, args []string) error {
 	}
 
 	// TODO: need to debug waitForMount; disabling it for time being - https://github.com/IBM/satellite-object-storage-plugin/issues/45
-	return nil
+	//return nil
 
-	// return waitForMount(path, 10*time.Second)
+	return waitForMount(path, 10*time.Second)
 }
 
 func FuseUnmount(path string) error {

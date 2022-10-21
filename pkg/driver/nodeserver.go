@@ -17,8 +17,6 @@ package driver
 
 import (
 	"fmt"
-	"os"
-
 	"github.com/IBM/satellite-object-storage-plugin/pkg/mounter"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"golang.org/x/net/context"
@@ -26,7 +24,9 @@ import (
 	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume/util/fs"
-	mount "k8s.io/mount-utils"
+	"os"
+	"os/exec"
+	"strings"
 )
 
 const (
@@ -257,9 +257,12 @@ func (ns *nodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 }
 
 func checkMount(targetPath string) (bool, error) {
-	notMnt, err := mount.New("").IsLikelyNotMountPoint(targetPath)
+	out, err := exec.Command("mountpoint", targetPath).CombinedOutput()
+	outStr := strings.TrimSpace(string(out))
+	notMnt := true
 	if err != nil {
-		if os.IsNotExist(err) {
+		klog.V(3).Infof("Output: Output string error %+v", outStr)
+		if strings.HasSuffix(outStr, "No such file or directory") {
 			if err = os.MkdirAll(targetPath, 0750); err != nil {
 				return false, err
 			}
