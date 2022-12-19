@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/mitchellh/go-ps"
-	mount "k8s.io/mount-utils"
 
 	"k8s.io/klog/v2"
 )
@@ -45,13 +44,16 @@ func waitForMount(path string, timeout time.Duration) error {
 	var elapsed time.Duration
 	var interval = 10 * time.Millisecond
 	for {
-		notMount, err := mount.New("").IsLikelyNotMountPoint(path)
+		out, err := exec.Command("mountpoint", path).CombinedOutput()
+		outStr := strings.TrimSpace(string(out))
 		if err != nil {
 			return err
 		}
-		if !notMount {
+		if strings.HasSuffix(outStr, "is a mountpoint") {
+			klog.Infof("Path is a mountpoint: pathname - %s", path)
 			return nil
 		}
+
 		time.Sleep(interval)
 		elapsed = elapsed + interval
 		if elapsed >= timeout {
