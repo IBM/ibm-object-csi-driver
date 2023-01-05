@@ -35,7 +35,7 @@ const (
 
 // Implements Node Server csi.NodeServer
 type nodeServer struct {
-	*s3Driver
+	*S3Driver
 	Stats  statsUtils
 	NodeID string
 }

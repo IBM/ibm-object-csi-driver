@@ -25,19 +25,19 @@ import (
 
 // Implements Identity Sever csi.IdentityServe
 type identityServer struct {
-	*s3Driver
+	*S3Driver
 }
 
 // GetPluginInfo ...
 func (csiIdentity *identityServer) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
 	klog.V(3).Infof("identityServer-GetPluginInfo: Request: %v", *req)
-	if csiIdentity.s3Driver == nil {
+	if csiIdentity.S3Driver == nil {
 		return nil, status.Error(codes.InvalidArgument, "Driver not configured")
 	}
 
 	return &csi.GetPluginInfoResponse{
-		Name:          csiIdentity.s3Driver.name,
-		VendorVersion: csiIdentity.s3Driver.version,
+		Name:          csiIdentity.S3Driver.name,
+		VendorVersion: csiIdentity.S3Driver.version,
 	}, nil
 }
 

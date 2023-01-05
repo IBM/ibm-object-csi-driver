@@ -1,0 +1,95 @@
+package sanity
+
+import (
+	csiDriver "github.com/IBM/satellite-object-storage-plugin/pkg/driver"
+	//"log"
+	"os"
+	cloudProvider "github.com/IBM/ibm-csi-common/pkg/ibmcloudprovider"
+	"testing"
+	sanity "github.com/kubernetes-csi/csi-test/v4/pkg/sanity"
+	//"github.com/kubernetes-csi/csi-test/pkg/sanity"
+	"fmt"
+//	. "github.com/onsi/ginkgo"
+//	. "github.com/onsi/gomega"
+)
+
+func initCSIDriverForSanity(t *testing.T) *csiDriver.S3Driver {
+	vendorVersion := "test-vendor-version-1.1.2"
+	driver := "mydriver"
+
+	endpoint := "test-endpoint"
+	nodeID := "test-nodeID"
+
+	// Creating test logger
+	logger, teardown := cloudProvider.GetTestLogger(t)
+	defer teardown()
+	// Setup the CSI driver
+	icDriver, err := csiDriver.Setups3Driver("controller", driver, vendorVersion, logger)
+	if err != nil {
+		t.Fatalf("Failed to setup CSI Driver: %v", err)
+	}
+
+	icsDriver, err := icDriver.NewS3CosDriver(nodeID, endpoint)
+	if err != nil {
+		t.Fatalf("Failed to create New COS CSI Driver: %v", err)
+	}
+
+	return icsDriver
+}
+
+func TestSanity(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping sanity testing...")
+	}
+	socket := "/tmp/csi-s3fs.sock"
+	csiEndpoint := "unix://" + socket
+
+	// Create a fake CSI driver
+	csiSanityDriver := initCSIDriverForSanity(t)
+	fmt.Println(csiSanityDriver)
+	go func() {
+		csiSanityDriver.Run()
+	}()
+
+	// Run sanity test
+	config := sanity.TestConfig{
+		TargetPath:  os.TempDir() + "/s3fs-no-bucket-target",
+		StagingPath: os.TempDir() + "/s3fs-no-bucket-staging",
+		Address:     csiEndpoint,
+		SecretsFile: "../../tests/secret.yaml",
+		TestVolumeParameters: map[string]string{
+			"mounter": "s3fs",
+			"bucket":  "testbucket0",
+		},
+	}
+	sanity.Test(t, config)
+	fmt.Println("here")
+}
+
+
+/*var _ = Describe("S3Driver", func() {
+
+	Context("geesefs", func() {
+		csiSanityDriver := initCSIDriverForSanity()
+		socket := "/tmp/csi-geesefs.sock"
+		csiEndpoint := "unix://" + socket
+		if err := os.Remove(socket); err != nil && !os.IsNotExist(err) {
+			Expect(err).NotTo(HaveOccurred())
+		}
+		go csiSanityDriver.Run()
+
+		Describe("CSI sanity", func() {
+			sanityCfg := &sanity.Config{
+				TargetPath:  os.TempDir() + "/geesefs-target",
+				StagingPath: os.TempDir() + "/geesefs-staging",
+				Address:     csiEndpoint,
+				//SecretsFile: "../../tests/secret.yaml",
+				TestVolumeParameters: map[string]string{
+					"mounter": "geesefs",
+					"bucket":  "testbucket0",
+				},
+			}
+			sanity.GinkgoTest(sanityCfg)
+		})
+	})
+})*/

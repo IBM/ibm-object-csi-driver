@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
- //Package driver ...
+//Package driver ...
 package driver
 
 import (
@@ -31,9 +31,9 @@ import (
 	"testing"
 )
 
-func getCustomControllerServer(csiDriver *s3Driver, factory s3client.ObjectStorageSessionFactory) *controllerServer {
+func getCustomControllerServer(csiDriver *S3Driver, factory s3client.ObjectStorageSessionFactory) *controllerServer {
 	return &controllerServer{
-		s3Driver:   csiDriver,
+		S3Driver:   csiDriver,
 		newSession: factory,
 	}
 }
@@ -106,10 +106,10 @@ func TestCreateVolumeArguments(t *testing.T) {
 				CapacityRange:      stdCapRange,
 				VolumeCapabilities: stdVolCap,
 				Secrets: map[string]string{"access-key": "xxx",
-					"secret-key":   "yyy",
-					"bucket-name":  "test-bucket",
-					"location-constraint":   "test-region",
-					"cos-endpoint": "test-endpoint",
+					"secret-key":          "yyy",
+					"bucket-name":         "test-bucket",
+					"location-constraint": "test-region",
+					"cos-endpoint":        "test-endpoint",
 				},
 			},
 			expVol: &csi.Volume{
@@ -175,10 +175,10 @@ func TestCreateVolumeArguments(t *testing.T) {
 				CapacityRange:      stdCapRange,
 				VolumeCapabilities: stdVolCap,
 				Secrets: map[string]string{"access-key": "xxx",
-					"secret-key":   "",
-					"bucket-name":  "test-bucket",
-					"location-constraint":   "test-region",
-					"cos-endpoint": "test-endpoint",
+					"secret-key":          "",
+					"bucket-name":         "test-bucket",
+					"location-constraint": "test-region",
+					"cos-endpoint":        "test-endpoint",
 				},
 			},
 			expVol: &csi.Volume{
@@ -196,10 +196,10 @@ func TestCreateVolumeArguments(t *testing.T) {
 				CapacityRange:      stdCapRange,
 				VolumeCapabilities: stdVolCap,
 				Secrets: map[string]string{"access-key": "xxx",
-					"secret-key":   "xxx",
-					"bucket-name":  "",
-					"location-constraint":   "test-region",
-					"cos-endpoint": "test-endpoint",
+					"secret-key":          "xxx",
+					"bucket-name":         "",
+					"location-constraint": "test-region",
+					"cos-endpoint":        "test-endpoint",
 				},
 			},
 			expVol: &csi.Volume{
@@ -217,10 +217,10 @@ func TestCreateVolumeArguments(t *testing.T) {
 				CapacityRange:      stdCapRange,
 				VolumeCapabilities: stdVolCap,
 				Secrets: map[string]string{"access-key": "",
-					"secret-key":   "xxx",
-					"bucket-name":  "test-bucket",
-					"location-constraint":   "test-region",
-					"cos-endpoint": "test-endpoint",
+					"secret-key":          "xxx",
+					"bucket-name":         "test-bucket",
+					"location-constraint": "test-region",
+					"cos-endpoint":        "test-endpoint",
 				},
 			},
 			expVol: &csi.Volume{
@@ -280,10 +280,10 @@ func TestDeleteVolume(t *testing.T) {
 			name: "Success volume delete",
 			req: &csi.DeleteVolumeRequest{VolumeId: "testVolumeId",
 				Secrets: map[string]string{"access-key": "xxx",
-					"secret-key":   "xxx",
-					"bucket-name":  "test-bucket",
-					"location-constraint":   "test-region",
-					"cos-endpoint": "test-endpoint",
+					"secret-key":          "xxx",
+					"bucket-name":         "test-bucket",
+					"location-constraint": "test-region",
+					"cos-endpoint":        "test-endpoint",
 				},
 			},
 			expResponse:          &csi.DeleteVolumeResponse{},
@@ -311,10 +311,10 @@ func TestDeleteVolume(t *testing.T) {
 			name: "Empty bucket name",
 			req: &csi.DeleteVolumeRequest{VolumeId: "testVolumeId",
 				Secrets: map[string]string{"access-key": "xxx",
-					"secret-key":   "xxx",
-					"bucket-name":  "",
-					"location-constraint":   "test-region",
-					"cos-endpoint": "test-endpoint",
+					"secret-key":          "xxx",
+					"bucket-name":         "",
+					"location-constraint": "test-region",
+					"cos-endpoint":        "test-endpoint",
 				},
 			},
 			//expResponse:          &csi.DeleteVolumeResponse{},
@@ -327,10 +327,10 @@ func TestDeleteVolume(t *testing.T) {
 			name: "Empty service instance id",
 			req: &csi.DeleteVolumeRequest{VolumeId: "testVolumeId",
 				Secrets: map[string]string{"api-key": "xxx",
-					"s-id":         "",
-					"bucket-name":  "",
-					"location-constraint":   "test-region",
-					"cos-endpoint": "test-endpoint",
+					"s-id":                "",
+					"bucket-name":         "",
+					"location-constraint": "test-region",
+					"cos-endpoint":        "test-endpoint",
 				},
 			},
 			//expResponse:          &csi.DeleteVolumeResponse{},

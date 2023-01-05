@@ -70,6 +70,8 @@ type ObjectStorageSessionFactory interface {
 	NewObjectStorageSession(endpoint, locationConstraint string, creds *ObjectStorageCredentials) ObjectStorageSession
 }
 
+var _ ObjectStorageSessionFactory = &COSSessionFactory{}
+
 // COSSession represents a COS (S3) session
 type COSSession struct {
 	logger *zap.Logger

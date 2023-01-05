@@ -34,7 +34,7 @@ const (
 	tib100 int64 = tib * 100
 )
 
-type s3Driver struct {
+type S3Driver struct {
 	name     string
 	version  string
 	mode     string
@@ -53,8 +53,8 @@ type s3Driver struct {
 	nscap []*csi.NodeServiceCapability
 }
 
-func Setups3Driver(mode, name, version string, lgr *zap.Logger) (*s3Driver, error) {
-	csiDriver := &s3Driver{}
+func Setups3Driver(mode, name, version string, lgr *zap.Logger) (*S3Driver, error) {
+	csiDriver := &S3Driver{}
 	csiDriver.logger = lgr
 	csiDriver.logger.Info("S3CSIDriver-SetupS3CSIDriver setting up S3 CSI Driver")
 	if name == "" {
@@ -69,26 +69,27 @@ func Setups3Driver(mode, name, version string, lgr *zap.Logger) (*s3Driver, erro
 	return csiDriver, nil
 }
 
-func newIdentityServer(d *s3Driver) *identityServer {
+func newIdentityServer(d *S3Driver) *identityServer {
 	return &identityServer{
-		s3Driver: d,
+		S3Driver: d,
 	}
 }
 
-func newControllerServer(d *s3Driver) *controllerServer {
+func newControllerServer(d *S3Driver, s3cosSession s3client.ObjectStorageSessionFactory) *controllerServer {
 	return &controllerServer{
-		s3Driver: d,
+		S3Driver: d,
+		cosSession: s3cosSession,
 	}
 }
 
-func newNodeServer(d *s3Driver, nodeID string) *nodeServer {
+func newNodeServer(d *S3Driver, nodeID string) *nodeServer {
 	return &nodeServer{
-		s3Driver: d,
+		S3Driver: d,
 		NodeID:   nodeID,
 	}
 }
 
-func (driver *s3Driver) NewS3CosDriver(nodeID string, endpoint string) (*s3Driver, error) {
+func (driver *S3Driver) NewS3CosDriver(nodeID string, endpoint string, s3cosSession s3client.ObjectStorageSessionFactory) (*S3Driver, error) {
 	s3client, err := s3client.NewS3Client(driver.logger)
 	if err != nil {
 		return nil, err
@@ -100,7 +101,7 @@ func (driver *s3Driver) NewS3CosDriver(nodeID string, endpoint string) (*s3Drive
 	// Create GRPC servers
 	driver.ids = newIdentityServer(driver)
 	if driver.mode == "controller" {
-		driver.cs = newControllerServer(driver)
+		driver.cs = newControllerServer(driver, s3cosSession)
 	}
 	if driver.mode == "node" {
 		driver.ns = newNodeServer(driver, nodeID)
@@ -109,7 +110,7 @@ func (driver *s3Driver) NewS3CosDriver(nodeID string, endpoint string) (*s3Drive
 	return driver, nil
 }
 
-func (driver *s3Driver) Run() {
+func (driver *S3Driver) Run() {
 	driver.logger.Info("--S3CSIDriver Run--")
 	driver.logger.Info("Driver:", zap.Reflect("Driver Name", driver.name))
 	driver.logger.Info("Version:", zap.Reflect("Driver Version", driver.version))

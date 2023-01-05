@@ -55,7 +55,7 @@ func GetTestLogger(t *testing.T) (logger *zap.Logger, teardown func()) {
 	return
 }
 
-func inits3Driver(t *testing.T) *s3Driver {
+func inits3Driver(t *testing.T) *S3Driver {
 	vendorVersion := "test-vendor-version-1.1.2"
 	driver := "mydriver"
 

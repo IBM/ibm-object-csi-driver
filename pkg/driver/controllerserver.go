@@ -38,9 +38,8 @@ const (
 
 // Implements Controller csi.ControllerServer
 type controllerServer struct {
-	*s3Driver
-	newSession s3client.ObjectStorageSessionFactory
-	cosSession s3client.COSSessionFactory
+	*S3Driver
+	cosSession s3client.ObjectStorageSessionFactory
 }
 
 var (

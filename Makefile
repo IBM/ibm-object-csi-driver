@@ -34,3 +34,5 @@ container: $(CMDS:%=container-%)
 
 clean:
 	-rm -rf bin
+test-sanity:
+	go test -timeout 160s ./tests/sanity -run ^TestSanity$$ -v

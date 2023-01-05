@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
+	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
 	libMetrics "github.com/IBM/ibmcloud-volume-interface/lib/metrics"
 	csiConfig "github.com/IBM/satellite-object-storage-plugin/config"
 	driver "github.com/IBM/satellite-object-storage-plugin/pkg/driver"
@@ -108,7 +108,7 @@ func serverSetup(options *Options, logger *zap.Logger) {
 		logger.Fatal("Failed to setup s3 driver", zap.Error(err))
 		os.Exit(1)
 	}
-	S3CSIDriver, err := csiDriver.NewS3CosDriver(options.NodeID, options.Endpoint)
+	S3CSIDriver, err := csiDriver.NewS3CosDriver(options.NodeID, options.Endpoint, s3client.COSSessionFactory)
 	if err != nil {
 		logger.Fatal("Failed in initialize s3 COS driver", zap.Error(err))
 		os.Exit(1)
