@@ -78,6 +78,10 @@ type COSSession struct {
 	svc    s3API
 }
 
+func NewObjectStorageSessionFactory() *COSSessionFactory {
+	return &COSSessionFactory{}
+}
+
 type s3API interface {
 	HeadBucket(input *s3.HeadBucketInput) (*s3.HeadBucketOutput, error)
 	CreateBucket(input *s3.CreateBucketInput) (*s3.CreateBucketOutput, error)
