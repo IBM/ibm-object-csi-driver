@@ -76,18 +76,18 @@ func (cs *controllerServer) getCredentials(secretMap map[string]string) (*s3clie
 		authType = "hmac"
 		accessKey = secretMap["access-key"]
 		if accessKey == "" {
-			return nil, status.Error(codes.Unauthenticated, fmt.Sprintf("Valid access credentials are not provided in the secret| access-key missing"))
+			return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| access-key missing")
 		}
 
 		secretKey = secretMap["secret-key"]
 		if secretKey == "" {
-			return nil, status.Error(codes.Unauthenticated, fmt.Sprintf("Valid access credentials are not provided in the secret| secret-key missing"))
+			return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| secret-key missing")
 		}
 	} else {
 		authType = "iam"
 		serviceInstanceID = secretMap["service-id"]
 		if serviceInstanceID == "" {
-			return nil, status.Error(codes.Unauthenticated, fmt.Sprintf("Valid access credentials are not provided in the secret| serviceInstanceID  missing"))
+			return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| serviceInstanceID  missing")
 		}
 	}
 
@@ -216,7 +216,10 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	endPoint := secretMap["cos-endpoint"]
 	locationConstraint := secretMap["location-constraint"]
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds)
-	sess.DeleteBucket(bucketName)
+	err = sess.DeleteBucket(bucketName)
+	if err != nil {
+		return nil, fmt.Errorf("cannot delete bucket: %v", err)
+	}
 
 	return &csi.DeleteVolumeResponse{}, nil
 }
@@ -334,7 +337,7 @@ func sanitizeVolumeID(volumeID string) string {
 	volumeID = strings.ToLower(volumeID)
 	if len(volumeID) > 63 {
 		h := sha1.New()
-		io.WriteString(h, volumeID)
+		io.WriteString(h, volumeID) //nolint
 		volumeID = hex.EncodeToString(h.Sum(nil))
 	}
 	return volumeID

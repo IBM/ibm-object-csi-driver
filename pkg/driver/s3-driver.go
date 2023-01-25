@@ -20,18 +20,7 @@ import (
 	"fmt"
 
 	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
-	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"go.uber.org/zap"
-)
-
-const (
-	kib    int64 = 1024
-	mib    int64 = kib * 1024
-	gib    int64 = mib * 1024
-	gib10  int64 = gib * 10
-	gib100 int64 = gib * 100
-	tib    int64 = gib * 1024
-	tib100 int64 = tib * 100
 )
 
 type s3Driver struct {
@@ -47,11 +36,13 @@ type s3Driver struct {
 	cs  *controllerServer
 
 	logger *zap.Logger
-
-	cap   []*csi.ControllerServiceCapability
-	vc    []*csi.VolumeCapability_AccessMode
-	nscap []*csi.NodeServiceCapability
 }
+
+const (
+	kib int64 = 1024
+	mib int64 = kib * 1024
+	gib int64 = mib * 1024
+)
 
 func Setups3Driver(mode, name, version string, lgr *zap.Logger) (*s3Driver, error) {
 	csiDriver := &s3Driver{}

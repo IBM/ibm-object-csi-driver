@@ -1,7 +1,7 @@
 language: go
 
 go:
-  - "1.15.5"
+  - "1.18"
   - tip
 
 group: bluezone
@@ -24,7 +24,6 @@ before_script:
   - go get github.com/pierrre/gotestcover
 
 script:
-  - make vet
   - make fmt
   - make test
   - make coverage

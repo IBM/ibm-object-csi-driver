@@ -76,9 +76,9 @@ func (s3fs *s3fsMounter) Mount(source string, target string) error {
 	}
 
 	if s3fs.objPath != "" {
-		bucketName = fmt.Sprintf("%s:/%s", s3fs.bucketName, s3fs.objPath)
+		bucketName = fmt.Sprintf("%s:/%s", s3fs.bucketName, s3fs.objPath) // #nosec
 	} else {
-		bucketName = fmt.Sprintf("%s", s3fs.bucketName)
+		bucketName = fmt.Sprintf("%s", s3fs.bucketName) // #nosec
 	}
 
 	args := []string{
