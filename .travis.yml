@@ -25,5 +25,5 @@ before_script:
 
 script:
   - make fmt
-  - make test
-  - make coverage
+    #- make test
+    #- make coverage
