@@ -1,8 +1,9 @@
 language: go
 
 go:
+
   - "1.18.4"
-  - tip
+
 
 group: bluezone
 
@@ -27,3 +28,4 @@ script:
   - make fmt
     #- make test
     #- make coverage
+
