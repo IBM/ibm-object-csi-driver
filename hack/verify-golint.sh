@@ -26,6 +26,6 @@ fi
 echo "Verifying golint"
 readonly PKG_ROOT="$(git rev-parse --show-toplevel)"
 
-golangci-lint run --deadline=10m -buildvcs=false
+golangci-lint run --deadline=10m
 
 echo "Congratulations! Lint check completed for all Go source files."
