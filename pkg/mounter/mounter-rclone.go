@@ -1,10 +1,12 @@
 package mounter
 
 import (
+	"bufio"
 	"crypto/sha256"
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"k8s.io/klog/v2"
 )
@@ -34,7 +36,12 @@ func newRcloneMounter(bucket string, objpath string, endpoint string, region str
 const (
 	rcloneCmd      = "rclone"
 	metaRootRclone = "/var/lib/ibmc-rclone"
-	passFileRclone = ".passwd-rclone"
+	configPath     = ".config/rclone"
+	configFileName = "rclone.conf"
+	remote         = "rclone-remote"
+	s3Type         = "s3"
+	provider       = "IBMCOS"
+	env_auth       = "true"
 )
 
 func (rclone *rcloneMounter) Stage(stagePath string) error {
@@ -63,30 +70,21 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 		}
 	}
 
-	//TODO: We need to see if we want to create a file to store Rclone creds or provide them some other way. For now we are mirroring s3fs set up.
-
-	passwdFile := path.Join(metaPath, passFileRclone)
-	if err = writePass(passwdFile, rclone.accessKeys); err != nil {
-		klog.Errorf("rcloneMounter Mount: Cannot create file %s: %v", passwdFile, err)
-		return fmt.Errorf("rcloneMounter Mount: Cannot create file %s: %v", passwdFile, err)
+	if err = createConfig(rclone.endPoint, rclone.regnClass, rclone.accessKeys); err != nil {
+		klog.Errorf("RcloneMounter Mount: Cannot create rclone config %v", err)
+		return fmt.Errorf("RcloneMounter Mount: Cannot create rclone config %v", err)
 	}
 
 	if rclone.objPath != "" {
-		bucketName = fmt.Sprintf("%s:/%s", rclone.bucketName, rclone.objPath)
+		bucketName = fmt.Sprintf("%s:%s/%s", remote, rclone.bucketName, rclone.objPath)
 	} else {
-		bucketName = fmt.Sprintf("%s", rclone.bucketName)
+		bucketName = fmt.Sprintf("%s:%s", remote, rclone.bucketName)
 	}
 
 	args := []string{
 		bucketName,
 		fmt.Sprintf("%s", target),
-		"-o", "sigv2",
-		"-o", "use_path_request_style",
-		"-o", fmt.Sprintf("passwd_file=%s", passwdFile),
-		"-o", fmt.Sprintf("url=%s", rclone.endPoint),
-		"-o", fmt.Sprintf("endpoint=%s", rclone.regnClass),
-		"-o", "allow_other",
-		"-o", "mp_umask=002",
+		"--daemon",
 	}
 	return fuseMount(target, rcloneCmd, args)
 }
@@ -98,9 +96,36 @@ func (rclone *rcloneMounter) Unmount(target string) error {
 	return FuseUnmount(target)
 }
 
-//We might want to use rclone env variables will need to have a method to set them up
-// $ export RCLONE_CONFIG_OCI_TYPE=s3
-// $ export RCLONE_CONFIG_OCI_ACCESS_KEY_ID=<your_access_key>
-// $ export RCLONE_CONFIG_OCI_SECRET_ACCESS_KEY=<your_secret_key>
-// $ export RCLONE_CONFIG_OCI_REGION=<your_region_identifier>
-// $ export RCLONE_CONFIG_OCI_ENDPOINT=
+func createConfig(endpoint, location_constraint, accessKeys string) error {
+	keys := strings.Split(accessKeys, ":")
+	lines := []string{
+		"[" + remote + "]",
+		"type = " + s3Type,
+		"endpoint = " + endpoint,
+		"provider = " + provider,
+		"env_auth = " + env_auth,
+		"location_constraint = " + location_constraint,
+		"access_key_id = " + keys[0],
+		"secret_access_key = " + keys[1],
+	}
+	if err := os.MkdirAll(configPath, 0755); err != nil {
+		fmt.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", configPath, err)
+		return fmt.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", configPath, err)
+	}
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	configFile := path.Join(homeDir, configPath, configFileName)
+	file, err := os.OpenFile(configFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed creating file: %s", err)
+	}
+	datawriter := bufio.NewWriter(file)
+	for _, line := range lines {
+		_, _ = datawriter.WriteString(line + "\n")
+	}
+	datawriter.Flush()
+	file.Close()
+	return nil
+}

@@ -156,7 +156,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	fmt.Println("CreateVolume Secrets:\n\t", secretMap)
 
 	//func newMounter(mounter string, bucket string, objpath string, endpoint string, region string, keys string) (Mounter, error) {
-	if mounterObj, err = newmounter("s3fs",
+	if mounterObj, err = newmounter(secretMap["mounter"],
 		secretMap["bucket-name"], secretMap["obj-path"],
 		secretMap["cos-endpoint"], secretMap["regn-class"],
 		fmt.Sprintf("%s:%s", accessKey, secretKey)); err != nil {
