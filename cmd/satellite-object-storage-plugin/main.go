@@ -51,7 +51,7 @@ func getOptions() *Options {
 		nodeID         = flag.String("nodeid", "host01", "node id")
 		metricsAddress = flag.String("metrics-address", "0.0.0.0:9080", "Metrics address")
 	)
-	flag.Set("logtostderr", "true")
+	flag.Set("logtostderr", "true") //nolint
 	flag.Parse()
 	return &Options{
 		ServerMode:     *serverMode,

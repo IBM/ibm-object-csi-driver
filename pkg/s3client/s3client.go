@@ -100,9 +100,7 @@ func (s *COSSession) CheckBucketAccess(bucket string) error {
 
 func (s *COSSession) CheckObjectPathExistence(bucket string, objectpath string) (bool, error) {
 	s.logger.Info("CheckObjectPathExistence args", zap.String("bucket", bucket), zap.String("objectpath", objectpath))
-	if strings.HasPrefix(objectpath, "/") {
-		objectpath = strings.TrimPrefix(objectpath, "/")
-	}
+	objectpath = strings.TrimPrefix(objectpath, "/")
 	resp, err := s.svc.ListObjectsV2(&s3.ListObjectsV2Input{
 		Bucket:  aws.String(bucket),
 		MaxKeys: aws.Int64(1),

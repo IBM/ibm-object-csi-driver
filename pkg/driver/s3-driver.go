@@ -21,7 +21,6 @@ import (
 	"github.com/IBM/ibm-csi-common/pkg/utils"
 	"github.com/IBM/satellite-object-storage-plugin/pkg/mounter"
 	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
-	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"go.uber.org/zap"
 )
 
@@ -29,10 +28,6 @@ const (
 	kib    int64 = 1024
 	mib    int64 = kib * 1024
 	gib    int64 = mib * 1024
-	gib10  int64 = gib * 10
-	gib100 int64 = gib * 100
-	tib    int64 = gib * 1024
-	tib100 int64 = tib * 100
 )
 
 type S3Driver struct {

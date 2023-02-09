@@ -21,10 +21,7 @@ var (
 )
 
 const (
-	s3fsMounterType   = "s3fs"
-	goofysMounterType = "goofys"
-	rcloneMounterType = "rclone"
-	mounterTypeKey    = "mounter"
+	s3fsMounterType = "s3fs"
 )
 
 type S3fsMounterFactory struct{}

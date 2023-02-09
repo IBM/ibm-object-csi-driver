@@ -58,16 +58,6 @@ var (
 			},
 		},
 	}
-	stdVolCapNotSupported = []*csi.VolumeCapability{
-		{
-			AccessType: &csi.VolumeCapability_Mount{
-				Mount: &csi.VolumeCapability_MountVolume{FsType: "ext2"},
-			},
-			AccessMode: &csi.VolumeCapability_AccessMode{
-				Mode: csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
-			},
-		},
-	}
 	stdBlockVolCap = []*csi.VolumeCapability{
 		{
 			AccessType: &csi.VolumeCapability_Block{
