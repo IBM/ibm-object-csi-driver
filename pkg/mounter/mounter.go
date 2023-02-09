@@ -21,10 +21,7 @@ var (
 )
 
 const (
-	s3fsMounterType   = "s3fs"
-	goofysMounterType = "goofys"
-	rcloneMounterType = "rclone"
-	mounterTypeKey    = "mounter"
+	s3fsMounterType = "s3fs"
 )
 
 // func newS3fsMounter(bucket string, objpath string, endpoint string, region string, keys string)

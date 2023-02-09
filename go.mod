@@ -7,7 +7,6 @@ require (
 	github.com/IBM/ibmcloud-storage-volume-lib v0.0.2
 	github.com/IBM/ibmcloud-volume-interface v1.0.0
 	github.com/container-storage-interface/spec v1.6.0
-	github.com/golang/glog v1.0.0
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/prometheus/client_golang v1.12.2
 	github.com/stretchr/testify v1.7.5
@@ -16,7 +15,6 @@ require (
 	google.golang.org/grpc v1.47.0
 	k8s.io/klog/v2 v2.70.0
 	k8s.io/kubernetes v1.21.0
-	k8s.io/mount-utils v0.24.2
 )
 
 require (
@@ -45,6 +43,7 @@ require (
 	k8s.io/apimachinery v0.24.4 // indirect
 	k8s.io/apiserver v0.21.0 // indirect
 	k8s.io/component-base v0.21.0 // indirect
+	k8s.io/mount-utils v0.24.2 // indirect
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9 // indirect
 )
 

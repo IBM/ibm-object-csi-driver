@@ -21,11 +21,7 @@ import (
 )
 
 const (
-	s3fsMounterType     = "s3fs"
-	goofysMounterType   = "goofys"
-	s3qlMounterType     = "s3ql"
-	s3backerMounterType = "s3backer"
-	mounterTypeKey      = "mounter"
+	s3fsMounterType = "s3fs"
 )
 
 //func newS3fsMounter(bucket string, objpath string, endpoint string, region string, keys string)

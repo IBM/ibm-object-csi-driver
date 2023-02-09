@@ -31,11 +31,6 @@ import (
 const defaultVolumeID = "csiprovidervolumeid"
 const defaultTargetPath = "/mnt/test"
 const defaultStagingPath = "/staging"
-const defaultVolumePath = "/var/volpath"
-
-const errorDeviceInfo = "/for/errordevicepath"
-const errorBlockDevice = "/for/errorblock"
-const notBlockDevice = "/for/notblocktest"
 
 var (
 	unmountSuccess            = func(target string) error { return nil }
