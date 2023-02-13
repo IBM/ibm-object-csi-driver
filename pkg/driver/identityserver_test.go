@@ -49,7 +49,7 @@ func TestGetPluginInfo(t *testing.T) {
 	}
 
 	// set driver as nil
-	icDriver.ids.s3Driver = nil
+	icDriver.ids.S3Driver = nil
 	resp, err = icDriver.ids.GetPluginInfo(context.Background(), &csi.GetPluginInfoRequest{})
 	assert.NotNil(t, err)
 	assert.Nil(t, resp)
