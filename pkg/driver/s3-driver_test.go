@@ -17,6 +17,8 @@ package driver
 
 import (
 	"bytes"
+	"github.com/IBM/satellite-object-storage-plugin/pkg/mounter"
+	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -55,12 +57,16 @@ func GetTestLogger(t *testing.T) (logger *zap.Logger, teardown func()) {
 	return
 }
 
-func inits3Driver(t *testing.T) *s3Driver {
+func inits3Driver(t *testing.T) *S3Driver {
 	vendorVersion := "test-vendor-version-1.1.2"
 	driver := "mydriver"
 
 	endpoint := "test-endpoint"
 	nodeID := "test-nodeID"
+
+	//This has to be used as fake cosSession and fake Mounter
+	mockSession := &s3client.COSSessionFactory{}
+	mockMountObj := &mounter.S3fsMounterFactory{}
 
 	// Creating test logger
 	logger, teardown := GetTestLogger(t)
@@ -72,7 +78,7 @@ func inits3Driver(t *testing.T) *s3Driver {
 		t.Fatalf("Failed to setup CSI Driver: %v", err)
 	}
 
-	icsDriver, err := icDriver.NewS3CosDriver(nodeID, endpoint)
+	icsDriver, err := icDriver.NewS3CosDriver(nodeID, endpoint, mockSession, mockMountObj)
 	if err != nil {
 		t.Fatalf("Failed to create New COS CSI Driver: %v", err)
 	}

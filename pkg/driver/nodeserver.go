@@ -35,9 +35,10 @@ const (
 
 // Implements Node Server csi.NodeServer
 type nodeServer struct {
-	*s3Driver
-	Stats  statsUtils
-	NodeID string
+	*S3Driver
+	Stats   statsUtils
+	NodeID  string
+	Mounter mounter.NewMounterFactory
 }
 
 type statsUtils interface {
@@ -52,7 +53,6 @@ type VolumeStatsUtils struct {
 
 var (
 	mounterObj      mounter.Mounter
-	newmounter      = mounter.NewMounter
 	fuseunmount     = mounter.FuseUnmount
 	checkMountpoint = checkMount
 	// nodeCaps represents the capability of node service.
@@ -156,7 +156,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	fmt.Println("CreateVolume Secrets:\n\t", secretMap)
 
 	//func newMounter(mounter string, bucket string, objpath string, endpoint string, region string, keys string) (Mounter, error) {
-	if mounterObj, err = newmounter(secretMap["mounter"],
+	if mounterObj, err = ns.Mounter.NewMounter(secretMap["mounter"],
 		secretMap["bucket-name"], secretMap["obj-path"],
 		secretMap["cos-endpoint"], secretMap["regn-class"],
 		fmt.Sprintf("%s:%s", accessKey, secretKey)); err != nil {
@@ -166,6 +166,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	klog.Info("-NodePublishVolume-: Mount")
 
 	if err = mounterObj.Mount("", targetPath); err != nil {
+		klog.Info("-Mount-: Error %v", err)
 		return nil, err
 	}
 
@@ -202,8 +203,12 @@ func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 func (ns *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
 	klog.V(2).Infof("NodeGetVolumeStats: Request: %+v", *req)
 
+	volumeID := req.GetVolumeId()
 	if req.VolumePath == "" {
-		return nil, status.Error(codes.NotFound, "Path Doesn't exist")
+		return nil, status.Error(codes.InvalidArgument, "Path Doesn't exist")
+	}
+	if len(volumeID) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 
 	klog.V(2).Info("NodeGetVolumeStats: Start getting Stats")
@@ -264,6 +269,7 @@ func checkMount(targetPath string) (bool, error) {
 		klog.V(3).Infof("Output: Output string error %+v", outStr)
 		if strings.HasSuffix(outStr, "No such file or directory") {
 			if err = os.MkdirAll(targetPath, 0750); err != nil {
+				klog.V(2).Infof("checkMount: Error: %+v", err)
 				return false, err
 			}
 			notMnt = true
@@ -276,11 +282,13 @@ func checkMount(targetPath string) (bool, error) {
 
 func (ns *nodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	klog.V(3).Infof("NodeGetInfo: called with args %+v", *req)
-
+	top := &csi.Topology{}
 	resp := &csi.NodeGetInfoResponse{
-		NodeId:            ns.NodeID,
-		MaxVolumesPerNode: DefaultVolumesPerNode,
+		NodeId:             ns.NodeID,
+		MaxVolumesPerNode:  DefaultVolumesPerNode,
+		AccessibleTopology: top,
 	}
+	fmt.Println(resp)
 	return resp, nil
 
 }

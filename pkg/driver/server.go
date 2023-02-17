@@ -124,11 +124,15 @@ func (s *nonBlockingGRPCServer) Setup(endpoint string, ids csi.IdentityServer, c
 	if s.mode == "controller" {
 		klog.V(3).Info("--Starting server in controller mode--")
 		csi.RegisterControllerServer(s.server, cs)
-	}
-	if s.mode == "node" {
+	} else if s.mode == "node" {
 		klog.V(3).Info("--Starting server in node server mode--")
 		csi.RegisterNodeServer(s.server, ns)
+	} else if s.mode == "controller-node" {
+		klog.V(3).Info("--Starting node and controller server mode--")
+		csi.RegisterControllerServer(s.server, cs)
+		csi.RegisterNodeServer(s.server, ns)
 	}
+
 	return listener, nil
 }
 
