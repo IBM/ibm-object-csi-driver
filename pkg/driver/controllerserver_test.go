@@ -31,9 +31,9 @@ import (
 	"testing"
 )
 
-func getCustomControllerServer(csiDriver *s3Driver, factory s3client.ObjectStorageSessionFactory) *controllerServer {
+func getCustomControllerServer(csiDriver *S3Driver, factory s3client.ObjectStorageSessionFactory) *controllerServer {
 	return &controllerServer{
-		s3Driver:   csiDriver,
+		S3Driver:   csiDriver,
 		newSession: factory,
 	}
 }
