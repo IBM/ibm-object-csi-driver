@@ -76,10 +76,10 @@ spec:
       labels:
         app: cos-s3-csi-controller
     spec:
-      serviceAccountName: csi-provisioner
+      serviceAccountName: cos-s3-csi-controller
       containers:
         - name: csi-provisioner
-          image: image-registry.openshift-image-registry.svc:5000/default/csi-provisioner:v2.2.2
+          image: csi-provisioner-image
           args:
             - "--csi-address=$(ADDRESS)"
             - "--timeout=180s"
@@ -91,8 +91,8 @@ spec:
           volumeMounts:
             - mountPath: /csi
               name: socket-dir
-        - name: cos-s3-csi-provisioner
-          image: image-registry.openshift-image-registry.svc:5000/default/satellite-object-storage-plugin:v1.1.3
+        - name: cos-driver
+          image: cos-driver-image
           args:
             - "--servermode=controller"
             - "--endpoint=$(CSI_ENDPOINT)"

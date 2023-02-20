@@ -67,10 +67,10 @@ spec:
       labels:
         app: cos-s3-csi-attacher
     spec:
-      serviceAccountName: csi-attacher
+      serviceAccountName: cos-s3-csi-attacher
       containers:
         - name: csi-attacher
-          image: image-registry.openshift-image-registry.svc:5000/default/csi-attacher:v3.2.1
+          image: csi-attacher-image
           args:
             - --v=5
             - --csi-address=$(ADDRESS)

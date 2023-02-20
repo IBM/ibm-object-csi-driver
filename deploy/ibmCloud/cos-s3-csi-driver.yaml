@@ -64,7 +64,7 @@ spec:
       hostNetwork: true
       containers:
         - name: driver-registrar
-          image: image-registry.openshift-image-registry.svc:5000/default/csi-node-driver-registrar:v2.2.0
+          image: driver-registrar-image
           args:
             - --v=5
             - --csi-address=$(ADDRESS)
@@ -85,13 +85,13 @@ spec:
             mountPath: /csi
           - name: registration-dir
             mountPath: /registration
-        - name: cos-s3-csi-driver
+        - name: cos-driver
           securityContext:
             privileged: true
             capabilities:
               add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
-          image: image-registry.openshift-image-registry.svc:5000/default/satellite-object-storage-plugin:v1.1.3
+          image: cos-driver-image
           args:
             - "--servermode=node"
             - "--endpoint=$(CSI_ENDPOINT)"
@@ -107,8 +107,6 @@ spec:
                   apiVersion: v1
                   fieldPath: spec.nodeName
           imagePullPolicy: Always
-          securityContext:
-            privileged: true
           volumeMounts:
             - name: plugin-dir
               mountPath: /csi
