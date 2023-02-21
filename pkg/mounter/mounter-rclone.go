@@ -36,7 +36,7 @@ func newRcloneMounter(bucket string, objpath string, endpoint string, region str
 const (
 	rcloneCmd      = "rclone"
 	metaRootRclone = "/var/lib/ibmc-rclone"
-	configPath     = ".config/rclone"
+	configPath     = "/root/.config/rclone"
 	configFileName = "rclone.conf"
 	remote         = "rclone-remote"
 	s3Type         = "s3"
@@ -60,19 +60,19 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 
 	if pathExist, err = checkPath(metaPath); err != nil {
 		klog.Errorf("RcloneMounter Mount: Cannot stat directory %s: %v", metaPath, err)
-		return fmt.Errorf("RcloneMounter Mount: Cannot stat directory %s: %v", metaPath, err)
+		return err
 	}
 
 	if !pathExist {
 		if err = os.MkdirAll(metaPath, 0755); err != nil {
 			klog.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", metaPath, err)
-			return fmt.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", metaPath, err)
+			return err
 		}
 	}
 
 	if err = createConfig(rclone.endPoint, rclone.regnClass, rclone.accessKeys); err != nil {
-		klog.Errorf("RcloneMounter Mount: Cannot create rclone config %v", err)
-		return fmt.Errorf("RcloneMounter Mount: Cannot create rclone config %v", err)
+		klog.Errorf("RcloneMounter Mount: Cannot create rclone config file %v", err)
+		return err
 	}
 
 	if rclone.objPath != "" {
@@ -82,6 +82,7 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 	}
 
 	args := []string{
+		"mount",
 		bucketName,
 		fmt.Sprintf("%s", target),
 		"--daemon",
@@ -108,24 +109,32 @@ func createConfig(endpoint, location_constraint, accessKeys string) error {
 		"access_key_id = " + keys[0],
 		"secret_access_key = " + keys[1],
 	}
+
 	if err := os.MkdirAll(configPath, 0755); err != nil {
-		fmt.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", configPath, err)
-		return fmt.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", configPath, err)
-	}
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
+		klog.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", configPath, err)
 		return err
 	}
-	configFile := path.Join(homeDir, configPath, configFileName)
-	file, err := os.OpenFile(configFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+
+	configFile := path.Join(configPath, configFileName)
+	file, err := os.Create(configFile)
 	if err != nil {
-		return fmt.Errorf("failed creating file: %s", err)
+		klog.Errorf("RcloneMounter Mount: Cannot create file %s: %v", configFileName, err)
+		return err
 	}
+	defer file.Close()
+
+	err = os.Chmod(configFile, 0644)
+	if err != nil {
+		klog.Errorf("RcloneMounter Mount: Cannot change permissions on file  %s: %v", configFileName, err)
+		return err
+	}
+
+	klog.Info("-Rclone writing to config-")
 	datawriter := bufio.NewWriter(file)
 	for _, line := range lines {
 		_, _ = datawriter.WriteString(line + "\n")
 	}
 	datawriter.Flush()
-	file.Close()
+	klog.Info("-Rclone created rclone config file-")
 	return nil
 }

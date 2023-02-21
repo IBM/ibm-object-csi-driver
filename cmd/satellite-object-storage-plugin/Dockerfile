@@ -30,7 +30,7 @@ FROM registry.access.redhat.com/ubi8/ubi as rclone-builder
 RUN yum install wget git gcc -y
 
 ENV ARCH=amd64
-ENV GO_VERSION=1.18.3
+ENV GO_VERSION=1.19
 
 RUN echo $ARCH $GO_VERSION
 
@@ -50,7 +50,7 @@ RUN cd rclone && go build && ./rclone version && cp rclone /usr/local/bin/rclone
 
 FROM registry.access.redhat.com/ubi8/ubi:latest
 LABEL description="Satellite Object Storage Plugin"
-RUN yum update -y && yum install fuse fuse-libs -y
+RUN yum update -y && yum install fuse fuse-libs fuse3 fuse3-libs -y
 COPY --from=s3fs-builder /usr/local/bin/s3fs /usr/bin/s3fs
 COPY --from=rclone-builder /usr/local/bin/rclone /usr/bin/rclone
 COPY ./bin/satellite-object-storage-plugin satellite-object-storage-plugin
