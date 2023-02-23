@@ -132,7 +132,11 @@ func createConfig(endpoint, location_constraint, accessKeys string) error {
 	klog.Info("-Rclone writing to config-")
 	datawriter := bufio.NewWriter(file)
 	for _, line := range lines {
-		_, _ = datawriter.WriteString(line + "\n")
+		_, err = datawriter.WriteString(line + "\n")
+		if err != nil {
+			klog.Errorf("RcloneMounter Mount: Could not write file: %v", err)
+			return err
+		}
 	}
 	datawriter.Flush()
 	klog.Info("-Rclone created rclone config file-")
