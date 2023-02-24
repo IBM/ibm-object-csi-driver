@@ -2,11 +2,9 @@ package mounter
 
 import (
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"os"
 	"path"
-	"syscall"
 
 	"k8s.io/klog/v2"
 )
@@ -70,7 +68,7 @@ func (s3fs *s3fsMounter) Mount(source string, target string) error {
 	}
 
 	passwdFile := path.Join(metaPath, passFile)
-	if err = writes3fsPass(passwdFile, s3fs.accessKeys); err != nil {
+	if err = writePass(passwdFile, s3fs.accessKeys); err != nil {
 		klog.Errorf("S3FSMounter Mount: Cannot create file %s: %v", passwdFile, err)
 		return fmt.Errorf("S3FSMounter Mount: Cannot create file %s: %v", passwdFile, err)
 	}
@@ -101,51 +99,4 @@ func (s3fs *s3fsMounter) Unmount(target string) error {
 	os.RemoveAll(metaPath)
 
 	return FuseUnmount(target)
-}
-
-func checkPath(path string) (bool, error) {
-	if path == "" {
-		return false, errors.New("Undefined path")
-	}
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	} else if os.IsNotExist(err) {
-		return false, nil
-	} else if isCorruptedMnt(err) {
-		return true, err
-	} else {
-		return false, err
-	}
-}
-
-func isCorruptedMnt(err error) bool {
-	if err == nil {
-		return false
-	}
-	var underlyingError error
-	switch pe := err.(type) {
-	case nil:
-		return false
-	case *os.PathError:
-		underlyingError = pe.Err
-	case *os.LinkError:
-		underlyingError = pe.Err
-	case *os.SyscallError:
-		underlyingError = pe.Err
-	}
-	return underlyingError == syscall.ENOTCONN || underlyingError == syscall.ESTALE
-}
-
-func writes3fsPass(pwFileName string, pwFileContent string) error {
-	pwFile, err := os.OpenFile(pwFileName, os.O_RDWR|os.O_CREATE, 0600)
-	if err != nil {
-		return err
-	}
-	_, err = pwFile.WriteString(pwFileContent)
-	if err != nil {
-		return err
-	}
-	pwFile.Close()
-	return nil
 }

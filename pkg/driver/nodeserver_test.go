@@ -19,7 +19,7 @@ package driver
 
 import (
 	"errors"
-	fakemounter "github.com/IBM/satellite-object-storage-plugin/pkg/driver/fake/mounter"
+	// fakemounter "github.com/IBM/satellite-object-storage-plugin/pkg/driver/fake/mounter"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
@@ -40,7 +40,7 @@ var (
 )
 
 func TestNodePublishVolume(t *testing.T) {
-	newmounter = fakemounter.NewMounter
+	// newmounter = fakemounter.NewMounter
 	testCases := []struct {
 		name       string
 		req        *csi.NodePublishVolumeRequest

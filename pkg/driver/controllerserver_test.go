@@ -34,6 +34,7 @@ import (
 func getCustomControllerServer(csiDriver *S3Driver, factory s3client.ObjectStorageSessionFactory) *controllerServer {
 	return &controllerServer{
 		S3Driver:   csiDriver,
+		cosSession: factory,
 		newSession: factory,
 	}
 }

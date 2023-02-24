@@ -1,8 +1,10 @@
 package mounter
 
 import (
+	"errors"
 	"fmt"
 	"k8s.io/klog/v2"
+	"os"
 	"os/exec"
 	"syscall"
 	"time"
@@ -22,6 +24,7 @@ var (
 
 const (
 	s3fsMounterType   = "s3fs"
+	rcloneMounterType = "rclone"
 )
 
 type S3fsMounterFactory struct{}
@@ -41,6 +44,8 @@ func (s *S3fsMounterFactory) NewMounter(mounter string, bucket string, objpath s
 	switch mounter {
 	case s3fsMounterType:
 		return newS3fsMounter(bucket, objpath, endpoint, region, keys)
+	case rcloneMounterType:
+		return newRcloneMounter(bucket, objpath, endpoint, region, keys)
 	default:
 		// default to s3backer
 		return newS3fsMounter(bucket, objpath, endpoint, region, keys)
@@ -53,8 +58,8 @@ func fuseMount(path string, comm string, args []string) error {
 	out, err := command(comm, args...).CombinedOutput()
 
 	if err != nil {
-		klog.Infof("fuseMount: cmd failed: <%s>\nargs: <%s>\noutput: <%s>", comm, args, out)
-		return fmt.Errorf("fuseMount: cmd failed: %s\nargs: %s\noutput: %s", comm, args, out)
+		klog.Infof("fuseMount: cmd failed: <%s>\nargs: <%s>\noutput: <%s>\nerror: <%v>", comm, args, out, err)
+		return fmt.Errorf("fuseMount: cmd failed: <%s>\nargs: <%s>\noutput: <%s>\nerror: <%v>", comm, args, out, err)
 	}
 
 	return waitForMount(path, 10*time.Second)
@@ -88,4 +93,51 @@ func FuseUnmount(path string) error {
 	}
 	klog.Infof("Found fuse pid %v of mount %s, checking if it still runs", process.Pid, path)
 	return waitForProcess(process, 1)
+}
+
+func checkPath(path string) (bool, error) {
+	if path == "" {
+		return false, errors.New("Undefined path")
+	}
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	} else if os.IsNotExist(err) {
+		return false, nil
+	} else if isCorruptedMnt(err) {
+		return true, err
+	} else {
+		return false, err
+	}
+}
+
+func isCorruptedMnt(err error) bool {
+	if err == nil {
+		return false
+	}
+	var underlyingError error
+	switch pe := err.(type) {
+	case nil:
+		return false
+	case *os.PathError:
+		underlyingError = pe.Err
+	case *os.LinkError:
+		underlyingError = pe.Err
+	case *os.SyscallError:
+		underlyingError = pe.Err
+	}
+	return underlyingError == syscall.ENOTCONN || underlyingError == syscall.ESTALE
+}
+
+func writePass(pwFileName string, pwFileContent string) error {
+	pwFile, err := os.OpenFile(pwFileName, os.O_RDWR|os.O_CREATE, 0600)
+	if err != nil {
+		return err
+	}
+	_, err = pwFile.WriteString(pwFileContent)
+	if err != nil {
+		return err
+	}
+	pwFile.Close()
+	return nil
 }
