@@ -35,7 +35,6 @@ func getCustomControllerServer(csiDriver *S3Driver, factory s3client.ObjectStora
 	return &controllerServer{
 		S3Driver:   csiDriver,
 		cosSession: factory,
-		newSession: factory,
 	}
 }
 
