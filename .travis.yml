@@ -2,7 +2,7 @@ language: go
 
 go:
 
-  - "1.20.1"
+  - "1.19.6"
 
 
 group: bluezone
