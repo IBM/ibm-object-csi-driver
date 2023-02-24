@@ -1,6 +1,6 @@
 module github.com/IBM/satellite-object-storage-plugin
 
-go 1.18
+go 1.20
 
 require (
 	github.com/IBM/ibm-cos-sdk-go v1.9.4
