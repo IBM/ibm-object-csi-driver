@@ -50,3 +50,29 @@ Provide proper values for parameters in secret under examples/cos-s3-csi-pvc-sec
       `kubectl create -f examples/cos-s3-csi-pvc.yaml`
 
       `kubectl create -f examples/cos-csi-app.yaml`
+
+2. Verify PVC is in `Bound` state
+
+3. Check for successful mount
+
+If mounter type is `rclone`, you will see
+   ```
+   mount | grep rclone
+   rclone-remote:rcloneambfail on /data type fuse.rclone (rw,nosuid,nodev,relatime,user_id=0,group_id=0)
+
+   ```
+If mounter type is `s3fs`, you will see
+
+
+   ```
+    root@cos-csi-app:/# mount | grep s3fs
+    s3fs on /data type fuse.s3fs (rw,nosuid,nodev,relatime,user_id=0,group_id=0,allow_other)
+
+   ```
+
+# Debug 
+
+Collect logs using below commands to check failure messages
+
+1.  `oc logs cos-s3-csi-controller-0 -c cos-csi-provisioner`
+2.  `oc logs cos-s3-csi-driver-xxx -c cos-csi-driver`

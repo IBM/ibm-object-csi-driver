@@ -85,7 +85,7 @@ spec:
             mountPath: /csi
           - name: registration-dir
             mountPath: /registration
-        - name: cos-driver
+        - name: cos-csi-driver
           securityContext:
             privileged: true
             capabilities:

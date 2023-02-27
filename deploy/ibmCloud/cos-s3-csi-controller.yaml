@@ -91,7 +91,7 @@ spec:
           volumeMounts:
             - mountPath: /csi
               name: socket-dir
-        - name: cos-driver
+        - name: cos-csi-provisioner
           image: cos-driver-image
           args:
             - "--servermode=controller"
