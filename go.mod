@@ -5,7 +5,6 @@ go 1.18
 require (
 	github.com/IBM/ibm-cos-sdk-go v1.9.4
 	github.com/IBM/ibm-csi-common v1.1.5
-	github.com/IBM/ibmcloud-storage-volume-lib v0.0.2
 	github.com/IBM/ibmcloud-volume-interface v1.1.2
 	github.com/container-storage-interface/spec v1.7.0
 	github.com/google/uuid v1.3.0

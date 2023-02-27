@@ -2,7 +2,7 @@ CMDS=satellite-object-storage-plugin
 
 REGISTRY_NAME=quay.io/satellite-object-storage-plugin
 
-export GO111MODULE=$(GO111MODULE_FLAG)
+#export GO111MODULE=$(GO111MODULE_FLAG)
 
 export LINT_VERSION="1.45.2"
 

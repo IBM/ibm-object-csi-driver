@@ -2,7 +2,7 @@ language: go
 
 go:
 
-  - "1.18.4"
+  - "1.19.6"
 
 
 group: bluezone
@@ -21,11 +21,7 @@ before_install:
   - sudo apt-get install bc
 
 before_script:
-  - make deps
-  - go get github.com/pierrre/gotestcover
+  - make fmt
 
 script:
-  - make fmt
-    #- make test
-    #- make coverage
-
+  - make container

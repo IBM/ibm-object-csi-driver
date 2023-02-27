@@ -76,12 +76,12 @@ func (s3fs *s3fsMounter) Mount(source string, target string) error {
 	if s3fs.objPath != "" {
 		bucketName = fmt.Sprintf("%s:/%s", s3fs.bucketName, s3fs.objPath)
 	} else {
-		bucketName = fmt.Sprintf("%s", s3fs.bucketName)
+		bucketName = s3fs.bucketName
 	}
 
 	args := []string{
 		bucketName,
-		fmt.Sprintf("%s", target),
+		target,
 		"-o", "sigv2",
 		"-o", "use_path_request_style",
 		"-o", fmt.Sprintf("passwd_file=%s", passwdFile),
