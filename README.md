@@ -6,7 +6,7 @@ Object storage plugin using CSI
 For building the driver `docker` and `GO` should be installed on the system
 
 1. On your local machine, install [`docker`](https://docs.docker.com/install/) and [`Go`](https://golang.org/doc/install).
-2. GO version should be >=1.18
+2. Install latest Go 
 3. Set the [`GOPATH` environment variable](https://github.com/golang/go/wiki/SettingGOPATH).
 4. Build the driver image
 
