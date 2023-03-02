@@ -17,11 +17,9 @@ cache:
 
 sudo: true
 
-before_install:
-  - sudo apt-get install bc
-
 before_script:
   - make fmt
+  - make lint
 
 script:
   - make container
