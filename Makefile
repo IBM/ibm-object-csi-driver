@@ -2,9 +2,7 @@ CMDS=satellite-object-storage-plugin
 
 REGISTRY_NAME=quay.io/satellite-object-storage-plugin
 
-export GO111MODULE=$(GO111MODULE_FLAG)
-
-export LINT_VERSION="1.45.2"
+export LINT_VERSION="1.51.1"
 
 COLOR_YELLOW=\033[0;33m
 COLOR_RESET=\033[0m
