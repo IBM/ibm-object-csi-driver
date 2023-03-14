@@ -22,6 +22,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/IBM/ibm-cos-sdk-go/aws/awserr"
 	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"golang.org/x/net/context"
@@ -163,8 +164,14 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		klog.Infof("Info:Create Volume module:", msg)
 	}
 	if err != nil {
-		klog.Errorf("CreateVolume: Unable to create the bucket: %v", err)
-		return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to create the bucket: %v", bucketName))
+
+		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "BucketAlreadyExists" {
+			klog.Warning(fmt.Sprintf("bucket '%s' already exists", bucketName))
+		} else {
+			klog.Errorf("CreateVolume: Unable to create the bucket: %v", err)
+			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to create the bucket: %v", bucketName))
+		}
+
 	}
 
 	if err := sess.CheckBucketAccess(bucketName); err != nil {
