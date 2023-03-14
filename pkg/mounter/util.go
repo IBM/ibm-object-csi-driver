@@ -3,7 +3,6 @@ package mounter
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -82,7 +81,7 @@ func findFuseMountProcess(path string) (*os.Process, error) {
 
 func getCmdLine(pid int) (string, error) {
 	cmdLineFile := fmt.Sprintf("/proc/%v/cmdline", pid)
-	cmdLine, err := ioutil.ReadFile(cmdLineFile)
+	cmdLine, err := os.ReadFile(cmdLineFile)
 	if err != nil {
 		return "", err
 	}

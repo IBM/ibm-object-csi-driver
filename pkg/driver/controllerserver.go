@@ -146,15 +146,15 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	bucketName = secretMap["bucket-name"]
 
 	if bucketName == "" {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Bucket name is empty"))
+		return nil, status.Error(codes.InvalidArgument, "Bucket name is empty")
 	}
 	endPoint = secretMap["cos-endpoint"]
 	if endPoint == "" {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("No endpoint value provided"))
+		return nil, status.Error(codes.InvalidArgument, "No endpoint value provided")
 	}
 	locationConstraint = secretMap["location-constraint"]
 	if locationConstraint == "" {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("No locationConstraint value provided"))
+		return nil, status.Error(codes.InvalidArgument, "No locationConstraint value provided")
 	}
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds)
 
@@ -209,7 +209,7 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	bucketName := secretMap["bucket-name"]
 
 	if bucketName == "" {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Bucket name is empty"))
+		return nil, status.Error(codes.InvalidArgument, "Bucket name is empty")
 	}
 
 	endPoint := secretMap["cos-endpoint"]

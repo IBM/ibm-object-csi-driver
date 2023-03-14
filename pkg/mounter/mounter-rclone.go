@@ -84,7 +84,7 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 	args := []string{
 		"mount",
 		bucketName,
-		fmt.Sprintf("%s", target),
+		target,
 		"--daemon",
 	}
 	return fuseMount(target, rcloneCmd, args)
