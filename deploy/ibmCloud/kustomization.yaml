@@ -8,8 +8,8 @@ images:
   newName: k8s.gcr.io/sig-storage/csi-provisioner
   newTag: v2.2.2
 - name: cos-driver-image
-  newName: ambikanair/satellite-object-storage-plugin
-  newTag: demo
+  newName: <registry>/satellite-object-storage-plugin
+  newTag: latest
 - name: driver-registrar-image
   newName: k8s.gcr.io/sig-storage/csi-node-driver-registrar
   newTag: v2.2.0
