@@ -5,10 +5,8 @@ metadata:
 spec:
   containers:
     - name: app-frontend
-      image: registry.access.redhat.com/ubi8/ubi-minimal:8.5-218
+      image: gcr.io/google-samples/node-hello:1.0
       imagePullPolicy: IfNotPresent
-      command: ["/bin/sh"]
-      args: ["-c", "while true; do msg=$(date); echo $msg; sleep 30; done"]
       volumeMounts:
       - mountPath: "/data"
         name: cos-csi-volume
