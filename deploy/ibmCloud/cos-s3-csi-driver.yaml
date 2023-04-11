@@ -122,6 +122,16 @@ spec:
               mountPath: /dev/log
             - name: host-log
               mountPath: /host/var/log
+        - name: liveness-probe
+          image: liveness-probe-image
+          args:
+            - "--csi-address=/csi/csi.sock"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /csi
       volumes:
         - name: plugin-dir
           hostPath:

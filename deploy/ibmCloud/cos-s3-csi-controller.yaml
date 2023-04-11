@@ -47,26 +47,11 @@ roleRef:
   name: cos-s3-csi-controller-role
   apiGroup: rbac.authorization.k8s.io
 ---
-kind: Service
-apiVersion: v1
-metadata:
-  name: cos-s3-csi-controller
-  labels:
-    app: cos-s3-csi-controller
-spec:
-  selector:
-    app: cos-s3-csi-controller
-  ports:
-    - name: dummy
-      port: 12345
-
----
-kind: StatefulSet
+kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: cos-s3-csi-controller
 spec:
-  serviceName: "cos-s3-csi-controller"
   replicas: 1
   selector:
     matchLabels:
@@ -110,6 +95,16 @@ spec:
           volumeMounts:
             - mountPath: /csi
               name: socket-dir
+        - name: liveness-probe
+          image: liveness-probe-image
+          args:
+            - "--csi-address=/csi/csi.sock"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
       volumes:
         - hostPath:
             path: /var/lib/kubelet/csi-plugins/cos.s3.csi.ibm.io
