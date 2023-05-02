@@ -1,19 +1,15 @@
 resources:
-- cos-s3-csi-attacher.yaml
 - cos-s3-csi-controller.yaml 
 - cos-s3-csi-driver.yaml
 - cos-s3-csi-sc.yaml
 - cos-s3-csidriver.yaml
 images:
-- name: csi-attacher-image
-  newName: k8s.gcr.io/sig-storage/csi-attacher
-  newTag: v3.2.1
 - name: csi-provisioner-image
   newName: k8s.gcr.io/sig-storage/csi-provisioner
   newTag: v2.2.2
 - name: cos-driver-image
   newName: <registry>/satellite-object-storage-plugin
-  newTag: v1.3
+  newTag: latest
 - name: driver-registrar-image
   newName: k8s.gcr.io/sig-storage/csi-node-driver-registrar
   newTag: v2.2.0
