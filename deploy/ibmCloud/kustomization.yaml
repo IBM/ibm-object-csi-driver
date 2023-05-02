@@ -4,13 +4,18 @@ resources:
 - cos-s3-csi-sc.yaml
 - cos-s3-csidriver.yaml
 images:
+- name: csi-attacher-image
+  newName: k8s.gcr.io/sig-storage/csi-attacher
+  newTag: v4.2.0
 - name: csi-provisioner-image
   newName: k8s.gcr.io/sig-storage/csi-provisioner
-  newTag: v2.2.2
+  newTag: v3.4.1
 - name: cos-driver-image
   newName: <registry>/satellite-object-storage-plugin
-  newTag: latest
+  newTag: main
 - name: driver-registrar-image
   newName: k8s.gcr.io/sig-storage/csi-node-driver-registrar
-  newTag: v2.2.0
-
+  newTag: v2.6.3
+- newName: registry.k8s.io/sig-storage/livenessprobe
+  newTag: v2.9.0
+  name: liveness-probe-image 
