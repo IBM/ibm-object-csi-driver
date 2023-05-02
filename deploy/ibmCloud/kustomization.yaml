@@ -1,5 +1,4 @@
 resources:
-- cos-s3-csi-attacher.yaml
 - cos-s3-csi-controller.yaml 
 - cos-s3-csi-driver.yaml
 - cos-s3-csi-sc.yaml
