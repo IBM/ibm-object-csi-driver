@@ -167,9 +167,10 @@ type Fakes3fsMounter struct {
 	endPoint   string //From Secret in SC
 	regnClass  string //From Secret in SC
 	accessKeys string
+	authType string
 }
 
-func (s *FakeS3fsMounterFactory) NewMounter(mounter string, bucket string, objpath string, endpoint string, region string, keys string) (mounter.Mounter, error) {
+func (s *FakeS3fsMounterFactory) NewMounter(mounter string, bucket string, objpath string, endpoint string, region string, keys string, authType string) (mounter.Mounter, error) {
 	klog.Info("-NewMounter-")
 	klog.Infof("NewMounter args:\n\tmounter: <%s>\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>", mounter, bucket, objpath, endpoint, region)
 	return &Fakes3fsMounter{
@@ -178,6 +179,7 @@ func (s *FakeS3fsMounterFactory) NewMounter(mounter string, bucket string, objpa
 		endPoint:   endpoint,
 		regnClass:  region,
 		accessKeys: keys,
+		authType: authType,
 	}, nil
 }
 

@@ -183,7 +183,7 @@ func NewS3Client(lgr *zap.Logger) (ObjectStorageSession, error) {
 func (s *COSSessionFactory) NewObjectStorageSession(endpoint, locationConstraint string, creds *ObjectStorageCredentials) ObjectStorageSession {
 	var sdkCreds *credentials.Credentials
 	if creds.AuthType == "iam" {
-		sdkCreds = ibmiam.NewStaticCredentials(aws.NewConfig(), creds.APIKey, creds.ServiceInstanceID, creds.IAMEndpoint)
+		sdkCreds = ibmiam.NewStaticCredentials(aws.NewConfig(), creds.IAMEndpoint+"/identity/token", creds.APIKey, creds.ServiceInstanceID)
 	} else {
 		sdkCreds = credentials.NewStaticCredentials(creds.AccessKey, creds.SecretKey, "")
 	}

@@ -25,14 +25,14 @@ const (
 )
 
 //func newS3fsMounter(bucket string, objpath string, endpoint string, region string, keys string)
-func NewMounter(mounter string, bucket string, objpath string, endpoint string, region string, keys string) (mounter.Mounter, error) {
+func NewMounter(mounter string, bucket string, objpath string, endpoint string, region string, keys string, authType string) (mounter.Mounter, error) {
 	klog.Info("-NewMounter-")
 	klog.Infof("NewMounter args:\n\tmounter: <%s>\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>", mounter, bucket, objpath, endpoint, region)
 	switch mounter {
 	case s3fsMounterType:
-		return fakenewS3fsMounter(bucket, objpath, endpoint, region, keys)
+		return fakenewS3fsMounter(bucket, objpath, endpoint, region, keys, authType)
 	default:
 		// default to s3backer
-		return fakenewS3fsMounter(bucket, objpath, endpoint, region, keys)
+		return fakenewS3fsMounter(bucket, objpath, endpoint, region, keys, authType)
 	}
 }

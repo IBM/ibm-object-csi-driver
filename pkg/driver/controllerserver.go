@@ -97,6 +97,7 @@ func (cs *controllerServer) getCredentials(secretMap map[string]string) (*s3clie
 		SecretKey:   secretKey,
 		APIKey:      apiKey,
 		IAMEndpoint: iamEndpoint,
+		ServiceInstanceID: serviceInstanceID,
 	}, nil
 
 }
