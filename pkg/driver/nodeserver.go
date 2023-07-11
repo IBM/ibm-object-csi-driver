@@ -102,6 +102,9 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		check     bool
 		accessKey string
 		secretKey string
+		apiKey    string
+		secretVal string
+		secretType string
 	)
 	klog.V(2).Infof("CSINodeServer-NodePublishVolume: Request %v", *req)
 
@@ -149,6 +152,16 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	if val, check = secretMap["secret-key"]; check {
 		secretKey = val
 	}
+	if val, check = secretMap["api-key"]; check {
+                apiKey = val
+        }
+	if apiKey != "" {
+		secretVal = fmt.Sprintf(":%s", apiKey)
+		secretType = "iam"
+	} else {
+		secretVal = fmt.Sprintf("%s:%s", accessKey, secretKey)
+		secretType = "hmac"
+	}
 
 	//TODO: IAM Implementation for above code snippet
 
@@ -159,7 +172,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	if mounterObj, err = ns.Mounter.NewMounter(secretMap["mounter"],
 		secretMap["bucket-name"], secretMap["obj-path"],
 		secretMap["cos-endpoint"], secretMap["regn-class"],
-		fmt.Sprintf("%s:%s", accessKey, secretKey)); err != nil {
+		secretVal, secretType); err != nil {
 		return nil, err
 	}
 

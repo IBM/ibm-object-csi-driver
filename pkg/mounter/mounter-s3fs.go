@@ -17,15 +17,18 @@ type s3fsMounter struct {
 	endPoint   string //From Secret in SC
 	regnClass  string //From Secret in SC
 	accessKeys string
+	authType string
 }
 
 const (
 	s3fsCmd  = "s3fs"
 	metaRoot = "/var/lib/ibmc-s3fs"
 	passFile = ".passwd-s3fs"
+	// defaultIAMEndPoint is the default URL of the IBM IAM endpoint
+	defaultIAMEndPoint = "https://iam.cloud.ibm.com"
 )
 
-func newS3fsMounter(bucket string, objpath string, endpoint string, region string, keys string) (Mounter, error) {
+func newS3fsMounter(bucket string, objpath string, endpoint string, region string, keys string, authType string) (Mounter, error) {
 	klog.Info("-newS3fsMounter-")
 	klog.Infof("newS3fsMounter args:\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>\n\tkeys: <%s>", bucket, objpath, endpoint, region, keys)
 	return &s3fsMounter{
@@ -33,6 +36,7 @@ func newS3fsMounter(bucket string, objpath string, endpoint string, region strin
 		objPath:    objpath,
 		endPoint:   endpoint,
 		regnClass:  region,
+		authType:   authType,
 		accessKeys: keys,
 	}, nil
 }
@@ -89,6 +93,12 @@ func (s3fs *s3fsMounter) Mount(source string, target string) error {
 		"-o", fmt.Sprintf("endpoint=%s", s3fs.regnClass),
 		"-o", "allow_other",
 		"-o", "mp_umask=002",
+	}
+	if s3fs.authType != "hmac" {
+		args = append(args, "-o", "ibm_iam_auth")
+		args = append(args, "-o", "ibm_iam_endpoint="+defaultIAMEndPoint)
+	} else {
+		args = append(args, "-o", "default_acl=private")
 	}
 	return fuseMount(target, s3fsCmd, args)
 }
