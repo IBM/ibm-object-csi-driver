@@ -17,6 +17,10 @@ package driver
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+
 	"github.com/IBM/satellite-object-storage-plugin/pkg/mounter"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"golang.org/x/net/context"
@@ -24,9 +28,6 @@ import (
 	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume/util/fs"
-	"os"
-	"os/exec"
-	"strings"
 )
 
 const (
@@ -97,15 +98,6 @@ func (ns *nodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 }
 
 func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	var (
-		val       string
-		check     bool
-		accessKey string
-		secretKey string
-		apiKey    string
-		secretVal string
-		secretType string
-	)
 	klog.V(2).Infof("CSINodeServer-NodePublishVolume: Request %v", *req)
 
 	volumeID := req.GetVolumeId()
@@ -146,33 +138,10 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		targetPath, deviceID, readOnly, volumeID, attrib, mountFlags)
 
 	secretMap := req.GetSecrets()
-	if val, check = secretMap["access-key"]; check {
-		accessKey = val
-	}
-	if val, check = secretMap["secret-key"]; check {
-		secretKey = val
-	}
-	if val, check = secretMap["api-key"]; check {
-                apiKey = val
-        }
-	if apiKey != "" {
-		secretVal = fmt.Sprintf(":%s", apiKey)
-		secretType = "iam"
-	} else {
-		secretVal = fmt.Sprintf("%s:%s", accessKey, secretKey)
-		secretType = "hmac"
-	}
-
-	//TODO: IAM Implementation for above code snippet
-
 	fmt.Println("CreateVolume VolumeContext:\n\t", attrib)
 	fmt.Println("CreateVolume Secrets:\n\t", secretMap)
 
-	//func newMounter(mounter string, bucket string, objpath string, endpoint string, region string, keys string) (Mounter, error) {
-	if mounterObj, err = ns.Mounter.NewMounter(secretMap["mounter"],
-		secretMap["bucket-name"], secretMap["obj-path"],
-		secretMap["cos-endpoint"], secretMap["regn-class"],
-		secretVal, secretType); err != nil {
+	if mounterObj, err = ns.Mounter.NewMounter(secretMap, mountFlags); err != nil {
 		return nil, err
 	}
 
@@ -183,7 +152,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return nil, err
 	}
 
-	klog.Infof("s3: bucket %s successfuly mounted to %s", secretMap["bucket-name"], targetPath)
+	klog.Infof("s3: bucket %s successfully mounted to %s", secretMap["bucket-name"], targetPath)
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 

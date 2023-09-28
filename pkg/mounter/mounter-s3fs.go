@@ -12,12 +12,13 @@ import (
 // Mounter interface defined in mounter.go
 // s3fsMounter Implements Mounter
 type s3fsMounter struct {
-	bucketName string //From Secret in SC
-	objPath    string //From Secret in SC
-	endPoint   string //From Secret in SC
-	regnClass  string //From Secret in SC
-	accessKeys string
-	authType string
+	bucketName   string //From Secret in SC
+	objPath      string //From Secret in SC
+	endPoint     string //From Secret in SC
+	regnClass    string //From Secret in SC
+	authType     string
+	accessKeys   string
+	mountOptions []string
 }
 
 const (
@@ -28,16 +29,50 @@ const (
 	defaultIAMEndPoint = "https://iam.cloud.ibm.com"
 )
 
-func newS3fsMounter(bucket string, objpath string, endpoint string, region string, keys string, authType string) (Mounter, error) {
+func newS3fsMounter(secretMap map[string]string, mountOptions []string) (Mounter, error) {
 	klog.Info("-newS3fsMounter-")
-	klog.Infof("newS3fsMounter args:\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>\n\tkeys: <%s>", bucket, objpath, endpoint, region, keys)
+
+	var (
+		val       string
+		check     bool
+		accessKey string
+		secretKey string
+		apiKey    string
+		secretVal string
+		authType  string
+	)
+
+	bucket := secretMap["bucket-name"]
+	objpath := secretMap["obj-path"]
+	endpoint := secretMap["cos-endpoint"]
+	region := secretMap["regn-class"]
+
+	if val, check = secretMap["access-key"]; check {
+		accessKey = val
+	}
+	if val, check = secretMap["secret-key"]; check {
+		secretKey = val
+	}
+	if val, check = secretMap["api-key"]; check {
+		apiKey = val
+	}
+	if apiKey != "" {
+		secretVal = fmt.Sprintf(":%s", apiKey)
+		authType = "iam"
+	} else {
+		secretVal = fmt.Sprintf("%s:%s", accessKey, secretKey)
+		authType = "hmac"
+	}
+
+	klog.Infof("newS3fsMounter args:\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>\n\tauthType: <%s>", bucket, objpath, endpoint, region, authType)
 	return &s3fsMounter{
-		bucketName: bucket,
-		objPath:    objpath,
-		endPoint:   endpoint,
-		regnClass:  region,
-		authType:   authType,
-		accessKeys: keys,
+		bucketName:   bucket,
+		objPath:      objpath,
+		endPoint:     endpoint,
+		regnClass:    region,
+		authType:     authType,
+		accessKeys:   secretVal,
+		mountOptions: mountOptions,
 	}, nil
 }
 
@@ -94,6 +129,12 @@ func (s3fs *s3fsMounter) Mount(source string, target string) error {
 		"-o", "allow_other",
 		"-o", "mp_umask=002",
 	}
+
+	for _, val := range s3fs.mountOptions {
+		args = append(args, "-o")
+		args = append(args, val)
+	}
+
 	if s3fs.authType != "hmac" {
 		args = append(args, "-o", "ibm_iam_auth")
 		args = append(args, "-o", "ibm_iam_endpoint="+defaultIAMEndPoint)
