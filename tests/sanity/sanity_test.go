@@ -190,7 +190,7 @@ func (s *FakeS3fsMounterFactory) NewMounter(secretMap map[string]string, mountFl
 	options = []string{}
 
 	if val, check = secretMap["cosEndpoint"]; check {
-		mounter.bucketName = val
+		mounter.endPoint = val
 	}
 	if val, check = secretMap["regionClass"]; check {
 		mounter.regnClass = val

@@ -47,7 +47,7 @@ func newS3fsMounter(secretMap map[string]string, mountOptions []string) (Mounter
 	options = []string{}
 
 	if val, check = secretMap["cosEndpoint"]; check {
-		mounter.bucketName = val
+		mounter.endPoint = val
 	}
 	if val, check = secretMap["regionClass"]; check {
 		mounter.regnClass = val

@@ -40,7 +40,7 @@ func newRcloneMounter(secretMap map[string]string, mountOptions []string) (Mount
 	options = []string{}
 
 	if val, check = secretMap["cosEndpoint"]; check {
-		mounter.bucketName = val
+		mounter.endPoint = val
 	}
 	if val, check = secretMap["regionClass"]; check {
 		mounter.regnClass = val
@@ -173,9 +173,7 @@ func (rclone *rcloneMounter) createConfig() error {
 		"secret_access_key = " + secretKey,
 	}
 
-	for _, val := range rclone.mountOptions {
-		configParams = append(configParams, val)
-	}
+	configParams = append(configParams, rclone.mountOptions...)
 
 	if err := os.MkdirAll(configPath, 0755); err != nil {
 		klog.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", configPath, err)
