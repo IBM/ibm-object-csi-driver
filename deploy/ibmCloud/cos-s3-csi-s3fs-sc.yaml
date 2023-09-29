@@ -5,12 +5,12 @@ metadata:
   name: cos-s3-csi-s3fs-sc
 provisioner: cos.s3.csi.ibm.io
 mountOptions:
-    - multipart_size=64
-    - max_upload_parts=64
-    - parallel_count=64
-    - max_stat_cache_size=100000
-    - retries=5
-    - kernel_cache
+    - "multipart_size=62"
+    - "max_dirty_data=51200"
+    - "parallel_count=8"
+    - "max_stat_cache_size=100000"
+    - "retries=5"
+    - "cache=kernel_cache"
 parameters:
   mounter: "s3fs"
   client: "awss3"

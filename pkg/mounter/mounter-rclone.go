@@ -18,32 +18,76 @@ type rcloneMounter struct {
 	objPath      string //From Secret in SC
 	endPoint     string //From Secret in SC
 	regnClass    string //From Secret in SC
-	accessKey    string
-	accessSecret string
+	authType     string
+	accessKeys   string
 	mountOptions []string
 }
 
 func newRcloneMounter(secretMap map[string]string, mountOptions []string) (Mounter, error) {
 	klog.Info("-newRcloneMounter-")
 
-	bucket := secretMap["bucket-name"]
-	objpath := secretMap["obj-path"]
-	endpoint := secretMap["cos-endpoint"]
-	region := secretMap["regn-class"]
-	accessKey := secretMap["access-key"]
-	secretKey := secretMap["secret-key"]
+	var (
+		val       string
+		check     bool
+		accessKey string
+		secretKey string
+		apiKey    string
+		mounter   *rcloneMounter
+		options   []string
+	)
 
-	klog.Infof("newRcloneMounter args:bucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>", bucket, objpath, endpoint, region)
+	mounter = &rcloneMounter{}
+	options = []string{}
 
-	return &rcloneMounter{
-		bucketName:   bucket,
-		objPath:      objpath,
-		endPoint:     endpoint,
-		regnClass:    region,
-		accessKey:    accessKey,
-		accessSecret: secretKey,
-		mountOptions: mountOptions,
-	}, nil
+	if val, check = secretMap["cosEndpoint"]; check {
+		mounter.bucketName = val
+	}
+	if val, check = secretMap["regionClass"]; check {
+		mounter.regnClass = val
+	}
+	if val, check = secretMap["bucketName"]; check {
+		mounter.bucketName = val
+	}
+	if val, check = secretMap["objPath"]; check {
+		mounter.objPath = val
+	}
+	if val, check = secretMap["accessKey"]; check {
+		accessKey = val
+	}
+	if val, check = secretMap["secretKey"]; check {
+		secretKey = val
+	}
+	if val, check = secretMap["apiKey"]; check {
+		apiKey = val
+	}
+	if apiKey != "" {
+		mounter.accessKeys = fmt.Sprintf(":%s", apiKey)
+		mounter.authType = "iam"
+	} else {
+		mounter.accessKeys = fmt.Sprintf("%s:%s", accessKey, secretKey)
+		mounter.authType = "hmac"
+	}
+
+	klog.Infof("newRcloneMounter args:\n\tbucketName: [%s]\n\tobjPath: [%s]\n\tendPoint: [%s]\n\tregionClass: [%s]\n\tauthType: [%s]",
+		mounter.bucketName, mounter.objPath, mounter.endPoint, mounter.regnClass, mounter.authType)
+
+	var option string
+	for _, val = range mountOptions {
+		option = val
+		keys := strings.Split(val, "=")
+		if len(keys) == 2 {
+			option = fmt.Sprintf("%s = %s", keys[0], keys[1])
+			if newVal, check := secretMap[keys[0]]; check {
+				option = fmt.Sprintf("%s=%s", keys[0], newVal)
+			}
+		}
+		options = append(options, option)
+		klog.Infof("newRcloneMounter mountOption: [%s]", option)
+	}
+
+	mounter.mountOptions = options
+
+	return mounter, nil
 }
 
 const (
@@ -111,6 +155,13 @@ func (rclone *rcloneMounter) Unmount(target string) error {
 }
 
 func (rclone *rcloneMounter) createConfig() error {
+	var accessKey string
+	var secretKey string
+	keys := strings.Split(rclone.accessKeys, ":")
+	if len(keys) == 2 {
+		accessKey = keys[0]
+		secretKey = keys[1]
+	}
 	configParams := []string{
 		"[" + remote + "]",
 		"type = " + s3Type,
@@ -118,12 +169,11 @@ func (rclone *rcloneMounter) createConfig() error {
 		"provider = " + cosProvider,
 		"env_auth = " + envAuth,
 		"location_constraint = " + rclone.regnClass,
-		"access_key_id = " + rclone.accessKey,
-		"secret_access_key = " + rclone.accessSecret,
+		"access_key_id = " + accessKey,
+		"secret_access_key = " + secretKey,
 	}
 
 	for _, val := range rclone.mountOptions {
-		val = strings.Replace(val, "=", " = ", 1)
 		configParams = append(configParams, val)
 	}
 

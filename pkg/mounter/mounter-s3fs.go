@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"k8s.io/klog/v2"
 )
@@ -38,42 +39,78 @@ func newS3fsMounter(secretMap map[string]string, mountOptions []string) (Mounter
 		accessKey string
 		secretKey string
 		apiKey    string
-		secretVal string
-		authType  string
+		mounter   *s3fsMounter
+		options   []string
 	)
 
-	bucket := secretMap["bucket-name"]
-	objpath := secretMap["obj-path"]
-	endpoint := secretMap["cos-endpoint"]
-	region := secretMap["regn-class"]
+	mounter = &s3fsMounter{}
+	options = []string{}
 
-	if val, check = secretMap["access-key"]; check {
+	if val, check = secretMap["cosEndpoint"]; check {
+		mounter.bucketName = val
+	}
+	if val, check = secretMap["regionClass"]; check {
+		mounter.regnClass = val
+	}
+	if val, check = secretMap["bucketName"]; check {
+		mounter.bucketName = val
+	}
+	if val, check = secretMap["objPath"]; check {
+		mounter.objPath = val
+	}
+	if val, check = secretMap["accessKey"]; check {
 		accessKey = val
 	}
-	if val, check = secretMap["secret-key"]; check {
+	if val, check = secretMap["secretKey"]; check {
 		secretKey = val
 	}
-	if val, check = secretMap["api-key"]; check {
+	if val, check = secretMap["apiKey"]; check {
 		apiKey = val
 	}
 	if apiKey != "" {
-		secretVal = fmt.Sprintf(":%s", apiKey)
-		authType = "iam"
+		mounter.accessKeys = fmt.Sprintf(":%s", apiKey)
+		mounter.authType = "iam"
 	} else {
-		secretVal = fmt.Sprintf("%s:%s", accessKey, secretKey)
-		authType = "hmac"
+		mounter.accessKeys = fmt.Sprintf("%s:%s", accessKey, secretKey)
+		mounter.authType = "hmac"
 	}
 
-	klog.Infof("newS3fsMounter args:\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>\n\tauthType: <%s>", bucket, objpath, endpoint, region, authType)
-	return &s3fsMounter{
-		bucketName:   bucket,
-		objPath:      objpath,
-		endPoint:     endpoint,
-		regnClass:    region,
-		authType:     authType,
-		accessKeys:   secretVal,
-		mountOptions: mountOptions,
-	}, nil
+	klog.Infof("newS3fsMounter args:\n\tbucketName: [%s]\n\tobjPath: [%s]\n\tendPoint: [%s]\n\tregionClass: [%s]\n\tauthType: [%s]",
+		mounter.bucketName, mounter.objPath, mounter.endPoint, mounter.regnClass, mounter.authType)
+
+	var option string
+	for _, val = range mountOptions {
+		option = val
+		isKeyValuePair := true
+		keys := strings.Split(val, "=")
+		if len(keys) == 2 {
+			if keys[0] == "cache" {
+				isKeyValuePair = false
+				option = keys[1]
+			}
+			if newVal, check := secretMap[keys[0]]; check {
+				if isKeyValuePair {
+					option = fmt.Sprintf("%s=%s", keys[0], newVal)
+				} else {
+					option = newVal
+				}
+			}
+		}
+		options = append(options, option)
+		klog.Infof("newS3fsMounter mountOption: [%s]", option)
+	}
+	if val, check = secretMap["tmpdir"]; check {
+		option = fmt.Sprintf("tmpdir=%s", val)
+		options = append(options, option)
+	}
+	if val, check = secretMap["use_cache"]; check {
+		option = fmt.Sprintf("use_cache=%s", val)
+		options = append(options, option)
+	}
+
+	mounter.mountOptions = options
+
+	return mounter, nil
 }
 
 func (s3fs *s3fsMounter) Stage(stageTarget string) error {
