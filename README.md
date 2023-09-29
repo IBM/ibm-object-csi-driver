@@ -31,9 +31,12 @@ An image named `satellite-object-storage-plugin:latest` is created. Please retag
 
 # Deploy CSI driver on your cluster
 
-Change image if required in deploy/ibmCloud/kustomization.yaml file. 
+Update images if required in `deploy/ibmCloud/kustomization.yaml` file. 
+
+Deploy the resources 
 
 `kubectl apply -k deploy/ibmCloud/`
+
 
 To clean up the deployment 
 
