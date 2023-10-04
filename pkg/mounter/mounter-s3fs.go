@@ -13,13 +13,13 @@ import (
 // Mounter interface defined in mounter.go
 // s3fsMounter Implements Mounter
 type s3fsMounter struct {
-	bucketName   string //From Secret in SC
-	objPath      string //From Secret in SC
-	endPoint     string //From Secret in SC
-	regnClass    string //From Secret in SC
-	authType     string
-	accessKeys   string
-	mountOptions []string
+	bucketName    string //From Secret in SC
+	objPath       string //From Secret in SC
+	endPoint      string //From Secret in SC
+	locConstraint string //From Secret in SC
+	authType      string
+	accessKeys    string
+	mountOptions  []string
 }
 
 const (
@@ -49,8 +49,8 @@ func newS3fsMounter(secretMap map[string]string, mountOptions []string) (Mounter
 	if val, check = secretMap["cosEndpoint"]; check {
 		mounter.endPoint = val
 	}
-	if val, check = secretMap["regionClass"]; check {
-		mounter.regnClass = val
+	if val, check = secretMap["locationConstraint"]; check {
+		mounter.locConstraint = val
 	}
 	if val, check = secretMap["bucketName"]; check {
 		mounter.bucketName = val
@@ -75,8 +75,8 @@ func newS3fsMounter(secretMap map[string]string, mountOptions []string) (Mounter
 		mounter.authType = "hmac"
 	}
 
-	klog.Infof("newS3fsMounter args:\n\tbucketName: [%s]\n\tobjPath: [%s]\n\tendPoint: [%s]\n\tregionClass: [%s]\n\tauthType: [%s]",
-		mounter.bucketName, mounter.objPath, mounter.endPoint, mounter.regnClass, mounter.authType)
+	klog.Infof("newS3fsMounter args:\n\tbucketName: [%s]\n\tobjPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
+		mounter.bucketName, mounter.objPath, mounter.endPoint, mounter.locConstraint, mounter.authType)
 
 	var option string
 	for _, val = range mountOptions {
@@ -162,7 +162,7 @@ func (s3fs *s3fsMounter) Mount(source string, target string) error {
 		"-o", "use_path_request_style",
 		"-o", fmt.Sprintf("passwd_file=%s", passwdFile),
 		"-o", fmt.Sprintf("url=%s", s3fs.endPoint),
-		"-o", fmt.Sprintf("endpoint=%s", s3fs.regnClass),
+		"-o", fmt.Sprintf("endpoint=%s", s3fs.locConstraint),
 		"-o", "allow_other",
 		"-o", "mp_umask=002",
 	}

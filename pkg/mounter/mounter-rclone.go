@@ -14,13 +14,13 @@ import (
 // Mounter interface defined in mounter.go
 // rcloneMounter Implements Mounter
 type rcloneMounter struct {
-	bucketName   string //From Secret in SC
-	objPath      string //From Secret in SC
-	endPoint     string //From Secret in SC
-	regnClass    string //From Secret in SC
-	authType     string
-	accessKeys   string
-	mountOptions []string
+	bucketName    string //From Secret in SC
+	objPath       string //From Secret in SC
+	endPoint      string //From Secret in SC
+	locConstraint string //From Secret in SC
+	authType      string
+	accessKeys    string
+	mountOptions  []string
 }
 
 func newRcloneMounter(secretMap map[string]string, mountOptions []string) (Mounter, error) {
@@ -42,8 +42,8 @@ func newRcloneMounter(secretMap map[string]string, mountOptions []string) (Mount
 	if val, check = secretMap["cosEndpoint"]; check {
 		mounter.endPoint = val
 	}
-	if val, check = secretMap["regionClass"]; check {
-		mounter.regnClass = val
+	if val, check = secretMap["locationConstraint"]; check {
+		mounter.locConstraint = val
 	}
 	if val, check = secretMap["bucketName"]; check {
 		mounter.bucketName = val
@@ -68,8 +68,8 @@ func newRcloneMounter(secretMap map[string]string, mountOptions []string) (Mount
 		mounter.authType = "hmac"
 	}
 
-	klog.Infof("newRcloneMounter args:\n\tbucketName: [%s]\n\tobjPath: [%s]\n\tendPoint: [%s]\n\tregionClass: [%s]\n\tauthType: [%s]",
-		mounter.bucketName, mounter.objPath, mounter.endPoint, mounter.regnClass, mounter.authType)
+	klog.Infof("newRcloneMounter args:\n\tbucketName: [%s]\n\tobjPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
+		mounter.bucketName, mounter.objPath, mounter.endPoint, mounter.locConstraint, mounter.authType)
 
 	var option string
 	for _, val = range mountOptions {
@@ -143,6 +143,7 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 		bucketName,
 		target,
 		"--daemon",
+		"--log-file=/var/log/rclone.log",
 	}
 	return fuseMount(target, rcloneCmd, args)
 }
@@ -168,7 +169,7 @@ func (rclone *rcloneMounter) createConfig() error {
 		"endpoint = " + rclone.endPoint,
 		"provider = " + cosProvider,
 		"env_auth = " + envAuth,
-		"location_constraint = " + rclone.regnClass,
+		"location_constraint = " + rclone.locConstraint,
 		"access_key_id = " + accessKey,
 		"secret_access_key = " + secretKey,
 	}

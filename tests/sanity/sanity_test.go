@@ -164,13 +164,13 @@ func createTargetDir(targetPath string) error {
 type FakeS3fsMounterFactory struct{}
 
 type Fakes3fsMounter struct {
-	bucketName   string //From Secret in SC
-	objPath      string //From Secret in SC
-	endPoint     string //From Secret in SC
-	regnClass    string //From Secret in SC
-	authType     string
-	accessKeys   string
-	mountOptions []string
+	bucketName    string //From Secret in SC
+	objPath       string //From Secret in SC
+	endPoint      string //From Secret in SC
+	locConstraint string //From Secret in SC
+	authType      string
+	accessKeys    string
+	mountOptions  []string
 }
 
 func (s *FakeS3fsMounterFactory) NewMounter(secretMap map[string]string, mountFlags []string) (mounter.Mounter, error) {
@@ -192,8 +192,8 @@ func (s *FakeS3fsMounterFactory) NewMounter(secretMap map[string]string, mountFl
 	if val, check = secretMap["cosEndpoint"]; check {
 		mounter.endPoint = val
 	}
-	if val, check = secretMap["regionClass"]; check {
-		mounter.regnClass = val
+	if val, check = secretMap["locationConstraint"]; check {
+		mounter.locConstraint = val
 	}
 	if val, check = secretMap["bucketName"]; check {
 		mounter.bucketName = val
