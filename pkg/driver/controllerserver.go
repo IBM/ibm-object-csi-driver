@@ -67,36 +67,42 @@ func (cs *controllerServer) getCredentials(secretMap map[string]string) (*s3clie
 		iamEndpoint       string
 	)
 
-	iamEndpoint = secretMap["iam-endpoint"]
+	if val, check := secretMap["iamEndpoint"]; check {
+		iamEndpoint = val
+	}
 	if iamEndpoint == "" {
 		iamEndpoint = defaultIAMEndPoint
 	}
-	apiKey = secretMap["api-key"]
+
+	if val, check := secretMap["apiKey"]; check {
+		apiKey = val
+	}
+
 	if apiKey == "" {
 		authType = "hmac"
-		accessKey = secretMap["access-key"]
+		accessKey = secretMap["accessKey"]
 		if accessKey == "" {
-			return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| access-key missing")
+			return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| accessKey unknown")
 		}
 
-		secretKey = secretMap["secret-key"]
+		secretKey = secretMap["secretKey"]
 		if secretKey == "" {
-			return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| secret-key missing")
+			return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| secretKey unknown")
 		}
 	} else {
 		authType = "iam"
-		serviceInstanceID = secretMap["service-id"]
+		serviceInstanceID = secretMap["serviceId"]
 		if serviceInstanceID == "" {
-			return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| serviceInstanceID  missing")
+			return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| serviceId  unknown")
 		}
 	}
 
 	return &s3client.ObjectStorageCredentials{
-		AuthType:    authType,
-		AccessKey:   accessKey,
-		SecretKey:   secretKey,
-		APIKey:      apiKey,
-		IAMEndpoint: iamEndpoint,
+		AuthType:          authType,
+		AccessKey:         accessKey,
+		SecretKey:         secretKey,
+		APIKey:            apiKey,
+		IAMEndpoint:       iamEndpoint,
 		ServiceInstanceID: serviceInstanceID,
 	}, nil
 
@@ -116,14 +122,14 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	caps := req.GetVolumeCapabilities()
 
 	if len(volumeID) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "Name missing in request")
+		return nil, status.Error(codes.InvalidArgument, "Volume name missing in request")
 	}
 	if caps == nil {
 		return nil, status.Error(codes.InvalidArgument, "Volume Capabilities missing in request")
 	}
 	for _, cap := range caps {
 		if cap.GetBlock() != nil {
-			return nil, status.Error(codes.InvalidArgument, "Block Volume not supported")
+			return nil, status.Error(codes.InvalidArgument, "Volume type block Volume not supported")
 		}
 	}
 
@@ -145,18 +151,18 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
 	}
-	bucketName = secretMap["bucket-name"]
+	bucketName = secretMap["bucketName"]
 
 	if bucketName == "" {
-		return nil, status.Error(codes.InvalidArgument, "Bucket name is empty")
+		return nil, status.Error(codes.InvalidArgument, "bucketName unknown")
 	}
-	endPoint = secretMap["cos-endpoint"]
+	endPoint = secretMap["cosEndpoint"]
 	if endPoint == "" {
-		return nil, status.Error(codes.InvalidArgument, "No endpoint value provided")
+		return nil, status.Error(codes.InvalidArgument, "cosEndpoint unknown")
 	}
-	locationConstraint = secretMap["location-constraint"]
+	locationConstraint = secretMap["locationConstraint"]
 	if locationConstraint == "" {
-		return nil, status.Error(codes.InvalidArgument, "No locationConstraint value provided")
+		return nil, status.Error(codes.InvalidArgument, "locationConstraint unknown")
 	}
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds)
 
@@ -231,13 +237,13 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
-//ControllerPublishVolume
+// ControllerPublishVolume
 func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 	klog.V(3).Infof("CSIControllerServer-ControllerPublishVolume: Request: %v", *req)
 	return nil, status.Error(codes.Unimplemented, "ControllerPublishVolume")
 }
 
-//ControllerUnpublishVolume
+// ControllerUnpublishVolume
 func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
 	klog.V(3).Infof("CSIControllerServer-ControllerUnPublishVolume: Request: %v", *req)
 	return nil, status.Error(codes.Unimplemented, "ControllerUnpublishVolume")
@@ -286,7 +292,7 @@ func isValidVolumeCapabilities(volCaps []*csi.VolumeCapability) bool {
 	return foundAll
 }
 
-//ListVolumes
+// ListVolumes
 func (cs *controllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
 	klog.V(3).Infof("ListVolumes: Request: %+v", *req)
 	return nil, status.Error(codes.Unimplemented, "ListVolumes")
