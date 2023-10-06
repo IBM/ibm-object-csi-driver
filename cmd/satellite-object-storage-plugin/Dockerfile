@@ -45,8 +45,10 @@ ENV PATH=$GOPATH/bin:$GOROOT/bin:$PATH
 ENV GOARCH $ARCH
 ENV GO111MODULE=on
 
-RUN git clone https://github.com/rclone/rclone.git
-RUN cd rclone && go build && ./rclone version && cp rclone /usr/local/bin/rclone
+RUN git clone https://github.com/rclone/rclone.git && \
+      cd rclone && git checkout tags/v1.64.0 && \
+      go build && ./rclone version && \
+      cp rclone /usr/local/bin/rclone
 
 FROM registry.access.redhat.com/ubi8/ubi:latest
 LABEL description="Satellite Object Storage Plugin"
