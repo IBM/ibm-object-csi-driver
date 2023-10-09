@@ -185,10 +185,6 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		klog.Errorf("CreateVolume: Unable to access the bucket: %v", err)
 		return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to access the bucket: %v", bucketName))
 	}
-	/*params["cos-endpoint"] = endPoint
-	params["location-constraint"] = locationConstraint
-	params["bucket-name"] = bucketName
-	params["obj-path"] = secretMap["obj-path"]*/
 
 	klog.Infof("create volume: %v", volumeID)
 
@@ -220,14 +216,14 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	if err != nil {
 		return nil, fmt.Errorf("cannot get credentials: %v", err)
 	}
-	bucketName := secretMap["bucket-name"]
+	bucketName := secretMap["bucketName"]
 
 	if bucketName == "" {
 		return nil, status.Error(codes.InvalidArgument, "Bucket name is empty")
 	}
 
-	endPoint := secretMap["cos-endpoint"]
-	locationConstraint := secretMap["location-constraint"]
+	endPoint := secretMap["cosEndpoint"]
+	locationConstraint := secretMap["locationConstraint"]
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds)
 	err = sess.DeleteBucket(bucketName)
 	if err != nil {
