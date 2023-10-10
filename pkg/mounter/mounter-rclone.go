@@ -14,23 +14,80 @@ import (
 // Mounter interface defined in mounter.go
 // rcloneMounter Implements Mounter
 type rcloneMounter struct {
-	bucketName string //From Secret in SC
-	objPath    string //From Secret in SC
-	endPoint   string //From Secret in SC
-	regnClass  string //From Secret in SC
-	accessKeys string
+	bucketName    string //From Secret in SC
+	objPath       string //From Secret in SC
+	endPoint      string //From Secret in SC
+	locConstraint string //From Secret in SC
+	authType      string
+	accessKeys    string
+	mountOptions  []string
 }
 
-func newRcloneMounter(bucket string, objpath string, endpoint string, region string, keys string) (Mounter, error) {
+func newRcloneMounter(secretMap map[string]string, mountOptions []string) (Mounter, error) {
 	klog.Info("-newRcloneMounter-")
-	klog.Infof("newRcloneMounter args:\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>\n\tkeys: <%s>", bucket, objpath, endpoint, region, keys)
-	return &rcloneMounter{
-		bucketName: bucket,
-		objPath:    objpath,
-		endPoint:   endpoint,
-		regnClass:  region,
-		accessKeys: keys,
-	}, nil
+
+	var (
+		val       string
+		check     bool
+		accessKey string
+		secretKey string
+		apiKey    string
+		mounter   *rcloneMounter
+		options   []string
+	)
+
+	mounter = &rcloneMounter{}
+	options = []string{}
+
+	if val, check = secretMap["cosEndpoint"]; check {
+		mounter.endPoint = val
+	}
+	if val, check = secretMap["locationConstraint"]; check {
+		mounter.locConstraint = val
+	}
+	if val, check = secretMap["bucketName"]; check {
+		mounter.bucketName = val
+	}
+	if val, check = secretMap["objPath"]; check {
+		mounter.objPath = val
+	}
+	if val, check = secretMap["accessKey"]; check {
+		accessKey = val
+	}
+	if val, check = secretMap["secretKey"]; check {
+		secretKey = val
+	}
+	if val, check = secretMap["apiKey"]; check {
+		apiKey = val
+	}
+	if apiKey != "" {
+		mounter.accessKeys = fmt.Sprintf(":%s", apiKey)
+		mounter.authType = "iam"
+	} else {
+		mounter.accessKeys = fmt.Sprintf("%s:%s", accessKey, secretKey)
+		mounter.authType = "hmac"
+	}
+
+	klog.Infof("newRcloneMounter args:\n\tbucketName: [%s]\n\tobjPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
+		mounter.bucketName, mounter.objPath, mounter.endPoint, mounter.locConstraint, mounter.authType)
+
+	var option string
+	for _, val = range mountOptions {
+		option = val
+		keys := strings.Split(val, "=")
+		if len(keys) == 2 {
+			option = fmt.Sprintf("%s = %s", keys[0], keys[1])
+			if newVal, check := secretMap[keys[0]]; check {
+				option = fmt.Sprintf("%s=%s", keys[0], newVal)
+			}
+		}
+		options = append(options, option)
+		klog.Infof("newRcloneMounter mountOption: [%s]", option)
+	}
+
+	mounter.mountOptions = options
+
+	return mounter, nil
 }
 
 const (
@@ -38,10 +95,10 @@ const (
 	metaRootRclone = "/var/lib/ibmc-rclone"
 	configPath     = "/root/.config/rclone"
 	configFileName = "rclone.conf"
-	remote         = "rclone-remote"
+	remote         = "ibmcos"
 	s3Type         = "s3"
-	provider       = "IBMCOS"
-	env_auth       = "true"
+	cosProvider    = "IBMCOS"
+	envAuth        = "true"
 )
 
 func (rclone *rcloneMounter) Stage(stagePath string) error {
@@ -70,7 +127,7 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 		}
 	}
 
-	if err = createConfig(rclone.endPoint, rclone.regnClass, rclone.accessKeys); err != nil {
+	if err = rclone.createConfig(); err != nil {
 		klog.Errorf("RcloneMounter Mount: Cannot create rclone config file %v", err)
 		return err
 	}
@@ -86,6 +143,7 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 		bucketName,
 		target,
 		"--daemon",
+		"--log-file=/var/log/rclone.log",
 	}
 	return fuseMount(target, rcloneCmd, args)
 }
@@ -97,18 +155,26 @@ func (rclone *rcloneMounter) Unmount(target string) error {
 	return FuseUnmount(target)
 }
 
-func createConfig(endpoint, location_constraint, accessKeys string) error {
-	keys := strings.Split(accessKeys, ":")
-	lines := []string{
+func (rclone *rcloneMounter) createConfig() error {
+	var accessKey string
+	var secretKey string
+	keys := strings.Split(rclone.accessKeys, ":")
+	if len(keys) == 2 {
+		accessKey = keys[0]
+		secretKey = keys[1]
+	}
+	configParams := []string{
 		"[" + remote + "]",
 		"type = " + s3Type,
-		"endpoint = " + endpoint,
-		"provider = " + provider,
-		"env_auth = " + env_auth,
-		"location_constraint = " + location_constraint,
-		"access_key_id = " + keys[0],
-		"secret_access_key = " + keys[1],
+		"endpoint = " + rclone.endPoint,
+		"provider = " + cosProvider,
+		"env_auth = " + envAuth,
+		"location_constraint = " + rclone.locConstraint,
+		"access_key_id = " + accessKey,
+		"secret_access_key = " + secretKey,
 	}
+
+	configParams = append(configParams, rclone.mountOptions...)
 
 	if err := os.MkdirAll(configPath, 0755); err != nil {
 		klog.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", configPath, err)
@@ -131,10 +197,10 @@ func createConfig(endpoint, location_constraint, accessKeys string) error {
 
 	klog.Info("-Rclone writing to config-")
 	datawriter := bufio.NewWriter(file)
-	for _, line := range lines {
+	for _, line := range configParams {
 		_, err = datawriter.WriteString(line + "\n")
 		if err != nil {
-			klog.Errorf("RcloneMounter Mount: Could not write file: %v", err)
+			klog.Errorf("RcloneMounter Mount: Could not write to config file: %v", err)
 			return err
 		}
 	}

@@ -1,0 +1,23 @@
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: cos-s3-csi-rclone-sc
+provisioner: cos.s3.csi.ibm.io
+mountOptions:
+    - "acl=private"
+    - "bucket_acl=private"
+    - "upload_cutoff=256Mi"
+    - "chunk_size=64Mi"
+    - "max_upload_parts=64"
+    - "upload_concurrency=20"
+    - "copy_cutoff=1Gi"
+    - "memory_pool_flush_time=30s"
+    - "disable_checksum=true"
+parameters:
+  mounter: "rclone"
+  client: "awss3"
+  csi.storage.k8s.io/provisioner-secret-name: ${pvc.name}
+  csi.storage.k8s.io/provisioner-secret-namespace: ${pvc.namespace}
+  csi.storage.k8s.io/node-publish-secret-name: ${pvc.name}
+  csi.storage.k8s.io/node-publish-secret-namespace: ${pvc.namespace}

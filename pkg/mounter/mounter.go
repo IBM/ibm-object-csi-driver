@@ -3,11 +3,12 @@ package mounter
 import (
 	"errors"
 	"fmt"
-	"k8s.io/klog/v2"
 	"os"
 	"os/exec"
 	"syscall"
 	"time"
+
+	"k8s.io/klog/v2"
 )
 
 type Mounter interface {
@@ -30,7 +31,8 @@ const (
 type S3fsMounterFactory struct{}
 
 type NewMounterFactory interface {
-	NewMounter(mounter, bucket, objpath, endpoint, region, keys string, authType string) (Mounter, error)
+	// NewMounter(mounter, bucket, objpath, endpoint, region, keys string, authType string) (Mounter, error)
+	NewMounter(secretMap map[string]string, mountFlags []string) (Mounter, error)
 }
 
 func NewS3fsMounterFactory() *S3fsMounterFactory {
@@ -38,17 +40,20 @@ func NewS3fsMounterFactory() *S3fsMounterFactory {
 }
 
 // func newS3fsMounter(bucket string, objpath string, endpoint string, region string, keys string)
-func (s *S3fsMounterFactory) NewMounter(mounter string, bucket string, objpath string, endpoint string, region string, keys string, authType string) (Mounter, error) {
+func (s *S3fsMounterFactory) NewMounter(secretMap map[string]string, mountFlags []string) (Mounter, error) {
 	klog.Info("-NewMounter-")
-	klog.Infof("NewMounter args:\n\tmounter: <%s>\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>", mounter, bucket, objpath, endpoint, region)
+
+	mounter := secretMap["mounter"]
+
+	//klog.Infof("NewMounter args:\n\tmounter: <%s>\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>", mounter, bucket, objpath, endpoint, region)
 	switch mounter {
 	case s3fsMounterType:
-		return newS3fsMounter(bucket, objpath, endpoint, region, keys, authType)
+		return newS3fsMounter(secretMap, mountFlags)
 	case rcloneMounterType:
-		return newRcloneMounter(bucket, objpath, endpoint, region, keys)
+		return newRcloneMounter(secretMap, mountFlags)
 	default:
 		// default to s3backer
-		return newS3fsMounter(bucket, objpath, endpoint, region, keys, authType)
+		return newS3fsMounter(secretMap, mountFlags)
 	}
 }
 
