@@ -7,21 +7,21 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	restclientset "k8s.io/client-go/rest"
 )
 
 type PodDetails struct {
-	Cmd         string
-	CmdExits    bool
-	Volumes     []VolumeDetails
-	VolumeMount VolumeMountDetails
+	Cmd      string
+	CmdExits bool
+	Volumes  []VolumeDetails
 }
 
 type VolumeDetails struct {
-	PVCName    string //PVC Name
-	VolumeType string //PVC SC
-	VolumeMount           VolumeMountDetails
-	pvc                   *TestPersistentVolumeClaim
+	PVCName     string //PVC Name
+	VolumeType  string //PVC SC
+	VolumeMount VolumeMountDetails
+	pvc         *TestPersistentVolumeClaim
+	ClaimSize   string //PVC Capacity
+	AccessMode  *v1.PersistentVolumeAccessMode
 }
 
 type VolumeMountDetails struct {
@@ -42,25 +42,24 @@ func (pod *PodDetails) SetupWithDynamicVolumes(client clientset.Interface, names
 	tpod := NewTestPod(client, namespace, pod.Cmd)
 	By("setting up the PVC for POD")
 	for n, v := range pod.Volumes {
-		tpvc, funcs := v.SetupDynamicPersistentVolumeClaim(client, namespace, false)
+		tpvc, funcs := v.SetupDynamicPersistentVolumeClaim(client, namespace)
 		cleanupFuncs = append(cleanupFuncs, funcs...)
 
-			tpod.SetupVolume(tpvc.persistentVolumeClaim,
-				fmt.Sprintf("%s%d", v.VolumeMount.NameGenerate, n+1),
-				fmt.Sprintf("%s%d", v.VolumeMount.MountPathGenerate, n+1), v.VolumeMount.ReadOnly)
+		tpod.SetupVolume(tpvc.persistentVolumeClaim,
+			fmt.Sprintf("%s%d", v.VolumeMount.NameGenerate, n+1),
+			fmt.Sprintf("%s%d", v.VolumeMount.MountPathGenerate, n+1), v.VolumeMount.ReadOnly)
 	}
 	return tpod, cleanupFuncs
 }
 
-func (volume *VolumeDetails) SetupDynamicPersistentVolumeClaim(client clientset.Interface, namespace *v1.Namespace, pvcErrExpected bool) (*TestPersistentVolumeClaim, []func()) {
+func (volume *VolumeDetails) SetupDynamicPersistentVolumeClaim(client clientset.Interface, namespace *v1.Namespace) (*TestPersistentVolumeClaim, []func()) {
 	cleanupFuncs := make([]func(), 0)
 	By("setting up the PVC and PV")
 	//By(fmt.Sprintf("PVC: %q    NS: %q", volume.PVCName, namespace.Name))
 	storageClass := storagev1.StorageClass{}
 	storageClass.Name = volume.VolumeType
-
 	var tpvc *TestPersistentVolumeClaim
-		tpvc = NewTestPersistentVolumeClaim(client, volume.PVCName, namespace,  &storageClass)
+	tpvc = NewTestPersistentVolumeClaim(client, volume.PVCName, namespace, volume.ClaimSize, volume.AccessMode, &storageClass)
 	tpvc.Create()
 	cleanupFuncs = append(cleanupFuncs, tpvc.Cleanup)
 	// PV will not be ready until PVC is used in a pod when volumeBindingMode: WaitForFirstConsumer
@@ -70,4 +69,3 @@ func (volume *VolumeDetails) SetupDynamicPersistentVolumeClaim(client clientset.
 
 	return tpvc, cleanupFuncs
 }
-

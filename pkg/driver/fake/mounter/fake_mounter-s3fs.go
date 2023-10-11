@@ -28,7 +28,7 @@ type fakes3fsMounter struct {
 	endPoint   string //From Secret in SC
 	regnClass  string //From Secret in SC
 	accessKeys string
-	authType string
+	authType   string
 }
 
 func fakenewS3fsMounter(bucket string, objpath string, endpoint string, region string, keys string, authType string) (mounter.Mounter, error) {
@@ -40,7 +40,7 @@ func fakenewS3fsMounter(bucket string, objpath string, endpoint string, region s
 		endPoint:   endpoint,
 		regnClass:  region,
 		accessKeys: keys,
-		authType: authType,
+		authType:   authType,
 	}, nil
 }
 
