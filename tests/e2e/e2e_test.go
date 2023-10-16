@@ -39,5 +39,5 @@ func init() {
 
 func TestE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "VPC Block Storage CSI Driver End-to-End Tests")
+	RunSpecs(t, "Object Storage CSI Driver End-to-End Tests")
 }
