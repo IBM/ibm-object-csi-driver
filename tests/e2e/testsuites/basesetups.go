@@ -58,8 +58,7 @@ func (volume *VolumeDetails) SetupDynamicPersistentVolumeClaim(client clientset.
 	//By(fmt.Sprintf("PVC: %q    NS: %q", volume.PVCName, namespace.Name))
 	storageClass := storagev1.StorageClass{}
 	storageClass.Name = volume.VolumeType
-	var tpvc *TestPersistentVolumeClaim
-	tpvc = NewTestPersistentVolumeClaim(client, volume.PVCName, namespace, volume.ClaimSize, volume.AccessMode, &storageClass)
+	tpvc := NewTestPersistentVolumeClaim(client, volume.PVCName, namespace, volume.ClaimSize, volume.AccessMode, &storageClass)
 	tpvc.Create()
 	cleanupFuncs = append(cleanupFuncs, tpvc.Cleanup)
 	// PV will not be ready until PVC is used in a pod when volumeBindingMode: WaitForFirstConsumer
