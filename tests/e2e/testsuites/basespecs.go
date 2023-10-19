@@ -1,5 +1,5 @@
 /**
- * Copyright 2021 IBM Corp.
+ * Copyright 2023 IBM Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -75,13 +75,13 @@ func NewTestPod(c clientset.Interface, ns *v1.Namespace, command string) *TestPo
 		namespace:   ns,
 		pod: &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "ics-e2e-tester-",
-				Labels:       map[string]string{"app": "ics-vol-e2e"},
+				GenerateName: "obj-e2e-tester-",
+				Labels:       map[string]string{"app": "obj-vol-e2e"},
 			},
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{
 					{
-						Name:         "ics-e2e-tester",
+						Name:         "obj-e2e-tester",
 						Image:        imageutils.GetE2EImage(imageutils.BusyBox),
 						Command:      []string{"/bin/sh"},
 						Args:         []string{"-c", command},
@@ -238,7 +238,6 @@ func (t *TestPersistentVolumeClaim) Create() {
 	By("creating a PVC")
 	storageClassName := ""
 	if t.storageClass != nil {
-		By("I am here")
 		storageClassName = t.storageClass.Name
 	}
 	_, err = t.client.StorageV1().StorageClasses().Get(context.Background(), storageClassName, metav1.GetOptions{})
@@ -310,11 +309,6 @@ func (t *TestPersistentVolumeClaim) ValidateProvisionedPersistentVolume() {
 	Expect(t.persistentVolume.Spec.AccessModes).To(Equal(expectedAccessModes))
 	Expect(t.persistentVolume.Spec.ClaimRef.Name).To(Equal(t.persistentVolumeClaim.ObjectMeta.Name))
 	Expect(t.persistentVolume.Spec.ClaimRef.Namespace).To(Equal(t.persistentVolumeClaim.ObjectMeta.Namespace))
-	// If storageClass is nil, PV was pre-provisioned with these values already set
-	/*if t.storageClass != nil {
-		Expect(t.persistentVolume.Spec.PersistentVolumeReclaimPolicy).To(Equal(*t.storageClass.ReclaimPolicy))
-		//Expect(t.persistentVolume.Spec.MountOptions).To(Equal(t.storageClass.MountOptions))
-	}*/
 }
 
 func generatePVC(name, namespace,

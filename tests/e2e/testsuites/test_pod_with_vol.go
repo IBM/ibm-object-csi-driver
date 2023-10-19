@@ -26,7 +26,6 @@ import (
 
 // DynamicallyProvisioneVolPodWRTest will provision required PVC and Deployment
 // Testing if the Pod can write and read to mounted volumes
-// Deleting a pod, and again testing if the Pod can write and read to mounted volumes
 type DynamicallyProvisionePodWithVolTest struct {
 	Pods     []PodDetails
 	PodCheck *PodExecCheck
