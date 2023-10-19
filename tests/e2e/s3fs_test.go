@@ -99,7 +99,7 @@ var _ = Describe("[obj-e2e] [s3fs] [with-pod] ", func() {
 			},
 		}
 		test.Run(cs, ns)
-		if _, err = fpointer.WriteString("OBJECT-CSI-PLUGIN S3FS LIFECYCLE: PASS\n"); err != nil {
+		if _, err = fpointer.WriteString("OBJECT-CSI-PLUGIN(s3fs): PVC CREATE, POD MOUNT, READ/WRITE, CLEANUP : PASS\n"); err != nil {
 			panic(err)
 		}
 	})
