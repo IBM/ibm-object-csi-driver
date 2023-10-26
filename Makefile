@@ -64,7 +64,7 @@ build:
 
 
 .PHONY: buildimage
-buildimage: build-systemutil
+buildimage: build-binary
 	docker build	\
         --build-arg RHSM_PASS=$(RHSM_PASS) \
         --build-arg RHSM_USER=$(RHSM_USER) \
@@ -76,8 +76,8 @@ buildimage: build-systemutil
         --build-arg BUILD_URL=${BUILD_URL} \
 	-t $(CORE_DRIVER_IMG):$(ARCH)-$(TAG) -f Dockerfile .
 
-.PHONY: build-systemutil
-build-systemutil:
+.PHONY: build-binary
+build-binary:
 	docker build --build-arg TAG=$(REV) --build-arg OS=linux --build-arg ARCH=$(ARCH) -t csi-driver-builder --pull -f Dockerfile.builder .
 	docker run --env GHE_TOKEN=${GHE_TOKEN} csi-driver-builder
 	docker cp `docker ps -q -n=1`:/go/bin/${EXE_DRIVER_NAME} ./${EXE_DRIVER_NAME}
