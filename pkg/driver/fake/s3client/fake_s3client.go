@@ -21,7 +21,7 @@ import (
 	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
 )
 
-//ObjectStorageSessionFactory is a factory for mocked object storage sessions
+// ObjectStorageSessionFactory is a factory for mocked object storage sessions
 type ObjectStorageSessionFactory struct {
 	//FailCheckBucketAccess ...
 	FailCheckBucketAccess bool

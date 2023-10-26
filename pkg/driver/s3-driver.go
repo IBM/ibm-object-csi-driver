@@ -26,9 +26,9 @@ import (
 )
 
 const (
-	kib    int64 = 1024
-	mib    int64 = kib * 1024
-	gib    int64 = mib * 1024
+	kib int64 = 1024
+	mib int64 = kib * 1024
+	gib int64 = mib * 1024
 )
 
 type S3Driver struct {
