@@ -53,6 +53,15 @@ Provide proper values for parameters in secret under examples/cos-s3-csi-pvc-sec
       `kubectl create -f examples/cos-s3-csi-pvc.yaml`
 
       `kubectl create -f examples/cos-csi-app.yaml`
+    
+    If rclone mount options need to be provided they can be provided in Secret using StringData field.
+    For example
+    ```
+    stringData: 
+        mountOptions: |
+            upload_concurrency=30
+            low_level_retries=3
+    ```
 
 2. Verify PVC is in `Bound` state
 
