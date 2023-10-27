@@ -25,6 +25,7 @@ import (
 	"github.com/IBM/ibm-cos-sdk-go/aws/awserr"
 	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -41,6 +42,7 @@ const (
 type controllerServer struct {
 	*S3Driver
 	cosSession s3client.ObjectStorageSessionFactory
+	Logger     *zap.Logger
 }
 
 var (
@@ -164,7 +166,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	if locationConstraint == "" {
 		return nil, status.Error(codes.InvalidArgument, "locationConstraint unknown")
 	}
-	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds)
+	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
 
 	msg, err := sess.CreateBucket(bucketName)
 	if msg != "" {
@@ -224,7 +226,7 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 
 	endPoint := secretMap["cosEndpoint"]
 	locationConstraint := secretMap["locationConstraint"]
-	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds)
+	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
 	err = sess.DeleteBucket(bucketName)
 	if err != nil {
 		return nil, fmt.Errorf("cannot delete bucket: %v", err)

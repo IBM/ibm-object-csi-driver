@@ -110,10 +110,11 @@ func newIdentityServer(d *S3Driver) *identityServer {
 	}
 }
 
-func newControllerServer(d *S3Driver, s3cosSession s3client.ObjectStorageSessionFactory) *controllerServer {
+func newControllerServer(d *S3Driver, s3cosSession s3client.ObjectStorageSessionFactory, logger *zap.Logger) *controllerServer {
 	return &controllerServer{
 		S3Driver:   d,
 		cosSession: s3cosSession,
+		Logger:     logger,
 	}
 }
 
@@ -161,11 +162,11 @@ func (driver *S3Driver) NewS3CosDriver(nodeID string, endpoint string, s3cosSess
 	// Create GRPC servers
 	driver.ids = newIdentityServer(driver)
 	if driver.mode == "controller" {
-		driver.cs = newControllerServer(driver, s3cosSession)
+		driver.cs = newControllerServer(driver, s3cosSession, driver.logger)
 	} else if driver.mode == "node" {
 		driver.ns = newNodeServer(driver, nodeID, mountObj)
 	} else if driver.mode == "controller-node" {
-		driver.cs = newControllerServer(driver, s3cosSession)
+		driver.cs = newControllerServer(driver, s3cosSession, driver.logger)
 		driver.ns = newNodeServer(driver, nodeID, mountObj)
 	}
 
