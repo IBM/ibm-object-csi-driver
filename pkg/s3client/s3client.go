@@ -67,7 +67,7 @@ type COSSessionFactory struct{}
 type ObjectStorageSessionFactory interface {
 
 	// NewObjectStorageBackend method creates a new object store session
-	NewObjectStorageSession(endpoint, locationConstraint string, creds *ObjectStorageCredentials) ObjectStorageSession
+	NewObjectStorageSession(endpoint, locationConstraint string, creds *ObjectStorageCredentials, lgr *zap.Logger) ObjectStorageSession
 }
 
 var _ ObjectStorageSessionFactory = &COSSessionFactory{}
@@ -180,7 +180,7 @@ func NewS3Client(lgr *zap.Logger) (ObjectStorageSession, error) {
 }
 
 // NewObjectStorageSession method creates a new object store session
-func (s *COSSessionFactory) NewObjectStorageSession(endpoint, locationConstraint string, creds *ObjectStorageCredentials) ObjectStorageSession {
+func (s *COSSessionFactory) NewObjectStorageSession(endpoint, locationConstraint string, creds *ObjectStorageCredentials, lgr *zap.Logger) ObjectStorageSession {
 	var sdkCreds *credentials.Credentials
 	if creds.AuthType == "iam" {
 		sdkCreds = ibmiam.NewStaticCredentials(aws.NewConfig(), creds.IAMEndpoint+"/identity/token", creds.APIKey, creds.ServiceInstanceID)
@@ -195,6 +195,7 @@ func (s *COSSessionFactory) NewObjectStorageSession(endpoint, locationConstraint
 	}))
 
 	return &COSSession{
-		svc: s3.New(sess),
+		svc:    s3.New(sess),
+		logger: lgr,
 	}
 }

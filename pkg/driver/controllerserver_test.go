@@ -24,6 +24,7 @@ import (
 	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -31,10 +32,11 @@ import (
 	"testing"
 )
 
-func getCustomControllerServer(csiDriver *S3Driver, factory s3client.ObjectStorageSessionFactory) *controllerServer {
+func getCustomControllerServer(csiDriver *S3Driver, factory s3client.ObjectStorageSessionFactory, logger *zap.Logger) *controllerServer {
 	return &controllerServer{
 		S3Driver:   csiDriver,
 		cosSession: factory,
+		Logger:     logger,
 	}
 }
 
@@ -228,7 +230,7 @@ func TestCreateVolumeArguments(t *testing.T) {
 		t.Logf("test case: %s", tc.name)
 		// Setup new driver each time so no interference
 		icDriver := inits3Driver(t)
-		cs := getCustomControllerServer(icDriver, &fakeclient.ObjectStorageSessionFactory{})
+		cs := getCustomControllerServer(icDriver, &fakeclient.ObjectStorageSessionFactory{}, icDriver.logger)
 
 		// Call CSI CreateVolume
 		resp, err := cs.CreateVolume(context.Background(), tc.req)
@@ -336,7 +338,7 @@ func TestDeleteVolume(t *testing.T) {
 		t.Logf("test case: %s", tc.name)
 		// Setup new driver each time so no interference
 		icDriver := inits3Driver(t)
-		cs := getCustomControllerServer(icDriver, &fakeclient.ObjectStorageSessionFactory{})
+		cs := getCustomControllerServer(icDriver, &fakeclient.ObjectStorageSessionFactory{}, icDriver.logger)
 		response, err := cs.DeleteVolume(context.Background(), tc.req)
 		if tc.expErrCode != codes.OK {
 			t.Logf("Error code")
