@@ -19,6 +19,7 @@ package s3client
 import (
 	"errors"
 	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
+	"go.uber.org/zap"
 )
 
 // ObjectStorageSessionFactory is a factory for mocked object storage sessions
@@ -50,15 +51,17 @@ type ObjectStorageSessionFactory struct {
 
 type fakeObjectStorageSession struct {
 	factory *ObjectStorageSessionFactory
+	logger  *zap.Logger
 }
 
 // NewObjectStorageSession method creates a new fake object store session
-func (f *ObjectStorageSessionFactory) NewObjectStorageSession(endpoint, region string, creds *s3client.ObjectStorageCredentials) s3client.ObjectStorageSession {
+func (f *ObjectStorageSessionFactory) NewObjectStorageSession(endpoint, region string, creds *s3client.ObjectStorageCredentials, lgr *zap.Logger) s3client.ObjectStorageSession {
 	f.LastEndpoint = endpoint
 	f.LastRegion = region
 	f.LastCredentials = creds
 	return &fakeObjectStorageSession{
 		factory: f,
+		logger:  lgr,
 	}
 }
 
