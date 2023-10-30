@@ -22,4 +22,4 @@ before_script:
   - make lint
 
 script:
-  - make container
+  - make driver
