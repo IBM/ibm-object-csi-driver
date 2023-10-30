@@ -181,8 +181,6 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	params := req.GetParameters()
 	secretMap := req.GetSecrets()
 	fmt.Println("CreateVolume Parameters:\n\t", params)
-	//TODO: get rid of this call since it is exposing secrets
-	fmt.Println("CreateVolume Secrets:\n\t", secretMap)
 
 	creds, err := cs.getCredentials(req.GetSecrets())
 	if err != nil {
@@ -249,8 +247,6 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	}
 	klog.Infof("Deleting volume %v", volumeID)
 	secretMap := req.GetSecrets()
-	//TODO: get rid of this call since it is exposing secrets
-	//fmt.Println("DeleteVolume Secrets:\n\t", secretMap)
 
 	creds, err := cs.getCredentials(req.GetSecrets())
 	if err != nil {
