@@ -13,7 +13,7 @@ GOFILES=$(shell find . -type f -name '*.go' -not -path "./vendor/*")
 all: build
 
 
-.PHONY: build-% build container-% container clean
+.PHONY: build-% clean
 
 REV=$(shell git describe --long --tags --match='v*' --dirty 2>/dev/null || git rev-list -n1 HEAD)
 GIT_REMOTE_URL="$(shell git config --get remote.origin.url 2>/dev/null)"
