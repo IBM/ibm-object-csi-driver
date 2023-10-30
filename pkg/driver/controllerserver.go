@@ -111,17 +111,17 @@ func (cs *controllerServer) getCredentials(secretMap map[string]string) (*s3clie
 }
 
 func ReplaceAndReturnCopy(req *csi.CreateVolumeRequest, newAccessKey, newSecretKey string) *csi.CreateVolumeRequest {
-    // Create a new CreateVolumeRequest and copy the original values
-    newReq := &csi.CreateVolumeRequest{}
-    *newReq = *req
+	// Create a new CreateVolumeRequest and copy the original values
+	newReq := &csi.CreateVolumeRequest{}
+	*newReq = *req
 
-    // Modify the Secrets map in the new request
-    newReq.Secrets = map[string]string{
-        "accesKey": newAccessKey,
-        "secretKey": newSecretKey,
-    }
+	// Modify the Secrets map in the new request
+	newReq.Secrets = map[string]string{
+		"accesKey":  newAccessKey,
+		"secretKey": newSecretKey,
+	}
 
-    return newReq
+	return newReq
 }
 
 func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
