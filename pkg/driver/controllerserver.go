@@ -108,6 +108,20 @@ func (cs *controllerServer) getCredentials(secretMap map[string]string) (*s3clie
 
 }
 
+func ReplaceAndReturnCopy(req *csi.CreateVolumeRequest, newAccessKey, newSecretKey string) *csi.CreateVolumeRequest {
+    // Create a new CreateVolumeRequest and copy the original values
+    newReq := &csi.CreateVolumeRequest{}
+    *newReq = *req
+
+    // Modify the Secrets map in the new request
+    newReq.Secrets = map[string]string{
+        "accesKey": newAccessKey,
+        "secretKey": newSecretKey,
+    }
+
+    return newReq
+}
+
 func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	var (
 		bucketName         string
@@ -115,7 +129,8 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		locationConstraint string
 		//objPath    string
 	)
-	klog.V(3).Infof("CSIControllerServer-CreateVolume: Request: %v", *req)
+	modifiedRequest := ReplaceAndReturnCopy(req, "xxx", "yyy")
+	klog.V(3).Infof("CSIControllerServer-CreateVolume: Request: %v", *modifiedRequest)
 
 	volumeName := sanitizeVolumeID(req.GetName())
 	volumeID := volumeName
@@ -200,14 +215,14 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 }
 
 func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	klog.V(3).Infof("CSIControllerServer-DeleteVolume: Request: %v", *req)
+	modifiedRequest := ReplaceAndReturnCopy(req, "xxx", "yyy")
+	klog.V(3).Infof("CSIControllerServer-DeleteVolume: Request: %v", *modifiedRequest)
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 	klog.Infof("Deleting volume %v", volumeID)
-	klog.Infof("deleting volume %v", volumeID)
 	secretMap := req.GetSecrets()
 	//TODO: get rid of this call since it is exposing secrets
 	//fmt.Println("DeleteVolume Secrets:\n\t", secretMap)
