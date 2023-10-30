@@ -98,7 +98,11 @@ func (ns *nodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 }
 
 func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	klog.V(2).Infof("CSINodeServer-NodePublishVolume: Request %v", *req)
+	modifiedRequest, err := ReplaceAndReturnCopy(req, "xxx", "yyy")
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
+	}
+	klog.V(2).Infof("CSINodeServer-NodePublishVolume: Request %v", modifiedRequest.(*csi.NodePublishVolumeRequest))
 
 	volumeID := req.GetVolumeId()
 
@@ -138,8 +142,6 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		targetPath, deviceID, readOnly, volumeID, attrib, mountFlags)
 
 	secretMap := req.GetSecrets()
-	fmt.Println("CreateVolume VolumeContext:\n\t", attrib)
-	fmt.Println("CreateVolume Secrets:\n\t", secretMap)
 
 	if mounterObj, err = ns.Mounter.NewMounter(secretMap, mountFlags); err != nil {
 		return nil, err

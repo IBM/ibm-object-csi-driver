@@ -110,37 +110,6 @@ func (cs *controllerServer) getCredentials(secretMap map[string]string) (*s3clie
 
 }
 
-func ReplaceAndReturnCopy(req interface{}, newAccessKey, newSecretKey string) (interface{}, error) {
-	switch r := req.(type) {
-	case *csi.CreateVolumeRequest:
-		// Create a new CreateVolumeRequest and copy the original values
-		newReq := &csi.CreateVolumeRequest{}
-		*newReq = *r
-
-		// Modify the Secrets map in the new request
-		newReq.Secrets = map[string]string{
-			"accesKey":  newAccessKey,
-			"secretKey": newSecretKey,
-		}
-
-		return newReq, nil
-	case *csi.DeleteVolumeRequest:
-		// Create a new DeleteVolumeRequest and copy the original values
-		newReq := &csi.DeleteVolumeRequest{}
-		*newReq = *r
-
-		// Modify the Secrets map in the new request
-		newReq.Secrets = map[string]string{
-			"accesKey":  newAccessKey,
-			"secretKey": newSecretKey,
-		}
-
-		return newReq, nil
-
-	default:
-		return req, fmt.Errorf("unsupported request type")
-	}
-}
 func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	var (
 		bucketName         string
@@ -150,7 +119,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	)
 	modifiedRequest, err := ReplaceAndReturnCopy(req, "xxx", "yyy")
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
 	}
 	klog.V(3).Infof("CSIControllerServer-CreateVolume: Request: %v", modifiedRequest.(*csi.CreateVolumeRequest))
 
@@ -237,7 +206,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	modifiedRequest, err := ReplaceAndReturnCopy(req, "xxx", "yyy")
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
 	}
 	klog.V(3).Infof("CSIControllerServer-DeleteVolume: Request: %v", modifiedRequest.(*csi.DeleteVolumeRequest))
 
