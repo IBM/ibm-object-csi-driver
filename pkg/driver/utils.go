@@ -48,7 +48,7 @@ func ReplaceAndReturnCopy(req interface{}, newAccessKey, newSecretKey string) (i
 
 		return newReq, nil
 	case *csi.NodePublishVolumeRequest:
-		// Create a new DeleteVolumeRequest and copy the original values
+		// Create a new NodePublishVolumeRequest and copy the original values
 		newReq := &csi.NodePublishVolumeRequest{}
 		*newReq = *r
 
