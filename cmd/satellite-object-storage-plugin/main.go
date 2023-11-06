@@ -32,7 +32,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // Options is the combined set of options for all operating modes.
