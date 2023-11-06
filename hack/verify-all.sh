@@ -19,7 +19,8 @@ set -euo pipefail
 
 PKG_ROOT=$(git rev-parse --show-toplevel)
 
-${PKG_ROOT}/hack/verify-gofmt.sh
-${PKG_ROOT}/hack/verify-govet.sh
-${PKG_ROOT}/hack/verify-golint.sh
-${PKG_ROOT}/hack/verify-vendor.sh
+"${PKG_ROOT}/hack/verify-gofmt.sh"
+"${PKG_ROOT}/hack/verify-govet.sh"
+"${PKG_ROOT}/hack/verify-golint.sh"
+"${PKG_ROOT}/hack/verify-vendor.sh"
+
