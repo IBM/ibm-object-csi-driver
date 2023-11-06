@@ -1,3 +1,4 @@
+//Package sanity ...
 package sanity
 
 import (
