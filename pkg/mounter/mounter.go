@@ -1,4 +1,4 @@
-//Package mounter
+// Package mounter
 package mounter
 
 import (
@@ -136,7 +136,7 @@ func isCorruptedMnt(err error) bool {
 }
 
 func writePass(pwFileName string, pwFileContent string) error {
-	pwFile, err := os.OpenFile(pwFileName, os.O_RDWR|os.O_CREATE, 0600)
+	pwFile, err := os.OpenFile(pwFileName, os.O_RDWR|os.O_CREATE, 0600) // #nosec G304: Value is dynamic
 	if err != nil {
 		return err
 	}
@@ -144,6 +144,9 @@ func writePass(pwFileName string, pwFileContent string) error {
 	if err != nil {
 		return err
 	}
-	pwFile.Close()
+	err = pwFile.Close()
+	if err != nil {
+		return err
+	}
 	return nil
 }

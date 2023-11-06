@@ -1,4 +1,4 @@
-//Package mounter
+// Package mounter
 package mounter
 
 import (
@@ -82,7 +82,7 @@ func findFuseMountProcess(path string) (*os.Process, error) {
 
 func getCmdLine(pid int) (string, error) {
 	cmdLineFile := fmt.Sprintf("/proc/%v/cmdline", pid)
-	cmdLine, err := os.ReadFile(cmdLineFile)
+	cmdLine, err := os.ReadFile(cmdLineFile) // #nosec G304: Dynamic pid .
 	if err != nil {
 		return "", err
 	}

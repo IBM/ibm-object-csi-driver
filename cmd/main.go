@@ -70,7 +70,7 @@ func getZapLogger() *zap.Logger {
 		zapcore.NewJSONEncoder(encoderCfg),
 		zapcore.Lock(os.Stdout),
 		atom,
-	), zap.AddCaller()).With(zap.String("name", csiConfig.CSIDriverGithubName)).With(zap.String("CSIDriverName", csiConfig.CSIDriverLogName))
+	), zap.AddCaller()).With(zap.String("name", "ibm-object-csi-driver")).With(zap.String("CSIDriverName", "IBM CSI Object Driver"))
 
 	atom.SetLevel(zap.InfoLevel)
 	return logger
@@ -128,7 +128,7 @@ func serveMetrics(metricsAddress string, logger *zap.Logger) {
 	go func() {
 		http.Handle("/metrics", promhttp.Handler())
 		//http.Handle("/health-check", healthCheck)
-		err := http.ListenAndServe(metricsAddress, nil) / #nosec G114: use default timeout.
+		err := http.ListenAndServe(metricsAddress, nil) // #nosec G114: use default timeout.
 		logger.Error("failed to start metrics service:", zap.Error(err))
 	}()
 	// TODO

@@ -16,7 +16,7 @@
 package driver
 
 import (
-        "crypto/sha256"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -123,7 +123,10 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 	klog.V(3).Infof("CSIControllerServer-CreateVolume: Request: %v", modifiedRequest.(*csi.CreateVolumeRequest))
 
-	volumeName := sanitizeVolumeID(req.GetName())
+	volumeName, err := sanitizeVolumeID(req.GetName())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in sanitizeVolumeID  %v", err))
+	}
 	volumeID := volumeName
 	caps := req.GetVolumeCapabilities()
 
@@ -347,12 +350,13 @@ func (cs *controllerServer) ControllerGetVolume(ctx context.Context, req *csi.Co
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func sanitizeVolumeID(volumeID string) string {
+func sanitizeVolumeID(volumeID string) (string, error) {
+	var err error
 	volumeID = strings.ToLower(volumeID)
 	if len(volumeID) > 63 {
 		h := sha256.New()
-		io.WriteString(h, volumeID) //nolint
+		_, err = io.WriteString(h, volumeID) //nolint
 		volumeID = hex.EncodeToString(h.Sum(nil))
 	}
-	return volumeID
+	return volumeID, err
 }
