@@ -49,7 +49,7 @@ func getOptions() *Options {
 		nodeID         = flag.String("nodeid", "host01", "node id")
 		metricsAddress = flag.String("metrics-address", "0.0.0.0:9080", "Metrics address")
 	)
-	flag.Set("logtostderr", "true") // #nosec G104: Attempt to set flags for logging to stderr only on best-effort basis.Error cannot be usefully handled.
+	_ = flag.Set("logtostderr", "true") // #nosec G104: Attempt to set flags for logging to stderr only on best-effort basis.Error cannot be usefully handled.
 	flag.Parse()
 	return &Options{
 		ServerMode:     *serverMode,
