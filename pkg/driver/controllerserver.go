@@ -16,7 +16,7 @@
 package driver
 
 import (
-	"crypto/sha1"
+        "crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -350,7 +350,7 @@ func (cs *controllerServer) ControllerGetVolume(ctx context.Context, req *csi.Co
 func sanitizeVolumeID(volumeID string) string {
 	volumeID = strings.ToLower(volumeID)
 	if len(volumeID) > 63 {
-		h := sha1.New()
+		h := sha256.New()
 		io.WriteString(h, volumeID) //nolint
 		volumeID = hex.EncodeToString(h.Sum(nil))
 	}

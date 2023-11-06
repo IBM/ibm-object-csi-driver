@@ -49,7 +49,7 @@ func getOptions() *Options {
 		nodeID         = flag.String("nodeid", "host01", "node id")
 		metricsAddress = flag.String("metrics-address", "0.0.0.0:9080", "Metrics address")
 	)
-	flag.Set("logtostderr", "true") //nolint
+	flag.Set("logtostderr", "true") // #nosec G104: Attempt to set flags for logging to stderr only on best-effort basis.Error cannot be usefully handled.
 	flag.Parse()
 	return &Options{
 		ServerMode:     *serverMode,
@@ -60,11 +60,19 @@ func getOptions() *Options {
 }
 
 func getZapLogger() *zap.Logger {
-	prodConf := zap.NewProductionConfig()
-	prodConf.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	logger, _ := prodConf.Build()
-	logger.Named("SatelliteObjStoragePlugin")
+	// Prepare a new logger
+	atom := zap.NewAtomicLevel()
+	encoderCfg := zap.NewProductionEncoderConfig()
+	encoderCfg.TimeKey = "timestamp"
+	encoderCfg.EncodeTime = zapcore.ISO8601TimeEncoder
 
+	logger := zap.New(zapcore.NewCore(
+		zapcore.NewJSONEncoder(encoderCfg),
+		zapcore.Lock(os.Stdout),
+		atom,
+	), zap.AddCaller()).With(zap.String("name", csiConfig.CSIDriverGithubName)).With(zap.String("CSIDriverName", csiConfig.CSIDriverLogName))
+
+	atom.SetLevel(zap.InfoLevel)
 	return logger
 }
 func getEnv(key string) string {
@@ -120,7 +128,7 @@ func serveMetrics(metricsAddress string, logger *zap.Logger) {
 	go func() {
 		http.Handle("/metrics", promhttp.Handler())
 		//http.Handle("/health-check", healthCheck)
-		err := http.ListenAndServe(metricsAddress, nil)
+		err := http.ListenAndServe(metricsAddress, nil) / #nosec G114: use default timeout.
 		logger.Error("failed to start metrics service:", zap.Error(err))
 	}()
 	// TODO

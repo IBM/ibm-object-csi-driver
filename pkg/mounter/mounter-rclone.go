@@ -157,7 +157,7 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 	}
 
 	if !pathExist {
-		if err = os.MkdirAll(metaPath, 0755); err != nil {
+		if err = os.MkdirAll(metaPath, 0755); err != nil { // #nosec G301: Required for rclone
 			klog.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", metaPath, err)
 			return err
 		}
@@ -223,7 +223,12 @@ func (rclone *rcloneMounter) createConfig() error {
 		klog.Errorf("RcloneMounter Mount: Cannot create file %s: %v", configFileName, err)
 		return err
 	}
-	defer file.Close()
+	defer func() {
+    		if err := file.Close(); err != nil {
+        	klog.Errorf("RcloneMounter Mount: Cannot close file %s: %v", configFileName, err)
+		return err
+    		}
+	}()
 
 	err = os.Chmod(configFile, 0644)
 	if err != nil {
