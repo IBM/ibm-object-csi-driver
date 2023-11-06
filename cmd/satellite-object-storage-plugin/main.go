@@ -28,7 +28,6 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/klog/v2"
-	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
@@ -98,7 +97,6 @@ func main() {
 		loggerLevel.SetLevel(zap.DebugLevel)
 	}
 
-	rand.Seed(time.Now().UnixNano())
 	serverSetup(options, logger)
 	os.Exit(0)
 }
