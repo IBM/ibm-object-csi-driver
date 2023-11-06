@@ -60,7 +60,7 @@ driver: deps buildimage
 
 .PHONY: build
 build:
-	CGO_ENABLED=0 GOOS=linux go build -mod=vendor -a -ldflags '-X main.version=$(REV) -extldflags "-static"' -o ${GOPATH}/bin/${EXE_DRIVER_NAME} ./cmd/satellite-object-storage-plugin/$*
+	CGO_ENABLED=0 GOOS=linux go build -mod=vendor -a -ldflags '-X main.version=$(REV) -extldflags "-static"' -o ${GOPATH}/bin/${EXE_DRIVER_NAME} ./cmd/$*
 
 
 .PHONY: buildimage
