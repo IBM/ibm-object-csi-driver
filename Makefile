@@ -3,7 +3,7 @@ EXE_DRIVER_NAME=ibm-object-csi-driver
 
 REGISTRY=quay.io/satellite-object-storage-plugin
 
-export LINT_VERSION="1.51.1"
+export LINT_VERSION="1.51.2"
 
 COLOR_YELLOW=\033[0;33m
 COLOR_RESET=\033[0m
