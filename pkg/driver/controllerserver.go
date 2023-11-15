@@ -138,23 +138,15 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	if capacity >= maxStorageCapacity {
 		return nil, status.Error(codes.OutOfRange, fmt.Sprintf("Requested capacity %d exceeds maximum allowed %d", capacity, maxStorageCapacity))
 	}
-
 	klog.Infof("Got a request to create volume: %s", volumeID)
-
 	params := req.GetParameters()
 	secretMap := req.GetSecrets()
 	fmt.Println("CreateVolume Parameters:\n\t", params)
 	//TODO: get rid of this call since it is exposing secrets
 	fmt.Println("CreateVolume Secrets:\n\t", secretMap)
-
 	creds, err := cs.getCredentials(req.GetSecrets())
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
-	}
-	bucketName = secretMap["bucketName"]
-
-	if bucketName == "" {
-		return nil, status.Error(codes.InvalidArgument, "bucketName unknown")
 	}
 	endPoint = secretMap["cosEndpoint"]
 	if endPoint == "" {
@@ -165,31 +157,43 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, status.Error(codes.InvalidArgument, "locationConstraint unknown")
 	}
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds)
-
-	msg, err := sess.CreateBucket(bucketName)
-	if msg != "" {
-		klog.Infof("Info:Create Volume module:", msg)
-	}
-	if err != nil {
-
-		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "BucketAlreadyExists" {
-			klog.Warning(fmt.Sprintf("bucket '%s' already exists", bucketName))
-		} else {
-			klog.Errorf("CreateVolume: Unable to create the bucket: %v", err)
-			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to create the bucket: %v", bucketName))
+	bucketName = secretMap["bucketName"]
+	if bucketName != "" {
+		// User Provided bucket. Check its existence and don't create bucket
+		if err := sess.CheckBucketAccess(bucketName); err != nil {
+			klog.Errorf("CreateVolume: Unable to access the bucket: %v", err)
+			return nil, err
 		}
-
+		klog.Infof("Using bucket provided by user: %s", bucketName)
+	} else {
+		// Generate random temp bucket name based on volume id
+		tempBucketName := getTempBucketName(secretMap["mounter"], volumeID)
+		if tempBucketName == "" {
+			klog.Errorf("CreateVolume: Unable to generate the bucket name")
+			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to access the bucket: %v", tempBucketName))
+		}
+		msg, err := sess.CreateBucket(tempBucketName)
+		if msg != "" {
+			klog.Infof("Info:Create Volume module with temp Bucket:", msg)
+		}
+		if err != nil {
+			if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "BucketAlreadyExists" {
+				klog.Warning(fmt.Sprintf("bucket '%s' already exists", tempBucketName))
+			} else {
+				klog.Errorf("CreateVolume: Unable to create the bucket: %v", err)
+				return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to create the bucket: %v", tempBucketName))
+			}
+		}
+		if err := sess.CheckBucketAccess(tempBucketName); err != nil {
+			klog.Errorf("CreateVolume: Unable to access the bucket: %v", err)
+			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to access the bucket: %v", tempBucketName))
+		}
+		klog.Infof("Created temp bucket: %s", tempBucketName)
 	}
-
-	if err := sess.CheckBucketAccess(bucketName); err != nil {
-		klog.Errorf("CreateVolume: Unable to access the bucket: %v", err)
-		return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to access the bucket: %v", bucketName))
-	}
-
 	klog.Infof("create volume: %v", volumeID)
-
 	//COS Endpoint, bucket, access keys will be stored in the csiProvisionerSecretName
 	//The other tunables will be SC Parameters like ibm.io/multireq-max and other
+
 	return &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
 			VolumeId:      volumeID,
@@ -201,34 +205,34 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	klog.V(3).Infof("CSIControllerServer-DeleteVolume: Request: %v", *req)
-
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 	klog.Infof("Deleting volume %v", volumeID)
-	klog.Infof("deleting volume %v", volumeID)
 	secretMap := req.GetSecrets()
-	//TODO: get rid of this call since it is exposing secrets
-	//fmt.Println("DeleteVolume Secrets:\n\t", secretMap)
+	bucketName := secretMap["bucketName"]
+
+	if bucketName != "" {
+		klog.V(3).Infof("Not deleting user provided bucket: %v", secretMap["bucketName"])
+	}
+	klog.Infof("Deleteting any temp buckets associated with volume : %s", volumeID)
 
 	creds, err := cs.getCredentials(req.GetSecrets())
 	if err != nil {
 		return nil, fmt.Errorf("cannot get credentials: %v", err)
 	}
-	bucketName := secretMap["bucketName"]
-
-	if bucketName == "" {
-		return nil, status.Error(codes.InvalidArgument, "Bucket name is empty")
-	}
 
 	endPoint := secretMap["cosEndpoint"]
 	locationConstraint := secretMap["locationConstraint"]
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds)
-	err = sess.DeleteBucket(bucketName)
+	tempBucketName := getTempBucketName(secretMap["mounter"], volumeID)
+
+	err = sess.DeleteBucket(tempBucketName)
 	if err != nil {
-		return nil, fmt.Errorf("cannot delete bucket: %v", err)
+		klog.V(3).Infof("Cannot Delete Temp Bucket: %v; error msg: %v", tempBucketName, err)
 	}
+	klog.Infof("Deleted temp bucket %s if it existed", tempBucketName)
 
 	return &csi.DeleteVolumeResponse{}, nil
 }
@@ -350,4 +354,10 @@ func sanitizeVolumeID(volumeID string) string {
 		volumeID = hex.EncodeToString(h.Sum(nil))
 	}
 	return volumeID
+}
+
+func getTempBucketName(mounterType, volumeID string) string {
+	prefix := mounterType + "-bucket"
+	name := fmt.Sprintf("%s-%s", prefix, volumeID)
+	return name
 }

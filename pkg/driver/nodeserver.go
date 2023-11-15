@@ -141,6 +141,11 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	fmt.Println("CreateVolume VolumeContext:\n\t", attrib)
 	fmt.Println("CreateVolume Secrets:\n\t", secretMap)
 
+	// If bucket name wasn't provided by user, we use temp bucket created for volume
+	if secretMap["bucketName"] == "" {
+		secretMap["bucketName"] = getTempBucketName(secretMap["mounter"], volumeID)
+	}
+
 	if mounterObj, err = ns.Mounter.NewMounter(secretMap, mountFlags); err != nil {
 		return nil, err
 	}

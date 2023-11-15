@@ -50,6 +50,8 @@ Provide proper values for parameters in secret under examples/cos-s3-csi-pvc-sec
 
       `kubectl create -f examples/cos-s3-csi-pvc-secret.yaml`
 
+      Bucket name should be specified in Secret. If left empty, a temp bucket will be generated. Temp bucket will be deleted after volume is unpublished. Make sure to provide bucket name that exists and is ready to be used for mounting.
+
       `kubectl create -f examples/cos-s3-csi-pvc.yaml`
 
       `kubectl create -f examples/cos-csi-app.yaml`
