@@ -153,7 +153,6 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, c
 // logGRPC ...
 func logGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	klog.V(3).Infof("GRPC call: %s", info.FullMethod)
-	klog.V(5).Infof("GRPC request: %+v", req)
 	resp, err := handler(ctx, req)
 	if err != nil {
 		klog.Errorf("GRPC error: %v", err)

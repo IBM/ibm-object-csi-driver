@@ -25,6 +25,7 @@ import (
 	"github.com/IBM/ibm-cos-sdk-go/aws/awserr"
 	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -41,6 +42,7 @@ const (
 type controllerServer struct {
 	*S3Driver
 	cosSession s3client.ObjectStorageSessionFactory
+	Logger     *zap.Logger
 }
 
 var (
@@ -115,7 +117,11 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		locationConstraint string
 		//objPath    string
 	)
-	klog.V(3).Infof("CSIControllerServer-CreateVolume: Request: %v", *req)
+	modifiedRequest, err := ReplaceAndReturnCopy(req, "xxx", "yyy")
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
+	}
+	klog.V(3).Infof("CSIControllerServer-CreateVolume: Request: %v", modifiedRequest.(*csi.CreateVolumeRequest))
 
 	volumeName := sanitizeVolumeID(req.GetName())
 	volumeID := volumeName
@@ -142,8 +148,6 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	params := req.GetParameters()
 	secretMap := req.GetSecrets()
 	fmt.Println("CreateVolume Parameters:\n\t", params)
-	//TODO: get rid of this call since it is exposing secrets
-	fmt.Println("CreateVolume Secrets:\n\t", secretMap)
 	creds, err := cs.getCredentials(req.GetSecrets())
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
@@ -156,7 +160,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	if locationConstraint == "" {
 		return nil, status.Error(codes.InvalidArgument, "locationConstraint unknown")
 	}
-	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds)
+	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
 	bucketName = secretMap["bucketName"]
 	if bucketName != "" {
 		// User Provided bucket. Check its existence and don't create bucket
@@ -204,7 +208,12 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 }
 
 func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	klog.V(3).Infof("CSIControllerServer-DeleteVolume: Request: %v", *req)
+	modifiedRequest, err := ReplaceAndReturnCopy(req, "xxx", "yyy")
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
+	}
+	klog.V(3).Infof("CSIControllerServer-DeleteVolume: Request: %v", modifiedRequest.(*csi.DeleteVolumeRequest))
+
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
@@ -225,7 +234,7 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 
 	endPoint := secretMap["cosEndpoint"]
 	locationConstraint := secretMap["locationConstraint"]
-	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds)
+	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
 	tempBucketName := getTempBucketName(secretMap["mounter"], volumeID)
 
 	err = sess.DeleteBucket(tempBucketName)

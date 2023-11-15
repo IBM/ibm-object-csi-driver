@@ -13,6 +13,7 @@ import (
 	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
 	"github.com/google/uuid"
 	sanity "github.com/kubernetes-csi/csi-test/v4/pkg/sanity"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"k8s.io/klog/v2"
@@ -114,6 +115,7 @@ var _ s3client.ObjectStorageSessionFactory = &FakeObjectStorageSessionFactory{}
 
 type fakeObjectStorageSession struct {
 	factory *FakeObjectStorageSessionFactory
+	logger  *zap.Logger
 }
 
 func NewObjectStorageSessionFactory() *FakeObjectStorageSessionFactory {
@@ -121,9 +123,10 @@ func NewObjectStorageSessionFactory() *FakeObjectStorageSessionFactory {
 }
 
 // NewObjectStorageSession method creates a new object store session
-func (f *FakeObjectStorageSessionFactory) NewObjectStorageSession(endpoint, locationConstraint string, creds *s3client.ObjectStorageCredentials) s3client.ObjectStorageSession {
+func (f *FakeObjectStorageSessionFactory) NewObjectStorageSession(endpoint, locationConstraint string, creds *s3client.ObjectStorageCredentials, lgr *zap.Logger) s3client.ObjectStorageSession {
 	return &fakeObjectStorageSession{
 		factory: f,
+		logger:  lgr,
 	}
 }
 
