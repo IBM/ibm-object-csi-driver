@@ -1,3 +1,5 @@
+---
+dist: trusty
 language: go
 
 go:
@@ -16,6 +18,8 @@ cache:
   bundler: true
 
 sudo: true
+services:
+  - docker
 
 before_script:
   - make fmt
