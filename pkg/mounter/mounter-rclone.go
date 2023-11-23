@@ -1,3 +1,14 @@
+/*******************************************************************************
+ * IBM Confidential
+ * OCO Source Materials
+ * IBM Cloud Kubernetes Service, 5737-D43
+ * (C) Copyright IBM Corp. 2023 All Rights Reserved.
+ * The source code for this program is not published or otherwise divested of
+ * its trade secrets, irrespective of what has been deposited with
+ * the U.S. Copyright Office.
+ ******************************************************************************/
+
+// Package mounter
 package mounter
 
 import (
@@ -155,7 +166,8 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 	}
 
 	if !pathExist {
-		if err = os.MkdirAll(metaPath, 0755); err != nil {
+		if err = os.MkdirAll(metaPath, 0755); // #nosec G301: used for rclone
+		err != nil {
 			klog.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", metaPath, err)
 			return err
 		}
@@ -184,7 +196,10 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 func (rclone *rcloneMounter) Unmount(target string) error {
 	klog.Info("-RcloneMounter Unmount-")
 	metaPath := path.Join(metaRootRclone, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
-	os.RemoveAll(metaPath)
+	err := os.RemoveAll(metaPath)
+	if err != nil {
+		return err
+	}
 
 	return FuseUnmount(target)
 }
@@ -210,20 +225,25 @@ func (rclone *rcloneMounter) createConfig() error {
 
 	configParams = append(configParams, rclone.mountOptions...)
 
-	if err := os.MkdirAll(configPath, 0755); err != nil {
+	if err := os.MkdirAll(configPath, 0755); // #nosec G301: used for rclone
+	err != nil {
 		klog.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", configPath, err)
 		return err
 	}
 
 	configFile := path.Join(configPath, configFileName)
-	file, err := os.Create(configFile)
+	file, err := os.Create(configFile) // #nosec G304 used for rclone
 	if err != nil {
 		klog.Errorf("RcloneMounter Mount: Cannot create file %s: %v", configFileName, err)
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		if err = file.Close(); err != nil {
+			klog.Errorf("RcloneMounter Mount: Cannot close file %s: %v", configFileName, err)
+		}
+	}()
 
-	err = os.Chmod(configFile, 0644)
+	err = os.Chmod(configFile, 0644) // #nosec G302: used for rclone
 	if err != nil {
 		klog.Errorf("RcloneMounter Mount: Cannot change permissions on file  %s: %v", configFileName, err)
 		return err
@@ -238,7 +258,10 @@ func (rclone *rcloneMounter) createConfig() error {
 			return err
 		}
 	}
-	datawriter.Flush()
+	err = datawriter.Flush()
+	if err != nil {
+		return err
+	}
 	klog.Info("-Rclone created rclone config file-")
 	return nil
 }

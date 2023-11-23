@@ -1,3 +1,14 @@
+/*******************************************************************************
+ * IBM Confidential
+ * OCO Source Materials
+ * IBM Cloud Kubernetes Service, 5737-D43
+ * (C) Copyright IBM Corp. 2023 All Rights Reserved.
+ * The source code for this program is not published or otherwise divested of
+ * its trade secrets, irrespective of what has been deposited with
+ * the U.S. Copyright Office.
+ ******************************************************************************/
+
+// Package mounter
 package mounter
 
 import (
@@ -81,7 +92,7 @@ func findFuseMountProcess(path string) (*os.Process, error) {
 
 func getCmdLine(pid int) (string, error) {
 	cmdLineFile := fmt.Sprintf("/proc/%v/cmdline", pid)
-	cmdLine, err := os.ReadFile(cmdLineFile)
+	cmdLine, err := os.ReadFile(cmdLineFile) // #nosec G304: Dynamic pid .
 	if err != nil {
 		return "", err
 	}

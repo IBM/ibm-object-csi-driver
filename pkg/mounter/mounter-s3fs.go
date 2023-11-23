@@ -1,3 +1,14 @@
+/*******************************************************************************
+ * IBM Confidential
+ * OCO Source Materials
+ * IBM Cloud Kubernetes Service, 5737-D43
+ * (C) Copyright IBM Corp. 2023 All Rights Reserved.
+ * The source code for this program is not published or otherwise divested of
+ * its trade secrets, irrespective of what has been deposited with
+ * the U.S. Copyright Office.
+ ******************************************************************************/
+
+// Package mounter
 package mounter
 
 import (
@@ -25,7 +36,7 @@ type s3fsMounter struct {
 const (
 	s3fsCmd  = "s3fs"
 	metaRoot = "/var/lib/ibmc-s3fs"
-	passFile = ".passwd-s3fs"
+	passFile = ".passwd-s3fs" // #nosec G101: not password
 	// defaultIAMEndPoint is the default URL of the IBM IAM endpoint
 	defaultIAMEndPoint = "https://iam.cloud.ibm.com"
 )
@@ -137,7 +148,8 @@ func (s3fs *s3fsMounter) Mount(source string, target string) error {
 	}
 
 	if !pathExist {
-		if err = os.MkdirAll(metaPath, 0755); err != nil {
+		if err = os.MkdirAll(metaPath, 0755); // #nosec G301: used for s3fs
+		err != nil {
 			klog.Errorf("S3FSMounter Mount: Cannot create directory %s: %v", metaPath, err)
 			return fmt.Errorf("S3FSMounter Mount: Cannot create directory %s: %v", metaPath, err)
 		}
@@ -184,7 +196,10 @@ func (s3fs *s3fsMounter) Mount(source string, target string) error {
 func (s3fs *s3fsMounter) Unmount(target string) error {
 	klog.Info("-S3FSMounter Unmount-")
 	metaPath := path.Join(metaRoot, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
-	os.RemoveAll(metaPath)
+	err := os.RemoveAll(metaPath)
+	if err != nil {
+		return err
+	}
 
 	return FuseUnmount(target)
 }
