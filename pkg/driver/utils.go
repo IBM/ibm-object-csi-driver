@@ -18,6 +18,7 @@ package driver
 
 import (
 	"fmt"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
 )
 
@@ -25,37 +26,66 @@ func ReplaceAndReturnCopy(req interface{}, newAccessKey, newSecretKey string) (i
 	switch r := req.(type) {
 	case *csi.CreateVolumeRequest:
 		// Create a new CreateVolumeRequest and copy the original values
+		var inReq *csi.CreateVolumeRequest
+
 		newReq := &csi.CreateVolumeRequest{}
 		*newReq = *r
 
-		// Modify the Secrets map in the new request
-		newReq.Secrets = map[string]string{
-			"accesKey":  newAccessKey,
-			"secretKey": newSecretKey,
-		}
+		inReq = req.(*csi.CreateVolumeRequest)
 
+		// Modify the Secrets map in the new request
+		newReq.Secrets = make(map[string]string)
+		secretMap := inReq.GetSecrets()
+
+		for k, v := range secretMap {
+			if k == "accessKey" || k == "secretKey" || k == "apiKey" {
+				newReq.Secrets[k] = "xxxxxxx"
+				continue
+			}
+			newReq.Secrets[k] = v
+		}
 		return newReq, nil
 	case *csi.DeleteVolumeRequest:
 		// Create a new DeleteVolumeRequest and copy the original values
+		var inReq *csi.DeleteVolumeRequest
+
 		newReq := &csi.DeleteVolumeRequest{}
 		*newReq = *r
 
+		inReq = req.(*csi.DeleteVolumeRequest)
+
 		// Modify the Secrets map in the new request
-		newReq.Secrets = map[string]string{
-			"accesKey":  newAccessKey,
-			"secretKey": newSecretKey,
+		newReq.Secrets = make(map[string]string)
+		secretMap := inReq.GetSecrets()
+
+		for k, v := range secretMap {
+			if k == "accessKey" || k == "secretKey" || k == "apiKey" {
+				newReq.Secrets[k] = "xxxxxxx"
+				continue
+			}
+			newReq.Secrets[k] = v
 		}
 
 		return newReq, nil
 	case *csi.NodePublishVolumeRequest:
 		// Create a new NodePublishVolumeRequest and copy the original values
+		var inReq *csi.NodePublishVolumeRequest
+
 		newReq := &csi.NodePublishVolumeRequest{}
 		*newReq = *r
 
+		inReq = req.(*csi.NodePublishVolumeRequest)
+
 		// Modify the Secrets map in the new request
-		newReq.Secrets = map[string]string{
-			"accesKey":  newAccessKey,
-			"secretKey": newSecretKey,
+		newReq.Secrets = make(map[string]string)
+		secretMap := inReq.GetSecrets()
+
+		for k, v := range secretMap {
+			if k == "accessKey" || k == "secretKey" || k == "apiKey" {
+				newReq.Secrets[k] = "xxxxxxx"
+				continue
+			}
+			newReq.Secrets[k] = v
 		}
 
 		return newReq, nil

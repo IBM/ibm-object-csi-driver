@@ -143,8 +143,6 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, status.Error(codes.OutOfRange, fmt.Sprintf("Requested capacity %d exceeds maximum allowed %d", capacity, maxStorageCapacity))
 	}
 
-	klog.Infof("Got a request to create volume: %s", volumeID)
-
 	params := req.GetParameters()
 	secretMap := req.GetSecrets()
 	fmt.Println("CreateVolume Parameters:\n\t", params)
@@ -158,6 +156,8 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	if bucketName == "" {
 		return nil, status.Error(codes.InvalidArgument, "bucketName unknown")
 	}
+	klog.Infof("-CreateVolume-: volumeID: %s   bucketName: %s", volumeID, bucketName)
+
 	endPoint = secretMap["cosEndpoint"]
 	if endPoint == "" {
 		return nil, status.Error(codes.InvalidArgument, "cosEndpoint unknown")
@@ -170,7 +170,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	msg, err := sess.CreateBucket(bucketName)
 	if msg != "" {
-		klog.Infof("Info:Create Volume module:", msg)
+		klog.Infof("-CreateVolume-: Create bucket:", msg)
 	}
 	if err != nil {
 

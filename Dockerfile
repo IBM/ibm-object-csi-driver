@@ -22,7 +22,7 @@ RUN   microdnf -y install fuse-devel
 RUN   rm /usr/bin/register-sys.sh && subscription-manager unregister && subscription-manager clean
 
 RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && cd s3fs-fuse && \
-    git checkout v1.91 && \
+    git checkout v1.93 && \
     ./autogen.sh && ./configure --prefix=/usr/local --with-openssl && make && make install && \
     rm -rf /var/lib/apt/lists/*
 
