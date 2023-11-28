@@ -187,7 +187,7 @@ type Fakes3fsMounter struct {
 	mountOptions  []string
 }
 
-func (s *FakeS3fsMounterFactory) NewMounter(secretMap map[string]string, mountFlags []string) (mounter.Mounter, error) {
+func (s *FakeS3fsMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) (mounter.Mounter, error) {
 	klog.Info("-New S3FS Fake Mounter-")
 
 	var (
