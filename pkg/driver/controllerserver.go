@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/IBM/ibm-cos-sdk-go/aws/awserr"
 	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
@@ -29,6 +30,9 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 )
 
@@ -169,6 +173,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 			return nil, err
 		}
 		klog.Infof("Using bucket provided by user: %s", bucketName)
+		params["bucketName"] = bucketName
 	} else {
 		// Generate random temp bucket name based on volume id
 		tempBucketName := getTempBucketName(secretMap["mounter"], volumeID)
@@ -193,6 +198,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to access the bucket: %v", tempBucketName))
 		}
 		klog.Infof("Created temp bucket: %s", tempBucketName)
+		params["bucketName"] = tempBucketName
 	}
 	klog.Infof("create volume: %v", volumeID)
 	//COS Endpoint, bucket, access keys will be stored in the csiProvisionerSecretName
@@ -224,8 +230,8 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 
 	if bucketName != "" {
 		klog.V(3).Infof("Not deleting user provided bucket: %v", secretMap["bucketName"])
+		return &csi.DeleteVolumeResponse{}, nil
 	}
-	klog.Infof("Deleteting any temp buckets associated with volume : %s", volumeID)
 
 	creds, err := cs.getCredentials(req.GetSecrets())
 	if err != nil {
@@ -235,13 +241,21 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	endPoint := secretMap["cosEndpoint"]
 	locationConstraint := secretMap["locationConstraint"]
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
-	tempBucketName := getTempBucketName(secretMap["mounter"], volumeID)
+	protectBucket := secretMap["bucketProtection"]
 
-	err = sess.DeleteBucket(tempBucketName)
+	bucketToDelete, err := bucketToDelete(volumeID, protectBucket)
+
 	if err != nil {
-		klog.V(3).Infof("Cannot Delete Temp Bucket: %v; error msg: %v", tempBucketName, err)
+		return &csi.DeleteVolumeResponse{}, nil
 	}
-	klog.Infof("Deleted temp bucket %s if it existed", tempBucketName)
+
+	if bucketToDelete != "" {
+		err = sess.DeleteBucket(bucketToDelete)
+		if err != nil {
+			klog.V(3).Infof("Cannot delete temp bucket: %v; error msg: %v", bucketToDelete, err)
+		}
+
+	}
 
 	return &csi.DeleteVolumeResponse{}, nil
 }
@@ -366,7 +380,42 @@ func sanitizeVolumeID(volumeID string) string {
 }
 
 func getTempBucketName(mounterType, volumeID string) string {
-	prefix := mounterType + "-bucket"
-	name := fmt.Sprintf("%s-%s", prefix, volumeID)
+	currentTime := time.Now()
+	timestamp := currentTime.Format("20060102150405")
+
+	name := fmt.Sprintf("%s%s-%s", mounterType, timestamp, volumeID)
 	return name
+}
+
+func bucketToDelete(volumeID, protectBucket string) (string, error) {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		klog.Errorf("Unable to fetch bucket %v", err)
+		return "", err
+	}
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		klog.Errorf("Unable to fetch bucket %v", err)
+		return "", err
+	}
+
+	pv, err := clientset.CoreV1().PersistentVolumes().Get(context.Background(), volumeID, metav1.GetOptions{})
+	if err != nil {
+		klog.Errorf("Unable to fetch bucket %v", err)
+		return "", err
+	}
+
+	klog.Infof("PV Reclaim Policy is %v and Bucket Protection is %v", string(pv.Spec.PersistentVolumeReclaimPolicy), protectBucket)
+
+	klog.Infof("***Attributes", pv.Spec.CSI.VolumeAttributes)
+
+	if string(pv.Spec.PersistentVolumeReclaimPolicy) == "Delete" && protectBucket != "Retain" {
+		klog.Infof("Bucket will be deleted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
+		return pv.Spec.CSI.VolumeAttributes["bucketName"], nil
+	}
+
+	klog.Infof("Bucket will be persisted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
+
+	return "", nil
+
 }
