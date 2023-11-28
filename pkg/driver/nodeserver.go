@@ -26,6 +26,9 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume/util/fs"
 )
@@ -143,9 +146,33 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 
 	secretMap := req.GetSecrets()
 
-	// If bucket name wasn't provided by user, we use temp bucket created for volume
+	// If bucket name wasn't provided by user, we use temp bucket created for volume.
 	if secretMap["bucketName"] == "" {
-		secretMap["bucketName"] = getTempBucketName(secretMap["mounter"], volumeID)
+		config, err := rest.InClusterConfig()
+		if err != nil {
+			klog.Errorf("Unable to get cluster config %v", err)
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		clientset, err := kubernetes.NewForConfig(config)
+		if err != nil {
+			klog.Errorf("Unable to create client %v", err)
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+
+		pv, err := clientset.CoreV1().PersistentVolumes().Get(context.Background(), volumeID, metav1.GetOptions{})
+		if err != nil {
+			klog.Errorf("Unable to fetch pv %v", err)
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+
+		tempBucketName := pv.Spec.CSI.VolumeAttributes["bucketName"]
+
+		if tempBucketName == "" {
+			klog.Errorf("Unable to fetch bucket name from pv %v", err)
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+
+		secretMap["bucketName"] = tempBucketName
 	}
 
 	if mounterObj, err = ns.Mounter.NewMounter(secretMap, mountFlags); err != nil {
