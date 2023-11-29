@@ -151,6 +151,9 @@ func writePass(pwFileName string, pwFileContent string) error {
 	if err != nil {
 		return err
 	}
-	pwFile.Close() // #nosec G304: Value is dynamic
+	err = pwFile.Close() // #nosec G304: Value is dynamic
+	if err != nil {
+		return err
+	}
 	return nil
 }
