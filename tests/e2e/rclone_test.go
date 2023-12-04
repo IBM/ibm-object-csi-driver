@@ -29,24 +29,14 @@ import (
 	"os"
 )
 
-// ENV required for testsuite execution
-var testResultFile = os.Getenv("E2E_TEST_RESULT")
-var cosEndpoint = os.Getenv("cosEndpoint")
-var locationConstraint = os.Getenv("locationConstraint")
-var bucketName = os.Getenv("bucketName")
-var accessKey = os.Getenv("accessKey")
-var secretKey = os.Getenv("secretKey")
 
-var err error
-var fpointer *os.File
 
 const (
-	driverName = "cos-s3-csi-driver"
-	scName     = "cos-s3-csi-s3fs-delete"
+	rclonescName     = "cos-s3-csi-rclone-delete"
 )
 
-var _ = Describe("[obj-e2e] [s3fs] [with-pod] ", func() {
-	f := framework.NewDefaultFramework("obj-e2e-s3fs")
+var _ = Describe("[obj-e2e] [rclone] [with-pod] ", func() {
+	f := framework.NewDefaultFramework("obj-e2e-rclone")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var (
 		cs clientset.Interface
@@ -58,7 +48,7 @@ var _ = Describe("[obj-e2e] [s3fs] [with-pod] ", func() {
 		ns = f.Namespace
 	})
 
-	It("with s3fs SC, Create a volume - Attach to a Pod  - Read/Write", func() {
+	It("with rclone SC, Create a volume - Attach to a Pod  - Read/Write", func() {
 		payload := `{"metadata": {"labels": {"security.openshift.io/scc.podSecurityLabelSync": "false","pod-security.kubernetes.io/enforce": "privileged"}}}`
 		_, labelerr := cs.CoreV1().Namespaces().Patch(context.TODO(), ns.Name, types.StrategicMergePatchType, []byte(payload), metav1.PatchOptions{})
 		if labelerr != nil {
@@ -80,7 +70,7 @@ var _ = Describe("[obj-e2e] [s3fs] [with-pod] ", func() {
 				Volumes: []testsuites.VolumeDetails{
 					{
 						PVCName:    ns.Name,
-						VolumeType: scName,
+						VolumeType: rclonescName,
 						ClaimSize:  "256Mi",
 						VolumeMount: testsuites.VolumeMountDetails{
 							NameGenerate:      "test-volume-",
@@ -99,7 +89,7 @@ var _ = Describe("[obj-e2e] [s3fs] [with-pod] ", func() {
 			},
 		}
 		test.Run(cs, ns)
-		if _, err = fpointer.WriteString("OBJECT-CSI-PLUGIN(s3fs): PVC CREATE, POD MOUNT, READ/WRITE, CLEANUP : PASS\n"); err != nil {
+		if _, err = fpointer.WriteString("OBJECT-CSI-PLUGIN(rclone): PVC CREATE, POD MOUNT, READ/WRITE, CLEANUP : PASS\n"); err != nil {
 			panic(err)
 		}
 	})
