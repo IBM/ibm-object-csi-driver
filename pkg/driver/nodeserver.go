@@ -141,10 +141,19 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	attrib := req.GetVolumeContext()
 	mountFlags := req.GetVolumeCapability().GetMount().GetMountFlags()
 
-	klog.V(2).Infof("target %v\ndevice %v\nreadonly %v\nvolumeId %v\nattributes %v\nmountflags %v\n",
+	klog.V(2).Infof("-NodePublishVolume-: targetPath: %v\ndeviceID: %v\nreadonly: %v\nvolumeId: %v\nattributes: %v\nmountFlags: %v\n",
 		targetPath, deviceID, readOnly, volumeID, attrib, mountFlags)
 
 	secretMap := req.GetSecrets()
+	secretMapCopy := make(map[string]string)
+	for k, v := range secretMap {
+		if k == "accessKey" || k == "secretKey" || k == "apiKey" {
+			secretMapCopy[k] = "xxxxxxx"
+			continue
+		}
+		secretMapCopy[k] = v
+	}
+	klog.V(2).Infof("-NodePublishVolume-: secretMap: %v", secretMapCopy)
 
 	// If bucket name wasn't provided by user, we use temp bucket created for volume.
 	if secretMap["bucketName"] == "" {
@@ -175,7 +184,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		secretMap["bucketName"] = tempBucketName
 	}
 
-	if mounterObj, err = ns.Mounter.NewMounter(secretMap, mountFlags); err != nil {
+	if mounterObj, err = ns.Mounter.NewMounter(attrib, secretMap, mountFlags); err != nil {
 		return nil, err
 	}
 

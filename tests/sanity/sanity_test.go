@@ -1,3 +1,14 @@
+/*******************************************************************************
+ * IBM Confidential
+ * OCO Source Materials
+ * IBM Cloud Kubernetes Service, 5737-D43
+ * (C) Copyright IBM Corp. 2023 All Rights Reserved.
+ * The source code for this program is not published or otherwise divested of
+ * its trade secrets, irrespective of what has been deposited with
+ * the U.S. Copyright Office.
+ ******************************************************************************/
+
+// Package sanity ...
 package sanity
 
 import (
@@ -176,7 +187,7 @@ type Fakes3fsMounter struct {
 	mountOptions  []string
 }
 
-func (s *FakeS3fsMounterFactory) NewMounter(secretMap map[string]string, mountFlags []string) (mounter.Mounter, error) {
+func (s *FakeS3fsMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) (mounter.Mounter, error) {
 	klog.Info("-New S3FS Fake Mounter-")
 
 	var (

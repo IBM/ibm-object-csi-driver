@@ -3,7 +3,7 @@ EXE_DRIVER_NAME=ibm-object-csi-driver
 
 REGISTRY=quay.io/satellite-object-storage-plugin
 
-export LINT_VERSION="1.51.1"
+export LINT_VERSION="1.51.2"
 
 COLOR_YELLOW=\033[0;33m
 COLOR_RESET=\033[0m
@@ -60,7 +60,7 @@ driver: deps buildimage
 
 .PHONY: build
 build:
-	CGO_ENABLED=0 GOOS=linux go build -mod=vendor -a -ldflags '-X main.version=$(REV) -extldflags "-static"' -o ${GOPATH}/bin/${EXE_DRIVER_NAME} ./cmd/satellite-object-storage-plugin/$*
+	CGO_ENABLED=0 GOOS=linux go build -mod=vendor -a -ldflags '-X main.version=$(REV) -extldflags "-static"' -o ${GOPATH}/bin/${EXE_DRIVER_NAME} ./cmd/$*
 
 
 .PHONY: buildimage

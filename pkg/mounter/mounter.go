@@ -32,7 +32,7 @@ type S3fsMounterFactory struct{}
 
 type NewMounterFactory interface {
 	// NewMounter(mounter, bucket, objpath, endpoint, region, keys string, authType string) (Mounter, error)
-	NewMounter(secretMap map[string]string, mountFlags []string) (Mounter, error)
+	NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) (Mounter, error)
 }
 
 func NewS3fsMounterFactory() *S3fsMounterFactory {
@@ -40,12 +40,20 @@ func NewS3fsMounterFactory() *S3fsMounterFactory {
 }
 
 // func newS3fsMounter(bucket string, objpath string, endpoint string, region string, keys string)
-func (s *S3fsMounterFactory) NewMounter(secretMap map[string]string, mountFlags []string) (Mounter, error) {
+func (s *S3fsMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) (Mounter, error) {
 	klog.Info("-NewMounter-")
+	var mounter, val string
+	var check bool
 
-	mounter := secretMap["mounter"]
-
-	//klog.Infof("NewMounter args:\n\tmounter: <%s>\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>", mounter, bucket, objpath, endpoint, region)
+	// Select mounter as per storage class
+	if val, check = attrib["mounter"]; check {
+		mounter = val
+	} else {
+		// if mounter not set in storage class
+		if val, check = secretMap["mounter"]; check {
+			mounter = val
+		}
+	}
 	switch mounter {
 	case s3fsMounterType:
 		return newS3fsMounter(secretMap, mountFlags)
@@ -135,7 +143,7 @@ func isCorruptedMnt(err error) bool {
 }
 
 func writePass(pwFileName string, pwFileContent string) error {
-	pwFile, err := os.OpenFile(pwFileName, os.O_RDWR|os.O_CREATE, 0600)
+	pwFile, err := os.OpenFile(pwFileName, os.O_RDWR|os.O_CREATE, 0600) // #nosec G304: Value is dynamic
 	if err != nil {
 		return err
 	}
@@ -143,6 +151,9 @@ func writePass(pwFileName string, pwFileContent string) error {
 	if err != nil {
 		return err
 	}
-	pwFile.Close()
+	err = pwFile.Close() // #nosec G304: Value is dynamic
+	if err != nil {
+		return err
+	}
 	return nil
 }

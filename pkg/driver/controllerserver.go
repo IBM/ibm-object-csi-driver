@@ -1,22 +1,17 @@
-/**
- * Copyright 2021 IBM Corp.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/*******************************************************************************
+ * IBM Confidential
+ * OCO Source Materials
+ * IBM Cloud Kubernetes Service, 5737-D43
+ * (C) Copyright IBM Corp. 2023 All Rights Reserved.
+ * The source code for this program is not published or otherwise divested of
+ * its trade secrets, irrespective of what has been deposited with
+ * the U.S. Copyright Office.
+ ******************************************************************************/
+
 package driver
 
 import (
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -127,7 +122,10 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 	klog.V(3).Infof("CSIControllerServer-CreateVolume: Request: %v", modifiedRequest.(*csi.CreateVolumeRequest))
 
-	volumeName := sanitizeVolumeID(req.GetName())
+	volumeName, err := sanitizeVolumeID(req.GetName())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in sanitizeVolumeID  %v", err))
+	}
 	volumeID := volumeName
 	caps := req.GetVolumeCapabilities()
 
@@ -369,14 +367,15 @@ func (cs *controllerServer) ControllerGetVolume(ctx context.Context, req *csi.Co
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func sanitizeVolumeID(volumeID string) string {
+func sanitizeVolumeID(volumeID string) (string, error) {
+	var err error
 	volumeID = strings.ToLower(volumeID)
 	if len(volumeID) > 63 {
-		h := sha1.New()
-		io.WriteString(h, volumeID) //nolint
+		h := sha256.New()
+		_, err = io.WriteString(h, volumeID) //nolint
 		volumeID = hex.EncodeToString(h.Sum(nil))
 	}
-	return volumeID
+	return volumeID, err
 }
 
 func getTempBucketName(mounterType, volumeID string) string {
