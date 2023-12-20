@@ -65,7 +65,7 @@ spec:
         app: cos-s3-csi-driver
     spec:
       serviceAccountName: cos-s3-csi-driver
-      hostNetwork: true
+      hostNetwork: false
       containers:
         - name: driver-registrar
           image: driver-registrar-image
