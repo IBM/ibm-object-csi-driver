@@ -50,6 +50,8 @@ Provide proper values for parameters in secret under examples/cos-s3-csi-pvc-sec
 
       `kubectl create -f examples/cos-s3-csi-pvc-secret.yaml`
 
+      If you want to use your own bucket, bucketName should be specified in the secret. If left empty, a temp bucket will be generated. Temp bucket will be deleted after volume is unpublished, unless bucketProtection value is set to Retain in the secret. If bucketProtection is set to Retain then, even if PersistentVolumeReclaimPolicy is Delete, the bucket will be retained for the user. 
+
       `kubectl create -f examples/cos-s3-csi-pvc.yaml`
 
       `kubectl create -f examples/cos-csi-app.yaml`
