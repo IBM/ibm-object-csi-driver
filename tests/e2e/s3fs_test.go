@@ -33,7 +33,7 @@ import (
 var testResultFile = os.Getenv("E2E_TEST_RESULT")
 var cosEndpoint = os.Getenv("cosEndpoint")
 var locationConstraint = os.Getenv("locationConstraint")
-var bucketName = os.Getenv("bucketName")
+var bucketName = os.Getenv("s3fsbucketName")
 var accessKey = os.Getenv("accessKey")
 var secretKey = os.Getenv("secretKey")
 
@@ -45,7 +45,7 @@ const (
 	scName     = "cos-s3-csi-s3fs-delete"
 )
 
-var _ = Describe("[obj-e2e] [s3fs] [with-pod] ", func() {
+var _ = Describe("s3fs", func() {
 	f := framework.NewDefaultFramework("obj-e2e-s3fs")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var (
