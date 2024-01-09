@@ -1,5 +1,5 @@
-# satellite-object-storage-plugin
-Object storage plugin using CSI
+# ibm-object-csi-driver
+CSI base Object Storage driver/plug-in. Currently, the driver supports s3fs and rclone mounters.
 
 # Build the driver
 
