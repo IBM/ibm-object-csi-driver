@@ -1,7 +1,7 @@
-CMDS=satellite-object-storage-plugin
+CMDS=ibm-object-csi-driver
 EXE_DRIVER_NAME=ibm-object-csi-driver
 
-REGISTRY=quay.io/satellite-object-storage-plugin
+REGISTRY=quay.io/ibm-object-csi-driver
 
 export LINT_VERSION="1.51.2"
 

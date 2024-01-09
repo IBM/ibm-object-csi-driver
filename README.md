@@ -15,8 +15,8 @@ For building the driver `docker` and `GO` should be installed on the system
    ```
    $ mkdir -p $GOPATH/src/github.com/IBM
    $ cd $GOPATH/src/github.com/IBM/
-   $ git clone https://github.com/IBM/satellite-object-storage-plugin.git
-   $ cd satellite-object-storage-plugin
+   $ git clone https://github.com/IBM/ibm-object-csi-driver.git
+   $ cd ibm-object-csi-driver
    ```
    ## Build container image for the driver
 
@@ -27,7 +27,7 @@ For building the driver `docker` and `GO` should be installed on the system
    make container
    ```
 
-An image named `satellite-object-storage-plugin:latest` is created. Please retag and push the image to suitable registries to deploy in cluster.
+An image named `ibm-object-csi-driver:latest` is created. Please retag and push the image to suitable registries to deploy in cluster.
 
 # Deploy CSI driver on your cluster
 
