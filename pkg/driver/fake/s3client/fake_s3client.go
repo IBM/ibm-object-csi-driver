@@ -18,7 +18,7 @@ package s3client
 
 import (
 	"errors"
-	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
+	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
 	"go.uber.org/zap"
 )
 

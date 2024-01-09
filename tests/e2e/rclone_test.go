@@ -17,7 +17,7 @@ package e2e
 
 import (
 	"context"
-	"github.com/IBM/satellite-object-storage-plugin/tests/e2e/testsuites"
+	"github.com/IBM/ibm-object-csi-driver/tests/e2e/testsuites"
 	. "github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
