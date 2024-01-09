@@ -17,8 +17,8 @@ package driver
 
 import (
 	"bytes"
-	"github.com/IBM/satellite-object-storage-plugin/pkg/mounter"
-	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
+	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
+	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"

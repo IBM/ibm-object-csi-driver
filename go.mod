@@ -1,4 +1,4 @@
-module github.com/IBM/satellite-object-storage-plugin
+module github.com/IBM/ibm-object-csi-driver
 
 go 1.20
 

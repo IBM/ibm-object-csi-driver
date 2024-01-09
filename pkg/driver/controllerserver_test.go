@@ -20,8 +20,8 @@ package driver
 import (
 	providerError "github.com/IBM/ibmcloud-storage-volume-lib/lib/utils"
 	"github.com/IBM/ibmcloud-volume-interface/lib/provider"
-	fakeclient "github.com/IBM/satellite-object-storage-plugin/pkg/driver/fake/s3client"
-	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
+	fakeclient "github.com/IBM/ibm-object-csi-driver/pkg/driver/fake/s3client"
+	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"

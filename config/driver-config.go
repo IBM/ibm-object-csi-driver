@@ -20,7 +20,7 @@ package config
 const (
 
 	// CSIPluginGithubName ...
-	CSIPluginGithubName = "satellite-object-storage-plugin"
+	CSIPluginGithubName = "ibm-object-csi-driver"
 	CSIDriverName       = "cos.s3.csi.ibm.io"
 	VendorVersion       = "1.1.2"
 )

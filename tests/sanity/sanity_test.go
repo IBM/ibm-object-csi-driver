@@ -19,9 +19,9 @@ import (
 	"testing"
 
 	cloudProvider "github.com/IBM/ibm-csi-common/pkg/ibmcloudprovider"
-	csiDriver "github.com/IBM/satellite-object-storage-plugin/pkg/driver"
-	"github.com/IBM/satellite-object-storage-plugin/pkg/mounter"
-	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
+	csiDriver "github.com/IBM/ibm-object-csi-driver/pkg/driver"
+	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
+	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
 	"github.com/google/uuid"
 	sanity "github.com/kubernetes-csi/csi-test/v4/pkg/sanity"
 	"go.uber.org/zap"

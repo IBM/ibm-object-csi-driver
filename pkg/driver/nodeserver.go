@@ -21,7 +21,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/IBM/satellite-object-storage-plugin/pkg/mounter"
+	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
@@ -216,7 +216,7 @@ func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 
 	if err := fuseunmount(targetPath); err != nil {
 
-		//TODO: Need to handle the case with non existing mount separately - https://github.com/IBM/satellite-object-storage-plugin/issues/46
+		//TODO: Need to handle the case with non existing mount separately - https://github.com/IBM/ibm-object-csi-driver/issues/46
 		klog.Infof("UNMOUNT ERROR: %v", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}

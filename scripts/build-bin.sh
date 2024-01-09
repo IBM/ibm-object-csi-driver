@@ -9,5 +9,5 @@
 
 set -e
 set -x
-cd /go/src/github.com/IBM/satellite-object-storage-plugin
+cd /go/src/github.com/IBM/ibm-object-csi-driver
 CGO_ENABLED=0 GOOS=linux go build -a -ldflags "-X main.version=${TAG} -extldflags \"-static\"" -o /go/bin/ibm-object-csi-driver ./cmd/$*

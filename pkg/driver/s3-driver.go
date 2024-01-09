@@ -19,8 +19,8 @@ package driver
 import (
 	"fmt"
 	"github.com/IBM/ibm-csi-common/pkg/utils"
-	"github.com/IBM/satellite-object-storage-plugin/pkg/mounter"
-	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
+	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
+	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"go.uber.org/zap"
 )

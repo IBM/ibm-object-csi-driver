@@ -16,7 +16,7 @@
 package fake
 
 import (
-	"github.com/IBM/satellite-object-storage-plugin/pkg/mounter"
+	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
 	"k8s.io/klog/v2"
 )
 

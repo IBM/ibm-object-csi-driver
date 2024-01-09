@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/IBM/ibm-cos-sdk-go/aws/awserr"
-	"github.com/IBM/satellite-object-storage-plugin/pkg/s3client"
+	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
