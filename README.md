@@ -33,7 +33,9 @@ An image named `ibm-object-csi-driver:latest` is created. Please retag and push 
 
 Update images if required in `deploy/ibmCloud/kustomization.yaml` file. 
 
-Deploy the resources 
+Deploy the resources
+
+For IBM Managed clusters 
 
 `kubectl apply -k deploy/ibmCloud/`
 
@@ -41,6 +43,17 @@ Deploy the resources
 To clean up the deployment 
 
 `kubectl delete -k deploy/ibmCloud/`
+
+
+
+For unmanaged clusters
+
+`kubectl apply -k deploy/ibmUnmanaged/`
+
+
+To clean up the deployment
+
+`kubectl delete -k deploy/ibmUnmanaged/`
 
 # Testing
 
