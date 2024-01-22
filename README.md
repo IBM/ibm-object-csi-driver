@@ -35,7 +35,7 @@ Update images if required in `deploy/ibmCloud/kustomization.yaml` file.
 
 Deploy the resources
 
-For IBM Managed clusters 
+## For IBM Managed clusters 
 
 `kubectl apply -k deploy/ibmCloud/`
 
@@ -46,7 +46,7 @@ To clean up the deployment
 
 
 
-For unmanaged clusters
+## For unmanaged clusters
 
 `kubectl apply -k deploy/ibmUnmanaged/`
 
