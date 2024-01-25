@@ -35,7 +35,7 @@ const (
 	rclonescName     = "cos-s3-csi-rclone-delete"
 )
 
-var _ = Describe("[obj-e2e] [rclone] [with-pod] ", func() {
+var _ = Describe("rclone", func() {
 	f := framework.NewDefaultFramework("obj-e2e-rclone")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var (
