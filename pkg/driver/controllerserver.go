@@ -167,8 +167,25 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	if bucketName != "" {
 		// User Provided bucket. Check its existence and don't create bucket
 		if err := sess.CheckBucketAccess(bucketName); err != nil {
-			klog.Errorf("CreateVolume: Unable to access the bucket: %v", err)
-			return nil, err
+			klog.Infof("CreateVolume: Unable to access the bucket: %v", err)
+			klog.Infof("Creating new Bucket with given name")
+			msg, err := sess.CreateBucket(bucketName)
+			if msg != "" {
+				klog.Infof("Info:Create Volume module with user provided Bucket name:", msg)
+			}
+			if err != nil {
+				if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "BucketAlreadyExists" {
+					klog.Warning(fmt.Sprintf("bucket '%s' already exists", bucketName))
+				} else {
+					klog.Errorf("CreateVolume: Unable to create the bucket: %v", err)
+					return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to create the bucket: %v", bucketName))
+				}
+			}
+			if err := sess.CheckBucketAccess(bucketName); err != nil {
+				klog.Errorf("CreateVolume: Unable to access the bucket: %v", err)
+				return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to access the bucket: %v", bucketName))
+			}
+			klog.Infof("Created bucket: %s", bucketName)
 		}
 		klog.Infof("Using bucket provided by user: %s", bucketName)
 		params["bucketName"] = bucketName
@@ -224,12 +241,6 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	}
 	klog.Infof("Deleting volume %v", volumeID)
 	secretMap := req.GetSecrets()
-	bucketName := secretMap["bucketName"]
-
-	if bucketName != "" {
-		klog.V(3).Infof("Not deleting user provided bucket: %v", secretMap["bucketName"])
-		return &csi.DeleteVolumeResponse{}, nil
-	}
 
 	creds, err := cs.getCredentials(req.GetSecrets())
 	if err != nil {
@@ -252,6 +263,7 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 		if err != nil {
 			klog.V(3).Infof("Cannot delete temp bucket: %v; error msg: %v", bucketToDelete, err)
 		}
+		klog.Infof("End of bucket delete for  %v", volumeID)
 
 	}
 
