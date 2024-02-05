@@ -17,6 +17,7 @@ import (
 	"io"
 	"strings"
 	"time"
+	"errors"
 
 	"github.com/IBM/ibm-cos-sdk-go/aws/awserr"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
@@ -165,25 +166,12 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
 	bucketName = secretMap["bucketName"]
 	if bucketName != "" {
-		// User Provided bucket. Check its existence and don't create bucket
+		// User Provided bucket. Check its existence and create if not present
 		if err := sess.CheckBucketAccess(bucketName); err != nil {
-			klog.Infof("CreateVolume: Unable to access the bucket: %v", err)
-			klog.Infof("Creating new Bucket with given name")
-			msg, err := sess.CreateBucket(bucketName)
-			if msg != "" {
-				klog.Infof("Info:Create Volume module with user provided Bucket name:", msg)
-			}
+			klog.Infof("CreateVolume: Unable to access the bucket: %v, Creating with given name", err)
+			err = createBucket(sess, bucketName)
 			if err != nil {
-				if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "BucketAlreadyExists" {
-					klog.Warning(fmt.Sprintf("bucket '%s' already exists", bucketName))
-				} else {
-					klog.Errorf("CreateVolume: Unable to create the bucket: %v", err)
-					return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to create the bucket: %v", bucketName))
-				}
-			}
-			if err := sess.CheckBucketAccess(bucketName); err != nil {
-				klog.Errorf("CreateVolume: Unable to access the bucket: %v", err)
-				return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to access the bucket: %v", bucketName))
+				return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", err, bucketName))
 			}
 			klog.Infof("Created bucket: %s", bucketName)
 		}
@@ -196,21 +184,9 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 			klog.Errorf("CreateVolume: Unable to generate the bucket name")
 			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to access the bucket: %v", tempBucketName))
 		}
-		msg, err := sess.CreateBucket(tempBucketName)
-		if msg != "" {
-			klog.Infof("Info:Create Volume module with temp Bucket:", msg)
-		}
+		err = createBucket(sess, bucketName)
 		if err != nil {
-			if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "BucketAlreadyExists" {
-				klog.Warning(fmt.Sprintf("bucket '%s' already exists", tempBucketName))
-			} else {
-				klog.Errorf("CreateVolume: Unable to create the bucket: %v", err)
-				return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to create the bucket: %v", tempBucketName))
-			}
-		}
-		if err := sess.CheckBucketAccess(tempBucketName); err != nil {
-			klog.Errorf("CreateVolume: Unable to access the bucket: %v", err)
-			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to access the bucket: %v", tempBucketName))
+			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", err, tempBucketName))
 		}
 		klog.Infof("Created temp bucket: %s", tempBucketName)
 		params["bucketName"] = tempBucketName
@@ -428,5 +404,26 @@ func bucketToDelete(volumeID, protectBucket string) (string, error) {
 	klog.Infof("Bucket will be persisted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
 
 	return "", nil
+
+}
+
+func createBucket(sess s3client.ObjectStorageSession, bucketName string) error{
+	msg, err := sess.CreateBucket(bucketName)
+			if msg != "" {
+				klog.Infof("Info:Create Volume module with user provided Bucket name:", msg)
+			}
+			if err != nil {
+				if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "BucketAlreadyExists" {
+					klog.Warning(fmt.Sprintf("bucket '%s' already exists", bucketName))
+				} else {
+					klog.Errorf("CreateVolume: Unable to create the bucket: %v", err)
+					return errors.New("Unable to create the bucket")
+				}
+			}
+			if err := sess.CheckBucketAccess(bucketName); err != nil {
+				klog.Errorf("CreateVolume: Unable to access the bucket: %v", err)
+				return errors.New("Unable to access the bucket")
+			}
+			return nil
 
 }
