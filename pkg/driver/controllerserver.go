@@ -13,11 +13,11 @@ package driver
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
 	"time"
-	"errors"
 
 	"github.com/IBM/ibm-cos-sdk-go/aws/awserr"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
@@ -184,7 +184,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 			klog.Errorf("CreateVolume: Unable to generate the bucket name")
 			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to access the bucket: %v", tempBucketName))
 		}
-		err = createBucket(sess, bucketName)
+		err = createBucket(sess, tempBucketName)
 		if err != nil {
 			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", err, tempBucketName))
 		}
@@ -396,7 +396,7 @@ func bucketToDelete(volumeID, protectBucket string) (string, error) {
 
 	klog.Infof("***Attributes", pv.Spec.CSI.VolumeAttributes)
 
-	if string(pv.Spec.PersistentVolumeReclaimPolicy) == "Delete" && protectBucket != "Retain" {
+	if string(pv.Spec.PersistentVolumeReclaimPolicy) == "Delete" && protectBucket == "Delete" {
 		klog.Infof("Bucket will be deleted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
 		return pv.Spec.CSI.VolumeAttributes["bucketName"], nil
 	}
@@ -407,23 +407,23 @@ func bucketToDelete(volumeID, protectBucket string) (string, error) {
 
 }
 
-func createBucket(sess s3client.ObjectStorageSession, bucketName string) error{
+func createBucket(sess s3client.ObjectStorageSession, bucketName string) error {
 	msg, err := sess.CreateBucket(bucketName)
-			if msg != "" {
-				klog.Infof("Info:Create Volume module with user provided Bucket name:", msg)
-			}
-			if err != nil {
-				if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "BucketAlreadyExists" {
-					klog.Warning(fmt.Sprintf("bucket '%s' already exists", bucketName))
-				} else {
-					klog.Errorf("CreateVolume: Unable to create the bucket: %v", err)
-					return errors.New("Unable to create the bucket")
-				}
-			}
-			if err := sess.CheckBucketAccess(bucketName); err != nil {
-				klog.Errorf("CreateVolume: Unable to access the bucket: %v", err)
-				return errors.New("Unable to access the bucket")
-			}
-			return nil
+	if msg != "" {
+		klog.Infof("Info:Create Volume module with user provided Bucket name:", msg)
+	}
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "BucketAlreadyExists" {
+			klog.Warning(fmt.Sprintf("bucket '%s' already exists", bucketName))
+		} else {
+			klog.Errorf("CreateVolume: Unable to create the bucket: %v", err)
+			return errors.New("Unable to create the bucket")
+		}
+	}
+	if err := sess.CheckBucketAccess(bucketName); err != nil {
+		klog.Errorf("CreateVolume: Unable to access the bucket: %v", err)
+		return errors.New("Unable to access the bucket")
+	}
+	return nil
 
 }
