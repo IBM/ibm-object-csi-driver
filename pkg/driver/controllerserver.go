@@ -226,9 +226,7 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	endPoint := secretMap["cosEndpoint"]
 	locationConstraint := secretMap["locationConstraint"]
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
-	protectBucket := secretMap["bucketProtection"]
-
-	bucketToDelete, err := bucketToDelete(volumeID, protectBucket)
+	bucketToDelete, err := bucketToDelete(volumeID)
 
 	if err != nil {
 		return &csi.DeleteVolumeResponse{}, nil
@@ -374,7 +372,7 @@ func getTempBucketName(mounterType, volumeID string) string {
 	return name
 }
 
-func bucketToDelete(volumeID, protectBucket string) (string, error) {
+func bucketToDelete(volumeID string) (string, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		klog.Errorf("Unable to fetch bucket %v", err)
@@ -392,18 +390,10 @@ func bucketToDelete(volumeID, protectBucket string) (string, error) {
 		return "", err
 	}
 
-	klog.Infof("PV Reclaim Policy is %v and Bucket Protection is %v", string(pv.Spec.PersistentVolumeReclaimPolicy), protectBucket)
-
 	klog.Infof("***Attributes", pv.Spec.CSI.VolumeAttributes)
 
-	if string(pv.Spec.PersistentVolumeReclaimPolicy) == "Delete" && protectBucket == "Delete" {
-		klog.Infof("Bucket will be deleted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
-		return pv.Spec.CSI.VolumeAttributes["bucketName"], nil
-	}
-
-	klog.Infof("Bucket will be persisted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
-
-	return "", nil
+	klog.Infof("Bucket will be deleted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
+	return pv.Spec.CSI.VolumeAttributes["bucketName"], nil
 
 }
 
