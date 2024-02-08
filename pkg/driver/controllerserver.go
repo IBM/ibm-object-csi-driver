@@ -13,6 +13,7 @@ package driver
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -164,38 +165,34 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
 	bucketName = secretMap["bucketName"]
+	params["userProvidedBucket"] = "true"
 	if bucketName != "" {
-		// User Provided bucket. Check its existence and don't create bucket
+		// User Provided bucket. Check its existence and create if not present
+		klog.Infof("Bucket name provided")
 		if err := sess.CheckBucketAccess(bucketName); err != nil {
-			klog.Errorf("CreateVolume: Unable to access the bucket: %v", err)
-			return nil, err
+			klog.Infof("CreateVolume: Unable to access the bucket: %v, Creating with given name", err)
+			err = createBucket(sess, bucketName)
+			if err != nil {
+				return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", err, bucketName))
+			}
+			params["userProvidedBucket"] = "false"
+			klog.Infof("Created bucket: %s", bucketName)
 		}
-		klog.Infof("Using bucket provided by user: %s", bucketName)
 		params["bucketName"] = bucketName
 	} else {
 		// Generate random temp bucket name based on volume id
+		klog.Infof("Bucket name not provided")
 		tempBucketName := getTempBucketName(secretMap["mounter"], volumeID)
 		if tempBucketName == "" {
 			klog.Errorf("CreateVolume: Unable to generate the bucket name")
 			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to access the bucket: %v", tempBucketName))
 		}
-		msg, err := sess.CreateBucket(tempBucketName)
-		if msg != "" {
-			klog.Infof("Info:Create Volume module with temp Bucket:", msg)
-		}
+		err = createBucket(sess, tempBucketName)
 		if err != nil {
-			if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "BucketAlreadyExists" {
-				klog.Warning(fmt.Sprintf("bucket '%s' already exists", tempBucketName))
-			} else {
-				klog.Errorf("CreateVolume: Unable to create the bucket: %v", err)
-				return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to create the bucket: %v", tempBucketName))
-			}
-		}
-		if err := sess.CheckBucketAccess(tempBucketName); err != nil {
-			klog.Errorf("CreateVolume: Unable to access the bucket: %v", err)
-			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to access the bucket: %v", tempBucketName))
+			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", err, tempBucketName))
 		}
 		klog.Infof("Created temp bucket: %s", tempBucketName)
+		params["userProvidedBucket"] = "false"
 		params["bucketName"] = tempBucketName
 	}
 	klog.Infof("create volume: %v", volumeID)
@@ -224,12 +221,6 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	}
 	klog.Infof("Deleting volume %v", volumeID)
 	secretMap := req.GetSecrets()
-	bucketName := secretMap["bucketName"]
-
-	if bucketName != "" {
-		klog.V(3).Infof("Not deleting user provided bucket: %v", secretMap["bucketName"])
-		return &csi.DeleteVolumeResponse{}, nil
-	}
 
 	creds, err := cs.getCredentials(req.GetSecrets())
 	if err != nil {
@@ -239,9 +230,7 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	endPoint := secretMap["cosEndpoint"]
 	locationConstraint := secretMap["locationConstraint"]
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
-	protectBucket := secretMap["bucketProtection"]
-
-	bucketToDelete, err := bucketToDelete(volumeID, protectBucket)
+	bucketToDelete, err := bucketToDelete(volumeID)
 
 	if err != nil {
 		return &csi.DeleteVolumeResponse{}, nil
@@ -252,6 +241,7 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 		if err != nil {
 			klog.V(3).Infof("Cannot delete temp bucket: %v; error msg: %v", bucketToDelete, err)
 		}
+		klog.Infof("End of bucket delete for  %v", volumeID)
 
 	}
 
@@ -386,7 +376,7 @@ func getTempBucketName(mounterType, volumeID string) string {
 	return name
 }
 
-func bucketToDelete(volumeID, protectBucket string) (string, error) {
+func bucketToDelete(volumeID string) (string, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		klog.Errorf("Unable to fetch bucket %v", err)
@@ -404,17 +394,34 @@ func bucketToDelete(volumeID, protectBucket string) (string, error) {
 		return "", err
 	}
 
-	klog.Infof("PV Reclaim Policy is %v and Bucket Protection is %v", string(pv.Spec.PersistentVolumeReclaimPolicy), protectBucket)
-
 	klog.Infof("***Attributes", pv.Spec.CSI.VolumeAttributes)
+	if string(pv.Spec.CSI.VolumeAttributes["userProvidedBucket"]) != "true" {
 
-	if string(pv.Spec.PersistentVolumeReclaimPolicy) == "Delete" && protectBucket != "Retain" {
 		klog.Infof("Bucket will be deleted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
 		return pv.Spec.CSI.VolumeAttributes["bucketName"], nil
 	}
-
 	klog.Infof("Bucket will be persisted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
-
 	return "", nil
+
+}
+
+func createBucket(sess s3client.ObjectStorageSession, bucketName string) error {
+	msg, err := sess.CreateBucket(bucketName)
+	if msg != "" {
+		klog.Infof("Info:Create Volume module with user provided Bucket name:", msg)
+	}
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "BucketAlreadyExists" {
+			klog.Warning(fmt.Sprintf("bucket '%s' already exists", bucketName))
+		} else {
+			klog.Errorf("CreateVolume: Unable to create the bucket: %v", err)
+			return errors.New("Unable to create the bucket")
+		}
+	}
+	if err := sess.CheckBucketAccess(bucketName); err != nil {
+		klog.Errorf("CreateVolume: Unable to access the bucket: %v", err)
+		return errors.New("Unable to access the bucket")
+	}
+	return nil
 
 }
