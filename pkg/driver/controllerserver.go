@@ -165,20 +165,23 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
 	bucketName = secretMap["bucketName"]
+	params["userProvidedBucket"] = "true"
 	if bucketName != "" {
 		// User Provided bucket. Check its existence and create if not present
+		klog.Infof("Bucket name provided")
 		if err := sess.CheckBucketAccess(bucketName); err != nil {
 			klog.Infof("CreateVolume: Unable to access the bucket: %v, Creating with given name", err)
 			err = createBucket(sess, bucketName)
 			if err != nil {
 				return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", err, bucketName))
 			}
+			params["userProvidedBucket"] = "false"
 			klog.Infof("Created bucket: %s", bucketName)
 		}
-		klog.Infof("Using bucket provided by user: %s", bucketName)
 		params["bucketName"] = bucketName
 	} else {
 		// Generate random temp bucket name based on volume id
+		klog.Infof("Bucket name not provided")
 		tempBucketName := getTempBucketName(secretMap["mounter"], volumeID)
 		if tempBucketName == "" {
 			klog.Errorf("CreateVolume: Unable to generate the bucket name")
@@ -189,6 +192,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", err, tempBucketName))
 		}
 		klog.Infof("Created temp bucket: %s", tempBucketName)
+		params["userProvidedBucket"] = "false"
 		params["bucketName"] = tempBucketName
 	}
 	klog.Infof("create volume: %v", volumeID)
@@ -391,9 +395,13 @@ func bucketToDelete(volumeID string) (string, error) {
 	}
 
 	klog.Infof("***Attributes", pv.Spec.CSI.VolumeAttributes)
+	if string(pv.Spec.CSI.VolumeAttributes["userProvidedBucket"]) != "true" {
 
-	klog.Infof("Bucket will be deleted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
-	return pv.Spec.CSI.VolumeAttributes["bucketName"], nil
+		klog.Infof("Bucket will be deleted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
+		return pv.Spec.CSI.VolumeAttributes["bucketName"], nil
+	}
+	klog.Infof("Bucket will be persisted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
+	return "", nil
 
 }
 
