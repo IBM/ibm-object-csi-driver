@@ -72,14 +72,14 @@ func fuseMount(path string, comm string, args []string) error {
 	err := cmd.Start()
 
 	if err != nil {
-		klog.Errorf("fuseMount: cmd failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
-		return fmt.Errorf("fuseMount: cmd failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+		klog.Errorf("fuseMount: cmd start failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+		return fmt.Errorf("fuseMount: cmd start failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
 	}
 	err = cmd.Wait()
 	if err != nil {
 		// Handle error
-		klog.Errorf("Command wait failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
-		return fmt.Errorf("Command wait failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+		klog.Errorf("fuseMount: cmd wait failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+		return fmt.Errorf("fuseMount: cmd wait failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
 	}
 
 	return waitForMount(path, 10*time.Second)
