@@ -68,11 +68,18 @@ func (s *S3fsMounterFactory) NewMounter(attrib map[string]string, secretMap map[
 func fuseMount(path string, comm string, args []string) error {
 	klog.Info("-fuseMount-")
 	klog.Infof("fuseMount args:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%s>", path, comm, args)
-	out, err := command(comm, args...).CombinedOutput()
+	cmd := command(comm, args...)
+	err := cmd.Start()
 
 	if err != nil {
-		klog.Infof("fuseMount: cmd failed: <%s>\nargs: <%s>\noutput: <%s>\nerror: <%v>", comm, args, out, err)
-		return fmt.Errorf("fuseMount: cmd failed: <%s>\nargs: <%s>\noutput: <%s>\nerror: <%v>", comm, args, out, err)
+		klog.Errorf("fuseMount: cmd start failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+		return fmt.Errorf("fuseMount: cmd start failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+	}
+	err = cmd.Wait()
+	if err != nil {
+		// Handle error
+		klog.Errorf("fuseMount: cmd wait failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+		return fmt.Errorf("fuseMount: cmd wait failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
 	}
 
 	return waitForMount(path, 10*time.Second)
