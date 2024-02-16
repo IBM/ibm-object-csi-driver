@@ -13,18 +13,18 @@ RUN   hostname; chmod 755 /usr/bin/register-sys.sh &&  /usr/bin/register-sys.sh
 RUN   microdnf update --setopt=tsflags=nodocs && \
       microdnf install -y --nodocs iputils nfs-utils rpcbind xfsprogs udev nc e2fsprogs e4fsprogs && \
       microdnf clean all -y
-RUN   microdnf update --setopt=tsflags=nodocs && \
-      microdnf install -y gcc libstdc++-devel \
-      gcc-c++ fuse curl-devel \
-      libxml2-devel openssl-devel mailcap \
-      git automake make
-RUN   microdnf -y install fuse-devel
-RUN   rm /usr/bin/register-sys.sh && subscription-manager unregister && subscription-manager clean
+#RUN   microdnf update --setopt=tsflags=nodocs && \
+#      microdnf install -y gcc libstdc++-devel \
+#      gcc-c++ fuse curl-devel \
+#      libxml2-devel openssl-devel mailcap \
+#      git automake make
+#RUN   microdnf -y install fuse-devel
+#RUN   rm /usr/bin/register-sys.sh && subscription-manager unregister && subscription-manager clean
 
-RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && cd s3fs-fuse && \
-    git checkout v1.93 && \
-    ./autogen.sh && ./configure --prefix=/usr/local --with-openssl && make && make install && \
-    rm -rf /var/lib/apt/lists/*
+#RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && cd s3fs-fuse && \
+#    git checkout v1.93 && \
+#    ./autogen.sh && ./configure --prefix=/usr/local --with-openssl && make && make install && \
+#    rm -rf /var/lib/apt/lists/*
 
 FROM registry.access.redhat.com/ubi8/ubi as rclone-builder
 RUN yum install wget git gcc -y
@@ -60,8 +60,8 @@ ARG build_date=unknown
 LABEL description="IBM CSI Object Storage Plugin"
 LABEL build-date=${build_date}
 LABEL git-commit-id=${git_commit_id}
-RUN yum update -y && yum install fuse fuse-libs fuse3 fuse3-libs -y
-COPY --from=s3fs-builder /usr/local/bin/s3fs /usr/bin/s3fs
+#RUN yum update -y && yum install fuse fuse-libs fuse3 fuse3-libs -y
+#COPY --from=s3fs-builder /usr/local/bin/s3fs /usr/bin/s3fs
 COPY --from=rclone-builder /usr/local/bin/rclone /usr/bin/rclone
 COPY ibm-object-csi-driver ibm-object-csi-driver
 ENTRYPOINT ["/ibm-object-csi-driver"]

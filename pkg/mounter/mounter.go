@@ -3,12 +3,15 @@ package mounter
 import (
 	"errors"
 	"fmt"
+	"net"
+	"context"
+	"github.ibm.com/alchemy-containers/cos-mounter-utility/s3fs"
+	"google.golang.org/grpc"
+	"k8s.io/klog/v2"
 	"os"
 	"os/exec"
 	"syscall"
 	"time"
-
-	"k8s.io/klog/v2"
 )
 
 type Mounter interface {
@@ -26,6 +29,8 @@ var (
 const (
 	s3fsMounterType   = "s3fs"
 	rcloneMounterType = "rclone"
+	//socket path
+	defaultSocketPath = "/tmp/mysocket.sock"
 )
 
 type S3fsMounterFactory struct{}
@@ -66,23 +71,58 @@ func (s *S3fsMounterFactory) NewMounter(attrib map[string]string, secretMap map[
 }
 
 func fuseMount(path string, comm string, args []string) error {
+
 	klog.Info("-fuseMount-")
 	klog.Infof("fuseMount args:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%s>", path, comm, args)
-	cmd := command(comm, args...)
-	err := cmd.Start()
-
-	if err != nil {
-		klog.Errorf("fuseMount: cmd start failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
-		return fmt.Errorf("fuseMount: cmd start failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+	// Get socket path
+	socketPath := os.Getenv("SOCKET_PATH")
+	if socketPath == "" {
+		socketPath = defaultSocketPath
 	}
-	err = cmd.Wait()
+	// Create a Unix domain socket connection
+	 klog.Infof("Before grpc.DialContext")
+	conn, err := grpc.DialContext(
+		context.TODO(),
+		socketPath,
+		grpc.WithInsecure(),
+		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
+			return net.DialTimeout("unix", addr, timeout)
+		}),
+	)
+	klog.Infof("After grpc.DialContext")
 	if err != nil {
-		// Handle error
-		klog.Errorf("fuseMount: cmd wait failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
-		return fmt.Errorf("fuseMount: cmd wait failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+		klog.Errorf("Failed to connect to gRPC server: %v",err)
+		return fmt.Errorf("Failed to connect to gRPC server: %v", err)
 	}
+	defer conn.Close()
 
-	return waitForMount(path, 10*time.Second)
+	client := s3fs.NewS3FSServiceClient(conn)
+	klog.Infof("After NewS3FSServiceClient")
+	// Call methods on the gRPC server
+	mountResponse, err := client.Mount(context.TODO(), &s3fs.MountRequest{
+		Args: args,
+	})
+	 klog.Infof("After client.Mount")
+	if err != nil {
+		return fmt.Errorf("Mount request failed: %v", err)
+	}
+	fmt.Println(mountResponse.Message)
+	return nil
+	/*	cmd := command(comm, args...)
+		err := cmd.Start()
+
+		if err != nil {
+			klog.Errorf("fuseMount: cmd start failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+			return fmt.Errorf("fuseMount: cmd start failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+		}
+		err = cmd.Wait()
+		if err != nil {
+			// Handle error
+			klog.Errorf("fuseMount: cmd wait failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+			return fmt.Errorf("fuseMount: cmd wait failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+		}
+
+		return waitForMount(path, 10*time.Second)*/
 }
 
 func FuseUnmount(path string) error {

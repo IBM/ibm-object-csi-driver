@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+option go_package = "github.ibm.com/alchemy-containers/cos-mounter-utility/s3fs";
+package s3fs;
+
+service S3FSService {
+  rpc Mount(MountRequest) returns (MountResponse);
+  rpc Unmount(UnmountRequest) returns (UnmountResponse);
+}
+
+message MountRequest {
+  repeated string args = 1;
+}
+
+message MountResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message UnmountRequest {
+  string mount_point = 1;
+}
+
+message UnmountResponse {
+  bool success = 1;
+  string message = 2;
+}
+

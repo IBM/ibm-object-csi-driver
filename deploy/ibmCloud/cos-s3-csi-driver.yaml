@@ -95,7 +95,8 @@ spec:
             capabilities:
               add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
-          image: cos-driver-image
+          image: ambikanair/ibm-object-csi-driver:mounter
+          imagePullPolicy: Always
           args:
             - "--servermode=node"
             - "--endpoint=$(CSI_ENDPOINT)"
@@ -103,6 +104,8 @@ spec:
             - "--logtostderr=true"
             - "--v=5"
           env:
+            - name: SOCKET_PATH
+              value: "/tmp/mounters3fs.sock"
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock
             - name: KUBE_NODE_NAME
@@ -110,7 +113,6 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
-          imagePullPolicy: Always
           volumeMounts:
             - name: plugin-dir
               mountPath: /csi
@@ -126,6 +128,22 @@ spec:
               mountPath: /dev/log
             - name: host-log
               mountPath: /host/var/log
+        - name: cos-mounter
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
+            privileged: true
+          image: ambikanair/ibmcloud-cos-mounter:latest
+          args:
+            - "--endpoint=$(SOCKET_PATH)"
+          env:
+            - name: SOCKET_PATH
+              value: "/tmp/mounters3fs.sock"
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: soc-dir
+              mountPath: /tmp
+              mountPropagation: "Bidirectional"
         - name: liveness-probe
           image: liveness-probe-image
           args:
@@ -137,6 +155,9 @@ spec:
             - name: plugin-dir
               mountPath: /csi
       volumes:
+        - name: soc-dir
+          hostPath:
+            path: /tmp
         - name: plugin-dir
           hostPath:
             path: /var/lib/kubelet/plugins/cos.s3.csi.ibm.io/
@@ -162,3 +183,4 @@ spec:
         - name: host-log
           hostPath:
             path: /var/log
+

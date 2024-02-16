@@ -81,7 +81,7 @@ spec:
             - mountPath: /csi
               name: socket-dir
         - name: cos-csi-provisioner
-          image: cos-driver-image
+          image: ambikanair/ibm-object-csi-driver:mounter
           args:
             - "--servermode=controller"
             - "--endpoint=$(CSI_ENDPOINT)"
