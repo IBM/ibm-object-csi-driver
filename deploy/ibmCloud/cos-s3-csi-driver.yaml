@@ -114,6 +114,8 @@ spec:
                   apiVersion: v1
                   fieldPath: spec.nodeName
           volumeMounts:
+            - name: soc-dir
+              mountPath: /tmp
             - name: plugin-dir
               mountPath: /csi
             - name: kubelet-dir-ibm
@@ -143,7 +145,7 @@ spec:
           volumeMounts:
             - name: soc-dir
               mountPath: /tmp
-              mountPropagation: "Bidirectional"
+              #mountPropagation: "Bidirectional"
         - name: liveness-probe
           image: liveness-probe-image
           args:

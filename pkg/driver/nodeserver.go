@@ -297,6 +297,7 @@ func checkMount(targetPath string) (bool, error) {
 				klog.V(2).Infof("checkMount: Error: %+v", err)
 				return false, err
 			}
+			klog.V(3).Infof("Target path %s created", targetPath)
 			notMnt = true
 		} else {
 			return false, err

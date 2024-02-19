@@ -89,15 +89,22 @@ func fuseMount(path string, comm string, args []string) error {
 			return net.DialTimeout("unix", addr, timeout)
 		}),
 	)
+       // Check if the connection is nil before using it
+	if conn == nil {
+		klog.Fatalf("gRPC connection is nil")
+	}
 	klog.Infof("After grpc.DialContext")
 	if err != nil {
 		klog.Errorf("Failed to connect to gRPC server: %v",err)
 		return fmt.Errorf("Failed to connect to gRPC server: %v", err)
 	}
-	defer conn.Close()
 
 	client := s3fs.NewS3FSServiceClient(conn)
-	klog.Infof("After NewS3FSServiceClient")
+        if conn != nil {
+                 klog.Info("Closing connection")
+                defer conn.Close()
+        }
+	klog.Infof("After NewS3FSServiceClient %+v\n", client)
 	// Call methods on the gRPC server
 	mountResponse, err := client.Mount(context.TODO(), &s3fs.MountRequest{
 		Args: args,
