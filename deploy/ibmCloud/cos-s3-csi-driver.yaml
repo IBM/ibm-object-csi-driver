@@ -105,7 +105,8 @@ spec:
             - "--v=5"
           env:
             - name: SOCKET_PATH
-              value: "/tmp/mounters3fs.sock"
+              #value: "/mountsocket/mounters3fs.sock"
+              value: "/tmp/mounter.sock"
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock
             - name: KUBE_NODE_NAME
@@ -114,7 +115,9 @@ spec:
                   apiVersion: v1
                   fieldPath: spec.nodeName
           volumeMounts:
-            - name: soc-dir
+            - name: host-lib
+              mountPath: /var/lib
+            - name: mount-socket-dir
               mountPath: /tmp
             - name: plugin-dir
               mountPath: /csi
@@ -130,22 +133,6 @@ spec:
               mountPath: /dev/log
             - name: host-log
               mountPath: /host/var/log
-        - name: cos-mounter
-          securityContext:
-            runAsNonRoot: false
-            runAsUser: 0
-            privileged: true
-          image: ambikanair/ibmcloud-cos-mounter:latest
-          args:
-            - "--endpoint=$(SOCKET_PATH)"
-          env:
-            - name: SOCKET_PATH
-              value: "/tmp/mounters3fs.sock"
-          imagePullPolicy: Always
-          volumeMounts:
-            - name: soc-dir
-              mountPath: /tmp
-              #mountPropagation: "Bidirectional"
         - name: liveness-probe
           image: liveness-probe-image
           args:
@@ -157,7 +144,8 @@ spec:
             - name: plugin-dir
               mountPath: /csi
       volumes:
-        - name: soc-dir
+        - name: mount-socket-dir
+          #emptyDir: {}
           hostPath:
             path: /tmp
         - name: plugin-dir
@@ -185,4 +173,12 @@ spec:
         - name: host-log
           hostPath:
             path: /var/log
+        - hostPath:
+            path: /
+            type: ""
+          name: host-root
+        - hostPath:
+            path: /var/lib/
+            type: DirectoryOrCreate
+          name: host-lib
 
