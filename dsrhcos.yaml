@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: debugger-daemonset
+spec:
+  selector:
+    matchLabels:
+      app: debugger
+  template:
+    metadata:
+      labels:
+        app: debugger
+    spec:
+      containers:
+      - name: debugger
+        image: ambikanair/grpctest:v1
+        imagePullPolicy: Always
+        tty: true
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /host/etc/os-release
+          name: etc-os-release-mount
+        - mountPath: /host/tmp
+          name: host-tmp
+        - mountPath: /host
+          name: host-root
+        command: ["/bin/sh", "-c", "./mh-install.sh"]
+      hostIPC: true
+      hostNetwork: true
+      hostPID: true
+      preemptionPolicy: PreemptLowerPriority
+      priority: 0
+      restartPolicy: Always
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 0
+      tolerations:
+      - operator: Exists
+      volumes:
+      - name: etc-os-release-mount
+        hostPath:
+          path: /etc/os-release
+      - hostPath:
+          path: /tmp
+          type: ""
+        name: host-tmp
+      - hostPath:
+          path: /
+          type: ""
+        name: host-root
