@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
       - name: debugger
-        image: ambikanair/grpctest:v1
+        image: ambikanair/grpctest:roks
         imagePullPolicy: Always
         tty: true
         securityContext:
@@ -22,16 +22,16 @@ spec:
         - mountPath: /host
           name: host-root
         command: ["/bin/sh", "-c", "./mh-install.sh"]
-      hostIPC: true
-      hostNetwork: true
+        #hostIPC: true
+        #hostNetwork: true
       hostPID: true
       preemptionPolicy: PreemptLowerPriority
       priority: 0
       restartPolicy: Always
-      securityContext:
-        runAsUser: 0
-        runAsGroup: 0
-        fsGroup: 0
+      #securityContext:
+      #  runAsUser: 0
+      #  runAsGroup: 0
+      #  fsGroup: 0
       tolerations:
       - operator: Exists
       volumes:
