@@ -240,6 +240,10 @@ func (ns *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 	//  Making direct call to fs library for the sake of simplicity. That way we don't need to initialize VolumeStatsUtils. If there is a need for VolumeStatsUtils to grow bigger then we can use it
 	available, capacity, usage, inodes, inodesFree, inodesUsed, err := fs.Info(req.VolumePath)
 
+	fmt.Println("ERROR:", err)
+	fmt.Println()
+	fmt.Println("NOERR:", available, capacity, usage, inodes, inodesFree, inodesUsed)
+
 	if err != nil {
 		return nil, err
 	}
