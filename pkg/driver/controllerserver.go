@@ -47,10 +47,8 @@ type controllerServer struct {
 
 var (
 	// volumeCaps represents how the volume could be accessed.
-	volumeCaps = []csi.VolumeCapability_AccessMode{
-		{
+	volumeCaps = &csi.VolumeCapability_AccessMode{
 			Mode: csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
-		},
 	}
 
 	// controllerCaps represents the capability of controller service
@@ -274,33 +272,22 @@ func (cs *controllerServer) ValidateVolumeCapabilities(ctx context.Context, req 
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 
-	var confirmed *csi.ValidateVolumeCapabilitiesResponse_Confirmed
-	if isValidVolumeCapabilities(volCaps) {
-		confirmed = &csi.ValidateVolumeCapabilitiesResponse_Confirmed{VolumeCapabilities: volCaps}
+	for _, capability := range req.VolumeCapabilities {
+		if capability.GetAccessMode().GetMode() != volumeCaps.GetMode() {
+			return &csi.ValidateVolumeCapabilitiesResponse{Message: "Only multi node multi writer is supported"}, nil
+		}
 	}
 	return &csi.ValidateVolumeCapabilitiesResponse{
-		Confirmed: confirmed,
+		Confirmed: &csi.ValidateVolumeCapabilitiesResponse_Confirmed{
+			VolumeCapabilities: []*csi.VolumeCapability{
+				{
+					AccessMode: volumeCaps,
+				},
+			},
+		},
 	}, nil
 
-}
 
-func isValidVolumeCapabilities(volCaps []*csi.VolumeCapability) bool {
-	hasSupport := func(cap *csi.VolumeCapability) bool {
-		for _, c := range volumeCaps {
-			if c.GetMode() == cap.AccessMode.GetMode() {
-				return true
-			}
-		}
-		return false
-	}
-
-	foundAll := true
-	for _, c := range volCaps {
-		if !hasSupport(c) {
-			foundAll = false
-		}
-	}
-	return foundAll
 }
 
 // ListVolumes

@@ -136,7 +136,7 @@ func (driver *S3Driver) NewS3CosDriver(nodeID string, endpoint string, s3cosSess
 	driver.s3client = s3client
 
 	vcam := []csi.VolumeCapability_AccessMode_Mode{
-		csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+		csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
 	}
 
 	_ = driver.AddVolumeCapabilityAccessModes(vcam) // #nosec G104: Attempt to AddVolumeCapabilityAccessModes only on best-effort basis.Error cannot be usefully handled.
