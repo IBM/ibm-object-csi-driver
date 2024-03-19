@@ -242,7 +242,7 @@ func (ns *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 
 	if err != nil {
 		data := map[string]string{"VolumeId": volumeID, "Error": err.Error()}
-		klog.V(2).ErrorS(err, "error occurred while getting volume stats", data)
+		klog.Error("NodeGetVolumeStats: error occurred while getting volume stats", data)
 		return nil, err
 	}
 
@@ -263,7 +263,7 @@ func (ns *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 		},
 	}
 
-	klog.V(2).Info("NodeGetVolumeStats: Volume Stats", resp)
+	klog.V(2).Info("NodeGetVolumeStats: Volume Stats ", resp)
 	return resp, nil
 }
 
