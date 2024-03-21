@@ -40,6 +40,8 @@ type ObjectStorageCredentials struct {
 	APIKey string
 	// ServiceInstanceID is the account identifier in IBM IAM authentication
 	ServiceInstanceID string
+	// KpRootKeyCrn
+	KpRootKeyCRN string
 	//IAMEndpoint ...
 	IAMEndpoint string
 }
@@ -54,7 +56,7 @@ type ObjectStorageSession interface {
 	CheckObjectPathExistence(bucket, objectpath string) (bool, error)
 
 	// CreateBucket methods creates a new bucket
-	CreateBucket(bucket string) (string, error)
+	CreateBucket(bucket, kpRootKeyCrn string) (string, error)
 
 	// DeleteBucket methods deletes a bucket (with all of its objects)
 	DeleteBucket(bucket string) error
@@ -77,6 +79,10 @@ type COSSession struct {
 	logger *zap.Logger
 	svc    s3API
 }
+
+const (
+	KPEncryptionAlgorithm = "AES256" // https://github.com/IBM/ibm-cos-sdk-go/blob/master/service/s3/api.go#L8509-L8511
+)
 
 func NewObjectStorageSessionFactory() *COSSessionFactory {
 	return &COSSessionFactory{}
@@ -119,10 +125,22 @@ func (s *COSSession) CheckObjectPathExistence(bucket string, objectpath string) 
 	return false, nil
 }
 
-func (s *COSSession) CreateBucket(bucket string) (string, error) {
-	_, err := s.svc.CreateBucket(&s3.CreateBucketInput{
-		Bucket: aws.String(bucket),
-	})
+func (s *COSSession) CreateBucket(bucket, kpRootKeyCrn string) (res string, err error) {
+
+	if kpRootKeyCrn != "" {
+		_, err = s.svc.CreateBucket(&s3.CreateBucketInput{
+			Bucket: aws.String(bucket),
+			//CreateBucketConfiguration: &s3.CreateBucketConfiguration{
+			//	LocationConstraint: aws.String(locationConstraint),
+			//},
+			IBMSSEKPCustomerRootKeyCrn:  aws.String(kpRootKeyCrn),
+			IBMSSEKPEncryptionAlgorithm: aws.String(KPEncryptionAlgorithm),
+		})
+	} else {
+		_, err = s.svc.CreateBucket(&s3.CreateBucketInput{
+			Bucket: aws.String(bucket),
+		})
+	}
 
 	if err != nil {
 		// TODO

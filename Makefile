@@ -27,7 +27,7 @@ CORE_IMAGE_NAME ?= $(EXE_DRIVER_NAME)
 CORE_DRIVER_IMG ?= $(REGISTRY)/$(CORE_IMAGE_NAME)
 
 .PHONY: test
-test: 
+test:
 	go test -v -race ./cmd/... ./pkg/...
 
 .PHONY: deps
@@ -60,7 +60,7 @@ driver: deps buildimage
 
 .PHONY: build
 build:
-	CGO_ENABLED=0 GOOS=linux go build -mod=vendor -a -ldflags '-X main.version=$(REV) -extldflags "-static"' -o ${GOPATH}/bin/${EXE_DRIVER_NAME} ./cmd/$*
+	CGO_ENABLED=0 GOOS=linux go build -mod=mod -a -ldflags '-X main.version=$(REV) -extldflags "-static"' -o ${GOPATH}/bin/${EXE_DRIVER_NAME} ./cmd/$*
 
 
 .PHONY: buildimage

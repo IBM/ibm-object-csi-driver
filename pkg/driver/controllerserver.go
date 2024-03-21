@@ -115,6 +115,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		bucketName         string
 		endPoint           string
 		locationConstraint string
+		kpRootKeyCrn       string
 		//objPath    string
 	)
 	modifiedRequest, err := ReplaceAndReturnCopy(req, "xxx", "yyy")
@@ -163,6 +164,12 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	if locationConstraint == "" {
 		return nil, status.Error(codes.InvalidArgument, "locationConstraint unknown")
 	}
+
+	kpRootKeyCrn = secretMap["kp-root-key-crn"]
+	if kpRootKeyCrn != "" {
+		klog.Infof("key protect root key crn provided for bucket creation")
+	}
+
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
 	bucketName = secretMap["bucketName"]
 	params["userProvidedBucket"] = "true"
@@ -171,7 +178,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		klog.Infof("Bucket name provided")
 		if err := sess.CheckBucketAccess(bucketName); err != nil {
 			klog.Infof("CreateVolume: Unable to access the bucket: %v, Creating with given name", err)
-			err = createBucket(sess, bucketName)
+			err = createBucket(sess, bucketName, kpRootKeyCrn)
 			if err != nil {
 				return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", err, bucketName))
 			}
@@ -187,7 +194,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 			klog.Errorf("CreateVolume: Unable to generate the bucket name")
 			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to access the bucket: %v", tempBucketName))
 		}
-		err = createBucket(sess, tempBucketName)
+		err = createBucket(sess, tempBucketName, kpRootKeyCrn)
 		if err != nil {
 			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", err, tempBucketName))
 		}
@@ -405,8 +412,8 @@ func bucketToDelete(volumeID string) (string, error) {
 
 }
 
-func createBucket(sess s3client.ObjectStorageSession, bucketName string) error {
-	msg, err := sess.CreateBucket(bucketName)
+func createBucket(sess s3client.ObjectStorageSession, bucketName, kpRootKeyCrn string) error {
+	msg, err := sess.CreateBucket(bucketName, kpRootKeyCrn)
 	if msg != "" {
 		klog.Infof("Info:Create Volume module with user provided Bucket name:", msg)
 	}
