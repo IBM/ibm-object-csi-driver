@@ -81,7 +81,7 @@ type COSSession struct {
 }
 
 const (
-	KPEncryptionAlgorithm = "AES256" // https://github.com/IBM/ibm-cos-sdk-go/blob/master/service/s3/api.go#L8509-L8511
+	KPEncryptionAlgorithm = "AES256" // https://github.com/IBM/ibm-cos-sdk-go/blob/master/service/s3/api.go#L9130-L9136
 )
 
 func NewObjectStorageSessionFactory() *COSSessionFactory {
