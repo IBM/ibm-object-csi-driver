@@ -30,6 +30,7 @@ type rcloneMounter struct {
 	locConstraint string //From Secret in SC
 	authType      string
 	accessKeys    string
+	kpRootKeyCrn  string
 	mountOptions  []string
 }
 
@@ -110,6 +111,9 @@ func newRcloneMounter(secretMap map[string]string, mountOptions []string) (Mount
 	}
 	if val, check = secretMap["secretKey"]; check {
 		secretKey = val
+	}
+	if val, check = secretMap["kp-root-key-crn"]; check {
+		mounter.kpRootKeyCrn = val
 	}
 	if val, check = secretMap["apiKey"]; check {
 		apiKey = val

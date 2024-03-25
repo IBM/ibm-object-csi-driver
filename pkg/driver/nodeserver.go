@@ -147,7 +147,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	secretMap := req.GetSecrets()
 	secretMapCopy := make(map[string]string)
 	for k, v := range secretMap {
-		if k == "accessKey" || k == "secretKey" || k == "apiKey" {
+		if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kp-root-key-crn" {
 			secretMapCopy[k] = "xxxxxxx"
 			continue
 		}
