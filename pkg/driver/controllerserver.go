@@ -357,6 +357,11 @@ func (cs *controllerServer) ControllerGetVolume(ctx context.Context, req *csi.Co
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
+func (cs *controllerServer) ControllerModifyVolume(ctx context.Context, req *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
+	klog.V(3).Infof("ControllerModifyVolume: called with args %+v", *req)
+	return nil, status.Error(codes.Unimplemented, "")
+}
+
 func sanitizeVolumeID(volumeID string) (string, error) {
 	var err error
 	volumeID = strings.ToLower(volumeID)
@@ -415,12 +420,12 @@ func createBucket(sess s3client.ObjectStorageSession, bucketName string) error {
 			klog.Warning(fmt.Sprintf("bucket '%s' already exists", bucketName))
 		} else {
 			klog.Errorf("CreateVolume: Unable to create the bucket: %v", err)
-			return errors.New("Unable to create the bucket")
+			return errors.New("unable to create the bucket")
 		}
 	}
 	if err := sess.CheckBucketAccess(bucketName); err != nil {
 		klog.Errorf("CreateVolume: Unable to access the bucket: %v", err)
-		return errors.New("Unable to access the bucket")
+		return errors.New("unable to access the bucket")
 	}
 	return nil
 
