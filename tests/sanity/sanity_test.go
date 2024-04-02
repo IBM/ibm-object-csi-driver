@@ -47,7 +47,7 @@ func TestSanity(t *testing.T) {
 
 	skipTests := strings.Join([]string{
 		"CreateVolume.*should fail when requesting to create a volume with already existing name and different capacity",
-		// "ValidateVolumeCapabilities.*should fail when the requested volume does not exist",
+		"ValidateVolumeCapabilities.*should fail when the requested volume does not exist",
 	}, "|")
 	err := flag.Set("ginkgo.skip", skipTests)
 	if err != nil {

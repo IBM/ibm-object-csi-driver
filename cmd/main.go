@@ -71,6 +71,7 @@ func getZapLogger() *zap.Logger {
 	atom.SetLevel(zap.InfoLevel)
 	return logger
 }
+
 func getEnv(key string) string {
 	return os.Getenv(strings.ToUpper(key))
 }

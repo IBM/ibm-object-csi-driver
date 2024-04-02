@@ -18,6 +18,7 @@ package s3client
 
 import (
 	"errors"
+
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
 	"go.uber.org/zap"
 )
