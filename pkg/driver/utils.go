@@ -18,8 +18,12 @@ package driver
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume/util/fs"
 )
 
@@ -98,9 +102,7 @@ func ReplaceAndReturnCopy(req interface{}, newAccessKey, newSecretKey string) (i
 
 type statsUtils interface {
 	FSInfo(path string) (int64, int64, int64, int64, int64, int64, error)
-	// IsBlockDevice(devicePath string) (bool, error)
-	// DeviceInfo(devicePath string) (int64, error)
-	// IsDevicePathNotExist(devicePath string) bool
+	CheckMount(targetPath string) (bool, error)
 }
 
 type VolumeStatsUtils struct {
@@ -108,4 +110,23 @@ type VolumeStatsUtils struct {
 
 func (su *VolumeStatsUtils) FSInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 	return fs.Info(path)
+}
+
+func (su *VolumeStatsUtils) CheckMount(targetPath string) (bool, error) {
+	out, err := exec.Command("mountpoint", targetPath).CombinedOutput()
+	outStr := strings.TrimSpace(string(out))
+	notMnt := true
+	if err != nil {
+		klog.V(3).Infof("Output: Output string error %+v", outStr)
+		if strings.HasSuffix(outStr, "No such file or directory") {
+			if err = os.MkdirAll(targetPath, 0750); err != nil {
+				klog.V(2).Infof("checkMount: Error: %+v", err)
+				return false, err
+			}
+			notMnt = true
+		} else {
+			return false, err
+		}
+	}
+	return notMnt, nil
 }

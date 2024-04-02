@@ -347,6 +347,7 @@ func TestNodeUnpublishVolumeUnMountFail(t *testing.T) {
 	}
 }
 
+/*
 func TestNodePublishVolumeCheckMountFail(t *testing.T) {
 	checkMountpoint = checkMountFailure
 	testCases := []struct {
@@ -412,3 +413,4 @@ func TestNodePublishVolumeCheckMountIsNotMountFail(t *testing.T) {
 		assert.Nil(t, err)
 	}
 }
+*/

@@ -33,9 +33,8 @@ import (
 )
 
 const (
-	PublishInfoRequestID = "request-id"
-	maxStorageCapacity   = gib
-	defaultIAMEndPoint   = "https://iam.cloud.ibm.com"
+	maxStorageCapacity = gib
+	defaultIAMEndPoint = "https://iam.cloud.ibm.com"
 )
 
 // Implements Controller csi.ControllerServer

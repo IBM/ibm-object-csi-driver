@@ -293,6 +293,10 @@ func (su *FakeNewVolumeStatsUtils) FSInfo(path string) (int64, int64, int64, int
 	return 1, 1, 1, 1, 1, 1, nil
 }
 
+func (su *FakeNewVolumeStatsUtils) CheckMount(targetPath string) (bool, error) {
+	return true, nil
+}
+
 func createTargetDir(targetPath string) error {
 	fileInfo, err := os.Stat(targetPath)
 	if err != nil && os.IsNotExist(err) {

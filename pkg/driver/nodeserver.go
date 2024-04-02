@@ -17,9 +17,6 @@ package driver
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
-	"strings"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -45,9 +42,8 @@ type nodeServer struct {
 }
 
 var (
-	mounterObj      mounter.Mounter
-	fuseunmount     = mounter.FuseUnmount
-	checkMountpoint = checkMount
+	mounterObj  mounter.Mounter
+	fuseunmount = mounter.FuseUnmount
 	// nodeCaps represents the capability of node service.
 	nodeCaps = []csi.NodeServiceCapability_RPC_Type{
 		csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
@@ -112,7 +108,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return nil, status.Error(codes.InvalidArgument, "Volume capability missing in request")
 	}
 
-	notMnt, err := checkMountpoint(targetPath)
+	notMnt, err := ns.Stats.CheckMount(targetPath)
 	if err != nil {
 		klog.Errorf("Can not validate target mount point: %s %v", targetPath, err)
 		return nil, status.Error(codes.Internal, err.Error())
@@ -288,23 +284,4 @@ func (ns *nodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	}
 	fmt.Println(resp)
 	return resp, nil
-}
-
-func checkMount(targetPath string) (bool, error) {
-	out, err := exec.Command("mountpoint", targetPath).CombinedOutput()
-	outStr := strings.TrimSpace(string(out))
-	notMnt := true
-	if err != nil {
-		klog.V(3).Infof("Output: Output string error %+v", outStr)
-		if strings.HasSuffix(outStr, "No such file or directory") {
-			if err = os.MkdirAll(targetPath, 0750); err != nil {
-				klog.V(2).Infof("checkMount: Error: %+v", err)
-				return false, err
-			}
-			notMnt = true
-		} else {
-			return false, err
-		}
-	}
-	return notMnt, nil
 }
