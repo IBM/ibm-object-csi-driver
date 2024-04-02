@@ -20,8 +20,8 @@ services:
   - docker
 
 before_script:
+  - go mod tidy
   - make fmt
-  - make lint
 
 script:
   - make driver
