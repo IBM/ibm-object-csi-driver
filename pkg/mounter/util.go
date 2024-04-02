@@ -21,13 +21,12 @@ import (
 	"time"
 
 	"github.com/mitchellh/go-ps"
-
 	"k8s.io/klog/v2"
 )
 
 func waitForProcess(p *os.Process, backoff int) error {
 	if backoff == 20 {
-		return fmt.Errorf("Timeout waiting for PID %v to end", p.Pid)
+		return fmt.Errorf("timeout waiting for PID %v to end", p.Pid)
 	}
 	cmdLine, err := getCmdLine(p.Pid)
 	if err != nil {
@@ -67,7 +66,7 @@ func waitForMount(path string, timeout time.Duration) error {
 		time.Sleep(interval)
 		elapsed = elapsed + interval
 		if elapsed >= timeout {
-			return errors.New("Timeout waiting for mount")
+			return errors.New("timeout waiting for mount")
 		}
 	}
 }
