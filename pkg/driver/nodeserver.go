@@ -167,8 +167,8 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		tempBucketName := pv.Spec.CSI.VolumeAttributes["bucketName"]
 
 		if tempBucketName == "" {
-			klog.Errorf("Unable to fetch bucket name from pv %v", err)
-			return nil, status.Error(codes.Internal, err.Error())
+			klog.Errorf("Unable to fetch bucket name from pv")
+			return nil, status.Error(codes.Internal, "unable to fetch bucket name from pv")
 		}
 
 		secretMap["bucketName"] = tempBucketName
@@ -181,7 +181,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	klog.Info("-NodePublishVolume-: Mount")
 
 	if err = mounterObj.Mount("", targetPath); err != nil {
-		klog.Info("-Mount-: Error %v", err)
+		klog.Info("-Mount-: Error: ", err)
 		return nil, err
 	}
 

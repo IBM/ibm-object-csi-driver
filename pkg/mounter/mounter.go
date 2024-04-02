@@ -117,7 +117,7 @@ func FuseUnmount(path string) error {
 
 func checkPath(path string) (bool, error) {
 	if path == "" {
-		return false, errors.New("Undefined path")
+		return false, errors.New("undefined path")
 	}
 	_, err := os.Stat(path)
 	if err == nil {
@@ -137,8 +137,6 @@ func isCorruptedMnt(err error) bool {
 	}
 	var underlyingError error
 	switch pe := err.(type) {
-	case nil:
-		return false
 	case *os.PathError:
 		underlyingError = pe.Err
 	case *os.LinkError:

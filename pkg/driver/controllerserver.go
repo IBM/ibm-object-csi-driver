@@ -399,7 +399,7 @@ func bucketToDelete(volumeID string) (string, error) {
 		return "", err
 	}
 
-	klog.Infof("***Attributes", pv.Spec.CSI.VolumeAttributes)
+	klog.Infof("***Attributes: %v", pv.Spec.CSI.VolumeAttributes)
 	if string(pv.Spec.CSI.VolumeAttributes["userProvidedBucket"]) != "true" {
 
 		klog.Infof("Bucket will be deleted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
@@ -413,19 +413,19 @@ func bucketToDelete(volumeID string) (string, error) {
 func createBucket(sess s3client.ObjectStorageSession, bucketName string) error {
 	msg, err := sess.CreateBucket(bucketName)
 	if msg != "" {
-		klog.Infof("Info:Create Volume module with user provided Bucket name:", msg)
+		klog.Infof("Info:Create Volume module with user provided Bucket name: %v", msg)
 	}
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "BucketAlreadyExists" {
 			klog.Warning(fmt.Sprintf("bucket '%s' already exists", bucketName))
 		} else {
 			klog.Errorf("CreateVolume: Unable to create the bucket: %v", err)
-			return errors.New("Unable to create the bucket")
+			return errors.New("unable to create the bucket")
 		}
 	}
 	if err := sess.CheckBucketAccess(bucketName); err != nil {
 		klog.Errorf("CreateVolume: Unable to access the bucket: %v", err)
-		return errors.New("Unable to access the bucket")
+		return errors.New("unable to access the bucket")
 	}
 	return nil
 

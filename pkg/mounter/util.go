@@ -119,7 +119,7 @@ func isMountpoint(pathname string) (bool, error) {
 		klog.Infof("Path is NOT a mountpoint:Pathname - %s", pathname)
 		return false, nil
 	} else {
-		klog.Errorf("Cannot parse mountpoint result: ", outStr)
+		klog.Errorf("Cannot parse mountpoint result: %v", outStr)
 		return false, fmt.Errorf("cannot parse mountpoint result: %s", outStr)
 	}
 }
