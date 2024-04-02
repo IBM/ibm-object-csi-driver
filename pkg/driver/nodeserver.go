@@ -30,7 +30,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/volume/util/fs"
 )
 
 const (
@@ -40,7 +39,7 @@ const (
 // Implements Node Server csi.NodeServer
 type nodeServer struct {
 	*S3Driver
-	// Stats   statsUtils
+	Stats   statsUtils
 	NodeID  string
 	Mounter mounter.NewMounterFactory
 }
@@ -228,7 +227,7 @@ func (ns *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 
 	klog.V(2).Info("NodeGetVolumeStats: Start getting Stats")
 	//  Making direct call to fs library for the sake of simplicity. That way we don't need to initialize VolumeStatsUtils. If there is a need for VolumeStatsUtils to grow bigger then we can use it
-	available, capacity, usage, inodes, inodesFree, inodesUsed, err := fs.Info(req.VolumePath)
+	available, capacity, usage, inodes, inodesFree, inodesUsed, err := ns.Stats.FSInfo(req.VolumePath)
 
 	if err != nil {
 		data := map[string]string{"VolumeId": volumeID, "Error": err.Error()}

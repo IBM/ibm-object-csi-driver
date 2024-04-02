@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"k8s.io/kubernetes/pkg/volume/util/fs"
 )
 
 func ReplaceAndReturnCopy(req interface{}, newAccessKey, newSecretKey string) (interface{}, error) {
@@ -95,16 +96,16 @@ func ReplaceAndReturnCopy(req interface{}, newAccessKey, newSecretKey string) (i
 	}
 }
 
-// type statsUtils interface {
-// 	FSInfo(path string) (int64, int64, int64, int64, int64, int64, error)
-// 	IsBlockDevice(devicePath string) (bool, error)
-// 	DeviceInfo(devicePath string) (int64, error)
-// 	IsDevicePathNotExist(devicePath string) bool
-// }
+type statsUtils interface {
+	FSInfo(path string) (int64, int64, int64, int64, int64, int64, error)
+	// IsBlockDevice(devicePath string) (bool, error)
+	// DeviceInfo(devicePath string) (int64, error)
+	// IsDevicePathNotExist(devicePath string) bool
+}
 
-// type VolumeStatsUtils struct {
-// }
+type VolumeStatsUtils struct {
+}
 
-// func (su *VolumeStatsUtils) FSInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
-// 	return fs.Info(path)
-// }
+func (su *VolumeStatsUtils) FSInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
+	return fs.Info(path)
+}

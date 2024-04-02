@@ -13,19 +13,20 @@ package main
 
 import (
 	"flag"
-	libMetrics "github.com/IBM/ibmcloud-volume-interface/lib/metrics"
-	csiConfig "github.com/IBM/ibm-object-csi-driver/config"
-	driver "github.com/IBM/ibm-object-csi-driver/pkg/driver"
-	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
-	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-	"k8s.io/klog/v2"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+
+	csiConfig "github.com/IBM/ibm-object-csi-driver/config"
+	driver "github.com/IBM/ibm-object-csi-driver/pkg/driver"
+	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
+	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
+	libMetrics "github.com/IBM/ibmcloud-volume-interface/lib/metrics"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"k8s.io/klog/v2"
 )
 
 // Options is the combined set of options for all operating modes.
@@ -108,7 +109,10 @@ func serverSetup(options *Options, logger *zap.Logger) {
 		logger.Fatal("Failed to setup s3 driver", zap.Error(err))
 		os.Exit(1)
 	}
-	S3CSIDriver, err := csiDriver.NewS3CosDriver(options.NodeID, options.Endpoint, s3client.NewObjectStorageSessionFactory(), mounter.NewS3fsMounterFactory())
+
+	statsUtil := &(driver.VolumeStatsUtils{})
+
+	S3CSIDriver, err := csiDriver.NewS3CosDriver(options.NodeID, options.Endpoint, s3client.NewObjectStorageSessionFactory(), mounter.NewS3fsMounterFactory(), statsUtil)
 	if err != nil {
 		logger.Fatal("Failed in initialize s3 COS driver", zap.Error(err))
 		os.Exit(1)

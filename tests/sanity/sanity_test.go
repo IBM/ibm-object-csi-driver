@@ -26,7 +26,9 @@ import (
 	"github.com/kubernetes-csi/csi-test/v5/pkg/sanity"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
 )
 
@@ -96,7 +98,7 @@ func initCSIDriverForSanity(t *testing.T) *csiDriver.S3Driver {
 	nodeID := "fakeNodeID"
 	session := FakeNewObjectStorageSessionFactory()
 	mountObj := FakeNewS3fsMounterFactory()
-	// 	statsUtil := &FakeNewVolumeStatsUtils{}
+	statsUtil := &FakeNewVolumeStatsUtils{}
 
 	// Creating test logger
 	logger, teardown := cloudProvider.GetTestLogger(t)
@@ -108,8 +110,7 @@ func initCSIDriverForSanity(t *testing.T) *csiDriver.S3Driver {
 		t.Fatalf("Failed to setup CSI Driver: %v", err)
 	}
 
-	icsDriver, err := icDriver.NewS3CosDriver(nodeID, CSIEndpoint, session, mountObj)
-	// icsDriver, err := icDriver.NewS3CosDriver(nodeID, CSIEndpoint, session, mountObj, statsUtil)
+	icsDriver, err := icDriver.NewS3CosDriver(nodeID, CSIEndpoint, session, mountObj, statsUtil)
 	if err != nil {
 		t.Fatalf("Failed to create New COS CSI Driver: %v", err)
 	}
@@ -281,19 +282,16 @@ func (v providerIDGenerator) GenerateUniqueValidVolumeID() string {
 	return fmt.Sprintf("fake-vol-ID-%s", uuid.New().String()[:10])
 }
 
-// type FakeNewVolumeStatsUtils struct {
-// }
+// Fake VolumeStatsUtils
+type FakeNewVolumeStatsUtils struct {
+}
 
-// func (su *FakeNewVolumeStatsUtils) FSInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
-// 	if path == "some/path" {
-// 		return 0, 0, 0, 0, 0, 0, status.Error(codes.NotFound, "volume not found on some/path")
-// 	}
-// 	return 1, 1, 1, 1, 1, 1, nil
-// }
-
-// func (su *FakeNewVolumeStatsUtils) CheckMount(targetPath string) (bool, error) {
-// 	return true, nil
-// }
+func (su *FakeNewVolumeStatsUtils) FSInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
+	if path == "some/path" {
+		return 0, 0, 0, 0, 0, 0, status.Error(codes.NotFound, "volume not found on some/path")
+	}
+	return 1, 1, 1, 1, 1, 1, nil
+}
 
 func createTargetDir(targetPath string) error {
 	fileInfo, err := os.Stat(targetPath)
