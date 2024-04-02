@@ -23,7 +23,7 @@ import (
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
 	"github.com/google/uuid"
-	sanity "github.com/kubernetes-csi/csi-test/v4/pkg/sanity"
+	sanity "github.com/kubernetes-csi/csi-test/v5/pkg/sanity"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"

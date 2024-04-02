@@ -33,9 +33,8 @@ import (
 )
 
 const (
-	PublishInfoRequestID = "request-id"
-	maxStorageCapacity   = gib
-	defaultIAMEndPoint   = "https://iam.cloud.ibm.com"
+	maxStorageCapacity = gib
+	defaultIAMEndPoint = "https://iam.cloud.ibm.com"
 )
 
 // Implements Controller csi.ControllerServer
@@ -354,6 +353,11 @@ func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 
 func (cs *controllerServer) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
 	klog.V(3).Infof("ControllerGetVolume: called with args %+v", *req)
+	return nil, status.Error(codes.Unimplemented, "")
+}
+
+func (cs *controllerServer) ControllerModifyVolume(ctx context.Context, req *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
+	klog.V(3).Infof("ControllerModifyVolume: called with args %+v", *req)
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
