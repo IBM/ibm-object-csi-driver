@@ -357,6 +357,11 @@ func (cs *controllerServer) ControllerGetVolume(ctx context.Context, req *csi.Co
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
+func (cs *controllerServer) ControllerModifyVolume(ctx context.Context, req *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
+	klog.V(3).Infof("ControllerModifyVolume: called with args %+v", *req)
+	return nil, status.Error(codes.Unimplemented, "")
+}
+
 func sanitizeVolumeID(volumeID string) (string, error) {
 	var err error
 	volumeID = strings.ToLower(volumeID)

@@ -19,13 +19,13 @@ package driver
 
 import (
 	"errors"
-	// fakemounter "github.com/IBM/ibm-object-csi-driver/pkg/driver/fake/mounter"
+	"testing"
+
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"testing"
 )
 
 const defaultVolumeID = "csiprovidervolumeid"

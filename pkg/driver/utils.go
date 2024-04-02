@@ -94,3 +94,17 @@ func ReplaceAndReturnCopy(req interface{}, newAccessKey, newSecretKey string) (i
 		return req, fmt.Errorf("unsupported request type")
 	}
 }
+
+// type statsUtils interface {
+// 	FSInfo(path string) (int64, int64, int64, int64, int64, int64, error)
+// 	IsBlockDevice(devicePath string) (bool, error)
+// 	DeviceInfo(devicePath string) (int64, error)
+// 	IsDevicePathNotExist(devicePath string) bool
+// }
+
+// type VolumeStatsUtils struct {
+// }
+
+// func (su *VolumeStatsUtils) FSInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
+// 	return fs.Info(path)
+// }

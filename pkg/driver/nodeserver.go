@@ -40,19 +40,9 @@ const (
 // Implements Node Server csi.NodeServer
 type nodeServer struct {
 	*S3Driver
-	Stats   statsUtils
+	// Stats   statsUtils
 	NodeID  string
 	Mounter mounter.NewMounterFactory
-}
-
-type statsUtils interface {
-	FSInfo(path string) (int64, int64, int64, int64, int64, int64, error)
-	IsBlockDevice(devicePath string) (bool, error)
-	DeviceInfo(devicePath string) (int64, error)
-	IsDevicePathNotExist(devicePath string) bool
-}
-
-type VolumeStatsUtils struct {
 }
 
 var (
@@ -289,6 +279,18 @@ func (ns *nodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 	return &csi.NodeGetCapabilitiesResponse{Capabilities: caps}, nil
 }
 
+func (ns *nodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+	klog.V(3).Infof("NodeGetInfo: called with args %+v", *req)
+	top := &csi.Topology{}
+	resp := &csi.NodeGetInfoResponse{
+		NodeId:             ns.NodeID,
+		MaxVolumesPerNode:  DefaultVolumesPerNode,
+		AccessibleTopology: top,
+	}
+	fmt.Println(resp)
+	return resp, nil
+}
+
 func checkMount(targetPath string) (bool, error) {
 	out, err := exec.Command("mountpoint", targetPath).CombinedOutput()
 	outStr := strings.TrimSpace(string(out))
@@ -306,21 +308,4 @@ func checkMount(targetPath string) (bool, error) {
 		}
 	}
 	return notMnt, nil
-}
-
-func (ns *nodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
-	klog.V(3).Infof("NodeGetInfo: called with args %+v", *req)
-	top := &csi.Topology{}
-	resp := &csi.NodeGetInfoResponse{
-		NodeId:             ns.NodeID,
-		MaxVolumesPerNode:  DefaultVolumesPerNode,
-		AccessibleTopology: top,
-	}
-	fmt.Println(resp)
-	return resp, nil
-
-}
-
-func (su *VolumeStatsUtils) FSInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
-	return fs.Info(path)
 }
