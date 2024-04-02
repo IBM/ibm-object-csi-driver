@@ -33,10 +33,10 @@ const defaultTargetPath = "/mnt/test"
 const defaultStagingPath = "/staging"
 
 var (
-	unmountSuccess            = func(target string) error { return nil }
-	unmountFailure            = func(target string) error { return errors.New("") }
-	checkMountFailure         = func(target string) (bool, error) { return false, errors.New("") }
-	checkMountFailureNotMount = func(target string) (bool, error) { return false, nil }
+	unmountSuccess = func(target string) error { return nil }
+	unmountFailure = func(target string) error { return errors.New("") }
+	// checkMountFailure         = func(target string) (bool, error) { return false, errors.New("") }
+	// checkMountFailureNotMount = func(target string) (bool, error) { return false, nil }
 )
 
 func TestNodePublishVolume(t *testing.T) {

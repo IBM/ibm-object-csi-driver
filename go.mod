@@ -3,7 +3,7 @@ module github.com/IBM/ibm-object-csi-driver
 go 1.21
 
 require (
-	github.com/IBM/ibm-cos-sdk-go v1.9.4
+	github.com/IBM/ibm-cos-sdk-go v1.10.2
 	github.com/IBM/ibm-csi-common v1.1.5
 	github.com/IBM/ibmcloud-storage-volume-lib v0.0.2
 	github.com/IBM/ibmcloud-volume-interface v1.1.2
@@ -14,9 +14,9 @@ require (
 	github.com/onsi/ginkgo/v2 v2.13.1
 	github.com/onsi/gomega v1.30.0
 	github.com/prometheus/client_golang v1.14.0
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.4
 	go.uber.org/zap v1.24.0
-	golang.org/x/net v0.17.0
+	golang.org/x/net v0.20.0
 	google.golang.org/grpc v1.58.1
 	k8s.io/api v0.26.1
 	k8s.io/apimachinery v0.26.1
@@ -108,11 +108,11 @@ require (
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
-	golang.org/x/crypto v0.14.0 // indirect
+	golang.org/x/crypto v0.18.0 // indirect
 	golang.org/x/oauth2 v0.10.0 // indirect
-	golang.org/x/sys v0.14.0 // indirect
-	golang.org/x/term v0.13.0 // indirect
-	golang.org/x/text v0.13.0 // indirect
+	golang.org/x/sys v0.16.0 // indirect
+	golang.org/x/term v0.16.0 // indirect
+	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
 	golang.org/x/tools v0.14.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
