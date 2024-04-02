@@ -13,19 +13,20 @@ package main
 
 import (
 	"flag"
-	libMetrics "github.com/IBM/ibmcloud-volume-interface/lib/metrics"
-	csiConfig "github.com/IBM/ibm-object-csi-driver/config"
-	driver "github.com/IBM/ibm-object-csi-driver/pkg/driver"
-	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
-	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-	"k8s.io/klog/v2"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+
+	csiConfig "github.com/IBM/ibm-object-csi-driver/config"
+	"github.com/IBM/ibm-object-csi-driver/pkg/driver"
+	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
+	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
+	libMetrics "github.com/IBM/ibmcloud-volume-interface/lib/metrics"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"k8s.io/klog/v2"
 )
 
 // Options is the combined set of options for all operating modes.

@@ -90,13 +90,11 @@ func FuseUnmount(path string) error {
 	isMount, checkMountErr := isMountpoint(path)
 	if isMount || checkMountErr != nil {
 		klog.Infof("isMountpoint  %v", isMount)
-		// err := unmount(path, syscall.MNT_DETACH)
-		err := unmount(path, 0)
+		err := unmount(path, syscall.MNT_DETACH)
 		if err != nil && checkMountErr == nil {
 			klog.Errorf("Cannot unmount. Trying force unmount %s", err)
 			//Do force unmount
-			// err = unmount(path, syscall.MNT_FORCE)
-			err = unmount(path, 0)
+			err = unmount(path, syscall.MNT_FORCE)
 			if err != nil {
 				klog.Errorf("Cannot force unmount %s", err)
 				return fmt.Errorf("cannot force unmount %s: %v", path, err)
@@ -119,7 +117,7 @@ func FuseUnmount(path string) error {
 
 func checkPath(path string) (bool, error) {
 	if path == "" {
-		return false, errors.New("Undefined path")
+		return false, errors.New("undefined path")
 	}
 	_, err := os.Stat(path)
 	if err == nil {
@@ -139,8 +137,6 @@ func isCorruptedMnt(err error) bool {
 	}
 	var underlyingError error
 	switch pe := err.(type) {
-	case nil:
-		return false
 	case *os.PathError:
 		underlyingError = pe.Err
 	case *os.LinkError:
