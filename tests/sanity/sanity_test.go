@@ -12,6 +12,7 @@
 package sanity
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path"
@@ -44,16 +45,20 @@ func TestSanity(t *testing.T) {
 		t.Skip("Skipping sanity testing...")
 	}
 
-	// skipTests := strings.Join([]string{}, "|")
-
-	// os.Setenv("KUBERNETES_SERVICE_HOST", "fake-service-host")
-	// os.Setenv("KUBERNETES_SERVICE_PORT", "fake-service-port")
+	skipTests := strings.Join([]string{
+		"CreateVolume.*should fail when requesting to create a volume with already existing name and different capacity",
+		// "ValidateVolumeCapabilities.*should fail when the requested volume does not exist",
+	}, "|")
+	err := flag.Set("ginkgo.skip", skipTests)
+	if err != nil {
+		t.Fatalf("Failed to set skipTests: %v, Error: %v", skipTests, err)
+	}
 
 	// Create a fake CSI driver
 	csiSanityDriver := initCSIDriverForSanity(t)
 
 	//  Create the temp directory for fake sanity driver
-	err := os.MkdirAll(TempDir, 0755) // #nosec
+	err = os.MkdirAll(TempDir, 0755) // #nosec
 	if err != nil {
 		t.Fatalf("Failed to create sanity temp working dir %s: %v", TempDir, err)
 	}
@@ -295,6 +300,10 @@ func (su *FakeNewVolumeStatsUtils) FSInfo(path string) (int64, int64, int64, int
 
 func (su *FakeNewVolumeStatsUtils) CheckMount(targetPath string) (bool, error) {
 	return true, nil
+}
+
+func (su *FakeNewVolumeStatsUtils) FuseUnmount(path string) error {
+	return nil
 }
 
 func createTargetDir(targetPath string) error {

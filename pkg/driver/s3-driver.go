@@ -22,6 +22,7 @@ import (
 	"github.com/IBM/ibm-csi-common/pkg/utils"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
+	pkgUtils "github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"go.uber.org/zap"
 )
@@ -119,7 +120,7 @@ func newControllerServer(d *S3Driver, s3cosSession s3client.ObjectStorageSession
 	}
 }
 
-func newNodeServer(d *S3Driver, statsUtil statsUtils, nodeID string, mountObj mounter.NewMounterFactory) *nodeServer {
+func newNodeServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, nodeID string, mountObj mounter.NewMounterFactory) *nodeServer {
 	return &nodeServer{
 		S3Driver: d,
 		Stats:    statsUtil,
@@ -128,7 +129,7 @@ func newNodeServer(d *S3Driver, statsUtil statsUtils, nodeID string, mountObj mo
 	}
 }
 
-func (driver *S3Driver) NewS3CosDriver(nodeID string, endpoint string, s3cosSession s3client.ObjectStorageSessionFactory, mountObj mounter.NewMounterFactory, statsUtil statsUtils) (*S3Driver, error) {
+func (driver *S3Driver) NewS3CosDriver(nodeID string, endpoint string, s3cosSession s3client.ObjectStorageSessionFactory, mountObj mounter.NewMounterFactory, statsUtil pkgUtils.StatsUtils) (*S3Driver, error) {
 	s3client, err := s3client.NewS3Client(driver.logger)
 	if err != nil {
 		return nil, err

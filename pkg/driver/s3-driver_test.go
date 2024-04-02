@@ -21,6 +21,7 @@ import (
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
+	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -79,7 +80,7 @@ func inits3Driver(t *testing.T) *S3Driver {
 		t.Fatalf("Failed to setup CSI Driver: %v", err)
 	}
 
-	statsUtil := &(VolumeStatsUtils{})
+	statsUtil := &(utils.VolumeStatsUtils{})
 	icsDriver, err := icDriver.NewS3CosDriver(nodeID, endpoint, mockSession, mockMountObj, statsUtil)
 	if err != nil {
 		t.Fatalf("Failed to create New COS CSI Driver: %v", err)
