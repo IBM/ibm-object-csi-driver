@@ -62,6 +62,7 @@ var (
 	// nodeCaps represents the capability of node service.
 	nodeCaps = []csi.NodeServiceCapability_RPC_Type{
 		csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
+		csi.NodeServiceCapability_RPC_VOLUME_MOUNT_GROUP,
 	}
 )
 
@@ -107,6 +108,8 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 	klog.V(2).Infof("CSINodeServer-NodePublishVolume: Request %v", modifiedRequest.(*csi.NodePublishVolumeRequest))
 
+	volumeMountGroup := req.GetVolumeCapability().GetMount().GetVolumeMountGroup()
+	klog.V(2).Infof("CSINodeServer-NodePublishVolume-: volumeMountGroup: %v", volumeMountGroup)
 	volumeID := req.GetVolumeId()
 
 	if len(volumeID) == 0 {
@@ -140,7 +143,6 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	readOnly := req.GetReadonly()
 	attrib := req.GetVolumeContext()
 	mountFlags := req.GetVolumeCapability().GetMount().GetMountFlags()
-
 	klog.V(2).Infof("-NodePublishVolume-: targetPath: %v\ndeviceID: %v\nreadonly: %v\nvolumeId: %v\nattributes: %v\nmountFlags: %v\n",
 		targetPath, deviceID, readOnly, volumeID, attrib, mountFlags)
 
@@ -154,6 +156,13 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		secretMapCopy[k] = v
 	}
 	klog.V(2).Infof("-NodePublishVolume-: secretMap: %v", secretMapCopy)
+	if volumeMountGroup != "" {
+		mountFlags = append(mountFlags, fmt.Sprintf("gid=%s", volumeMountGroup))
+	}
+	secretUid := secretMap["uid"]
+	if secretUid != "" {
+		mountFlags = append(mountFlags, fmt.Sprintf("uid=%s", secretUid))
+	}
 
 	// If bucket name wasn't provided by user, we use temp bucket created for volume.
 	if secretMap["bucketName"] == "" {
