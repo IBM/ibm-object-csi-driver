@@ -155,12 +155,15 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		}
 		secretMapCopy[k] = v
 	}
+	secretUid := secretMap["uid"]
 	klog.V(2).Infof("-NodePublishVolume-: secretMap: %v", secretMapCopy)
 	if volumeMountGroup != "" {
 		mountFlags = append(mountFlags, fmt.Sprintf("gid=%s", volumeMountGroup))
 	}
-	secretUid := secretMap["uid"]
-	if secretUid != "" {
+
+	if volumeMountGroup != ""  && secretUid == "" {
+		mountFlags = append(mountFlags, fmt.Sprintf("uid=%s", volumeMountGroup))
+	} else if secretUid !="" {
 		mountFlags = append(mountFlags, fmt.Sprintf("uid=%s", secretUid))
 	}
 
