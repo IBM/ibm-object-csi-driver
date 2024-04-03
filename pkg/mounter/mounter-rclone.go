@@ -188,8 +188,13 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 		"mount",
 		bucketName,
 		target,
+		"--allow-other",
 		"--daemon",
 		"--log-file=/var/log/rclone.log",
+	}
+	for _, val := range rclone.mountOptions {
+		val = "--" + val
+		args = append(args, val)
 	}
 	return fuseMount(target, rcloneCmd, args)
 }
