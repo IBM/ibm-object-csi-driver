@@ -22,6 +22,7 @@ import (
 	"github.com/IBM/ibm-object-csi-driver/pkg/driver"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
+	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	libMetrics "github.com/IBM/ibmcloud-volume-interface/lib/metrics"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
@@ -70,6 +71,7 @@ func getZapLogger() *zap.Logger {
 	atom.SetLevel(zap.InfoLevel)
 	return logger
 }
+
 func getEnv(key string) string {
 	return os.Getenv(strings.ToUpper(key))
 }
@@ -109,7 +111,10 @@ func serverSetup(options *Options, logger *zap.Logger) {
 		logger.Fatal("Failed to setup s3 driver", zap.Error(err))
 		os.Exit(1)
 	}
-	S3CSIDriver, err := csiDriver.NewS3CosDriver(options.NodeID, options.Endpoint, s3client.NewObjectStorageSessionFactory(), mounter.NewS3fsMounterFactory())
+
+	statsUtil := &(utils.VolumeStatsUtils{})
+
+	S3CSIDriver, err := csiDriver.NewS3CosDriver(options.NodeID, options.Endpoint, s3client.NewObjectStorageSessionFactory(), mounter.NewS3fsMounterFactory(), statsUtil)
 	if err != nil {
 		logger.Fatal("Failed in initialize s3 COS driver", zap.Error(err))
 		os.Exit(1)

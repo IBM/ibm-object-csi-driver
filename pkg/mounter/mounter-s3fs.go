@@ -18,6 +18,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"k8s.io/klog/v2"
 )
 
@@ -200,6 +201,6 @@ func (s3fs *s3fsMounter) Unmount(target string) error {
 	if err != nil {
 		return err
 	}
-
-	return FuseUnmount(target)
+	statsUtil := &(utils.VolumeStatsUtils{})
+	return statsUtil.FuseUnmount(target)
 }

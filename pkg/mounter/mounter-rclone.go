@@ -15,10 +15,12 @@ import (
 	"bufio"
 	"crypto/sha256"
 	"fmt"
-	"k8s.io/klog/v2"
 	"os"
 	"path"
 	"strings"
+
+	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
+	"k8s.io/klog/v2"
 )
 
 // Mounter interface defined in mounter.go
@@ -149,9 +151,11 @@ const (
 func (rclone *rcloneMounter) Stage(stagePath string) error {
 	return nil
 }
+
 func (rclone *rcloneMounter) Unstage(stagePath string) error {
 	return nil
 }
+
 func (rclone *rcloneMounter) Mount(source string, target string) error {
 	klog.Info("-RcloneMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
@@ -188,11 +192,17 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 		"mount",
 		bucketName,
 		target,
+		"--allow-other",
 		"--daemon",
 		"--log-file=/var/log/rclone.log",
 	}
+	for _, val := range rclone.mountOptions {
+		val = "--" + val
+		args = append(args, val)
+	}
 	return fuseMount(target, rcloneCmd, args)
 }
+
 func (rclone *rcloneMounter) Unmount(target string) error {
 	klog.Info("-RcloneMounter Unmount-")
 	metaPath := path.Join(metaRootRclone, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
@@ -200,8 +210,8 @@ func (rclone *rcloneMounter) Unmount(target string) error {
 	if err != nil {
 		return err
 	}
-
-	return FuseUnmount(target)
+	statsUtil := &(utils.VolumeStatsUtils{})
+	return statsUtil.FuseUnmount(target)
 }
 
 func (rclone *rcloneMounter) createConfig() error {

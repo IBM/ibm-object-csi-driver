@@ -18,10 +18,7 @@ type Mounter interface {
 	Unmount(target string) error
 }
 
-var (
-	unmount = syscall.Unmount
-	command = exec.Command
-)
+var command = exec.Command
 
 const (
 	s3fsMounterType   = "s3fs"
@@ -83,36 +80,6 @@ func fuseMount(path string, comm string, args []string) error {
 	}
 
 	return waitForMount(path, 10*time.Second)
-}
-
-func FuseUnmount(path string) error {
-	// directory exists
-	isMount, checkMountErr := isMountpoint(path)
-	if isMount || checkMountErr != nil {
-		klog.Infof("isMountpoint  %v", isMount)
-		err := unmount(path, syscall.MNT_DETACH)
-		if err != nil && checkMountErr == nil {
-			klog.Errorf("Cannot unmount. Trying force unmount %s", err)
-			//Do force unmount
-			err = unmount(path, syscall.MNT_FORCE)
-			if err != nil {
-				klog.Errorf("Cannot force unmount %s", err)
-				return fmt.Errorf("cannot force unmount %s: %v", path, err)
-			}
-		}
-	}
-	// as fuse quits immediately, we will try to wait until the process is done
-	process, err := findFuseMountProcess(path)
-	if err != nil {
-		klog.Infof("Error getting PID of fuse mount: %s", err)
-		return nil
-	}
-	if process == nil {
-		klog.Infof("Unable to find PID of fuse mount %s, it must have finished already", path)
-		return nil
-	}
-	klog.Infof("Found fuse pid %v of mount %s, checking if it still runs", process.Pid, path)
-	return waitForProcess(process, 1)
 }
 
 func checkPath(path string) (bool, error) {
