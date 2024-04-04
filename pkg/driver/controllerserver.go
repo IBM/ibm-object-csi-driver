@@ -21,7 +21,7 @@ import (
 
 	"github.com/IBM/ibm-cos-sdk-go/aws/awserr"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
-	"github.com/container-storage-interface/spec/lib/go/csi"
+	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
@@ -33,9 +33,8 @@ import (
 )
 
 const (
-	PublishInfoRequestID = "request-id"
-	maxStorageCapacity   = gib
-	defaultIAMEndPoint   = "https://iam.cloud.ibm.com"
+	maxStorageCapacity = gib
+	defaultIAMEndPoint = "https://iam.cloud.ibm.com"
 )
 
 // Implements Controller csi.ControllerServer
@@ -107,7 +106,6 @@ func (cs *controllerServer) getCredentials(secretMap map[string]string) (*s3clie
 		IAMEndpoint:       iamEndpoint,
 		ServiceInstanceID: serviceInstanceID,
 	}, nil
-
 }
 
 func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
@@ -115,7 +113,6 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		bucketName         string
 		endPoint           string
 		locationConstraint string
-		//objPath    string
 	)
 	modifiedRequest, err := ReplaceAndReturnCopy(req, "xxx", "yyy")
 	if err != nil {
@@ -262,45 +259,26 @@ func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 
 func (cs *controllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
 	klog.V(3).Infof("ValidateVolumeCapabilities: Request: %+v", *req)
-	// Validate Arguments
 
+	// Validate Arguments
 	volumeID := req.GetVolumeId()
+	if len(volumeID) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
+	}
+
 	volCaps := req.GetVolumeCapabilities()
 	if len(volCaps) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume capabilities missing in request")
-	}
-
-	if len(volumeID) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 
 	var confirmed *csi.ValidateVolumeCapabilitiesResponse_Confirmed
 	if isValidVolumeCapabilities(volCaps) {
 		confirmed = &csi.ValidateVolumeCapabilitiesResponse_Confirmed{VolumeCapabilities: volCaps}
 	}
+
 	return &csi.ValidateVolumeCapabilitiesResponse{
 		Confirmed: confirmed,
 	}, nil
-
-}
-
-func isValidVolumeCapabilities(volCaps []*csi.VolumeCapability) bool {
-	hasSupport := func(cap *csi.VolumeCapability) bool {
-		for _, c := range volumeCaps {
-			if c.GetMode() == cap.AccessMode.GetMode() {
-				return true
-			}
-		}
-		return false
-	}
-
-	foundAll := true
-	for _, c := range volCaps {
-		if !hasSupport(c) {
-			foundAll = false
-		}
-	}
-	return foundAll
 }
 
 // ListVolumes
@@ -334,7 +312,6 @@ func (cs *controllerServer) ControllerGetCapabilities(ctx context.Context, req *
 func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
 	klog.V(3).Infof("CreateSnapshot: Request: %+v", *req)
 	return nil, status.Error(codes.Unimplemented, "")
-
 }
 
 func (cs *controllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
@@ -357,15 +334,9 @@ func (cs *controllerServer) ControllerGetVolume(ctx context.Context, req *csi.Co
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func sanitizeVolumeID(volumeID string) (string, error) {
-	var err error
-	volumeID = strings.ToLower(volumeID)
-	if len(volumeID) > 63 {
-		h := sha256.New()
-		_, err = io.WriteString(h, volumeID) //nolint
-		volumeID = hex.EncodeToString(h.Sum(nil))
-	}
-	return volumeID, err
+func (cs *controllerServer) ControllerModifyVolume(ctx context.Context, req *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
+	klog.V(3).Infof("ControllerModifyVolume: called with args %+v", *req)
+	return nil, status.Error(codes.Unimplemented, "")
 }
 
 func getTempBucketName(mounterType, volumeID string) string {
@@ -394,7 +365,7 @@ func bucketToDelete(volumeID string) (string, error) {
 		return "", err
 	}
 
-	klog.Infof("***Attributes", pv.Spec.CSI.VolumeAttributes)
+	klog.Infof("***Attributes: %v", pv.Spec.CSI.VolumeAttributes)
 	if string(pv.Spec.CSI.VolumeAttributes["userProvidedBucket"]) != "true" {
 
 		klog.Infof("Bucket will be deleted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
@@ -402,26 +373,54 @@ func bucketToDelete(volumeID string) (string, error) {
 	}
 	klog.Infof("Bucket will be persisted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
 	return "", nil
-
 }
 
 func createBucket(sess s3client.ObjectStorageSession, bucketName string) error {
 	msg, err := sess.CreateBucket(bucketName)
 	if msg != "" {
-		klog.Infof("Info:Create Volume module with user provided Bucket name:", msg)
+		klog.Infof("Info:Create Volume module with user provided Bucket name: %v", msg)
 	}
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "BucketAlreadyExists" {
 			klog.Warning(fmt.Sprintf("bucket '%s' already exists", bucketName))
 		} else {
 			klog.Errorf("CreateVolume: Unable to create the bucket: %v", err)
-			return errors.New("Unable to create the bucket")
+			return errors.New("unable to create the bucket")
 		}
 	}
 	if err := sess.CheckBucketAccess(bucketName); err != nil {
 		klog.Errorf("CreateVolume: Unable to access the bucket: %v", err)
-		return errors.New("Unable to access the bucket")
+		return errors.New("unable to access the bucket")
 	}
 	return nil
+}
 
+func sanitizeVolumeID(volumeID string) (string, error) {
+	var err error
+	volumeID = strings.ToLower(volumeID)
+	if len(volumeID) > 63 {
+		h := sha256.New()
+		_, err = io.WriteString(h, volumeID) //nolint
+		volumeID = hex.EncodeToString(h.Sum(nil))
+	}
+	return volumeID, err
+}
+
+func isValidVolumeCapabilities(volCaps []*csi.VolumeCapability) bool {
+	hasSupport := func(cap *csi.VolumeCapability) bool {
+		for _, c := range volumeCaps {
+			if c.GetMode() == cap.AccessMode.GetMode() {
+				return true
+			}
+		}
+		return false
+	}
+
+	foundAll := true
+	for _, c := range volCaps {
+		if !hasSupport(c) {
+			foundAll = false
+		}
+	}
+	return foundAll
 }
