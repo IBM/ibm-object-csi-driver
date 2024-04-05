@@ -155,16 +155,9 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		}
 		secretMapCopy[k] = v
 	}
-	secretUid := secretMap["uid"]
 	klog.V(2).Infof("-NodePublishVolume-: secretMap: %v", secretMapCopy)
 	if volumeMountGroup != "" {
-		mountFlags = append(mountFlags, fmt.Sprintf("gid=%s", volumeMountGroup))
-	}
-
-	if volumeMountGroup != ""  && secretUid == "" {
-		mountFlags = append(mountFlags, fmt.Sprintf("uid=%s", volumeMountGroup))
-	} else if secretUid !="" {
-		mountFlags = append(mountFlags, fmt.Sprintf("uid=%s", secretUid))
+		secretMap["gid"] = volumeMountGroup
 	}
 
 	// If bucket name wasn't provided by user, we use temp bucket created for volume.
