@@ -201,6 +201,7 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 		target,
 		"--allow-other",
 		"--daemon",
+		"--config="+configPath + "/" + configFileName,
 		"--log-file=/var/log/rclone.log",
 	}
 	if rclone.gid != "" {
