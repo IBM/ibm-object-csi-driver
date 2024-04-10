@@ -306,6 +306,10 @@ func (su *FakeNewVolumeStatsUtils) FuseUnmount(path string) error {
 	return nil
 }
 
+func (su *FakeNewVolumeStatsUtils) GetBucketUsage(volumeID string) (int64, error) {
+	return 0, nil
+}
+
 func createTargetDir(targetPath string) error {
 	fileInfo, err := os.Stat(targetPath)
 	if err != nil && os.IsNotExist(err) {
