@@ -152,7 +152,7 @@ func (t *TestPod) Create() {
 func (t *TestPod) Delete() {
 	By("POD Delete: deleting POD")
 	framework.Logf("deleting POD [%s/%s]", t.namespace.Name, t.pod.Name)
-	e2eoutput.DumpDebugInfo(context.Background(), t.client, t.namespace.Name)
+	e2eoutput.DumpDebugInfo(t.client, t.namespace.Name)
 	err := t.client.CoreV1().Pods(t.namespace.Name).Delete(context.Background(), t.pod.Name, metav1.DeleteOptions{})
 	framework.ExpectNoError(err)
 }
@@ -166,7 +166,7 @@ func (t *TestPod) Exec(command []string, expectedString string) {
 
 func (t *TestPod) WaitForSuccess() {
 	By(fmt.Sprintf("checking that the pods command exits with no error [%s/%s]", t.namespace.Name, t.pod.Name))
-	err := k8sDevPod.WaitForPodSuccessInNamespaceSlow(context.Background(), t.client, t.pod.Name, t.namespace.Name)
+	err := k8sDevPod.WaitForPodSuccessInNamespaceSlow(t.client, t.pod.Name, t.namespace.Name)
 	framework.ExpectNoError(err)
 }
 
@@ -185,12 +185,12 @@ var podRunningCondition = func(pod *v1.Pod) (bool, error) {
 func (t *TestPod) WaitForRunningSlow() {
 	By(fmt.Sprintf("checking that the pods status is running [%s/%s]", t.namespace.Name, t.pod.Name))
 	//err := framework.WaitTimeoutForPodRunningInNamespace(t.client, t.pod.Name, t.namespace.Name, slowPodStartTimeout)
-	err := k8sDevPod.WaitForPodCondition(context.Background(), t.client, t.namespace.Name, t.pod.Name, failedConditionDescription, slowPodStartTimeout, podRunningCondition)
+	err := k8sDevPod.WaitForPodCondition(t.client, t.namespace.Name, t.pod.Name, failedConditionDescription, slowPodStartTimeout, podRunningCondition)
 	framework.ExpectNoError(err)
 }
 
 func (t *TestPod) WaitForRunning() {
-	err := k8sDevPod.WaitForPodRunningInNamespace(context.Background(), t.client, t.pod)
+	err := k8sDevPod.WaitForPodRunningInNamespace(t.client, t.pod)
 	framework.ExpectNoError(err)
 }
 
@@ -251,7 +251,7 @@ func (t *TestPersistentVolumeClaim) Create() {
 
 func (t *TestPersistentVolumeClaim) Cleanup() {
 	By(fmt.Sprintf("deleting PVC [%s]", t.persistentVolumeClaim.Name))
-	err := k8sDevPV.DeletePersistentVolumeClaim(context.Background(), t.client, t.persistentVolumeClaim.Name, t.namespace.Name)
+	err := k8sDevPV.DeletePersistentVolumeClaim(t.client, t.persistentVolumeClaim.Name, t.namespace.Name)
 	By("Triggered DeletePersistentVolumeClaim call")
 	framework.ExpectNoError(err)
 	// Wait for the PV to get deleted if reclaim policy is Delete. (If it's
@@ -263,7 +263,7 @@ func (t *TestPersistentVolumeClaim) Cleanup() {
 	if t.persistentVolume != nil && t.persistentVolume.Spec.PersistentVolumeReclaimPolicy == v1.PersistentVolumeReclaimDelete {
 		framework.Logf("deleting PVC [%s/%s] using PV [%s]", t.namespace.Name, t.persistentVolumeClaim.Name, t.persistentVolume.Name)
 		By(fmt.Sprintf("waiting for claim's PV [%s] to be deleted", t.persistentVolume.Name))
-		err := k8sDevPV.WaitForPersistentVolumeDeleted(context.Background(), t.client, t.persistentVolume.Name, 5*time.Second, 10*time.Minute)
+		err := k8sDevPV.WaitForPersistentVolumeDeleted(t.client, t.persistentVolume.Name, 5*time.Second, 10*time.Minute)
 		framework.ExpectNoError(err)
 	}
 	// Wait for the PVC to be deleted
@@ -275,7 +275,7 @@ func (t *TestPersistentVolumeClaim) WaitForBound() v1.PersistentVolumeClaim {
 	var err error
 
 	By(fmt.Sprintf("waiting for PVC to be in phase %q", v1.ClaimBound))
-	err = k8sDevPV.WaitForPersistentVolumeClaimPhase(context.Background(), v1.ClaimBound, t.client, t.namespace.Name, t.persistentVolumeClaim.Name, framework.Poll, framework.ClaimProvisionTimeout)
+	err = k8sDevPV.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, t.client, t.namespace.Name, t.persistentVolumeClaim.Name, framework.Poll, framework.ClaimProvisionTimeout)
 	framework.ExpectNoError(err)
 
 	By("checking the PVC")
@@ -337,7 +337,7 @@ func generatePVC(name, namespace,
 			AccessModes: []v1.PersistentVolumeAccessMode{
 				accessMode,
 			},
-			Resources: v1.VolumeResourceRequirements{
+			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceName(v1.ResourceStorage): resource.MustParse(claimSize),
 				},
@@ -354,7 +354,7 @@ func (t *TestPod) Cleanup() {
 
 func cleanupPodOrFail(client clientset.Interface, name, namespace string, dbginfo, log bool) {
 	if dbginfo {
-		e2eoutput.DumpDebugInfo(context.Background(), client, namespace)
+		e2eoutput.DumpDebugInfo(client, namespace)
 	}
 	if log {
 		body, err := podLogs(client, name, namespace)
@@ -365,7 +365,7 @@ func cleanupPodOrFail(client clientset.Interface, name, namespace string, dbginf
 		}
 	}
 	framework.Logf("deleting POD [%s/%s]", namespace, name)
-	k8sDevPod.DeletePodOrFail(context.Background(), client, namespace, name)
+	k8sDevPod.DeletePodOrFail(client, namespace, name)
 }
 
 func podLogs(client clientset.Interface, name, namespace string) ([]byte, error) {
