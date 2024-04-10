@@ -240,6 +240,21 @@ func (ns *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 		return nil, err
 	}
 
+	// k8sClient, err := ns.Stats.CreateK8sClient()
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// secert, err := ns.Stats.FetchSecret(k8sClient, volumeID)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// capacityUsed, err := ns.Stats.BucketSizeUsed(secert)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
 	resp := &csi.NodeGetVolumeStatsResponse{
 		Usage: []*csi.VolumeUsage{
 			{
