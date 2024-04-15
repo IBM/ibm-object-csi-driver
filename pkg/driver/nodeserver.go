@@ -242,7 +242,7 @@ func (ns *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 				Abnormal: true,
 				Message:  err.Error(),
 			},
-		}, err
+		}, nil
 	}
 
 	resp := &csi.NodeGetVolumeStatsResponse{
