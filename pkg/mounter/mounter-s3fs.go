@@ -80,7 +80,7 @@ func newS3fsMounter(secretMap map[string]string, mountOptions []string) (Mounter
 	if val, check = secretMap["apiKey"]; check {
 		apiKey = val
 	}
-	if val, check = secretMap["kp-root-key-crn"]; check {
+	if val, check = secretMap["kpRootKeyCRN"]; check {
 		mounter.kpRootKeyCrn = val
 	}
 	if apiKey != "" {

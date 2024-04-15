@@ -163,7 +163,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, status.Error(codes.InvalidArgument, "locationConstraint unknown")
 	}
 
-	kpRootKeyCrn = secretMap["kp-root-key-crn"]
+	kpRootKeyCrn = secretMap["kpRootKeyCRN"]
 	if kpRootKeyCrn != "" {
 		klog.Infof("key protect root key crn provided for bucket creation")
 	}

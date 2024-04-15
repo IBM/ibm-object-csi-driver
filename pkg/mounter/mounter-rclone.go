@@ -114,7 +114,7 @@ func newRcloneMounter(secretMap map[string]string, mountOptions []string) (Mount
 	if val, check = secretMap["secretKey"]; check {
 		secretKey = val
 	}
-	if val, check = secretMap["kp-root-key-crn"]; check {
+	if val, check = secretMap["kpRootKeyCRN"]; check {
 		mounter.kpRootKeyCrn = val
 	}
 	if val, check = secretMap["apiKey"]; check {
