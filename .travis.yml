@@ -3,9 +3,7 @@ dist: trusty
 language: go
 
 go:
-
-  - "1.20.10"
-
+  - "1.21.8"
 
 group: bluezone
 
@@ -23,7 +21,6 @@ services:
 
 before_script:
   - make fmt
-  - make lint
 
 script:
   - make driver

@@ -17,11 +17,9 @@ package driver
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
-	"strings"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
+	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
@@ -30,7 +28,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/volume/util/fs"
 )
 
 const (
@@ -40,28 +37,17 @@ const (
 // Implements Node Server csi.NodeServer
 type nodeServer struct {
 	*S3Driver
-	Stats   statsUtils
+	Stats   utils.StatsUtils
 	NodeID  string
 	Mounter mounter.NewMounterFactory
 }
 
-type statsUtils interface {
-	FSInfo(path string) (int64, int64, int64, int64, int64, int64, error)
-	IsBlockDevice(devicePath string) (bool, error)
-	DeviceInfo(devicePath string) (int64, error)
-	IsDevicePathNotExist(devicePath string) bool
-}
-
-type VolumeStatsUtils struct {
-}
-
 var (
-	mounterObj      mounter.Mounter
-	fuseunmount     = mounter.FuseUnmount
-	checkMountpoint = checkMount
+	mounterObj mounter.Mounter
 	// nodeCaps represents the capability of node service.
 	nodeCaps = []csi.NodeServiceCapability_RPC_Type{
 		csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
+		csi.NodeServiceCapability_RPC_VOLUME_MOUNT_GROUP,
 	}
 )
 
@@ -107,6 +93,8 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 	klog.V(2).Infof("CSINodeServer-NodePublishVolume: Request %v", modifiedRequest.(*csi.NodePublishVolumeRequest))
 
+	volumeMountGroup := req.GetVolumeCapability().GetMount().GetVolumeMountGroup()
+	klog.V(2).Infof("CSINodeServer-NodePublishVolume-: volumeMountGroup: %v", volumeMountGroup)
 	volumeID := req.GetVolumeId()
 
 	if len(volumeID) == 0 {
@@ -123,7 +111,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return nil, status.Error(codes.InvalidArgument, "Volume capability missing in request")
 	}
 
-	notMnt, err := checkMountpoint(targetPath)
+	notMnt, err := ns.Stats.CheckMount(targetPath)
 	if err != nil {
 		klog.Errorf("Can not validate target mount point: %s %v", targetPath, err)
 		return nil, status.Error(codes.Internal, err.Error())
@@ -140,7 +128,6 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	readOnly := req.GetReadonly()
 	attrib := req.GetVolumeContext()
 	mountFlags := req.GetVolumeCapability().GetMount().GetMountFlags()
-
 	klog.V(2).Infof("-NodePublishVolume-: targetPath: %v\ndeviceID: %v\nreadonly: %v\nvolumeId: %v\nattributes: %v\nmountFlags: %v\n",
 		targetPath, deviceID, readOnly, volumeID, attrib, mountFlags)
 
@@ -154,6 +141,13 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		secretMapCopy[k] = v
 	}
 	klog.V(2).Infof("-NodePublishVolume-: secretMap: %v", secretMapCopy)
+	if volumeMountGroup != "" {
+		mountFlags = append(mountFlags, fmt.Sprintf("gid=%s", volumeMountGroup))
+	}
+	secretUid := secretMap["uid"]
+	if secretUid != "" {
+		mountFlags = append(mountFlags, fmt.Sprintf("uid=%s", secretUid))
+	}
 
 	// If bucket name wasn't provided by user, we use temp bucket created for volume.
 	if secretMap["bucketName"] == "" {
@@ -177,8 +171,8 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		tempBucketName := pv.Spec.CSI.VolumeAttributes["bucketName"]
 
 		if tempBucketName == "" {
-			klog.Errorf("Unable to fetch bucket name from pv %v", err)
-			return nil, status.Error(codes.Internal, err.Error())
+			klog.Errorf("Unable to fetch bucket name from pv")
+			return nil, status.Error(codes.Internal, "unable to fetch bucket name from pv")
 		}
 
 		secretMap["bucketName"] = tempBucketName
@@ -191,7 +185,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	klog.Info("-NodePublishVolume-: Mount")
 
 	if err = mounterObj.Mount("", targetPath); err != nil {
-		klog.Info("-Mount-: Error %v", err)
+		klog.Info("-Mount-: Error: ", err)
 		return nil, err
 	}
 
@@ -214,7 +208,7 @@ func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	}
 	klog.Infof("Unmounting  target path %s", targetPath)
 
-	if err := fuseunmount(targetPath); err != nil {
+	if err := ns.Stats.FuseUnmount(targetPath); err != nil {
 
 		//TODO: Need to handle the case with non existing mount separately - https://github.com/IBM/ibm-object-csi-driver/issues/46
 		klog.Infof("UNMOUNT ERROR: %v", err)
@@ -238,9 +232,11 @@ func (ns *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 
 	klog.V(2).Info("NodeGetVolumeStats: Start getting Stats")
 	//  Making direct call to fs library for the sake of simplicity. That way we don't need to initialize VolumeStatsUtils. If there is a need for VolumeStatsUtils to grow bigger then we can use it
-	available, capacity, usage, inodes, inodesFree, inodesUsed, err := fs.Info(req.VolumePath)
+	available, capacity, usage, inodes, inodesFree, inodesUsed, err := ns.Stats.FSInfo(req.VolumePath)
 
 	if err != nil {
+		data := map[string]string{"VolumeId": volumeID, "Error": err.Error()}
+		klog.Error("NodeGetVolumeStats: error occurred while getting volume stats ", data)
 		return nil, err
 	}
 
@@ -261,6 +257,7 @@ func (ns *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 		},
 	}
 
+	klog.V(2).Info("NodeGetVolumeStats: Volume Stats ", resp)
 	return resp, nil
 }
 
@@ -286,25 +283,6 @@ func (ns *nodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 	return &csi.NodeGetCapabilitiesResponse{Capabilities: caps}, nil
 }
 
-func checkMount(targetPath string) (bool, error) {
-	out, err := exec.Command("mountpoint", targetPath).CombinedOutput()
-	outStr := strings.TrimSpace(string(out))
-	notMnt := true
-	if err != nil {
-		klog.V(3).Infof("Output: Output string error %+v", outStr)
-		if strings.HasSuffix(outStr, "No such file or directory") {
-			if err = os.MkdirAll(targetPath, 0750); err != nil {
-				klog.V(2).Infof("checkMount: Error: %+v", err)
-				return false, err
-			}
-			notMnt = true
-		} else {
-			return false, err
-		}
-	}
-	return notMnt, nil
-}
-
 func (ns *nodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	klog.V(3).Infof("NodeGetInfo: called with args %+v", *req)
 	top := &csi.Topology{}
@@ -315,9 +293,4 @@ func (ns *nodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	}
 	fmt.Println(resp)
 	return resp, nil
-
-}
-
-func (su *VolumeStatsUtils) FSInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
-	return fs.Info(path)
 }
