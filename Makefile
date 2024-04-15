@@ -48,6 +48,7 @@ coverage:
 
 clean:
 	-rm -rf bin
+
 test-sanity:
 	go test -timeout 160s ./tests/sanity/sanity_test.go
 

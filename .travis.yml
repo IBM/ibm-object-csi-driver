@@ -1,7 +1,6 @@
 ---
 dist: trusty
 language: go
-
 go:
   - "1.21.8"
 
@@ -11,6 +10,11 @@ matrix:
   fast_finish: true
   allow_failures:
   - go: tip
+  include:
+    - os: linux
+      env: MAKE_TASK="fmt"
+    - os: linux
+      env: MAKE_TASK="test-sanity"
 
 cache:
   bundler: true
@@ -19,8 +23,7 @@ sudo: true
 services:
   - docker
 
-before_script:
-  - make fmt
-
 script:
-  - make driver
+  if [[ "$MAKE_TASK" == "fmt" ]]; then
+    make driver;
+  fi
