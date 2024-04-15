@@ -79,6 +79,7 @@ func newS3fsMounter(secretMap map[string]string, mountOptions []string) (Mounter
 	if val, check = secretMap["apiKey"]; check {
 		apiKey = val
 	}
+
 	if apiKey != "" {
 		mounter.accessKeys = fmt.Sprintf(":%s", apiKey)
 		mounter.authType = "iam"
@@ -117,6 +118,17 @@ func newS3fsMounter(secretMap map[string]string, mountOptions []string) (Mounter
 	}
 	if val, check = secretMap["use_cache"]; check {
 		option = fmt.Sprintf("use_cache=%s", val)
+		options = append(options, option)
+	}
+	if val, check = secretMap["gid"]; check {
+		option = fmt.Sprintf("gid=%s", val)
+		options = append(options, option)
+	}
+	if secretMap["gid"] != "" && secretMap["uid"] == "" {
+		option = fmt.Sprintf("uid=%s", secretMap["gid"])
+		options = append(options, option)
+	} else if secretMap["uid"] != "" {
+		option = fmt.Sprintf("uid=%s", secretMap["uid"])
 		options = append(options, option)
 	}
 

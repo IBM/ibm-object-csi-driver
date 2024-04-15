@@ -32,6 +32,8 @@ type rcloneMounter struct {
 	locConstraint string //From Secret in SC
 	authType      string
 	accessKeys    string
+	uid           string
+	gid           string
 	mountOptions  []string
 }
 
@@ -124,6 +126,15 @@ func newRcloneMounter(secretMap map[string]string, mountOptions []string) (Mount
 		mounter.authType = "hmac"
 	}
 
+	if val, check = secretMap["gid"]; check {
+		mounter.gid = val
+	}
+	if secretMap["gid"] != "" && secretMap["uid"] == "" {
+		mounter.uid = secretMap["gid"]
+	} else if secretMap["uid"] != "" {
+		mounter.uid = secretMap["uid"]
+	}
+
 	klog.Infof("newRcloneMounter args:\n\tbucketName: [%s]\n\tobjPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
 		mounter.bucketName, mounter.objPath, mounter.endPoint, mounter.locConstraint, mounter.authType)
 
@@ -194,11 +205,16 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 		target,
 		"--allow-other",
 		"--daemon",
+		"--config="+configPath + "/" + configFileName,
 		"--log-file=/var/log/rclone.log",
 	}
-	for _, val := range rclone.mountOptions {
-		val = "--" + val
-		args = append(args, val)
+	if rclone.gid != "" {
+		gidOpt := "--gid=" + rclone.gid
+		args = append(args, gidOpt)
+	}
+	if rclone.uid != "" {
+		uidOpt := "--uid=" + rclone.uid
+		args = append(args, uidOpt)
 	}
 	return fuseMount(target, rcloneCmd, args)
 }
