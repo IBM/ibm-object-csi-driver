@@ -23,6 +23,9 @@ sudo: true
 services:
   - docker
 
+before_script:
+  - make $MAKE_TASK
+
 script:
   if [[ "$MAKE_TASK" == "fmt" ]]; then
     make driver;
