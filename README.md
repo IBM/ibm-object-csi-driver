@@ -78,6 +78,14 @@ Provide proper values for parameters in secret under examples/cos-s3-csi-pvc-sec
             low_level_retries=3
     ```
 
+    For non-root user support, in the Secret  user can add `uid` which must match `RunAsUser` in Pod spec.
+    
+    ```
+    stringData:
+      uid: "3000" # Provide uid to run as non root user. This must match runAsUser in SecurityContext of pod spec.
+    ```
+    User can skip changes in Secret and directly use Pod Spec to enforce non root volume mount by providing `RunAsUser` value same as `FsGroup`.
+
 2. Verify PVC is in `Bound` state
 
 3. Check for successful mount
