@@ -130,9 +130,6 @@ func (s *COSSession) CreateBucket(bucket, kpRootKeyCrn string) (res string, err 
 	if kpRootKeyCrn != "" {
 		_, err = s.svc.CreateBucket(&s3.CreateBucketInput{
 			Bucket: aws.String(bucket),
-			//CreateBucketConfiguration: &s3.CreateBucketConfiguration{
-			//	LocationConstraint: aws.String(locationConstraint),
-			//},
 			IBMSSEKPCustomerRootKeyCrn:  aws.String(kpRootKeyCrn),
 			IBMSSEKPEncryptionAlgorithm: aws.String(KPEncryptionAlgorithm),
 		})

@@ -114,7 +114,6 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		endPoint           string
 		locationConstraint string
 		kpRootKeyCrn       string
-		//objPath    string
 	)
 	modifiedRequest, err := ReplaceAndReturnCopy(req, "xxx", "yyy")
 	if err != nil {
