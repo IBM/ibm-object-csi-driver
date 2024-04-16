@@ -208,6 +208,7 @@ func fetchSecret(clientset *kubernetes.Clientset, volumeID string) (*v1.Secret, 
 	if err != nil {
 		return nil, err
 	}
+	klog.Info("pvc details found. pvc-name: %v, pvc-namespace: %v", pvcName, pvcNamespace)
 
 	secret, err := clientset.CoreV1().Secrets(pvcNamespace).Get(context.TODO(), pvcName, metav1.GetOptions{})
 	if err != nil {
@@ -218,6 +219,7 @@ func fetchSecret(clientset *kubernetes.Clientset, volumeID string) (*v1.Secret, 
 		return nil, fmt.Errorf("secret not found with name: %v", pvcName)
 	}
 
+	klog.Info("secret details found. secret-name: %v", secret.Name)
 	return secret, nil
 }
 
@@ -244,28 +246,32 @@ func getDataFromSecret(secret *v1.Secret, key string) (string, error) {
 	secretData := string(secret.Data[key])
 	decodedBytes, err := base64.StdEncoding.DecodeString(secretData)
 	if err != nil {
-		klog.Error("Error decoding base64:", err)
+		klog.Error("Error decoding base64: ", err)
 		return "", err
 	}
 	return string(decodedBytes), nil
 }
 
 func bucketSizeUsed(secret *v1.Secret) (int64, error) {
+	klog.Info("Get Secret Data... accessKey")
 	accessKey, err := getDataFromSecret(secret, "accessKey")
 	if err != nil {
 		return 0, err
 	}
 
+	klog.Info("Get Secret Data... secretKey")
 	secretKey, err := getDataFromSecret(secret, "secretKey")
 	if err != nil {
 		return 0, err
 	}
 
+	klog.Info("Get Secret Data... cosEndpoint")
 	endpoint, err := getDataFromSecret(secret, "cosEndpoint")
 	if err != nil {
 		return 0, err
 	}
 
+	klog.Info("Get Secret Data... bucketName")
 	bucketName, err := getDataFromSecret(secret, "bucketName")
 	if err != nil {
 		return 0, err
