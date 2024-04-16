@@ -208,7 +208,7 @@ func fetchSecret(clientset *kubernetes.Clientset, volumeID string) (*v1.Secret, 
 	if err != nil {
 		return nil, err
 	}
-	klog.Info("pvc details found. pvc-name: %v, pvc-namespace: %v", pvcName, pvcNamespace)
+	klog.Info("pvc details found. pvc-name: ", pvcName, ", pvc-namespace: ", pvcNamespace)
 
 	secret, err := clientset.CoreV1().Secrets(pvcNamespace).Get(context.TODO(), pvcName, metav1.GetOptions{})
 	if err != nil {
@@ -219,7 +219,7 @@ func fetchSecret(clientset *kubernetes.Clientset, volumeID string) (*v1.Secret, 
 		return nil, fmt.Errorf("secret not found with name: %v", pvcName)
 	}
 
-	klog.Info("secret details found. secret-name: %v", secret.Name)
+	klog.Info("secret details found. secret-name: ", secret.Name)
 	return secret, nil
 }
 
@@ -244,6 +244,7 @@ func getPVCNameFromPVID(clientset *kubernetes.Clientset, volumeID string) (strin
 
 func getDataFromSecret(secret *v1.Secret, key string) (string, error) {
 	secretData := string(secret.Data[key])
+	fmt.Println("---", secretData)
 	decodedBytes, err := base64.StdEncoding.DecodeString(secretData)
 	if err != nil {
 		klog.Error("Error decoding base64: ", err)
@@ -253,13 +254,16 @@ func getDataFromSecret(secret *v1.Secret, key string) (string, error) {
 }
 
 func bucketSizeUsed(secret *v1.Secret) (int64, error) {
-	klog.Info("Get Secret Data... accessKey")
+	locationConstraint, err := getDataFromSecret(secret, "locationConstraint")
+	if err != nil {
+		return 0, err
+	}
+
 	accessKey, err := getDataFromSecret(secret, "accessKey")
 	if err != nil {
 		return 0, err
 	}
 
-	klog.Info("Get Secret Data... secretKey")
 	secretKey, err := getDataFromSecret(secret, "secretKey")
 	if err != nil {
 		return 0, err
@@ -279,7 +283,7 @@ func bucketSizeUsed(secret *v1.Secret) (int64, error) {
 
 	// AWS Service configuration
 	awsConfig := &aws.Config{
-		Region:      aws.String("xxxx"),
+		Region:      aws.String(locationConstraint),
 		Credentials: credentials.NewStaticCredentials(accessKey, secretKey, ""),
 		Endpoint:    aws.String(endpoint),
 	}
