@@ -241,45 +241,17 @@ func getPVCNameFromPVID(clientset *kubernetes.Clientset, volumeID string) (strin
 	return pvcName, pvcNamespace, nil
 }
 
-func getDataFromSecret(secret *v1.Secret, key string) (string, error) {
+func getDataFromSecret(secret *v1.Secret, key string) string {
 	secretData := string(secret.Data[key])
-	fmt.Println("---", secretData)
-	// decodedBytes, err := base64.StdEncoding.DecodeString(secretData)
-	// if err != nil {
-	// 	klog.Error("Error decoding base64: ", err)
-	// 	return "", err
-	// }
-	// return string(decodedBytes), nil
-	return string(secretData), nil
+	return secretData
 }
 
 func bucketSizeUsed(secret *v1.Secret) (int64, error) {
-	locationConstraint, err := getDataFromSecret(secret, "locationConstraint")
-	if err != nil {
-		return 0, err
-	}
-
-	accessKey, err := getDataFromSecret(secret, "accessKey")
-	if err != nil {
-		return 0, err
-	}
-
-	secretKey, err := getDataFromSecret(secret, "secretKey")
-	if err != nil {
-		return 0, err
-	}
-
-	klog.Info("Get Secret Data... cosEndpoint")
-	endpoint, err := getDataFromSecret(secret, "cosEndpoint")
-	if err != nil {
-		return 0, err
-	}
-
-	klog.Info("Get Secret Data... bucketName")
-	bucketName, err := getDataFromSecret(secret, "bucketName")
-	if err != nil {
-		return 0, err
-	}
+	locationConstraint := getDataFromSecret(secret, "locationConstraint")
+	accessKey := getDataFromSecret(secret, "accessKey")
+	secretKey := getDataFromSecret(secret, "secretKey")
+	endpoint := getDataFromSecret(secret, "cosEndpoint")
+	bucketName := getDataFromSecret(secret, "bucketName")
 
 	// AWS Service configuration
 	awsConfig := &aws.Config{
@@ -317,13 +289,3 @@ func bucketSizeUsed(secret *v1.Secret) (int64, error) {
 
 	return usage, nil
 }
-
-// func formatSize(size int64) string {
-// 	units := []string{"B", "KB", "MB", "GB", "TB"}
-// 	var unitIndex int
-// 	for size >= 1024 && unitIndex < len(units)-1 {
-// 		size /= 1024
-// 		unitIndex++
-// 	}
-// 	return fmt.Sprintf("%d%s", size, units[unitIndex])
-// }
