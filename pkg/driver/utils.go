@@ -38,7 +38,7 @@ func ReplaceAndReturnCopy(req interface{}, newAccessKey, newSecretKey string) (i
 		secretMap := inReq.GetSecrets()
 
 		for k, v := range secretMap {
-			if k == "accessKey" || k == "secretKey" || k == "apiKey" {
+			if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
 				newReq.Secrets[k] = "xxxxxxx"
 				continue
 			}
@@ -59,7 +59,7 @@ func ReplaceAndReturnCopy(req interface{}, newAccessKey, newSecretKey string) (i
 		secretMap := inReq.GetSecrets()
 
 		for k, v := range secretMap {
-			if k == "accessKey" || k == "secretKey" || k == "apiKey" {
+			if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
 				newReq.Secrets[k] = "xxxxxxx"
 				continue
 			}
@@ -81,7 +81,7 @@ func ReplaceAndReturnCopy(req interface{}, newAccessKey, newSecretKey string) (i
 		secretMap := inReq.GetSecrets()
 
 		for k, v := range secretMap {
-			if k == "accessKey" || k == "secretKey" || k == "apiKey" {
+			if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
 				newReq.Secrets[k] = "xxxxxxx"
 				continue
 			}

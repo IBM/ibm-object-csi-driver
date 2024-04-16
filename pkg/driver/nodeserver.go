@@ -134,7 +134,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	secretMap := req.GetSecrets()
 	secretMapCopy := make(map[string]string)
 	for k, v := range secretMap {
-		if k == "accessKey" || k == "secretKey" || k == "apiKey" {
+		if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
 			secretMapCopy[k] = "xxxxxxx"
 			continue
 		}
@@ -142,11 +142,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 	klog.V(2).Infof("-NodePublishVolume-: secretMap: %v", secretMapCopy)
 	if volumeMountGroup != "" {
-		mountFlags = append(mountFlags, fmt.Sprintf("gid=%s", volumeMountGroup))
-	}
-	secretUid := secretMap["uid"]
-	if secretUid != "" {
-		mountFlags = append(mountFlags, fmt.Sprintf("uid=%s", secretUid))
+		secretMap["gid"] = volumeMountGroup
 	}
 
 	// If bucket name wasn't provided by user, we use temp bucket created for volume.

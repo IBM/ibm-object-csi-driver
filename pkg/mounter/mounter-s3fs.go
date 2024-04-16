@@ -31,6 +31,7 @@ type s3fsMounter struct {
 	locConstraint string //From Secret in SC
 	authType      string
 	accessKeys    string
+	kpRootKeyCrn  string
 	mountOptions  []string
 }
 
@@ -79,6 +80,10 @@ func newS3fsMounter(secretMap map[string]string, mountOptions []string) (Mounter
 	if val, check = secretMap["apiKey"]; check {
 		apiKey = val
 	}
+	if val, check = secretMap["kpRootKeyCRN"]; check {
+		mounter.kpRootKeyCrn = val
+	}
+  
 	if apiKey != "" {
 		mounter.accessKeys = fmt.Sprintf(":%s", apiKey)
 		mounter.authType = "iam"
@@ -87,8 +92,8 @@ func newS3fsMounter(secretMap map[string]string, mountOptions []string) (Mounter
 		mounter.authType = "hmac"
 	}
 
-	klog.Infof("newS3fsMounter args:\n\tbucketName: [%s]\n\tobjPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
-		mounter.bucketName, mounter.objPath, mounter.endPoint, mounter.locConstraint, mounter.authType)
+	klog.Infof("newS3fsMounter args:\n\tbucketName: [%s]\n\tobjPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]kpRootKeyCrn: [%s]",
+		mounter.bucketName, mounter.objPath, mounter.endPoint, mounter.locConstraint, mounter.authType, mounter.kpRootKeyCrn)
 
 	var option string
 	for _, val = range mountOptions {
@@ -117,6 +122,17 @@ func newS3fsMounter(secretMap map[string]string, mountOptions []string) (Mounter
 	}
 	if val, check = secretMap["use_cache"]; check {
 		option = fmt.Sprintf("use_cache=%s", val)
+		options = append(options, option)
+	}
+	if val, check = secretMap["gid"]; check {
+		option = fmt.Sprintf("gid=%s", val)
+		options = append(options, option)
+	}
+	if secretMap["gid"] != "" && secretMap["uid"] == "" {
+		option = fmt.Sprintf("uid=%s", secretMap["gid"])
+		options = append(options, option)
+	} else if secretMap["uid"] != "" {
+		option = fmt.Sprintf("uid=%s", secretMap["uid"])
 		options = append(options, option)
 	}
 
