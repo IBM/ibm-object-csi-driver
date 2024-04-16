@@ -152,7 +152,7 @@ func (s *fakeObjectStorageSession) CheckObjectPathExistence(bucket, objectpath s
 	return true, nil
 }
 
-func (s *fakeObjectStorageSession) CreateBucket(bucket string) (string, error) {
+func (s *fakeObjectStorageSession) CreateBucket(bucket, kpRootKeyCrn string) (string, error) {
 	return "", nil
 }
 
