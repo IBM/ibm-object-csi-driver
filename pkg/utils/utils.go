@@ -2,7 +2,6 @@ package utils
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"os"
 	"os/exec"
@@ -245,12 +244,13 @@ func getPVCNameFromPVID(clientset *kubernetes.Clientset, volumeID string) (strin
 func getDataFromSecret(secret *v1.Secret, key string) (string, error) {
 	secretData := string(secret.Data[key])
 	fmt.Println("---", secretData)
-	decodedBytes, err := base64.StdEncoding.DecodeString(secretData)
-	if err != nil {
-		klog.Error("Error decoding base64: ", err)
-		return "", err
-	}
-	return string(decodedBytes), nil
+	// decodedBytes, err := base64.StdEncoding.DecodeString(secretData)
+	// if err != nil {
+	// 	klog.Error("Error decoding base64: ", err)
+	// 	return "", err
+	// }
+	// return string(decodedBytes), nil
+	return string(secretData), nil
 }
 
 func bucketSizeUsed(secret *v1.Secret) (int64, error) {
