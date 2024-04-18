@@ -47,6 +47,7 @@ var (
 	// nodeCaps represents the capability of node service.
 	nodeCaps = []csi.NodeServiceCapability_RPC_Type{
 		csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
+		csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
 		csi.NodeServiceCapability_RPC_VOLUME_MOUNT_GROUP,
 	}
 )
@@ -233,7 +234,12 @@ func (ns *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 	if err != nil {
 		data := map[string]string{"VolumeId": volumeID, "Error": err.Error()}
 		klog.Error("NodeGetVolumeStats: error occurred while getting volume stats ", data)
-		return nil, err
+		return &csi.NodeGetVolumeStatsResponse{
+			VolumeCondition: &csi.VolumeCondition{
+				Abnormal: true,
+				Message:  err.Error(),
+			},
+		}, nil
 	}
 
 	resp := &csi.NodeGetVolumeStatsResponse{
