@@ -54,7 +54,7 @@ func (s3fs *fakes3fsMounter) Unstage(stageTarget string) error {
 	return nil
 }
 
-func (s3fs *fakes3fsMounter) Mount(source string, target string) error {
+func (s3fs *fakes3fsMounter) Mount(volumeID, source, target string) error {
 	return nil
 }
 

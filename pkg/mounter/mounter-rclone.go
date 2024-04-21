@@ -171,7 +171,7 @@ func (rclone *rcloneMounter) Unstage(stagePath string) error {
 	return nil
 }
 
-func (rclone *rcloneMounter) Mount(source string, target string) error {
+func (rclone *rcloneMounter) Mount(volumeID, source, target string) error {
 	klog.Info("-RcloneMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
 	var bucketName string
@@ -192,7 +192,8 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 		}
 	}
 
-	if err = rclone.createConfig(); err != nil {
+	configPathWithVolID := path.Join(configPath, volumeID)
+	if err = rclone.createConfig(configPathWithVolID); err != nil {
 		klog.Errorf("RcloneMounter Mount: Cannot create rclone config file %v", err)
 		return err
 	}
@@ -209,7 +210,7 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 		target,
 		"--allow-other",
 		"--daemon",
-		"--config="+configPath + "/" + configFileName,
+		"--config=" + configPathWithVolID + "/" + configFileName,
 		"--log-file=/var/log/rclone.log",
 	}
 	if rclone.gid != "" {
@@ -234,7 +235,7 @@ func (rclone *rcloneMounter) Unmount(target string) error {
 	return statsUtil.FuseUnmount(target)
 }
 
-func (rclone *rcloneMounter) createConfig() error {
+func (rclone *rcloneMounter) createConfig(configPathWithVolID string) error {
 	var accessKey string
 	var secretKey string
 	keys := strings.Split(rclone.accessKeys, ":")
@@ -255,7 +256,7 @@ func (rclone *rcloneMounter) createConfig() error {
 
 	configParams = append(configParams, rclone.mountOptions...)
 
-	if err := os.MkdirAll(configPath, 0755); // #nosec G301: used for rclone
+	if err := os.MkdirAll(configPathWithVolID, 0755); // #nosec G301: used for rclone
 	err != nil {
 		klog.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", configPath, err)
 		return err

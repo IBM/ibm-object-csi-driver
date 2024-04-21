@@ -83,7 +83,7 @@ func newS3fsMounter(secretMap map[string]string, mountOptions []string) (Mounter
 	if val, check = secretMap["kpRootKeyCRN"]; check {
 		mounter.kpRootKeyCrn = val
 	}
-  
+
 	if apiKey != "" {
 		mounter.accessKeys = fmt.Sprintf(":%s", apiKey)
 		mounter.authType = "iam"
@@ -151,7 +151,7 @@ func (s3fs *s3fsMounter) Unstage(stageTarget string) error {
 	return nil
 }
 
-func (s3fs *s3fsMounter) Mount(source string, target string) error {
+func (s3fs *s3fsMounter) Mount(_, source, target string) error {
 	klog.Info("-S3FSMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
 	var bucketName string
