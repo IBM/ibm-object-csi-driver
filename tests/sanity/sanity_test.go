@@ -47,7 +47,9 @@ func TestSanity(t *testing.T) {
 
 	skipTests := strings.Join([]string{
 		"CreateVolume.*should fail when requesting to create a volume with already existing name and different capacity",
-		"ValidateVolumeCapabilities.*should fail when the requested volume does not exist",
+		"NodeGetVolumeStats.*should fail when volume is not found",
+		"NodeGetVolumeStats.*should fail when volume does not exist on the specified path", // since volume_condition is supported, so instead of err, response is sent
+		"ValidateVolumeCapabilities.*should fail when the requested volume does not exist", // since volume_condition is supported, so instead of err, response is sent
 	}, "|")
 	err := flag.Set("ginkgo.skip", skipTests)
 	if err != nil {
@@ -150,7 +152,7 @@ func (s *fakeObjectStorageSession) CheckObjectPathExistence(bucket, objectpath s
 	return true, nil
 }
 
-func (s *fakeObjectStorageSession) CreateBucket(bucket string) (string, error) {
+func (s *fakeObjectStorageSession) CreateBucket(bucket, kpRootKeyCrn string) (string, error) {
 	return "", nil
 }
 

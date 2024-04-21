@@ -47,6 +47,7 @@ var (
 	// nodeCaps represents the capability of node service.
 	nodeCaps = []csi.NodeServiceCapability_RPC_Type{
 		csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
+		csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
 		csi.NodeServiceCapability_RPC_VOLUME_MOUNT_GROUP,
 	}
 )
@@ -134,7 +135,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	secretMap := req.GetSecrets()
 	secretMapCopy := make(map[string]string)
 	for k, v := range secretMap {
-		if k == "accessKey" || k == "secretKey" || k == "apiKey" {
+		if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
 			secretMapCopy[k] = "xxxxxxx"
 			continue
 		}
@@ -142,11 +143,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 	klog.V(2).Infof("-NodePublishVolume-: secretMap: %v", secretMapCopy)
 	if volumeMountGroup != "" {
-		mountFlags = append(mountFlags, fmt.Sprintf("gid=%s", volumeMountGroup))
-	}
-	secretUid := secretMap["uid"]
-	if secretUid != "" {
-		mountFlags = append(mountFlags, fmt.Sprintf("uid=%s", secretUid))
+		secretMap["gid"] = volumeMountGroup
 	}
 
 	// If bucket name wasn't provided by user, we use temp bucket created for volume.
@@ -237,7 +234,12 @@ func (ns *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 	if err != nil {
 		data := map[string]string{"VolumeId": volumeID, "Error": err.Error()}
 		klog.Error("NodeGetVolumeStats: error occurred while getting volume stats ", data)
-		return nil, err
+		return &csi.NodeGetVolumeStatsResponse{
+			VolumeCondition: &csi.VolumeCondition{
+				Abnormal: true,
+				Message:  err.Error(),
+			},
+		}, nil
 	}
 
 	resp := &csi.NodeGetVolumeStatsResponse{

@@ -27,7 +27,7 @@ CORE_IMAGE_NAME ?= $(EXE_DRIVER_NAME)
 CORE_DRIVER_IMG ?= $(REGISTRY)/$(CORE_IMAGE_NAME)
 
 .PHONY: test
-test: 
+test:
 	go test -v -race ./cmd/... ./pkg/...
 
 .PHONY: deps
@@ -48,6 +48,7 @@ coverage:
 
 clean:
 	-rm -rf bin
+
 test-sanity:
 	go test -timeout 160s ./tests/sanity/sanity_test.go
 
