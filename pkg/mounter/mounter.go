@@ -14,7 +14,7 @@ import (
 type Mounter interface {
 	Stage(stagePath string) error
 	Unstage(stagePath string) error
-	Mount(source, target string) error
+	Mount(source string, target string) error
 	Unmount(target string) error
 }
 
