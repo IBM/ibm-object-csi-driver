@@ -250,7 +250,7 @@ func (s *FakeS3fsMounterFactory) NewMounter(attrib map[string]string, secretMap 
 	return mounter, nil
 }
 
-func (s3fs *Fakes3fsMounter) Mount(volumeID, source, target string) error {
+func (s3fs *Fakes3fsMounter) Mount(source string, target string) error {
 	klog.Info("-S3FSMounter Mount-")
 	return nil
 }

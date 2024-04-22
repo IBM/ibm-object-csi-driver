@@ -151,7 +151,7 @@ func (s3fs *s3fsMounter) Unstage(stageTarget string) error {
 	return nil
 }
 
-func (s3fs *s3fsMounter) Mount(_, source, target string) error {
+func (s3fs *s3fsMounter) Mount(source string, target string) error {
 	klog.Info("-S3FSMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
 	var bucketName string

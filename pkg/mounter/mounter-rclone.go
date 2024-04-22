@@ -171,7 +171,7 @@ func (rclone *rcloneMounter) Unstage(stagePath string) error {
 	return nil
 }
 
-func (rclone *rcloneMounter) Mount(volumeID, source, target string) error {
+func (rclone *rcloneMounter) Mount(source string, target string) error {
 	klog.Info("-RcloneMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
 	var bucketName string
@@ -192,7 +192,7 @@ func (rclone *rcloneMounter) Mount(volumeID, source, target string) error {
 		}
 	}
 
-	configPathWithVolID := path.Join(configPath, volumeID)
+	configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 	if err = rclone.createConfig(configPathWithVolID); err != nil {
 		klog.Errorf("RcloneMounter Mount: Cannot create rclone config file %v", err)
 		return err
