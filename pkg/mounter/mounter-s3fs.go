@@ -83,7 +83,7 @@ func newS3fsMounter(secretMap map[string]string, mountOptions []string) (Mounter
 	if val, check = secretMap["kpRootKeyCRN"]; check {
 		mounter.kpRootKeyCrn = val
 	}
-  
+
 	if apiKey != "" {
 		mounter.accessKeys = fmt.Sprintf(":%s", apiKey)
 		mounter.authType = "iam"
@@ -136,7 +136,11 @@ func newS3fsMounter(secretMap map[string]string, mountOptions []string) (Mounter
 		options = append(options, option)
 	}
 
-	mounter.mountOptions = options
+	updatedOptions, err := updateMountOptions(options, secretMap)
+	if err != nil {
+		klog.Infof("Problems with retrieving secret map dynamically %v", err)
+	}
+	mounter.mountOptions = updatedOptions
 
 	return mounter, nil
 }
