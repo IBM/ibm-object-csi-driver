@@ -258,11 +258,11 @@ func (rclone *rcloneMounter) createConfig(configPathWithVolID string) error {
 
 	if err := os.MkdirAll(configPathWithVolID, 0755); // #nosec G301: used for rclone
 	err != nil {
-		klog.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", configPath, err)
+		klog.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", configPathWithVolID, err)
 		return err
 	}
 
-	configFile := path.Join(configPath, configFileName)
+	configFile := path.Join(configPathWithVolID, configFileName)
 	file, err := os.Create(configFile) // #nosec G304 used for rclone
 	if err != nil {
 		klog.Errorf("RcloneMounter Mount: Cannot create file %s: %v", configFileName, err)
