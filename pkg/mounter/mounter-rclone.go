@@ -50,6 +50,7 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 	}
 
 	stringData, ok := secretMap["mountOptions"]
+
 	if !ok {
 		klog.Infof("No new mountOptions found. Using default mountOptions: %v", dafaultMountOptions)
 		return dafaultMountOptions, nil
@@ -68,6 +69,7 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 			continue
 		}
 		mountOptsMap[strings.TrimSpace(opts[0])] = strings.TrimSpace(opts[1])
+
 	}
 
 	// Create array out of map
@@ -141,6 +143,7 @@ func newRcloneMounter(secretMap map[string]string, mountOptions []string) (Mount
 		mounter.bucketName, mounter.objPath, mounter.endPoint, mounter.locConstraint, mounter.authType)
 
 	updatedOptions, err := updateMountOptions(mountOptions, secretMap)
+
 	if err != nil {
 		klog.Infof("Problems with retrieving secret map dynamically %v", err)
 	}
