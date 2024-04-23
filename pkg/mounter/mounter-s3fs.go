@@ -193,8 +193,9 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 		opts := strings.Split(val, "=")
 		if len(opts) == 2 {
 			mountOptsMap[opts[0]] = opts[1]
+		} else if len(opts) == 1 {
+			mountOptsMap[opts[0]] = opts[0]
 		}
-
 	}
 
 	if val, check := secretMap["tmpdir"]; check {
@@ -226,21 +227,35 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 				continue
 			}
 			opts := strings.Split(line, "=")
-			if len(opts) != 2 {
+			if len(opts) == 2 {
+				mountOptsMap[strings.TrimSpace(opts[0])] = strings.TrimSpace(opts[1])
+			} else if len(opts) == 1 {
+				mountOptsMap[strings.TrimSpace(opts[0])] = strings.TrimSpace(opts[0])
+			} else {
 				klog.Infof("Invalid mount option: %s\n", line)
-				continue
 			}
-			mountOptsMap[strings.TrimSpace(opts[0])] = strings.TrimSpace(opts[1])
 		}
 	}
 
 	// Create array out of map
 	updatedOptions := []string{}
-	for k, v := range mountOptsMap {
-		option := fmt.Sprintf("%s=%s", k, v)
-		if k == "cache" {
-			option = v
+	for key, val := range mountOptsMap {
+		option := fmt.Sprintf("%s=%s", key, val)
+		isKeyValuePair := true
+
+		if key == val {
+			isKeyValuePair = false
+			option = val
 		}
+
+		if newVal, check := secretMap[key]; check {
+			if isKeyValuePair {
+				option = fmt.Sprintf("%s=%s", key, newVal)
+			} else {
+				option = newVal
+			}
+		}
+
 		updatedOptions = append(updatedOptions, option)
 		klog.Infof("newS3fsMounter mountOption: [%s]", option)
 	}
