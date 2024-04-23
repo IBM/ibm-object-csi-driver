@@ -53,11 +53,9 @@ func newS3fsMounter(secretMap map[string]string, mountOptions []string) (Mounter
 		secretKey string
 		apiKey    string
 		mounter   *s3fsMounter
-		options   []string
 	)
 
 	mounter = &s3fsMounter{}
-	options = []string{}
 
 	if val, check = secretMap["cosEndpoint"]; check {
 		mounter.endPoint = val
@@ -95,48 +93,7 @@ func newS3fsMounter(secretMap map[string]string, mountOptions []string) (Mounter
 	klog.Infof("newS3fsMounter args:\n\tbucketName: [%s]\n\tobjPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]kpRootKeyCrn: [%s]",
 		mounter.bucketName, mounter.objPath, mounter.endPoint, mounter.locConstraint, mounter.authType, mounter.kpRootKeyCrn)
 
-	var option string
-	for _, val = range mountOptions {
-		option = val
-		isKeyValuePair := true
-		keys := strings.Split(val, "=")
-		if len(keys) == 2 {
-			if keys[0] == "cache" {
-				isKeyValuePair = false
-				option = keys[1]
-			}
-			if newVal, check := secretMap[keys[0]]; check {
-				if isKeyValuePair {
-					option = fmt.Sprintf("%s=%s", keys[0], newVal)
-				} else {
-					option = newVal
-				}
-			}
-		}
-		options = append(options, option)
-		klog.Infof("newS3fsMounter mountOption: [%s]", option)
-	}
-	if val, check = secretMap["tmpdir"]; check {
-		option = fmt.Sprintf("tmpdir=%s", val)
-		options = append(options, option)
-	}
-	if val, check = secretMap["use_cache"]; check {
-		option = fmt.Sprintf("use_cache=%s", val)
-		options = append(options, option)
-	}
-	if val, check = secretMap["gid"]; check {
-		option = fmt.Sprintf("gid=%s", val)
-		options = append(options, option)
-	}
-	if secretMap["gid"] != "" && secretMap["uid"] == "" {
-		option = fmt.Sprintf("uid=%s", secretMap["gid"])
-		options = append(options, option)
-	} else if secretMap["uid"] != "" {
-		option = fmt.Sprintf("uid=%s", secretMap["uid"])
-		options = append(options, option)
-	}
-
-	updatedOptions, err := updateMountOptions(options, secretMap)
+	updatedOptions, err := updateS3FSMountOptions(mountOptions, secretMap)
 	if err != nil {
 		klog.Infof("Problems with retrieving secret map dynamically %v", err)
 	}
@@ -223,4 +180,71 @@ func (s3fs *s3fsMounter) Unmount(target string) error {
 	}
 	statsUtil := &(utils.VolumeStatsUtils{})
 	return statsUtil.FuseUnmount(target)
+}
+
+func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string) ([]string, error) {
+	mountOptsMap := make(map[string]string)
+
+	// Create map out of array
+	for _, val := range defaultMountOp {
+		if strings.TrimSpace(val) == "" {
+			continue
+		}
+		opts := strings.Split(val, "=")
+		if len(opts) == 2 {
+			mountOptsMap[opts[0]] = opts[1]
+		}
+
+	}
+
+	if val, check := secretMap["tmpdir"]; check {
+		mountOptsMap["tmpdir"] = val
+	}
+
+	if val, check := secretMap["use_cache"]; check {
+		mountOptsMap["use_cache"] = val
+	}
+
+	if val, check := secretMap["gid"]; check {
+		mountOptsMap["gid"] = val
+	}
+
+	if secretMap["gid"] != "" && secretMap["uid"] == "" {
+		mountOptsMap["uid"] = secretMap["gid"]
+	} else if secretMap["uid"] != "" {
+		mountOptsMap["uid"] = secretMap["uid"]
+	}
+
+	stringData, ok := secretMap["mountOptions"]
+	if !ok {
+		klog.Infof("No new mountOptions found. Using default mountOptions: %v", mountOptsMap)
+	} else {
+		lines := strings.Split(stringData, "\n")
+		// Update map
+		for _, line := range lines {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			opts := strings.Split(line, "=")
+			if len(opts) != 2 {
+				klog.Infof("Invalid mount option: %s\n", line)
+				continue
+			}
+			mountOptsMap[strings.TrimSpace(opts[0])] = strings.TrimSpace(opts[1])
+		}
+	}
+
+	// Create array out of map
+	updatedOptions := []string{}
+	for k, v := range mountOptsMap {
+		option := fmt.Sprintf("%s=%s", k, v)
+		if k == "cache" {
+			option = v
+		}
+		updatedOptions = append(updatedOptions, option)
+		klog.Infof("newS3fsMounter mountOption: [%s]", option)
+	}
+
+	klog.Infof("S3fsMounter Options: %v", updatedOptions)
+	return updatedOptions, nil
 }
