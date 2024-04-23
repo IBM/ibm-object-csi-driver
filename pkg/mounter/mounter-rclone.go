@@ -38,6 +38,50 @@ type rcloneMounter struct {
 	mountOptions  []string
 }
 
+func updateMountOptions(dafaultMountOptions []string, secretMap map[string]string) ([]string, error) {
+	mountOptsMap := make(map[string]string)
+
+	// Create map out of array
+	for _, e := range dafaultMountOptions {
+		opts := strings.Split(e, "=")
+		if len(opts) == 2 {
+			mountOptsMap[opts[0]] = opts[1]
+		}
+	}
+
+	stringData, ok := secretMap["mountOptions"]
+	if !ok {
+		klog.Infof("No new mountOptions found. Using default mountOptions: %v", dafaultMountOptions)
+		return dafaultMountOptions, nil
+	}
+
+	lines := strings.Split(stringData, "\n")
+
+	// Update map
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		opts := strings.Split(line, "=")
+		if len(opts) != 2 {
+			klog.Infof("Invalid mount option: %s\n", line)
+			continue
+		}
+		mountOptsMap[strings.TrimSpace(opts[0])] = strings.TrimSpace(opts[1])
+	}
+
+	// Create array out of map
+	updatedOptions := []string{}
+	for k, v := range mountOptsMap {
+		option := fmt.Sprintf("%s=%s", k, v)
+		updatedOptions = append(updatedOptions, option)
+	}
+
+	klog.Infof("Updated Options: %v", updatedOptions)
+
+	return updatedOptions, nil
+}
+
 func newRcloneMounter(secretMap map[string]string, mountOptions []string) (Mounter, error) {
 	klog.Info("-newRcloneMounter-")
 
