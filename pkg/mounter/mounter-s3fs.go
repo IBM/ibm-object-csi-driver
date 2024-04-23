@@ -83,7 +83,7 @@ func newS3fsMounter(secretMap map[string]string, mountOptions []string) (Mounter
 	if val, check = secretMap["kpRootKeyCRN"]; check {
 		mounter.kpRootKeyCrn = val
 	}
-  
+
 	if apiKey != "" {
 		mounter.accessKeys = fmt.Sprintf(":%s", apiKey)
 		mounter.authType = "iam"
