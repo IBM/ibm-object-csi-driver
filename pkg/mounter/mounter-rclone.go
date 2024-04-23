@@ -145,7 +145,8 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 		}
 	}
 
-	if err = rclone.createConfig(); err != nil {
+	configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
+	if err = rclone.createConfig(configPathWithVolID); err != nil {
 		klog.Errorf("RcloneMounter Mount: Cannot create rclone config file %v", err)
 		return err
 	}
@@ -162,7 +163,7 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 		target,
 		"--allow-other",
 		"--daemon",
-		"--config=" + configPath + "/" + configFileName,
+		"--config=" + configPathWithVolID + "/" + configFileName,
 		"--log-file=/var/log/rclone.log",
 	}
 	if rclone.gid != "" {
@@ -187,7 +188,7 @@ func (rclone *rcloneMounter) Unmount(target string) error {
 	return statsUtil.FuseUnmount(target)
 }
 
-func (rclone *rcloneMounter) createConfig() error {
+func (rclone *rcloneMounter) createConfig(configPathWithVolID string) error {
 	var accessKey string
 	var secretKey string
 	keys := strings.Split(rclone.accessKeys, ":")
@@ -208,13 +209,13 @@ func (rclone *rcloneMounter) createConfig() error {
 
 	configParams = append(configParams, rclone.mountOptions...)
 
-	if err := os.MkdirAll(configPath, 0755); // #nosec G301: used for rclone
+	if err := os.MkdirAll(configPathWithVolID, 0755); // #nosec G301: used for rclone
 	err != nil {
-		klog.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", configPath, err)
+		klog.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", configPathWithVolID, err)
 		return err
 	}
 
-	configFile := path.Join(configPath, configFileName)
+	configFile := path.Join(configPathWithVolID, configFileName)
 	file, err := os.Create(configFile) // #nosec G304 used for rclone
 	if err != nil {
 		klog.Errorf("RcloneMounter Mount: Cannot create file %s: %v", configFileName, err)
