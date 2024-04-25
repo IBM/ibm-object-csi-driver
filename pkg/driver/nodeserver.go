@@ -206,7 +206,6 @@ func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	klog.Infof("Unmounting  target path %s", targetPath)
 
 	if err := ns.Stats.FuseUnmount(targetPath); err != nil {
-
 		//TODO: Need to handle the case with non existing mount separately - https://github.com/IBM/ibm-object-csi-driver/issues/46
 		klog.Infof("UNMOUNT ERROR: %v", err)
 		return nil, status.Error(codes.Internal, err.Error())

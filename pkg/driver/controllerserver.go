@@ -141,7 +141,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	// Check for maximum available capacity
-	capacity := int64(req.GetCapacityRange().GetRequiredBytes())
+	capacity := req.GetCapacityRange().GetRequiredBytes()
 	if capacity >= maxStorageCapacity {
 		return nil, status.Error(codes.OutOfRange, fmt.Sprintf("Requested capacity %d exceeds maximum allowed %d", capacity, maxStorageCapacity))
 	}
@@ -373,7 +373,7 @@ func bucketToDelete(volumeID string) (string, error) {
 	}
 
 	klog.Infof("***Attributes: %v", pv.Spec.CSI.VolumeAttributes)
-	if string(pv.Spec.CSI.VolumeAttributes["userProvidedBucket"]) != "true" {
+	if pv.Spec.CSI.VolumeAttributes["userProvidedBucket"] != "true" {
 
 		klog.Infof("Bucket will be deleted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
 		return pv.Spec.CSI.VolumeAttributes["bucketName"], nil

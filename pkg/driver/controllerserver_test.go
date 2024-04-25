@@ -255,7 +255,6 @@ func TestCreateVolumeArguments(t *testing.T) {
 		if vol == nil {
 			t.Fatalf("Expected volume-> %v, Actual volume is nil", tc.expVol)
 		}
-
 	}
 }
 
