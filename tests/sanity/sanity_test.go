@@ -179,18 +179,8 @@ func (s3fs *Fakes3fsMounter) Mount(source string, target string) error {
 	return nil
 }
 
-func (s3fs *Fakes3fsMounter) Stage(stageTarget string) error {
-	klog.Info("-S3FSMounter Stage-")
-	return nil
-}
-
 func (s3fs *Fakes3fsMounter) Unmount(target string) error {
 	klog.Info("-S3FSMounter Unmount-")
-	return nil
-}
-
-func (s3fs *Fakes3fsMounter) Unstage(stageTarget string) error {
-	klog.Info("-S3FSMounter Unstage-")
 	return nil
 }
 

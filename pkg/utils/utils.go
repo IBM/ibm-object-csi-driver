@@ -52,11 +52,11 @@ func (su *VolumeStatsUtils) FuseUnmount(path string) error {
 	isMount, checkMountErr := isMountpoint(path)
 	if isMount || checkMountErr != nil {
 		klog.Infof("isMountpoint  %v", isMount)
-		err := unmount(path, syscall.MNT_DETACH)
+		err := unmount(path, 0)
 		if err != nil && checkMountErr == nil {
 			klog.Errorf("Cannot unmount. Trying force unmount %s", err)
 			//Do force unmount
-			err = unmount(path, syscall.MNT_FORCE)
+			err = unmount(path, 0)
 			if err != nil {
 				klog.Errorf("Cannot force unmount %s", err)
 				return fmt.Errorf("cannot force unmount %s: %v", path, err)
@@ -85,9 +85,8 @@ func isMountpoint(pathname string) (bool, error) {
 	if err != nil {
 		if strings.HasSuffix(outStr, "Transport endpoint is not connected") {
 			return true, err
-		} else {
-			return false, err
 		}
+		return false, err
 	}
 
 	if strings.HasSuffix(outStr, "is a mountpoint") {
@@ -96,10 +95,9 @@ func isMountpoint(pathname string) (bool, error) {
 	} else if strings.HasSuffix(outStr, "is not a mountpoint") {
 		klog.Infof("Path is NOT a mountpoint:Pathname - %s", pathname)
 		return false, nil
-	} else {
-		klog.Errorf("Cannot parse mountpoint result: %v", outStr)
-		return false, fmt.Errorf("cannot parse mountpoint result: %s", outStr)
 	}
+	klog.Errorf("Cannot parse mountpoint result: %v", outStr)
+	return false, fmt.Errorf("cannot parse mountpoint result: %s", outStr)
 }
 
 func findFuseMountProcess(path string) (*os.Process, error) {

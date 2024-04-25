@@ -102,16 +102,6 @@ func newS3fsMounter(secretMap map[string]string, mountOptions []string) (Mounter
 	return mounter, nil
 }
 
-func (s3fs *s3fsMounter) Stage(stageTarget string) error {
-	klog.Info("-S3FSMounter Stage-")
-	return nil
-}
-
-func (s3fs *s3fsMounter) Unstage(stageTarget string) error {
-	klog.Info("-S3FSMounter Unstage-")
-	return nil
-}
-
 func (s3fs *s3fsMounter) Mount(source string, target string) error {
 	klog.Info("-S3FSMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)

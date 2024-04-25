@@ -44,16 +44,6 @@ func fakenewS3fsMounter(bucket string, objpath string, endpoint string, region s
 	}, nil
 }
 
-func (s3fs *fakes3fsMounter) Stage(stageTarget string) error {
-	klog.Infof("-S3FSMounter Stage-")
-	return nil
-}
-
-func (s3fs *fakes3fsMounter) Unstage(stageTarget string) error {
-	klog.Infof("-S3FSMounter Unstage-")
-	return nil
-}
-
 func (s3fs *fakes3fsMounter) Mount(source string, target string) error {
 	return nil
 }

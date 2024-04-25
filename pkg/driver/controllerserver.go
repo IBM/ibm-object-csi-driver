@@ -108,14 +108,14 @@ func (cs *controllerServer) getCredentials(secretMap map[string]string) (*s3clie
 	}, nil
 }
 
-func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	var (
 		bucketName         string
 		endPoint           string
 		locationConstraint string
 		kpRootKeyCrn       string
 	)
-	modifiedRequest, err := ReplaceAndReturnCopy(req, "xxx", "yyy")
+	modifiedRequest, err := ReplaceAndReturnCopy(req)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
 	}
@@ -141,7 +141,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	// Check for maximum available capacity
-	capacity := int64(req.GetCapacityRange().GetRequiredBytes())
+	capacity := req.GetCapacityRange().GetRequiredBytes()
 	if capacity >= maxStorageCapacity {
 		return nil, status.Error(codes.OutOfRange, fmt.Sprintf("Requested capacity %d exceeds maximum allowed %d", capacity, maxStorageCapacity))
 	}
@@ -212,8 +212,8 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}, nil
 }
 
-func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	modifiedRequest, err := ReplaceAndReturnCopy(req, "xxx", "yyy")
+func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
+	modifiedRequest, err := ReplaceAndReturnCopy(req)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
 	}
@@ -246,25 +246,24 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 			klog.V(3).Infof("Cannot delete temp bucket: %v; error msg: %v", bucketToDelete, err)
 		}
 		klog.Infof("End of bucket delete for  %v", volumeID)
-
 	}
 
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
 // ControllerPublishVolume
-func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+func (cs *controllerServer) ControllerPublishVolume(_ context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 	klog.V(3).Infof("CSIControllerServer-ControllerPublishVolume: Request: %v", *req)
 	return nil, status.Error(codes.Unimplemented, "ControllerPublishVolume")
 }
 
 // ControllerUnpublishVolume
-func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
+func (cs *controllerServer) ControllerUnpublishVolume(_ context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
 	klog.V(3).Infof("CSIControllerServer-ControllerUnPublishVolume: Request: %v", *req)
 	return nil, status.Error(codes.Unimplemented, "ControllerUnpublishVolume")
 }
 
-func (cs *controllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
+func (cs *controllerServer) ValidateVolumeCapabilities(_ context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
 	klog.V(3).Infof("ValidateVolumeCapabilities: Request: %+v", *req)
 
 	// Validate Arguments
@@ -289,18 +288,18 @@ func (cs *controllerServer) ValidateVolumeCapabilities(ctx context.Context, req 
 }
 
 // ListVolumes
-func (cs *controllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
+func (cs *controllerServer) ListVolumes(_ context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
 	klog.V(3).Infof("ListVolumes: Request: %+v", *req)
 	return nil, status.Error(codes.Unimplemented, "ListVolumes")
 }
 
 // GetCapacity ...
-func (cs *controllerServer) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
+func (cs *controllerServer) GetCapacity(_ context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
 	klog.V(3).Infof("GetCapacity: Request: %+v", *req)
 	return nil, status.Error(codes.Unimplemented, "GetCapacity")
 }
 
-func (cs *controllerServer) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
+func (cs *controllerServer) ControllerGetCapabilities(_ context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
 	klog.V(3).Infof("ControllerGetCapabilities: Request: %+v", *req)
 	var caps []*csi.ControllerServiceCapability
 	for _, cap := range controllerCaps {
@@ -316,32 +315,32 @@ func (cs *controllerServer) ControllerGetCapabilities(ctx context.Context, req *
 	return &csi.ControllerGetCapabilitiesResponse{Capabilities: caps}, nil
 }
 
-func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
+func (cs *controllerServer) CreateSnapshot(_ context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
 	klog.V(3).Infof("CreateSnapshot: Request: %+v", *req)
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (cs *controllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
+func (cs *controllerServer) DeleteSnapshot(_ context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
 	klog.V(3).Infof("DeleteSnapshot: called with args %+v", *req)
 	return nil, status.Error(codes.Unimplemented, "DeleteSnapshot")
 }
 
-func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
+func (cs *controllerServer) ListSnapshots(_ context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
 	klog.V(3).Infof("ListSnapshots: called with args %+v", *req)
 	return nil, status.Error(codes.Unimplemented, "ListSnapshots")
 }
 
-func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
+func (cs *controllerServer) ControllerExpandVolume(_ context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	klog.V(3).Infof("ControllerExpandVolume: called with args %+v", *req)
 	return nil, status.Error(codes.Unimplemented, "ControllerExpandVolume")
 }
 
-func (cs *controllerServer) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
+func (cs *controllerServer) ControllerGetVolume(_ context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
 	klog.V(3).Infof("ControllerGetVolume: called with args %+v", *req)
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (cs *controllerServer) ControllerModifyVolume(ctx context.Context, req *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
+func (cs *controllerServer) ControllerModifyVolume(_ context.Context, req *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
 	klog.V(3).Infof("ControllerModifyVolume: called with args %+v", *req)
 	return nil, status.Error(codes.Unimplemented, "")
 }
@@ -373,8 +372,7 @@ func bucketToDelete(volumeID string) (string, error) {
 	}
 
 	klog.Infof("***Attributes: %v", pv.Spec.CSI.VolumeAttributes)
-	if string(pv.Spec.CSI.VolumeAttributes["userProvidedBucket"]) != "true" {
-
+	if pv.Spec.CSI.VolumeAttributes["userProvidedBucket"] != "true" {
 		klog.Infof("Bucket will be deleted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
 		return pv.Spec.CSI.VolumeAttributes["bucketName"], nil
 	}
