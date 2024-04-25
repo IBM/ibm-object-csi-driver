@@ -115,7 +115,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		locationConstraint string
 		kpRootKeyCrn       string
 	)
-	modifiedRequest, err := ReplaceAndReturnCopy(req, "xxx", "yyy")
+	modifiedRequest, err := ReplaceAndReturnCopy(req, "yyy")
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
 	}
@@ -213,7 +213,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 }
 
 func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	modifiedRequest, err := ReplaceAndReturnCopy(req, "xxx", "yyy")
+	modifiedRequest, err := ReplaceAndReturnCopy(req, "yyy")
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
 	}
@@ -246,7 +246,6 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 			klog.V(3).Infof("Cannot delete temp bucket: %v; error msg: %v", bucketToDelete, err)
 		}
 		klog.Infof("End of bucket delete for  %v", volumeID)
-
 	}
 
 	return &csi.DeleteVolumeResponse{}, nil
@@ -374,7 +373,6 @@ func bucketToDelete(volumeID string) (string, error) {
 
 	klog.Infof("***Attributes: %v", pv.Spec.CSI.VolumeAttributes)
 	if pv.Spec.CSI.VolumeAttributes["userProvidedBucket"] != "true" {
-
 		klog.Infof("Bucket will be deleted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
 		return pv.Spec.CSI.VolumeAttributes["bucketName"], nil
 	}

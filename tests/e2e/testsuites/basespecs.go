@@ -217,7 +217,6 @@ func NewTestPersistentVolumeClaim(
 	c clientset.Interface, pvcName string, ns *v1.Namespace,
 	claimSize string, accessmode *v1.PersistentVolumeAccessMode,
 	sc *storagev1.StorageClass) *TestPersistentVolumeClaim {
-
 	pvcAccessMode := v1.ReadWriteOnce
 	if accessmode != nil {
 		pvcAccessMode = *accessmode
@@ -300,7 +299,7 @@ func (t *TestPersistentVolumeClaim) ValidateProvisionedPersistentVolume() {
 	claimCapacity := t.persistentVolumeClaim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	Expect(claimCapacity.Value()).To(Equal(expectedCapacity.Value()), "claimCapacity is not equal to requestedCapacity")
 
-	pvCapacity := t.persistentVolume.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
+	pvCapacity := t.persistentVolume.Spec.Capacity[v1.ResourceStorage]
 	Expect(pvCapacity.Value()).To(Equal(expectedCapacity.Value()), "pvCapacity is not equal to requestedCapacity")
 
 	// Check PV properties

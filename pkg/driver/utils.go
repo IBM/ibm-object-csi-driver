@@ -22,7 +22,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 )
 
-func ReplaceAndReturnCopy(req interface{}, newAccessKey, newSecretKey string) (interface{}, error) {
+func ReplaceAndReturnCopy(req interface{}, newSecretKey string) (interface{}, error) {
 	switch r := req.(type) {
 	case *csi.CreateVolumeRequest:
 		// Create a new CreateVolumeRequest and copy the original values

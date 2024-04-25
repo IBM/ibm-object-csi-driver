@@ -613,7 +613,6 @@ func TestListVolumes(t *testing.T) {
 		}
 		assert.Equal(t, tc.expResponse, response)
 	}
-
 }
 
 func TestGetCapacity(t *testing.T) {
