@@ -91,9 +91,8 @@ func checkPath(path string) (bool, error) {
 		return false, nil
 	} else if isCorruptedMnt(err) {
 		return true, err
-	} else {
-		return false, err
 	}
+	return false, err
 }
 
 func isCorruptedMnt(err error) bool {
