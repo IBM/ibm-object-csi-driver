@@ -126,7 +126,6 @@ func (s *COSSession) CheckObjectPathExistence(bucket string, objectpath string) 
 }
 
 func (s *COSSession) CreateBucket(bucket, kpRootKeyCrn string) (res string, err error) {
-
 	if kpRootKeyCrn != "" {
 		_, err = s.svc.CreateBucket(&s3.CreateBucketInput{
 			Bucket:                      aws.String(bucket),

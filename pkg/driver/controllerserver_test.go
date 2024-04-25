@@ -644,7 +644,6 @@ func TestGetCapacity(t *testing.T) {
 		}
 		assert.Equal(t, tc.expResponse, response)
 	}
-
 }
 
 func TestControllerGetCapabilities(t *testing.T) {

@@ -69,7 +69,6 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 			continue
 		}
 		mountOptsMap[strings.TrimSpace(opts[0])] = strings.TrimSpace(opts[1])
-
 	}
 
 	// Create array out of map

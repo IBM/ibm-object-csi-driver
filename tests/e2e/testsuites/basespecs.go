@@ -295,8 +295,8 @@ func (t *TestPersistentVolumeClaim) ValidateProvisionedPersistentVolume() {
 	framework.Logf("validating provisioned PV [%s] for PVC [%s]", t.persistentVolume.Name, t.persistentVolumeClaim.Name)
 
 	// Check sizes
-	expectedCapacity := t.requestedPersistentVolumeClaim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	claimCapacity := t.persistentVolumeClaim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	expectedCapacity := t.requestedPersistentVolumeClaim.Spec.Resources.Requests[v1.ResourceStorage]
+	claimCapacity := t.persistentVolumeClaim.Spec.Resources.Requests[v1.ResourceStorage]
 	gomega.Expect(claimCapacity.Value()).To(gomega.Equal(expectedCapacity.Value()), "claimCapacity is not equal to requestedCapacity")
 
 	pvCapacity := t.persistentVolume.Spec.Capacity[v1.ResourceStorage]
@@ -338,7 +338,7 @@ func generatePVC(name, namespace,
 			},
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceStorage): resource.MustParse(claimSize),
+					v1.ResourceStorage: resource.MustParse(claimSize),
 				},
 			},
 		},
