@@ -258,12 +258,12 @@ func (cs *controllerServer) ControllerPublishVolume(_ context.Context, req *csi.
 }
 
 // ControllerUnpublishVolume
-func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
+func (cs *controllerServer) ControllerUnpublishVolume(_ context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
 	klog.V(3).Infof("CSIControllerServer-ControllerUnPublishVolume: Request: %v", *req)
 	return nil, status.Error(codes.Unimplemented, "ControllerUnpublishVolume")
 }
 
-func (cs *controllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
+func (cs *controllerServer) ValidateVolumeCapabilities(_ context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
 	klog.V(3).Infof("ValidateVolumeCapabilities: Request: %+v", *req)
 
 	// Validate Arguments
@@ -288,7 +288,7 @@ func (cs *controllerServer) ValidateVolumeCapabilities(ctx context.Context, req 
 }
 
 // ListVolumes
-func (cs *controllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
+func (cs *controllerServer) ListVolumes(_ context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
 	klog.V(3).Infof("ListVolumes: Request: %+v", *req)
 	return nil, status.Error(codes.Unimplemented, "ListVolumes")
 }
