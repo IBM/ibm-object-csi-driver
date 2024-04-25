@@ -3,7 +3,7 @@ package testsuites
 import (
 	"fmt"
 
-	. "github.com/onsi/ginkgo/v2"
+	v2 "github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -38,9 +38,9 @@ type PodExecCheck struct {
 func (pod *PodDetails) SetupWithDynamicVolumes(client clientset.Interface, namespace *v1.Namespace) (*TestPod, []func()) {
 	cleanupFuncs := make([]func(), 0)
 
-	By("setting up POD")
+	v2.By("setting up POD")
 	tpod := NewTestPod(client, namespace, pod.Cmd)
-	By("setting up the PVC for POD")
+	v2.By("setting up the PVC for POD")
 	for n, v := range pod.Volumes {
 		tpvc, funcs := v.SetupDynamicPersistentVolumeClaim(client, namespace)
 		cleanupFuncs = append(cleanupFuncs, funcs...)
@@ -54,7 +54,7 @@ func (pod *PodDetails) SetupWithDynamicVolumes(client clientset.Interface, names
 
 func (volume *VolumeDetails) SetupDynamicPersistentVolumeClaim(client clientset.Interface, namespace *v1.Namespace) (*TestPersistentVolumeClaim, []func()) {
 	cleanupFuncs := make([]func(), 0)
-	By("setting up the PVC and PV")
+	v2.By("setting up the PVC and PV")
 	//By(fmt.Sprintf("PVC: %q    NS: %q", volume.PVCName, namespace.Name))
 	storageClass := storagev1.StorageClass{}
 	storageClass.Name = volume.VolumeType
