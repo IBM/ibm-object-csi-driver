@@ -52,11 +52,11 @@ func (su *VolumeStatsUtils) FuseUnmount(path string) error {
 	isMount, checkMountErr := isMountpoint(path)
 	if isMount || checkMountErr != nil {
 		klog.Infof("isMountpoint  %v", isMount)
-		err := unmount(path, syscall.MNT_DETACH)
+		err := unmount(path, 0)
 		if err != nil && checkMountErr == nil {
 			klog.Errorf("Cannot unmount. Trying force unmount %s", err)
 			//Do force unmount
-			err = unmount(path, syscall.MNT_FORCE)
+			err = unmount(path, 0)
 			if err != nil {
 				klog.Errorf("Cannot force unmount %s", err)
 				return fmt.Errorf("cannot force unmount %s: %v", path, err)

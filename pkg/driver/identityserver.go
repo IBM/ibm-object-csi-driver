@@ -29,7 +29,7 @@ type identityServer struct {
 }
 
 // GetPluginInfo ...
-func (csiIdentity *identityServer) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
+func (csiIdentity *identityServer) GetPluginInfo(_ context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
 	klog.V(3).Infof("identityServer-GetPluginInfo: Request: %v", *req)
 	if csiIdentity.S3Driver == nil {
 		return nil, status.Error(codes.InvalidArgument, "Driver not configured")
@@ -42,7 +42,7 @@ func (csiIdentity *identityServer) GetPluginInfo(ctx context.Context, req *csi.G
 }
 
 // GetPluginCapabilities ...
-func (csiIdentity *identityServer) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
+func (csiIdentity *identityServer) GetPluginCapabilities(_ context.Context, req *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
 	klog.V(3).Infof("identityServer-GetPluginCapabilities: Request %v", *req)
 	return &csi.GetPluginCapabilitiesResponse{
 		Capabilities: []*csi.PluginCapability{
@@ -72,7 +72,7 @@ func (csiIdentity *identityServer) GetPluginCapabilities(ctx context.Context, re
 }
 
 // Probe ...
-func (csiIdentity *identityServer) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
+func (csiIdentity *identityServer) Probe(_ context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
 	klog.V(3).Infof("identityServer-Probe: Request %v", *req)
 	return &csi.ProbeResponse{}, nil
 }
