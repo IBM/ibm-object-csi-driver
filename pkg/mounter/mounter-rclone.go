@@ -163,14 +163,6 @@ const (
 	envAuth        = "true"
 )
 
-func (rclone *rcloneMounter) Stage(stagePath string) error {
-	return nil
-}
-
-func (rclone *rcloneMounter) Unstage(stagePath string) error {
-	return nil
-}
-
 func (rclone *rcloneMounter) Mount(source string, target string) error {
 	klog.Info("-RcloneMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)

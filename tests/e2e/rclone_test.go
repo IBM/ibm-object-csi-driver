@@ -17,6 +17,8 @@ package e2e
 
 import (
 	"context"
+	"os"
+
 	"github.com/IBM/ibm-object-csi-driver/tests/e2e/testsuites"
 	. "github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
@@ -26,13 +28,10 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"os"
 )
 
-
-
 const (
-	rclonescName     = "cos-s3-csi-rclone-delete"
+	rclonescName = "cos-s3-csi-rclone-delete"
 )
 
 var _ = Describe("rclone", func() {
