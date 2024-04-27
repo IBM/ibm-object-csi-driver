@@ -26,6 +26,7 @@ services:
   - docker
 
 before_script:
+  - rm -rf ~/.cache/go-build
   - make $MAKE_TASK
 
 script:
