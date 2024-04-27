@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 	"time"
 
@@ -125,4 +126,26 @@ func writePass(pwFileName string, pwFileContent string) error {
 		return err
 	}
 	return nil
+}
+
+func waitForMount(path string, timeout time.Duration) error {
+	var elapsed time.Duration
+	var interval = 10 * time.Millisecond
+	for {
+		out, err := exec.Command("mountpoint", path).CombinedOutput()
+		outStr := strings.TrimSpace(string(out))
+		if err != nil {
+			return err
+		}
+		if strings.HasSuffix(outStr, "is a mountpoint") {
+			klog.Infof("Path is a mountpoint: pathname - %s", path)
+			return nil
+		}
+
+		time.Sleep(interval)
+		elapsed = elapsed + interval
+		if elapsed >= timeout {
+			return errors.New("timeout waiting for mount")
+		}
+	}
 }
