@@ -21,12 +21,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc/codes"
 )
 
 /*
