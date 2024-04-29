@@ -21,16 +21,12 @@ import (
 	"reflect"
 	"testing"
 
-	fakeclient "github.com/IBM/ibm-object-csi-driver/pkg/driver/fake/s3client"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
-	providerError "github.com/IBM/ibmcloud-storage-volume-lib/lib/utils"
-	"github.com/IBM/ibmcloud-volume-interface/lib/provider"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func getCustomControllerServer(csiDriver *S3Driver, factory s3client.ObjectStorageSessionFactory, logger *zap.Logger) *controllerServer {
