@@ -27,6 +27,7 @@ services:
 
 before_script:
   - rm -rf ~/.cache/go-build
+  - sudo apt-get install glibc-static
   - make $MAKE_TASK
 
 script:
