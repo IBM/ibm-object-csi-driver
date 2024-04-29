@@ -10,4 +10,4 @@
 set -e
 set -x
 cd /go/src/github.com/IBM/ibm-object-csi-driver
-CGO_ENABLED=0 GOOS=linux go build -mod=mod -a -ldflags "-X main.version=${git_commit_id} -extldflags \"-static\"" -o /go/bin/ibm-object-csi-driver ./cmd/$*
+CGO_ENABLED=0 GOOS=linux go install -mod=mod -a -ldflags "-X main.version=${git_commit_id} -extldflags \"-static\"" -o /go/bin/ibm-object-csi-driver ./cmd/$*
