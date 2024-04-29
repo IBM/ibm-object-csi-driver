@@ -178,7 +178,6 @@ func TestNodeUnpublishVolume(t *testing.T) {
 		}
 	}
 }
-*/
 
 func TestNodeStageVolume(t *testing.T) {
 	volumeID := "newstagevolumeID"
@@ -296,6 +295,8 @@ func TestNodeUnstageVolume(t *testing.T) {
 		}
 	}
 }
+
+*/
 
 func TestNodeGetCapabilities(t *testing.T) {
 	req := &csi.NodeGetCapabilitiesRequest{}
