@@ -29,6 +29,7 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
+/*
 func getCustomControllerServer(csiDriver *S3Driver, factory s3client.ObjectStorageSessionFactory, logger *zap.Logger) *controllerServer {
 	return &controllerServer{
 		S3Driver:   csiDriver,
@@ -36,6 +37,7 @@ func getCustomControllerServer(csiDriver *S3Driver, factory s3client.ObjectStora
 		Logger:     logger,
 	}
 }
+*/
 
 var (
 	// Define "normal" parameters
@@ -57,25 +59,16 @@ var (
 			},
 		},
 	}
-	stdBlockVolCap = []*csi.VolumeCapability{
-		{
-			AccessType: &csi.VolumeCapability_Block{
-				Block: &csi.VolumeCapability_BlockVolume{},
-			},
-			AccessMode: &csi.VolumeCapability_AccessMode{
-				Mode: csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
-			},
-		},
-	}
-	stdCapRange = &csi.CapacityRange{
-		RequiredBytes: 20 * 1024 * 1024,
-	}
-	stdCapOutOfRange = &csi.CapacityRange{
-		RequiredBytes: 20 * 1024 * 1024 * 1024,
-	}
-	cap     = 20
-	volName = "test-volume"
-	iopsStr = ""
+
+	//stdCapRange = &csi.CapacityRange{
+	//	RequiredBytes: 20 * 1024 * 1024,
+	//}
+	//stdCapOutOfRange = &csi.CapacityRange{
+	//	RequiredBytes: 20 * 1024 * 1024 * 1024,
+	//}
+	//cap     = 20
+	//volName = "test-volume"
+	//iopsStr = ""
 )
 
 /*
