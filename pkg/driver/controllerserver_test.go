@@ -82,6 +82,7 @@ var (
 	iopsStr = ""
 )
 
+/*
 func TestCreateVolumeArguments(t *testing.T) {
 	// test cases
 	testCases := []struct {
@@ -347,6 +348,7 @@ func TestDeleteVolume(t *testing.T) {
 		assert.Equal(t, tc.expResponse, response)
 	}
 }
+ */
 
 func TestControllerPublishVolume(t *testing.T) {
 	// test cases

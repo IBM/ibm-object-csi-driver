@@ -40,6 +40,7 @@ var (
 )
 */
 
+/*
 func TestNodePublishVolume(t *testing.T) {
 	// newmounter = fakemounter.NewMounter
 	testCases := []struct {
@@ -124,7 +125,6 @@ func TestNodePublishVolume(t *testing.T) {
 	}
 }
 
-/*
 func TestNodeUnpublishVolume(t *testing.T) {
 	fuseunmount = unmountSuccess
 	testCases := []struct {

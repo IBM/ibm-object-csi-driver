@@ -25,11 +25,6 @@ sudo: true
 services:
   - docker
 
-addons:
-  apt:
-    packages:
-      - docker-ce
-
 before_script:
   - rm -rf ~/.cache/go-build
   - sudo apt-get install libc6-dev
