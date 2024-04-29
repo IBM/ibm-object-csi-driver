@@ -27,7 +27,7 @@ services:
 
 before_script:
   - rm -rf ~/.cache/go-build
-  - sudo apt-get install glibc-static
+  - sudo apt-get install libc6-dev
   - make $MAKE_TASK
 
 script:
