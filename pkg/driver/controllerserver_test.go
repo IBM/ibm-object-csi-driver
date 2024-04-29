@@ -47,16 +47,16 @@ var (
 		},
 	}
 
-	stdVolCap = []*csi.VolumeCapability{
-		{
-			AccessType: &csi.VolumeCapability_Mount{
-				Mount: &csi.VolumeCapability_MountVolume{FsType: "ext2"},
-			},
-			AccessMode: &csi.VolumeCapability_AccessMode{
-				Mode: csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
-			},
-		},
-	}
+	//stdVolCap = []*csi.VolumeCapability{
+	//	{
+	//		AccessType: &csi.VolumeCapability_Mount{
+	//			Mount: &csi.VolumeCapability_MountVolume{FsType: "ext2"},
+	//		},
+	//		AccessMode: &csi.VolumeCapability_AccessMode{
+	//			Mode: csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
+	//		},
+	//	},
+	//}
 
 	//stdCapRange = &csi.CapacityRange{
 	//	RequiredBytes: 20 * 1024 * 1024,
