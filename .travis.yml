@@ -1,5 +1,5 @@
 ---
-dist: xenial
+dist: bionic
 language: go
 go:
   - "1.21.9"
@@ -26,8 +26,9 @@ services:
   - docker
 
 before_script:
-  - rm -rf ~/.cache/go-build
-  - sudo apt-get install libc6-dev
+  - sudo apt-get update
+#  - rm -rf ~/.cache/go-build
+#  - sudo apt-get install libc6-dev
   - make $MAKE_TASK
 
 script:
