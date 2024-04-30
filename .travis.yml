@@ -2,7 +2,7 @@
 dist: bionic
 language: go
 go:
-  - "1.21.9"
+  - "1.22.2"
 
 group: bluezone
 
@@ -27,8 +27,6 @@ services:
 
 before_script:
   - sudo apt-get update
-#  - rm -rf ~/.cache/go-build
-#  - sudo apt-get install libc6-dev
   - make $MAKE_TASK
 
 script:
