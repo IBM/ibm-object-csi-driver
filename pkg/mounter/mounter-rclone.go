@@ -69,7 +69,6 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 			continue
 		}
 		mountOptsMap[strings.TrimSpace(opts[0])] = strings.TrimSpace(opts[1])
-
 	}
 
 	// Create array out of map
@@ -162,14 +161,6 @@ const (
 	cosProvider    = "IBMCOS"
 	envAuth        = "true"
 )
-
-func (rclone *rcloneMounter) Stage(stagePath string) error {
-	return nil
-}
-
-func (rclone *rcloneMounter) Unstage(stagePath string) error {
-	return nil
-}
 
 func (rclone *rcloneMounter) Mount(source string, target string) error {
 	klog.Info("-RcloneMounter Mount-")

@@ -255,7 +255,6 @@ func TestCreateVolumeArguments(t *testing.T) {
 		if vol == nil {
 			t.Fatalf("Expected volume-> %v, Actual volume is nil", tc.expVol)
 		}
-
 	}
 }
 
@@ -614,7 +613,6 @@ func TestListVolumes(t *testing.T) {
 		}
 		assert.Equal(t, tc.expResponse, response)
 	}
-
 }
 
 func TestGetCapacity(t *testing.T) {
@@ -646,7 +644,6 @@ func TestGetCapacity(t *testing.T) {
 		}
 		assert.Equal(t, tc.expResponse, response)
 	}
-
 }
 
 func TestControllerGetCapabilities(t *testing.T) {

@@ -19,7 +19,7 @@ package testsuites
 import (
 	"fmt"
 
-	. "github.com/onsi/ginkgo/v2"
+	v2 "github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 )
@@ -39,19 +39,19 @@ func (t *DynamicallyProvisionePodWithVolTest) Run(client clientset.Interface, na
 			defer cleanup[i]()
 		}
 		ind := fmt.Sprintf("%d", n)
-		By(fmt.Sprintf("deploying the pod %q", ind))
+		v2.By(fmt.Sprintf("deploying the pod %q", ind))
 		tpod.Create()
 		defer tpod.Cleanup()
 
 		if !pod.CmdExits {
-			By("checking that the pods status is running")
+			v2.By("checking that the pods status is running")
 			tpod.WaitForRunningSlow()
 			if t.PodCheck != nil {
-				By("checking pod exec after pod recreate")
+				v2.By("checking pod exec after pod recreate")
 				tpod.Exec(t.PodCheck.Cmd, t.PodCheck.ExpectedString01)
 			}
 		} else {
-			By("checking that the pods command exits with no error")
+			v2.By("checking that the pods command exits with no error")
 			tpod.WaitForSuccess()
 		}
 	}

@@ -12,8 +12,6 @@ import (
 )
 
 type Mounter interface {
-	Stage(stagePath string) error
-	Unstage(stagePath string) error
 	Mount(source string, target string) error
 	Unmount(target string) error
 }
@@ -93,9 +91,8 @@ func checkPath(path string) (bool, error) {
 		return false, nil
 	} else if isCorruptedMnt(err) {
 		return true, err
-	} else {
-		return false, err
 	}
+	return false, err
 }
 
 func isCorruptedMnt(err error) bool {
