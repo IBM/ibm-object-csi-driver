@@ -239,10 +239,12 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 		}, nil
 	}
 
-	capUsed, err := ns.Stats.GetBucketUsage(volumeID)
+	capUsed, totalCap, err := ns.Stats.GetBucketUsage(volumeID)
 	if err != nil {
 		return nil, err
 	}
+
+	klog.Info("Capacity Get", totalCap)
 
 	capAvailable := capacity - capUsed
 
