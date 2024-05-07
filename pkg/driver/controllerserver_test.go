@@ -102,7 +102,7 @@ func TestControllerUnpublishVolume(t *testing.T) {
 
 func TestValidateVolumeCapabilities(t *testing.T) {
 	// test cases
-	confirmed := &csi.ValidateVolumeCapabilitiesResponse_Confirmed{VolumeCapabilities: volCaps}
+	//confirmed := &csi.ValidateVolumeCapabilitiesResponse_Confirmed{VolumeCapabilities: volCaps}
 	testCases := []struct {
 		name        string
 		req         *csi.ValidateVolumeCapabilitiesRequest
