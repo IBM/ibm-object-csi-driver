@@ -2,12 +2,13 @@ package s3client
 
 import (
 	"errors"
+	"strings"
+	"testing"
+
 	"github.com/IBM/ibm-cos-sdk-go/aws/awserr"
 	"github.com/IBM/ibm-cos-sdk-go/service/s3"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
-	"strings"
-	"testing"
 )
 
 type fakeS3API struct {
