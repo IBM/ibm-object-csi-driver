@@ -249,7 +249,7 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 		capAsInt64 = capacity
 	}
 
-	klog.Info("NodeGetVolumeStats: Total Capacity of Volume", capAsInt64)
+	klog.Info("NodeGetVolumeStats: Total Capacity of Volume: ", capAsInt64)
 
 	capAvailable := capAsInt64 - capUsed
 
