@@ -3,10 +3,11 @@ module github.com/IBM/ibm-object-csi-driver
 go 1.21
 
 require (
-	github.com/IBM/ibm-cos-sdk-go v1.10.2
+	github.com/IBM/ibm-cos-sdk-go v1.10.3
 	github.com/IBM/ibm-csi-common v1.1.7
 	github.com/IBM/ibmcloud-storage-volume-lib v0.0.2
 	github.com/IBM/ibmcloud-volume-interface v1.2.1
+	github.com/aws/aws-sdk-go v1.44.116
 	github.com/container-storage-interface/spec v1.9.0
 	github.com/google/uuid v1.6.0
 	github.com/kubernetes-csi/csi-test/v5 v5.2.0
@@ -34,7 +35,6 @@ require (
 	github.com/IBM/secret-common-lib v1.1.4 // indirect
 	github.com/IBM/secret-utils-lib v1.1.4 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20200907205600-7a23bdc65eef // indirect
-	github.com/aws/aws-sdk-go v1.44.116 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
