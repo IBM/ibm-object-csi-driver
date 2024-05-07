@@ -27,17 +27,6 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
-var (
-	// Define "normal" parameters
-	volCaps = []*csi.VolumeCapability{
-		{
-			AccessMode: &csi.VolumeCapability_AccessMode{
-				Mode: csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
-			},
-		},
-	}
-)
-
 func TestControllerPublishVolume(t *testing.T) {
 	// test cases
 	testCases := []struct {
