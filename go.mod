@@ -3,7 +3,7 @@ module github.com/IBM/ibm-object-csi-driver
 go 1.21
 
 require (
-	github.com/IBM/ibm-cos-sdk-go v1.10.2
+	github.com/IBM/ibm-cos-sdk-go v1.10.3
 	github.com/IBM/ibm-csi-common v1.1.7
 	github.com/IBM/ibmcloud-storage-volume-lib v0.0.2
 	github.com/IBM/ibmcloud-volume-interface v1.2.1

@@ -18,6 +18,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"k8s.io/klog/v2"
 )
@@ -36,11 +37,8 @@ type s3fsMounter struct {
 }
 
 const (
-	s3fsCmd  = "s3fs"
 	metaRoot = "/var/lib/ibmc-s3fs"
 	passFile = ".passwd-s3fs" // #nosec G101: not password
-	// defaultIAMEndPoint is the default URL of the IBM IAM endpoint
-	defaultIAMEndPoint = "https://iam.cloud.ibm.com"
 )
 
 func newS3fsMounter(secretMap map[string]string, mountOptions []string) (Mounter, error) {
@@ -154,11 +152,11 @@ func (s3fs *s3fsMounter) Mount(source string, target string) error {
 
 	if s3fs.authType != "hmac" {
 		args = append(args, "-o", "ibm_iam_auth")
-		args = append(args, "-o", "ibm_iam_endpoint="+defaultIAMEndPoint)
+		args = append(args, "-o", "ibm_iam_endpoint="+constants.DefaultIAMEndPoint)
 	} else {
 		args = append(args, "-o", "default_acl=private")
 	}
-	return fuseMount(target, s3fsCmd, args)
+	return fuseMount(target, constants.S3FS, args)
 }
 
 func (s3fs *s3fsMounter) Unmount(target string) error {
@@ -168,7 +166,7 @@ func (s3fs *s3fsMounter) Unmount(target string) error {
 	if err != nil {
 		return err
 	}
-	statsUtil := &(utils.VolumeStatsUtils{})
+	statsUtil := &(utils.DriverStatsUtils{})
 	return statsUtil.FuseUnmount(target)
 }
 

@@ -79,7 +79,7 @@ func inits3Driver(t *testing.T) *S3Driver {
 		t.Fatalf("Failed to setup CSI Driver: %v", err)
 	}
 
-	statsUtil := &(utils.VolumeStatsUtils{})
+	statsUtil := &(utils.DriverStatsUtils{})
 	icsDriver, err := icDriver.NewS3CosDriver(nodeID, endpoint, mockSession, mockMountObj, statsUtil)
 	if err != nil {
 		t.Fatalf("Failed to create New COS CSI Driver: %v", err)

@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package driver
 
 import (
 	"fmt"
 
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
 	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -28,10 +30,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
-)
-
-const (
-	DefaultVolumesPerNode = 4
 )
 
 // Implements Node Server csi.NodeServer
@@ -296,7 +294,7 @@ func (ns *nodeServer) NodeGetInfo(_ context.Context, req *csi.NodeGetInfoRequest
 	top := &csi.Topology{}
 	resp := &csi.NodeGetInfoResponse{
 		NodeId:             ns.NodeID,
-		MaxVolumesPerNode:  DefaultVolumesPerNode,
+		MaxVolumesPerNode:  constants.DefaultVolumesPerNode,
 		AccessibleTopology: top,
 	}
 	fmt.Println(resp)

@@ -25,6 +25,7 @@ import (
 	"github.com/IBM/ibm-cos-sdk-go/aws/credentials/ibmiam"
 	"github.com/IBM/ibm-cos-sdk-go/aws/session"
 	"github.com/IBM/ibm-cos-sdk-go/service/s3"
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"go.uber.org/zap"
 )
 
@@ -80,10 +81,6 @@ type COSSession struct {
 	svc    s3API
 }
 
-const (
-	KPEncryptionAlgorithm = "AES256" // https://github.com/IBM/ibm-cos-sdk-go/blob/master/service/s3/api.go#L9130-L9136
-)
-
 func NewObjectStorageSessionFactory() *COSSessionFactory {
 	return &COSSessionFactory{}
 }
@@ -130,7 +127,7 @@ func (s *COSSession) CreateBucket(bucket, kpRootKeyCrn string) (res string, err 
 		_, err = s.svc.CreateBucket(&s3.CreateBucketInput{
 			Bucket:                      aws.String(bucket),
 			IBMSSEKPCustomerRootKeyCrn:  aws.String(kpRootKeyCrn),
-			IBMSSEKPEncryptionAlgorithm: aws.String(KPEncryptionAlgorithm),
+			IBMSSEKPEncryptionAlgorithm: aws.String(constants.KPEncryptionAlgorithm),
 		})
 	} else {
 		_, err = s.svc.CreateBucket(&s3.CreateBucketInput{

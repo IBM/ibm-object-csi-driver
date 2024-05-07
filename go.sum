@@ -39,8 +39,8 @@ github.com/IBM-Cloud/ibm-cloud-cli-sdk v0.6.7 h1:eHgfQl6IeSmzWUyiSi13CvoFYsovoyq
 github.com/IBM-Cloud/ibm-cloud-cli-sdk v0.6.7/go.mod h1:RiUvKuHKTBmBApDMUQzBL14pQUGKcx/IioKQPIcRQjs=
 github.com/IBM/go-sdk-core/v5 v5.9.1 h1:06pXbD9Rgmqqe2HA5YAeQbB4eYRRFgIoOT+Kh3cp1zo=
 github.com/IBM/go-sdk-core/v5 v5.9.1/go.mod h1:axE2JrRq79gIJTjKPBwV6gWHswvVptBjbcvvCPIxARM=
-github.com/IBM/ibm-cos-sdk-go v1.10.2 h1:IlG7ruBNp10u03FIYvY1qeLoNNHAAAdpFP8h+WmlqM0=
-github.com/IBM/ibm-cos-sdk-go v1.10.2/go.mod h1:h+IwNGkLJWCUOyCM9tj2rBCIf1tsckfe+DrJwzHx2PI=
+github.com/IBM/ibm-cos-sdk-go v1.10.3 h1:YfZSLqMiCrqDPbr3r+amY2sicIXlrd+3L5pok6QRXIQ=
+github.com/IBM/ibm-cos-sdk-go v1.10.3/go.mod h1:T9x7pC47DUd5jD/TMFzlvly39P6EdW5wOemA78XEo2g=
 github.com/IBM/ibm-csi-common v1.1.7 h1:4QY86ZJ8rX1ghrhytgIY+VoEemeG+J2PbvzXTuYZakc=
 github.com/IBM/ibm-csi-common v1.1.7/go.mod h1:TilE1H+F4rzhgnEHHDzdcJ9M+WcJB6QCBxwtGdCDv7A=
 github.com/IBM/ibmcloud-storage-volume-lib v0.0.2 h1:K6MxfKjGC0ID49tR9iZP9JWo+gVdWw7bueEMNLArhzs=

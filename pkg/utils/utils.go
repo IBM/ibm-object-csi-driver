@@ -25,20 +25,43 @@ import (
 var unmount = syscall.Unmount
 
 type StatsUtils interface {
+	BucketToDelete(volumeID string) (string, error)
 	FSInfo(path string) (int64, int64, int64, int64, int64, int64, error)
 	CheckMount(targetPath string) (bool, error)
 	FuseUnmount(path string) error
 	GetBucketUsage(volumeID string) (int64, error)
 }
 
-type VolumeStatsUtils struct {
+type DriverStatsUtils struct {
 }
 
-func (su *VolumeStatsUtils) FSInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
+func (su *DriverStatsUtils) BucketToDelete(volumeID string) (string, error) {
+	clientset, err := createK8sClient()
+	if err != nil {
+		return "", err
+	}
+
+	pv, err := clientset.CoreV1().PersistentVolumes().Get(context.Background(), volumeID, metav1.GetOptions{})
+	if err != nil {
+		klog.Errorf("Unable to fetch bucket %v", err)
+		return "", err
+	}
+
+	klog.Infof("***Attributes: %v", pv.Spec.CSI.VolumeAttributes)
+	if pv.Spec.CSI.VolumeAttributes["userProvidedBucket"] != "true" {
+		klog.Infof("Bucket will be deleted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
+		return pv.Spec.CSI.VolumeAttributes["bucketName"], nil
+	}
+
+	klog.Infof("Bucket will be persisted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
+	return "", nil
+}
+
+func (su *DriverStatsUtils) FSInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 	return fs.Info(path)
 }
 
-func (su *VolumeStatsUtils) CheckMount(targetPath string) (bool, error) {
+func (su *DriverStatsUtils) CheckMount(targetPath string) (bool, error) {
 	out, err := exec.Command("mountpoint", targetPath).CombinedOutput()
 	outStr := strings.TrimSpace(string(out))
 	notMnt := true
@@ -57,7 +80,7 @@ func (su *VolumeStatsUtils) CheckMount(targetPath string) (bool, error) {
 	return notMnt, nil
 }
 
-func (su *VolumeStatsUtils) FuseUnmount(path string) error {
+func (su *DriverStatsUtils) FuseUnmount(path string) error {
 	// directory exists
 	isMount, checkMountErr := isMountpoint(path)
 	if isMount || checkMountErr != nil {
@@ -87,7 +110,7 @@ func (su *VolumeStatsUtils) FuseUnmount(path string) error {
 	return waitForProcess(process, 1)
 }
 
-func (su *VolumeStatsUtils) GetBucketUsage(volumeID string) (int64, error) {
+func (su *DriverStatsUtils) GetBucketUsage(volumeID string) (int64, error) {
 	k8sClient, err := createK8sClient()
 	if err != nil {
 		return 0, err
