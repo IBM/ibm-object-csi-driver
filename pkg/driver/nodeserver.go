@@ -239,18 +239,25 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 		}, nil
 	}
 
-	capUsed, err := ns.Stats.GetBucketUsage(volumeID)
+	capUsed, totalCap, err := ns.Stats.GetBucketUsage(volumeID)
 	if err != nil {
 		return nil, err
 	}
 
-	capAvailable := capacity - capUsed
+	capAsInt64, converted := totalCap.AsInt64()
+	if !converted {
+		capAsInt64 = capacity
+	}
+
+	klog.Info("NodeGetVolumeStats: Total Capacity of Volume: ", capAsInt64)
+
+	capAvailable := capAsInt64 - capUsed
 
 	resp := &csi.NodeGetVolumeStatsResponse{
 		Usage: []*csi.VolumeUsage{
 			{
 				Available: capAvailable,
-				Total:     capacity,
+				Total:     capAsInt64,
 				Used:      capUsed,
 				Unit:      csi.VolumeUsage_BYTES,
 			},

@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/mitchellh/go-ps"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -29,7 +30,7 @@ type StatsUtils interface {
 	FSInfo(path string) (int64, int64, int64, int64, int64, int64, error)
 	CheckMount(targetPath string) (bool, error)
 	FuseUnmount(path string) error
-	GetBucketUsage(volumeID string) (int64, error)
+	GetBucketUsage(volumeID string) (int64, resource.Quantity, error)
 }
 
 type DriverStatsUtils struct {
@@ -110,23 +111,23 @@ func (su *DriverStatsUtils) FuseUnmount(path string) error {
 	return waitForProcess(process, 1)
 }
 
-func (su *DriverStatsUtils) GetBucketUsage(volumeID string) (int64, error) {
+func (su *DriverStatsUtils) GetBucketUsage(volumeID string) (int64, resource.Quantity, error) {
 	k8sClient, err := createK8sClient()
 	if err != nil {
-		return 0, err
+		return 0, resource.Quantity{}, err
 	}
 
-	secert, err := fetchSecret(k8sClient, volumeID)
+	secert, capacity, err := fetchSecret(k8sClient, volumeID)
 	if err != nil {
-		return 0, err
+		return 0, resource.Quantity{}, err
 	}
 
 	usage, err := bucketSizeUsed(secert)
 	if err != nil {
-		return 0, err
+		return 0, resource.Quantity{}, err
 	}
 
-	return usage, nil
+	return usage, capacity, nil
 }
 
 func isMountpoint(pathname string) (bool, error) {
@@ -223,35 +224,35 @@ func createK8sClient() (*kubernetes.Clientset, error) {
 	return clientset, nil
 }
 
-func fetchSecret(clientset *kubernetes.Clientset, volumeID string) (*v1.Secret, error) {
-	pvcName, pvcNamespace, err := getPVCNameFromPVID(clientset, volumeID)
+func fetchSecret(clientset *kubernetes.Clientset, volumeID string) (*v1.Secret, resource.Quantity, error) {
+	pvcName, pvcNamespace, capacity, err := getPVCNameFromPVID(clientset, volumeID)
 	if err != nil {
-		return nil, err
+		return nil, resource.Quantity{}, err
 	}
 	klog.Info("pvc details found. pvc-name: ", pvcName, ", pvc-namespace: ", pvcNamespace)
 
 	secret, err := clientset.CoreV1().Secrets(pvcNamespace).Get(context.TODO(), pvcName, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("error getting Secret: %v", err)
+		return nil, resource.Quantity{}, fmt.Errorf("error getting Secret: %v", err)
 	}
 
 	if secret == nil {
-		return nil, fmt.Errorf("secret not found with name: %v", pvcName)
+		return nil, resource.Quantity{}, fmt.Errorf("secret not found with name: %v", pvcName)
 	}
 
 	klog.Info("secret details found. secret-name: ", secret.Name)
-	return secret, nil
+	return secret, capacity, nil
 }
 
-func getPVCNameFromPVID(clientset *kubernetes.Clientset, volumeID string) (string, string, error) {
+func getPVCNameFromPVID(clientset *kubernetes.Clientset, volumeID string) (string, string, resource.Quantity, error) {
 	pv, err := clientset.CoreV1().PersistentVolumes().Get(context.TODO(), volumeID, metav1.GetOptions{})
 	if err != nil {
-		return "", "", fmt.Errorf("error getting PV: %v", err)
+		return "", "", resource.Quantity{}, fmt.Errorf("error getting PV: %v", err)
 	}
 
 	pvcName := pv.Spec.ClaimRef.Name
 	if pvcName == "" {
-		return "", "", fmt.Errorf("PVC name not found for PV with ID: %s", volumeID)
+		return "", "", resource.Quantity{}, fmt.Errorf("PVC name not found for PV with ID: %s", volumeID)
 	}
 
 	pvcNamespace := pv.Spec.ClaimRef.Namespace
@@ -259,7 +260,9 @@ func getPVCNameFromPVID(clientset *kubernetes.Clientset, volumeID string) (strin
 		pvcNamespace = "default"
 	}
 
-	return pvcName, pvcNamespace, nil
+	capacity := pv.Spec.Capacity["storage"]
+
+	return pvcName, pvcNamespace, capacity, nil
 }
 
 func getDataFromSecret(secret *v1.Secret, key string) string {
