@@ -207,6 +207,10 @@ func (v providerIDGenerator) GenerateUniqueValidVolumeID() string {
 type FakeNewVolumeStatsUtils struct {
 }
 
+func (su *FakeNewVolumeStatsUtils) BucketToDelete(volumeID string) (string, error) {
+	return "", nil
+}
+
 func (su *FakeNewVolumeStatsUtils) FSInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 	if path == "some/path" {
 		return 0, 0, 0, 0, 0, 0, status.Error(codes.NotFound, "volume not found on some/path")

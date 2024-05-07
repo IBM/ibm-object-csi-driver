@@ -222,7 +222,7 @@ func (rclone *rcloneMounter) Unmount(target string) error {
 	if err != nil {
 		return err
 	}
-	statsUtil := &(utils.VolumeStatsUtils{})
+	statsUtil := &(utils.DriverStatsUtils{})
 	return statsUtil.FuseUnmount(target)
 }
 
