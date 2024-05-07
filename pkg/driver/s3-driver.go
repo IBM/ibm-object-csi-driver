@@ -27,10 +27,16 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	kib int64 = 1024
-	mib int64 = kib * 1024
-	gib int64 = mib * 1024
+var (
+	// volumeCapabilities represents how the volume could be accessed.
+	volumeCapabilities = []csi.VolumeCapability_AccessMode_Mode{
+		csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+	}
+
+	// controllerCapabilities represents the capability of controller service
+	controllerCapabilities = []csi.ControllerServiceCapability_RPC_Type{
+		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
+	}
 )
 
 type S3Driver struct {
@@ -112,9 +118,10 @@ func newIdentityServer(d *S3Driver) *identityServer {
 	}
 }
 
-func newControllerServer(d *S3Driver, s3cosSession s3client.ObjectStorageSessionFactory, logger *zap.Logger) *controllerServer {
+func newControllerServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, s3cosSession s3client.ObjectStorageSessionFactory, logger *zap.Logger) *controllerServer {
 	return &controllerServer{
 		S3Driver:   d,
+		Stats:      statsUtil,
 		cosSession: s3cosSession,
 		Logger:     logger,
 	}
@@ -138,22 +145,9 @@ func (driver *S3Driver) NewS3CosDriver(nodeID string, endpoint string, s3cosSess
 	driver.endpoint = endpoint
 	driver.s3client = s3client
 
-	vcam := []csi.VolumeCapability_AccessMode_Mode{
-		csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-	}
+	_ = driver.AddVolumeCapabilityAccessModes(volumeCapabilities) // #nosec G104: Attempt to AddVolumeCapabilityAccessModes only on best-effort basis.Error cannot be usefully handled.
 
-	_ = driver.AddVolumeCapabilityAccessModes(vcam) // #nosec G104: Attempt to AddVolumeCapabilityAccessModes only on best-effort basis.Error cannot be usefully handled.
-	csc := []csi.ControllerServiceCapability_RPC_Type{
-		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
-		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
-		//csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
-		// csi.ControllerServiceCapability_RPC_GET_CAPACITY,
-		//csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT,
-		//csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS,
-		// csi.ControllerServiceCapability_RPC_PUBLISH_READONLY,
-		//csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
-	}
-	_ = driver.AddControllerServiceCapabilities(csc) // #nosec G104: Attempt to AddControllerServiceCapabilities only on best-effort basis.Error cannot be usefully handled.
+	_ = driver.AddControllerServiceCapabilities(controllerCapabilities) // #nosec G104: Attempt to AddControllerServiceCapabilities only on best-effort basis.Error cannot be usefully handled.
 
 	ns := []csi.NodeServiceCapability_RPC_Type{
 		csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
@@ -166,11 +160,11 @@ func (driver *S3Driver) NewS3CosDriver(nodeID string, endpoint string, s3cosSess
 	// Create GRPC servers
 	driver.ids = newIdentityServer(driver)
 	if driver.mode == "controller" {
-		driver.cs = newControllerServer(driver, s3cosSession, driver.logger)
+		driver.cs = newControllerServer(driver, statsUtil, s3cosSession, driver.logger)
 	} else if driver.mode == "node" {
 		driver.ns = newNodeServer(driver, statsUtil, nodeID, mountObj)
 	} else if driver.mode == "controller-node" {
-		driver.cs = newControllerServer(driver, s3cosSession, driver.logger)
+		driver.cs = newControllerServer(driver, statsUtil, s3cosSession, driver.logger)
 		driver.ns = newNodeServer(driver, statsUtil, nodeID, mountObj)
 	}
 

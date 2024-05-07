@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,6 +10,9 @@ import (
 	"time"
 
 	"github.com/mitchellh/go-ps"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume/util/fs"
 )
@@ -16,19 +20,42 @@ import (
 var unmount = syscall.Unmount
 
 type StatsUtils interface {
+	BucketToDelete(volumeID string) (string, error)
 	FSInfo(path string) (int64, int64, int64, int64, int64, int64, error)
 	CheckMount(targetPath string) (bool, error)
 	FuseUnmount(path string) error
 }
 
-type VolumeStatsUtils struct {
+type DriverStatsUtils struct {
 }
 
-func (su *VolumeStatsUtils) FSInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
+func (su *DriverStatsUtils) BucketToDelete(volumeID string) (string, error) {
+	clientset, err := createK8sClient()
+	if err != nil {
+		return "", err
+	}
+
+	pv, err := clientset.CoreV1().PersistentVolumes().Get(context.Background(), volumeID, metav1.GetOptions{})
+	if err != nil {
+		klog.Errorf("Unable to fetch bucket %v", err)
+		return "", err
+	}
+
+	klog.Infof("***Attributes: %v", pv.Spec.CSI.VolumeAttributes)
+	if pv.Spec.CSI.VolumeAttributes["userProvidedBucket"] != "true" {
+		klog.Infof("Bucket will be deleted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
+		return pv.Spec.CSI.VolumeAttributes["bucketName"], nil
+	}
+
+	klog.Infof("Bucket will be persisted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
+	return "", nil
+}
+
+func (su *DriverStatsUtils) FSInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 	return fs.Info(path)
 }
 
-func (su *VolumeStatsUtils) CheckMount(targetPath string) (bool, error) {
+func (su *DriverStatsUtils) CheckMount(targetPath string) (bool, error) {
 	out, err := exec.Command("mountpoint", targetPath).CombinedOutput()
 	outStr := strings.TrimSpace(string(out))
 	notMnt := true
@@ -47,7 +74,7 @@ func (su *VolumeStatsUtils) CheckMount(targetPath string) (bool, error) {
 	return notMnt, nil
 }
 
-func (su *VolumeStatsUtils) FuseUnmount(path string) error {
+func (su *DriverStatsUtils) FuseUnmount(path string) error {
 	// directory exists
 	isMount, checkMountErr := isMountpoint(path)
 	if isMount || checkMountErr != nil {
@@ -151,4 +178,22 @@ func waitForProcess(p *os.Process, backoff int) error {
 	klog.Infof("Fuse process with PID %v still active, waiting...", p.Pid)
 	time.Sleep(time.Duration(backoff*100) * time.Millisecond)
 	return waitForProcess(p, backoff+1)
+}
+
+func createK8sClient() (*kubernetes.Clientset, error) {
+	// Create a Kubernetes client configuration
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		klog.Error("Error creating Kubernetes client configuration: ", err)
+		return nil, err
+	}
+
+	// Create a Kubernetes clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		klog.Error("Error creating Kubernetes clientset: ", err)
+		return nil, err
+	}
+
+	return clientset, nil
 }

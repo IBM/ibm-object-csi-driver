@@ -112,7 +112,7 @@ func serverSetup(options *Options, logger *zap.Logger) {
 		os.Exit(1)
 	}
 
-	statsUtil := &(utils.VolumeStatsUtils{})
+	statsUtil := &(utils.DriverStatsUtils{})
 
 	S3CSIDriver, err := csiDriver.NewS3CosDriver(options.NodeID, options.Endpoint, s3client.NewObjectStorageSessionFactory(), mounter.NewS3fsMounterFactory(), statsUtil)
 	if err != nil {

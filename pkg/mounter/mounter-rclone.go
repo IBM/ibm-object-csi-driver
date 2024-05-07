@@ -19,6 +19,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"k8s.io/klog/v2"
 )
@@ -152,7 +153,6 @@ func newRcloneMounter(secretMap map[string]string, mountOptions []string) (Mount
 }
 
 const (
-	rcloneCmd      = "rclone"
 	metaRootRclone = "/var/lib/ibmc-rclone"
 	configPath     = "/root/.config/rclone"
 	configFileName = "rclone.conf"
@@ -212,7 +212,7 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 		uidOpt := "--uid=" + rclone.uid
 		args = append(args, uidOpt)
 	}
-	return fuseMount(target, rcloneCmd, args)
+	return fuseMount(target, constants.RClone, args)
 }
 
 func (rclone *rcloneMounter) Unmount(target string) error {
@@ -222,7 +222,7 @@ func (rclone *rcloneMounter) Unmount(target string) error {
 	if err != nil {
 		return err
 	}
-	statsUtil := &(utils.VolumeStatsUtils{})
+	statsUtil := &(utils.DriverStatsUtils{})
 	return statsUtil.FuseUnmount(target)
 }
 

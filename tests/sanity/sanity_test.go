@@ -84,7 +84,6 @@ func TestSanity(t *testing.T) {
 		SecretsFile: "../../tests/secret.yaml",
 		TestVolumeParameters: map[string]string{
 			"bucketName": "fakeBucketName",
-			//			"mounter":    "s3fs",
 		},
 		CreateTargetDir: func(targetPath string) (string, error) {
 			return targetPath, createTargetDir(targetPath)
@@ -205,6 +204,10 @@ func (v providerIDGenerator) GenerateUniqueValidVolumeID() string {
 
 // Fake VolumeStatsUtils
 type FakeNewVolumeStatsUtils struct {
+}
+
+func (su *FakeNewVolumeStatsUtils) BucketToDelete(volumeID string) (string, error) {
+	return "", nil
 }
 
 func (su *FakeNewVolumeStatsUtils) FSInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
