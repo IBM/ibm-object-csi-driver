@@ -80,6 +80,5 @@ buildimage: build-binary
 .PHONY: build-binary
 build-binary:
 	docker build --build-arg TAG=$(REV) --build-arg OS=linux --build-arg ARCH=$(ARCH) -t csi-driver-builder --pull -f Dockerfile.builder .
-	#docker run --env GHE_TOKEN=${GHE_TOKEN} csi-driver-builder
 	docker run csi-driver-builder
 	docker cp `docker ps -q -n=1`:/go/bin/${EXE_DRIVER_NAME} ./${EXE_DRIVER_NAME}
