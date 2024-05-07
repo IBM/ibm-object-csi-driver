@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"k8s.io/klog/v2"
 )
 
@@ -17,11 +18,6 @@ type Mounter interface {
 }
 
 var command = exec.Command
-
-const (
-	s3fsMounterType   = "s3fs"
-	rcloneMounterType = "rclone"
-)
 
 type S3fsMounterFactory struct{}
 
@@ -50,9 +46,9 @@ func (s *S3fsMounterFactory) NewMounter(attrib map[string]string, secretMap map[
 		}
 	}
 	switch mounter {
-	case s3fsMounterType:
+	case constants.S3FS:
 		return newS3fsMounter(secretMap, mountFlags)
-	case rcloneMounterType:
+	case constants.RClone:
 		return newRcloneMounter(secretMap, mountFlags)
 	default:
 		// default to s3backer

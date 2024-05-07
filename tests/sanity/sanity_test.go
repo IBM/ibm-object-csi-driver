@@ -84,7 +84,6 @@ func TestSanity(t *testing.T) {
 		SecretsFile: "../../tests/secret.yaml",
 		TestVolumeParameters: map[string]string{
 			"bucketName": "fakeBucketName",
-			//			"mounter":    "s3fs",
 		},
 		CreateTargetDir: func(targetPath string) (string, error) {
 			return targetPath, createTargetDir(targetPath)
