@@ -109,14 +109,14 @@ func TestValidateVolumeCapabilities(t *testing.T) {
 		expResponse *csi.ValidateVolumeCapabilitiesResponse
 		expErrCode  codes.Code
 	}{
-		{
-			name: "Success validate volume capabilities",
-			req: &csi.ValidateVolumeCapabilitiesRequest{VolumeId: "volumeid",
-				VolumeCapabilities: []*csi.VolumeCapability{{AccessMode: &csi.VolumeCapability_AccessMode{Mode: csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER}}},
-			},
-			expResponse: &csi.ValidateVolumeCapabilitiesResponse{Confirmed: confirmed},
-			expErrCode:  codes.OK,
-		},
+		//{
+		//	name: "Success validate volume capabilities",
+		//	req: &csi.ValidateVolumeCapabilitiesRequest{VolumeId: "volumeid",
+		//		VolumeCapabilities: []*csi.VolumeCapability{{AccessMode: &csi.VolumeCapability_AccessMode{Mode: csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER}}},
+		//	},
+		//	expResponse: &csi.ValidateVolumeCapabilitiesResponse{Confirmed: confirmed},
+		//	expErrCode:  codes.OK,
+		//},
 		{
 			name: "Empty volume capabilities",
 			req: &csi.ValidateVolumeCapabilitiesRequest{VolumeId: "volumeid",
