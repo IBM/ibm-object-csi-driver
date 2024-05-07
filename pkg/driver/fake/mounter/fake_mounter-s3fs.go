@@ -36,13 +36,13 @@ func fakenewS3fsMounter(bucket string, objpath string, endpoint string, region s
 	klog.Infof("-newS3fsMounter-")
 	klog.Infof("newS3fsMounter args:\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>\n\tkeys: <%s>", bucket, objpath, endpoint, region, keys)
 	return &fakes3fsMounter{
-		bucketName: bucket,
-		objPath:    objpath,
-		endPoint:   endpoint,
-		locConstraint:  region,
-		accessKeys: keys,
-		authType:   authType,
-		kpRootKeyCrn: kpCrn,
+		bucketName:    bucket,
+		objPath:       objpath,
+		endPoint:      endpoint,
+		locConstraint: region,
+		accessKeys:    keys,
+		authType:      authType,
+		kpRootKeyCrn:  kpCrn,
 	}, nil
 }
 

@@ -1,5 +1,5 @@
 /**
- * Copyright 2021 IBM Corp.
+ * Copyright 2024 IBM Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,8 @@
 package fake
 
 import (
-"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
-"k8s.io/klog/v2"
+	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
+	"k8s.io/klog/v2"
 )
 
 // Mounter interface defined in mounter.go
@@ -38,15 +38,15 @@ func fakenewRcloneMounter(bucket string, objpath string, endpoint string, region
 	klog.Infof("-newS3fsMounter-")
 	klog.Infof("newS3fsMounter args:\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>\n\tkeys: <%s>", bucket, objpath, endpoint, region, keys)
 	return &fakercloneMounter{
-		bucketName: bucket,
-		objPath:    objpath,
-		endPoint:   endpoint,
-		locConstraint:  region,
-		accessKeys: keys,
-		authType:   authType,
-		kpRootKeyCrn: kpCrn,
-		uid: uid,
-		gid: gid,
+		bucketName:    bucket,
+		objPath:       objpath,
+		endPoint:      endpoint,
+		locConstraint: region,
+		accessKeys:    keys,
+		authType:      authType,
+		kpRootKeyCrn:  kpCrn,
+		uid:           uid,
+		gid:           gid,
 	}, nil
 }
 
@@ -57,4 +57,3 @@ func (s3fs *fakercloneMounter) Mount(source string, target string) error {
 func (s3fs *fakercloneMounter) Unmount(target string) error {
 	return nil
 }
-

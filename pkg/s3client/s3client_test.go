@@ -11,13 +11,13 @@ import (
 )
 
 type fakeS3API struct {
-	ErrHeadBucket   error
-	ErrCreateBucket error
-	ErrListObjects  error
-	ErrListObjectsV2  error
-	ErrDeleteObject error
-	ErrDeleteBucket error
-	ObjectPath      string
+	ErrHeadBucket    error
+	ErrCreateBucket  error
+	ErrListObjects   error
+	ErrListObjectsV2 error
+	ErrDeleteObject  error
+	ErrDeleteBucket  error
+	ObjectPath       string
 }
 
 const (

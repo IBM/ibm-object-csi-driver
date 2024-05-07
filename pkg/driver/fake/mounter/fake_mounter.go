@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	s3fsMounterType = "s3fs"
+	s3fsMounterType   = "s3fs"
 	rcloneMounterType = "rclone"
 )
 
