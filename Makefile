@@ -61,7 +61,7 @@ driver: deps buildimage
 
 .PHONY: build
 build:
-	CGO_ENABLED=0 GOOS=linux go build -mod=vendor -a -ldflags '-X main.version=$(REV) -extldflags "-static"' -o ${GOPATH}/bin/${EXE_DRIVER_NAME} ./cmd/$*
+	CGO_ENABLED=0 GOOS=linux go build -mod=vendor -v -ldflags '-X main.version=${git_commit_id} -extldflags "-static"' -o ${GOPATH}/bin/${EXE_DRIVER_NAME} ./cmd/$*
 
 
 .PHONY: buildimage
@@ -80,5 +80,5 @@ buildimage: build-binary
 .PHONY: build-binary
 build-binary:
 	docker build --build-arg TAG=$(REV) --build-arg OS=linux --build-arg ARCH=$(ARCH) -t csi-driver-builder --pull -f Dockerfile.builder .
-	docker run --env GHE_TOKEN=${GHE_TOKEN} csi-driver-builder
+	docker run csi-driver-builder
 	docker cp `docker ps -q -n=1`:/go/bin/${EXE_DRIVER_NAME} ./${EXE_DRIVER_NAME}
