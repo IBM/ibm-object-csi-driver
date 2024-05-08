@@ -187,6 +187,26 @@ func TestCreateVolume(t *testing.T) {
 			expectedErr:  errors.New("Error in getting credentials"),
 		},
 		{
+			testCaseName: "Negative: API Key is present in secret but not service ID",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: volumeCapabilities[0],
+						},
+					},
+				},
+				Secrets: map[string]string{
+					"iamEndpoint": "testIAMEndpoint",
+					"apiKey":      "testAPIKey",
+				},
+			},
+			cosSession:   &fakes3client.FakeCOSSessionFactory{},
+			expectedResp: nil,
+			expectedErr:  errors.New("Error in getting credentials"),
+		},
+		{
 			testCaseName: "Negative: cosEndpoint is missing",
 			req: &csi.CreateVolumeRequest{
 				Name: testVolumeName,
