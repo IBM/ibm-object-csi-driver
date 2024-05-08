@@ -1,5 +1,5 @@
 /**
- * Copyright 2021 IBM Corp.
+ * Copyright 2024 IBM Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 
 // Mounter interface defined in mounter.go
 // s3fsMounter Implements Mounter
-type fakes3fsMounter struct {
+type fakercloneMounter struct {
 	bucketName    string //From Secret in SC
 	objPath       string //From Secret in SC
 	endPoint      string //From Secret in SC
@@ -30,12 +30,14 @@ type fakes3fsMounter struct {
 	authType      string
 	accessKeys    string
 	kpRootKeyCrn  string
+	uid           string
+	gid           string
 }
 
-func fakenewS3fsMounter(bucket string, objpath string, endpoint string, region string, keys string, authType, kpCrn string) (mounter.Mounter, error) {
+func fakenewRcloneMounter(bucket string, objpath string, endpoint string, region string, keys string, authType, kpCrn, uid, gid string) (mounter.Mounter, error) {
 	klog.Infof("-newS3fsMounter-")
 	klog.Infof("newS3fsMounter args:\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>\n\tkeys: <%s>", bucket, objpath, endpoint, region, keys)
-	return &fakes3fsMounter{
+	return &fakercloneMounter{
 		bucketName:    bucket,
 		objPath:       objpath,
 		endPoint:      endpoint,
@@ -43,13 +45,15 @@ func fakenewS3fsMounter(bucket string, objpath string, endpoint string, region s
 		accessKeys:    keys,
 		authType:      authType,
 		kpRootKeyCrn:  kpCrn,
+		uid:           uid,
+		gid:           gid,
 	}, nil
 }
 
-func (s3fs *fakes3fsMounter) Mount(source string, target string) error {
+func (s3fs *fakercloneMounter) Mount(source string, target string) error {
 	return nil
 }
 
-func (s3fs *fakes3fsMounter) Unmount(target string) error {
+func (s3fs *fakercloneMounter) Unmount(target string) error {
 	return nil
 }
