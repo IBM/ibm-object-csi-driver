@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -18,12 +19,14 @@ import (
 )
 
 var unmount = syscall.Unmount
+var command = exec.Command
 
 type StatsUtils interface {
 	BucketToDelete(volumeID string) (string, error)
 	FSInfo(path string) (int64, int64, int64, int64, int64, int64, error)
 	CheckMount(targetPath string) (bool, error)
 	FuseUnmount(path string) error
+	FuseMount(path string, comm string, args []string) error
 }
 
 type DriverStatsUtils struct {
@@ -74,7 +77,28 @@ func (su *DriverStatsUtils) CheckMount(targetPath string) (bool, error) {
 	return notMnt, nil
 }
 
+func (su *DriverStatsUtils) FuseMount(path string, comm string, args []string) error {
+	klog.Info("-fuseMount-")
+	klog.Infof("fuseMount args:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%s>", path, comm, args)
+	cmd := command(comm, args...)
+	err := cmd.Start()
+
+	if err != nil {
+		klog.Errorf("fuseMount: cmd start failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+		return fmt.Errorf("fuseMount: cmd start failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+	}
+	err = cmd.Wait()
+	if err != nil {
+		// Handle error
+		klog.Errorf("fuseMount: cmd wait failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+		return fmt.Errorf("fuseMount: cmd wait failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+	}
+
+	return waitForMount(path, 10*time.Second)
+}
+
 func (su *DriverStatsUtils) FuseUnmount(path string) error {
+	klog.Info("-fuseUnmount-")
 	// directory exists
 	isMount, checkMountErr := isMountpoint(path)
 	if isMount || checkMountErr != nil {
@@ -125,6 +149,28 @@ func isMountpoint(pathname string) (bool, error) {
 	}
 	klog.Errorf("Cannot parse mountpoint result: %v", outStr)
 	return false, fmt.Errorf("cannot parse mountpoint result: %s", outStr)
+}
+
+func waitForMount(path string, timeout time.Duration) error {
+	var elapsed time.Duration
+	var interval = 10 * time.Millisecond
+	for {
+		out, err := exec.Command("mountpoint", path).CombinedOutput()
+		outStr := strings.TrimSpace(string(out))
+		if err != nil {
+			return err
+		}
+		if strings.HasSuffix(outStr, "is a mountpoint") {
+			klog.Infof("Path is a mountpoint: pathname - %s", path)
+			return nil
+		}
+
+		time.Sleep(interval)
+		elapsed = elapsed + interval
+		if elapsed >= timeout {
+			return errors.New("timeout waiting for mount")
+		}
+	}
 }
 
 func findFuseMountProcess(path string) (*os.Process, error) {

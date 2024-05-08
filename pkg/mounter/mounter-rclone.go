@@ -26,17 +26,98 @@ import (
 
 // Mounter interface defined in mounter.go
 // rcloneMounter Implements Mounter
-type rcloneMounter struct {
-	bucketName    string //From Secret in SC
-	objPath       string //From Secret in SC
-	endPoint      string //From Secret in SC
-	locConstraint string //From Secret in SC
-	authType      string
-	accessKeys    string
-	kpRootKeyCrn  string
-	uid           string
-	gid           string
-	mountOptions  []string
+type RcloneMounter struct {
+	BucketName    string //From Secret in SC
+	ObjPath       string //From Secret in SC
+	EndPoint      string //From Secret in SC
+	LocConstraint string //From Secret in SC
+	AuthType      string
+	AccessKeys    string
+	KpRootKeyCrn  string
+	Uid           string
+	Gid           string
+	MountOptions  []string
+	StatsUtils    utils.StatsUtils
+}
+
+const (
+	metaRootRclone = "/var/lib/ibmc-rclone"
+	configPath     = "/root/.config/rclone"
+	configFileName = "rclone.conf"
+	remote         = "ibmcos"
+	s3Type         = "s3"
+	cosProvider    = "IBMCOS"
+	envAuth        = "true"
+)
+
+func NewRcloneMounter(secretMap map[string]string, mountOptions []string, statsUtils utils.StatsUtils) (Mounter, error) {
+	klog.Info("-newRcloneMounter-")
+
+	var (
+		val       string
+		check     bool
+		accessKey string
+		secretKey string
+		apiKey    string
+		mounter   *RcloneMounter
+	)
+
+	mounter = &RcloneMounter{}
+
+	if val, check = secretMap["cosEndpoint"]; check {
+		mounter.EndPoint = val
+	}
+	if val, check = secretMap["locationConstraint"]; check {
+		mounter.LocConstraint = val
+	}
+	if val, check = secretMap["bucketName"]; check {
+		mounter.BucketName = val
+	}
+	if val, check = secretMap["objPath"]; check {
+		mounter.ObjPath = val
+	}
+	if val, check = secretMap["accessKey"]; check {
+		accessKey = val
+	}
+	if val, check = secretMap["secretKey"]; check {
+		secretKey = val
+	}
+	if val, check = secretMap["kpRootKeyCRN"]; check {
+		mounter.KpRootKeyCrn = val
+	}
+	if val, check = secretMap["apiKey"]; check {
+		apiKey = val
+	}
+	if apiKey != "" {
+		mounter.AccessKeys = fmt.Sprintf(":%s", apiKey)
+		mounter.AuthType = "iam"
+	} else {
+		mounter.AccessKeys = fmt.Sprintf("%s:%s", accessKey, secretKey)
+		mounter.AuthType = "hmac"
+	}
+
+	if val, check = secretMap["gid"]; check {
+		mounter.Gid = val
+	}
+	if secretMap["gid"] != "" && secretMap["uid"] == "" {
+		mounter.Uid = secretMap["gid"]
+	} else if secretMap["uid"] != "" {
+		mounter.Uid = secretMap["uid"]
+	}
+
+	klog.Infof("newRcloneMounter args:\n\tbucketName: [%s]\n\tobjPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
+		mounter.BucketName, mounter.ObjPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType)
+
+	updatedOptions, err := updateMountOptions(mountOptions, secretMap)
+
+	if err != nil {
+		klog.Infof("Problems with retrieving secret map dynamically %v", err)
+	}
+	mounter.MountOptions = updatedOptions
+
+	mounter.StatsUtils = statsUtils
+
+	return mounter, nil
 }
 
 func updateMountOptions(dafaultMountOptions []string, secretMap map[string]string) ([]string, error) {
@@ -84,85 +165,7 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 	return updatedOptions, nil
 }
 
-func newRcloneMounter(secretMap map[string]string, mountOptions []string) (Mounter, error) {
-	klog.Info("-newRcloneMounter-")
-
-	var (
-		val       string
-		check     bool
-		accessKey string
-		secretKey string
-		apiKey    string
-		mounter   *rcloneMounter
-	)
-
-	mounter = &rcloneMounter{}
-
-	if val, check = secretMap["cosEndpoint"]; check {
-		mounter.endPoint = val
-	}
-	if val, check = secretMap["locationConstraint"]; check {
-		mounter.locConstraint = val
-	}
-	if val, check = secretMap["bucketName"]; check {
-		mounter.bucketName = val
-	}
-	if val, check = secretMap["objPath"]; check {
-		mounter.objPath = val
-	}
-	if val, check = secretMap["accessKey"]; check {
-		accessKey = val
-	}
-	if val, check = secretMap["secretKey"]; check {
-		secretKey = val
-	}
-	if val, check = secretMap["kpRootKeyCRN"]; check {
-		mounter.kpRootKeyCrn = val
-	}
-	if val, check = secretMap["apiKey"]; check {
-		apiKey = val
-	}
-	if apiKey != "" {
-		mounter.accessKeys = fmt.Sprintf(":%s", apiKey)
-		mounter.authType = "iam"
-	} else {
-		mounter.accessKeys = fmt.Sprintf("%s:%s", accessKey, secretKey)
-		mounter.authType = "hmac"
-	}
-
-	if val, check = secretMap["gid"]; check {
-		mounter.gid = val
-	}
-	if secretMap["gid"] != "" && secretMap["uid"] == "" {
-		mounter.uid = secretMap["gid"]
-	} else if secretMap["uid"] != "" {
-		mounter.uid = secretMap["uid"]
-	}
-
-	klog.Infof("newRcloneMounter args:\n\tbucketName: [%s]\n\tobjPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
-		mounter.bucketName, mounter.objPath, mounter.endPoint, mounter.locConstraint, mounter.authType)
-
-	updatedOptions, err := updateMountOptions(mountOptions, secretMap)
-
-	if err != nil {
-		klog.Infof("Problems with retrieving secret map dynamically %v", err)
-	}
-	mounter.mountOptions = updatedOptions
-
-	return mounter, nil
-}
-
-const (
-	metaRootRclone = "/var/lib/ibmc-rclone"
-	configPath     = "/root/.config/rclone"
-	configFileName = "rclone.conf"
-	remote         = "ibmcos"
-	s3Type         = "s3"
-	cosProvider    = "IBMCOS"
-	envAuth        = "true"
-)
-
-func (rclone *rcloneMounter) Mount(source string, target string) error {
+func (rclone *RcloneMounter) Mount(source string, target string) error {
 	klog.Info("-RcloneMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
 	var bucketName string
@@ -189,10 +192,10 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 		return err
 	}
 
-	if rclone.objPath != "" {
-		bucketName = fmt.Sprintf("%s:%s/%s", remote, rclone.bucketName, rclone.objPath)
+	if rclone.ObjPath != "" {
+		bucketName = fmt.Sprintf("%s:%s/%s", remote, rclone.BucketName, rclone.ObjPath)
 	} else {
-		bucketName = fmt.Sprintf("%s:%s", remote, rclone.bucketName)
+		bucketName = fmt.Sprintf("%s:%s", remote, rclone.BucketName)
 	}
 
 	args := []string{
@@ -204,32 +207,31 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 		"--config=" + configPathWithVolID + "/" + configFileName,
 		"--log-file=/var/log/rclone.log",
 	}
-	if rclone.gid != "" {
-		gidOpt := "--gid=" + rclone.gid
+	if rclone.Gid != "" {
+		gidOpt := "--gid=" + rclone.Gid
 		args = append(args, gidOpt)
 	}
-	if rclone.uid != "" {
-		uidOpt := "--uid=" + rclone.uid
+	if rclone.Uid != "" {
+		uidOpt := "--uid=" + rclone.Uid
 		args = append(args, uidOpt)
 	}
-	return fuseMount(target, constants.RClone, args)
+	return rclone.StatsUtils.FuseMount(target, constants.RClone, args)
 }
 
-func (rclone *rcloneMounter) Unmount(target string) error {
+func (rclone *RcloneMounter) Unmount(target string) error {
 	klog.Info("-RcloneMounter Unmount-")
 	metaPath := path.Join(metaRootRclone, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 	err := os.RemoveAll(metaPath)
 	if err != nil {
 		return err
 	}
-	statsUtil := &(utils.DriverStatsUtils{})
-	return statsUtil.FuseUnmount(target)
+	return rclone.StatsUtils.FuseUnmount(target)
 }
 
-func (rclone *rcloneMounter) createConfig(configPathWithVolID string) error {
+func (rclone *RcloneMounter) createConfig(configPathWithVolID string) error {
 	var accessKey string
 	var secretKey string
-	keys := strings.Split(rclone.accessKeys, ":")
+	keys := strings.Split(rclone.AccessKeys, ":")
 	if len(keys) == 2 {
 		accessKey = keys[0]
 		secretKey = keys[1]
@@ -237,15 +239,15 @@ func (rclone *rcloneMounter) createConfig(configPathWithVolID string) error {
 	configParams := []string{
 		"[" + remote + "]",
 		"type = " + s3Type,
-		"endpoint = " + rclone.endPoint,
+		"endpoint = " + rclone.EndPoint,
 		"provider = " + cosProvider,
 		"env_auth = " + envAuth,
-		"location_constraint = " + rclone.locConstraint,
+		"location_constraint = " + rclone.LocConstraint,
 		"access_key_id = " + accessKey,
 		"secret_access_key = " + secretKey,
 	}
 
-	configParams = append(configParams, rclone.mountOptions...)
+	configParams = append(configParams, rclone.MountOptions...)
 
 	if err := os.MkdirAll(configPathWithVolID, 0755); // #nosec G301: used for rclone
 	err != nil {
