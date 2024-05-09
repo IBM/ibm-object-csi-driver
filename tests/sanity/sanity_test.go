@@ -230,7 +230,7 @@ func (m *FakeNewDriverStatsUtils) FuseMount(path string, comm string, args []str
 	return nil
 }
 
-func (su *FakeNewVolumeStatsUtils) GetBucketUsage(volumeID string) (int64, resource.Quantity, error) {
+func (su *FakeNewDriverStatsUtils) GetBucketUsage(volumeID string) (int64, resource.Quantity, error) {
 	return 0, resource.Quantity{}, nil
 }
 

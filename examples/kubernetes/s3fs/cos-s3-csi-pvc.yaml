@@ -9,4 +9,4 @@ spec:
   resources:
     requests:
       storage: 256Mi
-  storageClassName: cos-s3-csi-rclone-sc
+  storageClassName: cos-s3-csi-s3fs-sc
