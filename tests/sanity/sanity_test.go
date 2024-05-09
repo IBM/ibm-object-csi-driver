@@ -30,6 +30,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
 )
 
@@ -227,6 +228,10 @@ func (su *FakeNewDriverStatsUtils) FuseUnmount(path string) error {
 
 func (m *FakeNewDriverStatsUtils) FuseMount(path string, comm string, args []string) error {
 	return nil
+}
+
+func (su *FakeNewVolumeStatsUtils) GetBucketUsage(volumeID string) (int64, resource.Quantity, error) {
+	return 0, resource.Quantity{}, nil
 }
 
 func createTargetDir(targetPath string) error {

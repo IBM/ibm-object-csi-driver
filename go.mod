@@ -7,7 +7,7 @@ require (
 	github.com/IBM/ibm-csi-common v1.1.7
 	github.com/IBM/ibmcloud-storage-volume-lib v0.0.2
 	github.com/IBM/ibmcloud-volume-interface v1.2.1
-	github.com/aws/aws-sdk-go v1.44.116
+	github.com/aws/aws-sdk-go v1.51.18
 	github.com/container-storage-interface/spec v1.9.0
 	github.com/google/uuid v1.6.0
 	github.com/kubernetes-csi/csi-test/v5 v5.2.0
