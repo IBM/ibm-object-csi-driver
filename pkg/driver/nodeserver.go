@@ -226,7 +226,7 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 
 	klog.V(2).Info("NodeGetVolumeStats: Start getting Stats")
 	//  Making direct call to fs library for the sake of simplicity. That way we don't need to initialize VolumeStatsUtils. If there is a need for VolumeStatsUtils to grow bigger then we can use it
-	available, capacity, usage, inodes, inodesFree, inodesUsed, err := ns.Stats.FSInfo(req.VolumePath)
+	_, capacity, _, inodes, inodesFree, inodesUsed, err := ns.Stats.FSInfo(req.VolumePath)
 
 	if err != nil {
 		data := map[string]string{"VolumeId": volumeID, "Error": err.Error()}
@@ -239,12 +239,26 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 		}, nil
 	}
 
+	capUsed, totalCap, err := ns.Stats.GetBucketUsage(volumeID)
+	if err != nil {
+		return nil, err
+	}
+
+	capAsInt64, converted := totalCap.AsInt64()
+	if !converted {
+		capAsInt64 = capacity
+	}
+
+	klog.Info("NodeGetVolumeStats: Total Capacity of Volume: ", capAsInt64)
+
+	capAvailable := capAsInt64 - capUsed
+
 	resp := &csi.NodeGetVolumeStatsResponse{
 		Usage: []*csi.VolumeUsage{
 			{
-				Available: available,
-				Total:     capacity,
-				Used:      usage,
+				Available: capAvailable,
+				Total:     capAsInt64,
+				Used:      capUsed,
 				Unit:      csi.VolumeUsage_BYTES,
 			},
 			{
