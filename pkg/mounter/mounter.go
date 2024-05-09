@@ -6,7 +6,7 @@ import (
 	"syscall"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
-	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
+	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"k8s.io/klog/v2"
 )
 
@@ -41,16 +41,16 @@ func (s *S3fsMounterFactory) NewMounter(attrib map[string]string, secretMap map[
 		}
 	}
 
-	statsUtils := &(utils.DriverStatsUtils{})
+	mounterUtils := &(mounterUtils.MounterOptsUtils{})
 
 	switch mounter {
 	case constants.S3FS:
-		return NewS3fsMounter(secretMap, mountFlags, statsUtils)
+		return NewS3fsMounter(secretMap, mountFlags, mounterUtils)
 	case constants.RClone:
-		return NewRcloneMounter(secretMap, mountFlags, statsUtils)
+		return NewRcloneMounter(secretMap, mountFlags, mounterUtils)
 	default:
 		// default to s3backer
-		return NewS3fsMounter(secretMap, mountFlags, statsUtils)
+		return NewS3fsMounter(secretMap, mountFlags, mounterUtils)
 	}
 }
 

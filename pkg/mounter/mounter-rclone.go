@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
-	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
+	"github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"k8s.io/klog/v2"
 )
 
@@ -37,7 +37,7 @@ type RcloneMounter struct {
 	UID           string
 	GID           string
 	MountOptions  []string
-	StatsUtils    utils.StatsUtils
+	MounterUtils  utils.MounterUtils
 }
 
 const (
@@ -50,7 +50,7 @@ const (
 	envAuth        = "true"
 )
 
-func NewRcloneMounter(secretMap map[string]string, mountOptions []string, statsUtils utils.StatsUtils) (Mounter, error) {
+func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) (Mounter, error) {
 	klog.Info("-newRcloneMounter-")
 
 	var (
@@ -115,7 +115,7 @@ func NewRcloneMounter(secretMap map[string]string, mountOptions []string, statsU
 	}
 	mounter.MountOptions = updatedOptions
 
-	mounter.StatsUtils = statsUtils
+	mounter.MounterUtils = mounterUtils
 
 	return mounter, nil
 }
@@ -215,7 +215,7 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 		uidOpt := "--uid=" + rclone.UID
 		args = append(args, uidOpt)
 	}
-	return rclone.StatsUtils.FuseMount(target, constants.RClone, args)
+	return rclone.MounterUtils.FuseMount(target, constants.RClone, args)
 }
 
 func (rclone *RcloneMounter) Unmount(target string) error {
@@ -225,7 +225,7 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 	if err != nil {
 		return err
 	}
-	return rclone.StatsUtils.FuseUnmount(target)
+	return rclone.MounterUtils.FuseUnmount(target)
 }
 
 func (rclone *RcloneMounter) createConfig(configPathWithVolID string) error {

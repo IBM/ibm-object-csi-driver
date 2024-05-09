@@ -1,9 +1,5 @@
 package utils
 
-import (
-	"k8s.io/klog/v2"
-)
-
 var _ StatsUtils = (*MockStatsUtilsFuncStructImpl)(nil)
 
 type MockStatsUtilsFuncStruct struct {
@@ -26,13 +22,6 @@ func NewMockStatsUtilsImpl(reqFn MockStatsUtilsFuncStruct) *MockStatsUtilsFuncSt
 	}
 }
 
-func (m *MockStatsUtilsFuncStructImpl) FuseMount(path string, comm string, args []string) error {
-	if m.FuncStruct.FuseMountFn != nil {
-		return m.FuncStruct.FuseMountFn(path, comm, args)
-	}
-	panic("requested method should not be nil")
-}
-
 func (m *MockStatsUtilsFuncStructImpl) FSInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 	if m.FuncStruct.FSInfoFn != nil {
 		return m.FuncStruct.FSInfoFn(path)
@@ -43,14 +32,6 @@ func (m *MockStatsUtilsFuncStructImpl) FSInfo(path string) (int64, int64, int64,
 func (m *MockStatsUtilsFuncStructImpl) CheckMount(targetPath string) (bool, error) {
 	if m.FuncStruct.CheckMountFn != nil {
 		return m.FuncStruct.CheckMountFn(targetPath)
-	}
-	panic("requested method should not be nil")
-}
-
-func (m *MockStatsUtilsFuncStructImpl) FuseUnmount(path string) error {
-	klog.Info("-fake-fuseUnmount-")
-	if m.FuncStruct.FuseUnmountFn != nil {
-		return m.FuncStruct.FuseUnmountFn(path)
 	}
 	panic("requested method should not be nil")
 }

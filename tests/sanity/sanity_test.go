@@ -106,6 +106,7 @@ func initCSIDriverForSanity(t *testing.T) *csiDriver.S3Driver {
 	session := FakeNewObjectStorageSessionFactory()
 	mountObj := FakeNewS3fsMounterFactory()
 	statsUtil := &FakeNewDriverStatsUtils{}
+	mounterUtil := &FakeNewMounterOptsUtils{}
 
 	// Creating test logger
 	logger, teardown := cloudProvider.GetTestLogger(t)
@@ -117,7 +118,7 @@ func initCSIDriverForSanity(t *testing.T) *csiDriver.S3Driver {
 		t.Fatalf("Failed to setup CSI Driver: %v", err)
 	}
 
-	icsDriver, err := icDriver.NewS3CosDriver(nodeID, CSIEndpoint, session, mountObj, statsUtil)
+	icsDriver, err := icDriver.NewS3CosDriver(nodeID, CSIEndpoint, session, mountObj, statsUtil, mounterUtil)
 	if err != nil {
 		t.Fatalf("Failed to create New COS CSI Driver: %v", err)
 	}
@@ -203,6 +204,18 @@ func (v providerIDGenerator) GenerateUniqueValidVolumeID() string {
 	return fmt.Sprintf("fake-vol-ID-%s", uuid.New().String()[:10])
 }
 
+// Fake MounterOptsUtils
+type FakeNewMounterOptsUtils struct {
+}
+
+func (su *FakeNewMounterOptsUtils) FuseUnmount(path string) error {
+	return nil
+}
+
+func (m *FakeNewMounterOptsUtils) FuseMount(path string, comm string, args []string) error {
+	return nil
+}
+
 // Fake DriverStatsUtils
 type FakeNewDriverStatsUtils struct {
 }
@@ -220,14 +233,6 @@ func (su *FakeNewDriverStatsUtils) FSInfo(path string) (int64, int64, int64, int
 
 func (su *FakeNewDriverStatsUtils) CheckMount(targetPath string) (bool, error) {
 	return true, nil
-}
-
-func (su *FakeNewDriverStatsUtils) FuseUnmount(path string) error {
-	return nil
-}
-
-func (m *FakeNewDriverStatsUtils) FuseMount(path string, comm string, args []string) error {
-	return nil
 }
 
 func (su *FakeNewDriverStatsUtils) GetBucketUsage(volumeID string) (int64, resource.Quantity, error) {

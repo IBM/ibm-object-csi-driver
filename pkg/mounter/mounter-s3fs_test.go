@@ -6,26 +6,26 @@ import (
 	"os"
 	"testing"
 
-	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
+	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/stretchr/testify/assert"
 )
 
+// Mock the secretMap and mountOptions
+var secretMap = map[string]string{
+	"cosEndpoint":        "test-endpoint",
+	"locationConstraint": "test-loc-constraint",
+	"bucketName":         "test-bucket-name",
+	"objPath":            "test-obj-path",
+	"accessKey":          "test-access-key",
+	"secretKey":          "test-secret-key",
+	"apiKey":             "test-api-key",
+	"kpRootKeyCRN":       "test-kp-root-key-crn",
+}
+
+var mountOptions = []string{"opt1=val1", "opt2=val2"}
+
 func TestNewS3fsMounter_Success(t *testing.T) {
-	// Mock the secretMap and mountOptions
-	secretMap := map[string]string{
-		"cosEndpoint":        "test-endpoint",
-		"locationConstraint": "test-loc-constraint",
-		"bucketName":         "test-bucket-name",
-		"objPath":            "test-obj-path",
-		"accessKey":          "test-access-key",
-		"secretKey":          "test-secret-key",
-		"apiKey":             "test-api-key",
-		"kpRootKeyCRN":       "test-kp-root-key-crn",
-	}
-
-	mountOptions := []string{"opt1=val1", "opt2=val2"}
-
-	mounter, err := NewS3fsMounter(secretMap, mountOptions, utils.NewMockStatsUtilsImpl(utils.MockStatsUtilsFuncStruct{}))
+	mounter, err := NewS3fsMounter(secretMap, mountOptions, mounterUtils.NewMockMounterUtilsImpl(mounterUtils.MockMounterUtilsFuncStruct{}))
 	if err != nil {
 		t.Errorf("NewS3fsMounter failed: %v", err)
 	}
@@ -61,9 +61,7 @@ func TestNewS3fsMounter_Success_Hmac(t *testing.T) {
 		"kpRootKeyCRN":       "test-kp-root-key-crn",
 	}
 
-	mountOptions := []string{"opt1=val1", "opt2=val2"}
-
-	mounter, err := NewS3fsMounter(secretMap, mountOptions, utils.NewMockStatsUtilsImpl(utils.MockStatsUtilsFuncStruct{}))
+	mounter, err := NewS3fsMounter(secretMap, mountOptions, mounterUtils.NewMockMounterUtilsImpl(mounterUtils.MockMounterUtilsFuncStruct{}))
 	if err != nil {
 		t.Errorf("NewS3fsMounter failed: %v", err)
 	}
@@ -88,18 +86,8 @@ func TestNewS3fsMounter_Success_Hmac(t *testing.T) {
 }
 
 func Test_Mount_Positive(t *testing.T) {
-	secretMap := map[string]string{
-		"cosEndpoint":        "test-endpoint",
-		"locationConstraint": "test-loc-constraint",
-		"bucketName":         "test-bucket-name",
-		"objPath":            "test-obj-path",
-		"accessKey":          "test-access-key",
-		"secretKey":          "test-secret-key",
-		"apiKey":             "test-api-key",
-		"kpRootKeyCRN":       "test-kp-root-key-crn",
-	}
-	mounter, err := NewS3fsMounter(secretMap, []string{"mountOption1", "mountOption2"},
-		utils.NewMockStatsUtilsImpl(utils.MockStatsUtilsFuncStruct{
+	mounter, err := NewS3fsMounter(secretMap, mountOptions,
+		mounterUtils.NewMockMounterUtilsImpl(mounterUtils.MockMounterUtilsFuncStruct{
 			FuseMountFn: func(path string, comm string, args []string) error {
 				return nil
 			},
@@ -137,19 +125,9 @@ func Test_Mount_Positive(t *testing.T) {
 	}
 }
 
-func Test_Mount_Positive_(t *testing.T) {
-	secretMap := map[string]string{
-		"cosEndpoint":        "test-endpoint",
-		"locationConstraint": "test-loc-constraint",
-		"bucketName":         "test-bucket-name",
-		"objPath":            "test-obj-path",
-		"accessKey":          "test-access-key",
-		"secretKey":          "test-secret-key",
-		"apiKey":             "test-api-key",
-		"kpRootKeyCRN":       "test-kp-root-key-crn",
-	}
+func Test_Mount_Positive_SingleMountOptions(t *testing.T) {
 	mounter, err := NewS3fsMounter(secretMap, []string{"mountOption1", "mountOption2"},
-		utils.NewMockStatsUtilsImpl(utils.MockStatsUtilsFuncStruct{
+		mounterUtils.NewMockMounterUtilsImpl(mounterUtils.MockMounterUtilsFuncStruct{
 			FuseMountFn: func(path string, comm string, args []string) error {
 				return nil
 			},
@@ -188,18 +166,8 @@ func Test_Mount_Positive_(t *testing.T) {
 }
 
 func Test_Mount_Error_Creating_Mount_Point(t *testing.T) {
-	secretMap := map[string]string{
-		"cosEndpoint":        "test-endpoint",
-		"locationConstraint": "test-loc-constraint",
-		"bucketName":         "test-bucket-name",
-		"objPath":            "test-obj-path",
-		"accessKey":          "test-access-key",
-		"secretKey":          "test-secret-key",
-		"apiKey":             "test-api-key",
-		"kpRootKeyCRN":       "test-kp-root-key-crn",
-	}
-	mounter, err := NewS3fsMounter(secretMap, []string{"mountOption1", "mountOption2"},
-		utils.NewMockStatsUtilsImpl(utils.MockStatsUtilsFuncStruct{
+	mounter, err := NewS3fsMounter(secretMap, mountOptions,
+		mounterUtils.NewMockMounterUtilsImpl(mounterUtils.MockMounterUtilsFuncStruct{
 			FuseMountFn: func(path string, comm string, args []string) error {
 				return nil
 			},
@@ -227,18 +195,8 @@ func Test_Mount_Error_Creating_Mount_Point(t *testing.T) {
 }
 
 func Test_Mount_Error_Creating_PWFile(t *testing.T) {
-	secretMap := map[string]string{
-		"cosEndpoint":        "test-endpoint",
-		"locationConstraint": "test-loc-constraint",
-		"bucketName":         "test-bucket-name",
-		"objPath":            "test-obj-path",
-		"accessKey":          "test-access-key",
-		"secretKey":          "test-secret-key",
-		"apiKey":             "test-api-key",
-		"kpRootKeyCRN":       "test-kp-root-key-crn",
-	}
-	mounter, err := NewS3fsMounter(secretMap, []string{"mountOption1", "mountOption2"},
-		utils.NewMockStatsUtilsImpl(utils.MockStatsUtilsFuncStruct{
+	mounter, err := NewS3fsMounter(secretMap, mountOptions,
+		mounterUtils.NewMockMounterUtilsImpl(mounterUtils.MockMounterUtilsFuncStruct{
 			FuseMountFn: func(path string, comm string, args []string) error {
 				return nil
 			},
@@ -274,18 +232,8 @@ func Test_Mount_Error_Creating_PWFile(t *testing.T) {
 }
 
 func Test_Mount_ErrorMount(t *testing.T) {
-	secretMap := map[string]string{
-		"cosEndpoint":        "test-endpoint",
-		"locationConstraint": "test-loc-constraint",
-		"bucketName":         "test-bucket-name",
-		"objPath":            "test-obj-path",
-		"accessKey":          "test-access-key",
-		"secretKey":          "test-secret-key",
-		"apiKey":             "test-api-key",
-		"kpRootKeyCRN":       "test-kp-root-key-crn",
-	}
-	mounter, err := NewS3fsMounter(secretMap, []string{"mountOption1", "mountOption2"},
-		utils.NewMockStatsUtilsImpl(utils.MockStatsUtilsFuncStruct{
+	mounter, err := NewS3fsMounter(secretMap, mountOptions,
+		mounterUtils.NewMockMounterUtilsImpl(mounterUtils.MockMounterUtilsFuncStruct{
 			FuseMountFn: func(path string, comm string, args []string) error {
 				return errors.New("error mounting volume")
 			},
@@ -321,18 +269,8 @@ func Test_Mount_ErrorMount(t *testing.T) {
 }
 
 func Test_Unmount_Positive(t *testing.T) {
-	secretMap := map[string]string{
-		"cosEndpoint":        "test-endpoint",
-		"locationConstraint": "test-loc-constraint",
-		"bucketName":         "test-bucket-name",
-		"objPath":            "test-obj-path",
-		"accessKey":          "test-access-key",
-		"secretKey":          "test-secret-key",
-		"apiKey":             "test-api-key",
-		"kpRootKeyCRN":       "test-kp-root-key-crn",
-	}
-	mounter, err := NewS3fsMounter(secretMap, []string{"mountOption1", "mountOption2"},
-		utils.NewMockStatsUtilsImpl(utils.MockStatsUtilsFuncStruct{
+	mounter, err := NewS3fsMounter(secretMap, mountOptions,
+		mounterUtils.NewMockMounterUtilsImpl(mounterUtils.MockMounterUtilsFuncStruct{
 			FuseUnmountFn: func(path string) error {
 				return nil
 			},
@@ -367,18 +305,8 @@ func Test_Unmount_Positive(t *testing.T) {
 }
 
 func Test_Unmount_Error(t *testing.T) {
-	secretMap := map[string]string{
-		"cosEndpoint":        "test-endpoint",
-		"locationConstraint": "test-loc-constraint",
-		"bucketName":         "test-bucket-name",
-		"objPath":            "test-obj-path",
-		"accessKey":          "test-access-key",
-		"secretKey":          "test-secret-key",
-		"apiKey":             "test-api-key",
-		"kpRootKeyCRN":       "test-kp-root-key-crn",
-	}
-	mounter, err := NewS3fsMounter(secretMap, []string{"mountOption1", "mountOption2"},
-		utils.NewMockStatsUtilsImpl(utils.MockStatsUtilsFuncStruct{
+	mounter, err := NewS3fsMounter(secretMap, mountOptions,
+		mounterUtils.NewMockMounterUtilsImpl(mounterUtils.MockMounterUtilsFuncStruct{
 			FuseUnmountFn: func(path string) error {
 				return errors.New("error unmounting volume")
 			},

@@ -21,6 +21,7 @@ import (
 
 	"github.com/IBM/ibm-csi-common/pkg/utils"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
+	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
 	pkgUtils "github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
@@ -136,7 +137,7 @@ func newNodeServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, nodeID string, mo
 	}
 }
 
-func (driver *S3Driver) NewS3CosDriver(nodeID string, endpoint string, s3cosSession s3client.ObjectStorageSessionFactory, mountObj mounter.NewMounterFactory, statsUtil pkgUtils.StatsUtils) (*S3Driver, error) {
+func (driver *S3Driver) NewS3CosDriver(nodeID string, endpoint string, s3cosSession s3client.ObjectStorageSessionFactory, mountObj mounter.NewMounterFactory, statsUtil pkgUtils.StatsUtils, mounterUtil mounterUtils.MounterUtils) (*S3Driver, error) {
 	s3client, err := s3client.NewS3Client(driver.logger)
 	if err != nil {
 		return nil, err

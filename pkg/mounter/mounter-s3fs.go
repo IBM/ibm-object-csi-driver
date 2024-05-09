@@ -19,7 +19,7 @@ import (
 	"strings"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
-	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
+	"github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"k8s.io/klog/v2"
 )
 
@@ -34,7 +34,7 @@ type S3fsMounter struct {
 	AccessKeys    string
 	KpRootKeyCrn  string
 	MountOptions  []string
-	StatsUtils    utils.StatsUtils
+	MounterUtils  utils.MounterUtils
 }
 
 const (
@@ -42,7 +42,7 @@ const (
 	passFile = ".passwd-s3fs" // #nosec G101: not password
 )
 
-func NewS3fsMounter(secretMap map[string]string, mountOptions []string, statsUtils utils.StatsUtils) (Mounter, error) {
+func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) (Mounter, error) {
 	klog.Info("-newS3fsMounter-")
 
 	var (
@@ -98,7 +98,7 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, statsUti
 	}
 	mounter.MountOptions = updatedOptions
 
-	mounter.StatsUtils = statsUtils
+	mounter.MounterUtils = mounterUtils
 
 	return mounter, nil
 }
@@ -161,7 +161,7 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	} else {
 		args = append(args, "-o", "default_acl=private")
 	}
-	return s3fs.StatsUtils.FuseMount(target, constants.S3FS, args)
+	return s3fs.MounterUtils.FuseMount(target, constants.S3FS, args)
 }
 
 var mkdirAllFunc = os.MkdirAll
@@ -186,7 +186,7 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 		return err
 	}
 
-	return s3fs.StatsUtils.FuseUnmount(target)
+	return s3fs.MounterUtils.FuseUnmount(target)
 }
 
 func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string) ([]string, error) {

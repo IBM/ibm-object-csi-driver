@@ -43,8 +43,6 @@ github.com/IBM/ibm-cos-sdk-go v1.10.3 h1:YfZSLqMiCrqDPbr3r+amY2sicIXlrd+3L5pok6Q
 github.com/IBM/ibm-cos-sdk-go v1.10.3/go.mod h1:T9x7pC47DUd5jD/TMFzlvly39P6EdW5wOemA78XEo2g=
 github.com/IBM/ibm-csi-common v1.1.7 h1:4QY86ZJ8rX1ghrhytgIY+VoEemeG+J2PbvzXTuYZakc=
 github.com/IBM/ibm-csi-common v1.1.7/go.mod h1:TilE1H+F4rzhgnEHHDzdcJ9M+WcJB6QCBxwtGdCDv7A=
-github.com/IBM/ibmcloud-storage-volume-lib v0.0.2 h1:K6MxfKjGC0ID49tR9iZP9JWo+gVdWw7bueEMNLArhzs=
-github.com/IBM/ibmcloud-storage-volume-lib v0.0.2/go.mod h1:xFXCpJFg3Nj3HDgP79Uq/t+DTVFH/9lKxia5e6t49pg=
 github.com/IBM/ibmcloud-volume-interface v1.2.1 h1:h7bi/fQzFFvqN2nGxtAfnbYIw3CQetZ8YPAF/g7IQ2Y=
 github.com/IBM/ibmcloud-volume-interface v1.2.1/go.mod h1:646HOeq8dAKbgpr7jRehGKckhgduJyII2uN5T6RDLww=
 github.com/IBM/ibmcloud-volume-vpc v1.1.5 h1:dN/LxVxtkiK0g4JzDP2VnHoh+LfHwPyzB+TgUZbhVyU=
@@ -118,6 +116,7 @@ github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeME
 github.com/go-gl/glfw v0.0.0-20190409004039-e6da0acd62b1/go.mod h1:vR7hzQXu2zJy9AVAgeJqvqgH9Q5CA+iKCZ2gyEVpxRU=
 github.com/go-gl/glfw/v3.3/glfw v0.0.0-20191125211704-12ad95a8df72/go.mod h1:tQ2UAYgL5IevRw8kRxooKSPJfGvJ9fJQFa0TUsXzTg8=
 github.com/go-gl/glfw/v3.3/glfw v0.0.0-20200222043503-6f7a984d4dc4/go.mod h1:tQ2UAYgL5IevRw8kRxooKSPJfGvJ9fJQFa0TUsXzTg8=
+github.com/go-logr/logr v0.1.0/go.mod h1:ixOQHD9gLJUVQQ2ZOR7zLEifBX6tGkNJF4QyIY7sIas=
 github.com/go-logr/logr v1.2.2/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=
 github.com/go-logr/logr v1.4.1 h1:pKouT5E8xu9zeFC39JXRDukb6JFQPXM5p5I91188VAQ=
 github.com/go-logr/logr v1.4.1/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
@@ -760,6 +759,8 @@ k8s.io/component-helpers v0.26.1 h1:Y5h1OYUJTGyHZlSAsc7mcfNsWF08S/MlrQyF/vn93mU=
 k8s.io/component-helpers v0.26.1/go.mod h1:jxNTnHb1axLe93MyVuvKj9T/+f4nxBVrj/xf01/UNFk=
 k8s.io/csi-translation-lib v0.26.1 h1:GQT88qX4e903HlFne1ovGFilvsd7kJUVi6SWOkOg2SQ=
 k8s.io/csi-translation-lib v0.26.1/go.mod h1:tbcXKaVAS3G9iIAi+8Ujp+LPLetZ+vZ2AsZj+c1yXd8=
+k8s.io/klog v1.0.0 h1:Pt+yjF5aB1xDSVbau4VsWe+dQNzA0qv1LlXdC2dF6Q8=
+k8s.io/klog v1.0.0/go.mod h1:4Bi6QPql/J/LkTDqv7R/cd3hPo4k2DG6Ptcz060Ez5I=
 k8s.io/klog/v2 v2.120.1 h1:QXU6cPEOIslTGvZaXvFWiP9VKyeet3sawzTOvdXb4Vw=
 k8s.io/klog/v2 v2.120.1/go.mod h1:3Jpz1GvMt720eyJH1ckRHK1EDfpxISzJ7I9OYgaDtPE=
 k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280 h1:+70TFaan3hfJzs+7VK2o+OGxg8HsuBr/5f6tVAjDu6E=

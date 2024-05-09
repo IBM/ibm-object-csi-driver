@@ -5,7 +5,6 @@ go 1.21
 require (
 	github.com/IBM/ibm-cos-sdk-go v1.10.3
 	github.com/IBM/ibm-csi-common v1.1.7
-	github.com/IBM/ibmcloud-storage-volume-lib v0.0.2
 	github.com/IBM/ibmcloud-volume-interface v1.2.1
 	github.com/aws/aws-sdk-go v1.51.18
 	github.com/container-storage-interface/spec v1.9.0
@@ -22,6 +21,7 @@ require (
 	k8s.io/api v0.26.1
 	k8s.io/apimachinery v0.26.1
 	k8s.io/client-go v0.26.1
+	k8s.io/klog v1.0.0
 	k8s.io/klog/v2 v2.120.1
 	k8s.io/kubernetes v1.26.6
 	k8s.io/pod-security-admission v0.0.0

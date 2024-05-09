@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
+	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
 	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"github.com/stretchr/testify/assert"
@@ -80,7 +81,8 @@ func inits3Driver(t *testing.T) *S3Driver {
 	}
 
 	statsUtil := &(utils.DriverStatsUtils{})
-	icsDriver, err := icDriver.NewS3CosDriver(nodeID, endpoint, mockSession, mockMountObj, statsUtil)
+	mounterUtil := &(mounterUtils.MounterOptsUtils{})
+	icsDriver, err := icDriver.NewS3CosDriver(nodeID, endpoint, mockSession, mockMountObj, statsUtil, mounterUtil)
 	if err != nil {
 		t.Fatalf("Failed to create New COS CSI Driver: %v", err)
 	}
