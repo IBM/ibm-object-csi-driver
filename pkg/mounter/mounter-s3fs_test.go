@@ -407,7 +407,6 @@ func Test_Unmount_Error(t *testing.T) {
 }
 
 func TestUpdateS3FSMountOptions(t *testing.T) {
-
 	defaultMountOp := []string{"option1=value1", "option2=value2"}
 	secretMap := map[string]string{
 		"tmpdir":       "/tmp",

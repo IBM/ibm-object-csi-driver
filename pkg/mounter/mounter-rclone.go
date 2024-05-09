@@ -34,8 +34,8 @@ type RcloneMounter struct {
 	AuthType      string
 	AccessKeys    string
 	KpRootKeyCrn  string
-	Uid           string
-	Gid           string
+	UID           string
+	GID           string
 	MountOptions  []string
 	StatsUtils    utils.StatsUtils
 }
@@ -97,12 +97,12 @@ func NewRcloneMounter(secretMap map[string]string, mountOptions []string, statsU
 	}
 
 	if val, check = secretMap["gid"]; check {
-		mounter.Gid = val
+		mounter.GID = val
 	}
 	if secretMap["gid"] != "" && secretMap["uid"] == "" {
-		mounter.Uid = secretMap["gid"]
+		mounter.UID = secretMap["gid"]
 	} else if secretMap["uid"] != "" {
-		mounter.Uid = secretMap["uid"]
+		mounter.UID = secretMap["uid"]
 	}
 
 	klog.Infof("newRcloneMounter args:\n\tbucketName: [%s]\n\tobjPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
@@ -207,12 +207,12 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 		"--config=" + configPathWithVolID + "/" + configFileName,
 		"--log-file=/var/log/rclone.log",
 	}
-	if rclone.Gid != "" {
-		gidOpt := "--gid=" + rclone.Gid
+	if rclone.GID != "" {
+		gidOpt := "--gid=" + rclone.GID
 		args = append(args, gidOpt)
 	}
-	if rclone.Uid != "" {
-		uidOpt := "--uid=" + rclone.Uid
+	if rclone.UID != "" {
+		uidOpt := "--uid=" + rclone.UID
 		args = append(args, uidOpt)
 	}
 	return rclone.StatsUtils.FuseMount(target, constants.RClone, args)
