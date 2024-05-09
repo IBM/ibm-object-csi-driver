@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Mock the secretMap and mountOptions
+// Fake the secretMap and mountOptions
 var secretMap = map[string]string{
 	"cosEndpoint":        "test-endpoint",
 	"locationConstraint": "test-loc-constraint",
@@ -25,7 +25,7 @@ var secretMap = map[string]string{
 var mountOptions = []string{"opt1=val1", "opt2=val2"}
 
 func TestNewS3fsMounter_Success(t *testing.T) {
-	mounter, err := NewS3fsMounter(secretMap, mountOptions, mounterUtils.NewMockMounterUtilsImpl(mounterUtils.MockMounterUtilsFuncStruct{}))
+	mounter, err := NewS3fsMounter(secretMap, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
 	if err != nil {
 		t.Errorf("NewS3fsMounter failed: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestNewS3fsMounter_Success(t *testing.T) {
 }
 
 func TestNewS3fsMounter_Success_Hmac(t *testing.T) {
-	// Mock the secretMap and mountOptions
+	// Fake the secretMap and mountOptions
 	secretMap := map[string]string{
 		"cosEndpoint":        "test-endpoint",
 		"locationConstraint": "test-loc-constraint",
@@ -61,7 +61,7 @@ func TestNewS3fsMounter_Success_Hmac(t *testing.T) {
 		"kpRootKeyCRN":       "test-kp-root-key-crn",
 	}
 
-	mounter, err := NewS3fsMounter(secretMap, mountOptions, mounterUtils.NewMockMounterUtilsImpl(mounterUtils.MockMounterUtilsFuncStruct{}))
+	mounter, err := NewS3fsMounter(secretMap, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
 	if err != nil {
 		t.Errorf("NewS3fsMounter failed: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestNewS3fsMounter_Success_Hmac(t *testing.T) {
 
 func Test_Mount_Positive(t *testing.T) {
 	mounter, err := NewS3fsMounter(secretMap, mountOptions,
-		mounterUtils.NewMockMounterUtilsImpl(mounterUtils.MockMounterUtilsFuncStruct{
+		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path string, comm string, args []string) error {
 				return nil
 			},
@@ -100,20 +100,20 @@ func Test_Mount_Positive(t *testing.T) {
 		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
 	}
 
-	mockMkdirAll := func(path string, perm os.FileMode) error {
+	FakeMkdirAll := func(path string, perm os.FileMode) error {
 		return nil
 	}
 
-	// Replace mkdirAllFunc with the mock function
-	mkdirAllFunc = mockMkdirAll
+	// Replace mkdirAllFunc with the Fake function
+	mkdirAllFunc = FakeMkdirAll
 	defer func() { mkdirAllFunc = os.MkdirAll }()
 
-	mockWritePass := func(pwFileName string, pwFileContent string) error {
+	FakeWritePass := func(pwFileName string, pwFileContent string) error {
 		return nil
 	}
 
-	// Replace writePassFunc with the mock function
-	writePassFunc = mockWritePass
+	// Replace writePassFunc with the Fake function
+	writePassFunc = FakeWritePass
 	defer func() { writePassFunc = writePass }()
 
 	target := "/tmp/test-mount"
@@ -127,7 +127,7 @@ func Test_Mount_Positive(t *testing.T) {
 
 func Test_Mount_Positive_SingleMountOptions(t *testing.T) {
 	mounter, err := NewS3fsMounter(secretMap, []string{"mountOption1", "mountOption2"},
-		mounterUtils.NewMockMounterUtilsImpl(mounterUtils.MockMounterUtilsFuncStruct{
+		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path string, comm string, args []string) error {
 				return nil
 			},
@@ -140,20 +140,20 @@ func Test_Mount_Positive_SingleMountOptions(t *testing.T) {
 		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
 	}
 
-	mockMkdirAll := func(path string, perm os.FileMode) error {
+	FakeMkdirAll := func(path string, perm os.FileMode) error {
 		return nil
 	}
 
-	// Replace mkdirAllFunc with the mock function
-	mkdirAllFunc = mockMkdirAll
+	// Replace mkdirAllFunc with the Fake function
+	mkdirAllFunc = FakeMkdirAll
 	defer func() { mkdirAllFunc = os.MkdirAll }()
 
-	mockWritePass := func(pwFileName string, pwFileContent string) error {
+	FakeWritePass := func(pwFileName string, pwFileContent string) error {
 		return nil
 	}
 
-	// Replace writePassFunc with the mock function
-	writePassFunc = mockWritePass
+	// Replace writePassFunc with the Fake function
+	writePassFunc = FakeWritePass
 	defer func() { writePassFunc = writePass }()
 
 	target := "/tmp/test-mount"
@@ -167,7 +167,7 @@ func Test_Mount_Positive_SingleMountOptions(t *testing.T) {
 
 func Test_Mount_Error_Creating_Mount_Point(t *testing.T) {
 	mounter, err := NewS3fsMounter(secretMap, mountOptions,
-		mounterUtils.NewMockMounterUtilsImpl(mounterUtils.MockMounterUtilsFuncStruct{
+		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path string, comm string, args []string) error {
 				return nil
 			},
@@ -180,12 +180,12 @@ func Test_Mount_Error_Creating_Mount_Point(t *testing.T) {
 		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
 	}
 
-	mockMkdirAll := func(path string, perm os.FileMode) error {
+	FakeMkdirAll := func(path string, perm os.FileMode) error {
 		return errors.New("error creating mount path")
 	}
 
-	// Replace mkdirAllFunc with the mock function
-	mkdirAllFunc = mockMkdirAll
+	// Replace mkdirAllFunc with the Fake function
+	mkdirAllFunc = FakeMkdirAll
 	defer func() { mkdirAllFunc = os.MkdirAll }()
 
 	target := "/tmp/test-mount"
@@ -196,7 +196,7 @@ func Test_Mount_Error_Creating_Mount_Point(t *testing.T) {
 
 func Test_Mount_Error_Creating_PWFile(t *testing.T) {
 	mounter, err := NewS3fsMounter(secretMap, mountOptions,
-		mounterUtils.NewMockMounterUtilsImpl(mounterUtils.MockMounterUtilsFuncStruct{
+		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path string, comm string, args []string) error {
 				return nil
 			},
@@ -209,20 +209,20 @@ func Test_Mount_Error_Creating_PWFile(t *testing.T) {
 		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
 	}
 
-	mockMkdirAll := func(path string, perm os.FileMode) error {
+	FakeMkdirAll := func(path string, perm os.FileMode) error {
 		return nil
 	}
 
-	// Replace mkdirAllFunc with the mock function
-	mkdirAllFunc = mockMkdirAll
+	// Replace mkdirAllFunc with the Fake function
+	mkdirAllFunc = FakeMkdirAll
 	defer func() { mkdirAllFunc = os.MkdirAll }()
 
-	mockWritePass := func(pwFileName string, pwFileContent string) error {
+	FakeWritePass := func(pwFileName string, pwFileContent string) error {
 		return errors.New("error creating PWFile")
 	}
 
-	// Replace writePassFunc with the mock function
-	writePassFunc = mockWritePass
+	// Replace writePassFunc with the Fake function
+	writePassFunc = FakeWritePass
 	defer func() { writePassFunc = writePass }()
 
 	target := "/tmp/test-mount"
@@ -233,7 +233,7 @@ func Test_Mount_Error_Creating_PWFile(t *testing.T) {
 
 func Test_Mount_ErrorMount(t *testing.T) {
 	mounter, err := NewS3fsMounter(secretMap, mountOptions,
-		mounterUtils.NewMockMounterUtilsImpl(mounterUtils.MockMounterUtilsFuncStruct{
+		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path string, comm string, args []string) error {
 				return errors.New("error mounting volume")
 			},
@@ -246,20 +246,20 @@ func Test_Mount_ErrorMount(t *testing.T) {
 		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
 	}
 
-	mockMkdirAll := func(path string, perm os.FileMode) error {
+	FakeMkdirAll := func(path string, perm os.FileMode) error {
 		return nil
 	}
 
-	// Replace mkdirAllFunc with the mock function
-	mkdirAllFunc = mockMkdirAll
+	// Replace mkdirAllFunc with the Fake function
+	mkdirAllFunc = FakeMkdirAll
 	defer func() { mkdirAllFunc = os.MkdirAll }()
 
-	mockWritePass := func(pwFileName string, pwFileContent string) error {
+	FakeWritePass := func(pwFileName string, pwFileContent string) error {
 		return nil
 	}
 
-	// Replace writePassFunc with the mock function
-	writePassFunc = mockWritePass
+	// Replace writePassFunc with the Fake function
+	writePassFunc = FakeWritePass
 	defer func() { writePassFunc = writePass }()
 
 	target := "/tmp/test-mount"
@@ -270,7 +270,7 @@ func Test_Mount_ErrorMount(t *testing.T) {
 
 func Test_Unmount_Positive(t *testing.T) {
 	mounter, err := NewS3fsMounter(secretMap, mountOptions,
-		mounterUtils.NewMockMounterUtilsImpl(mounterUtils.MockMounterUtilsFuncStruct{
+		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseUnmountFn: func(path string) error {
 				return nil
 			},
@@ -306,7 +306,7 @@ func Test_Unmount_Positive(t *testing.T) {
 
 func Test_Unmount_Error(t *testing.T) {
 	mounter, err := NewS3fsMounter(secretMap, mountOptions,
-		mounterUtils.NewMockMounterUtilsImpl(mounterUtils.MockMounterUtilsFuncStruct{
+		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseUnmountFn: func(path string) error {
 				return errors.New("error unmounting volume")
 			},

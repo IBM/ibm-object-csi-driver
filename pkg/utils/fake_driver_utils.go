@@ -1,8 +1,8 @@
 package utils
 
-var _ StatsUtils = (*MockStatsUtilsFuncStructImpl)(nil)
+var _ StatsUtils = (*FakeStatsUtilsFuncStructImpl)(nil)
 
-type MockStatsUtilsFuncStruct struct {
+type FakeStatsUtilsFuncStruct struct {
 	FuseMountFn      func(path string, comm string, args []string) error
 	FSInfoFn         func(path string) (int64, int64, int64, int64, int64, int64, error)
 	CheckMountFn     func(targetPath string) (bool, error)
@@ -10,33 +10,33 @@ type MockStatsUtilsFuncStruct struct {
 	BucketToDeleteFn func(volumeID string) (string, error)
 }
 
-type MockStatsUtilsFuncStructImpl struct {
+type FakeStatsUtilsFuncStructImpl struct {
 	DriverStatsUtils
 
-	FuncStruct MockStatsUtilsFuncStruct
+	FuncStruct FakeStatsUtilsFuncStruct
 }
 
-func NewMockStatsUtilsImpl(reqFn MockStatsUtilsFuncStruct) *MockStatsUtilsFuncStructImpl {
-	return &MockStatsUtilsFuncStructImpl{
+func NewFakeStatsUtilsImpl(reqFn FakeStatsUtilsFuncStruct) *FakeStatsUtilsFuncStructImpl {
+	return &FakeStatsUtilsFuncStructImpl{
 		FuncStruct: reqFn,
 	}
 }
 
-func (m *MockStatsUtilsFuncStructImpl) FSInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
+func (m *FakeStatsUtilsFuncStructImpl) FSInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 	if m.FuncStruct.FSInfoFn != nil {
 		return m.FuncStruct.FSInfoFn(path)
 	}
 	panic("requested method should not be nil")
 }
 
-func (m *MockStatsUtilsFuncStructImpl) CheckMount(targetPath string) (bool, error) {
+func (m *FakeStatsUtilsFuncStructImpl) CheckMount(targetPath string) (bool, error) {
 	if m.FuncStruct.CheckMountFn != nil {
 		return m.FuncStruct.CheckMountFn(targetPath)
 	}
 	panic("requested method should not be nil")
 }
 
-func (m *MockStatsUtilsFuncStructImpl) BucketToDelete(volumeID string) (string, error) {
+func (m *FakeStatsUtilsFuncStructImpl) BucketToDelete(volumeID string) (string, error) {
 	if m.FuncStruct.BucketToDeleteFn != nil {
 		return m.FuncStruct.BucketToDeleteFn(volumeID)
 	}

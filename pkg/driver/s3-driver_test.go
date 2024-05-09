@@ -67,8 +67,8 @@ func inits3Driver(t *testing.T) *S3Driver {
 	nodeID := "test-nodeID"
 
 	//This has to be used as fake cosSession and fake Mounter
-	mockSession := &s3client.COSSessionFactory{}
-	mockMountObj := &mounter.S3fsMounterFactory{}
+	fakeSession := &s3client.COSSessionFactory{}
+	fakeMountObj := &mounter.S3fsMounterFactory{}
 
 	// Creating test logger
 	logger, teardown := GetTestLogger(t)
@@ -82,7 +82,7 @@ func inits3Driver(t *testing.T) *S3Driver {
 
 	statsUtil := &(utils.DriverStatsUtils{})
 	mounterUtil := &(mounterUtils.MounterOptsUtils{})
-	icsDriver, err := icDriver.NewS3CosDriver(nodeID, endpoint, mockSession, mockMountObj, statsUtil, mounterUtil)
+	icsDriver, err := icDriver.NewS3CosDriver(nodeID, endpoint, fakeSession, fakeMountObj, statsUtil, mounterUtil)
 	if err != nil {
 		t.Fatalf("Failed to create New COS CSI Driver: %v", err)
 	}
