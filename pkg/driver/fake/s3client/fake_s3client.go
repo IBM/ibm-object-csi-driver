@@ -1,5 +1,5 @@
 /**
- * Copyright 2021 IBM Corp.
+ * Copyright 2024 IBM Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,87 +24,46 @@ import (
 )
 
 // ObjectStorageSessionFactory is a factory for mocked object storage sessions
-type ObjectStorageSessionFactory struct {
-	//FailCheckBucketAccess ...
+type FakeCOSSessionFactory struct {
 	FailCheckBucketAccess bool
-	//FailCreateBucket ...
-	FailCreateBucket bool
-	//FailDeleteBucket ...
-	FailDeleteBucket bool
-	//CheckObjectPathExistenceError ...
-	CheckObjectPathExistenceError bool
-	//CheckObjectPathExistencePathNotFound ...
-	CheckObjectPathExistencePathNotFound bool
-
-	// LastEndpoint holds the endpoint of the last created session
-	LastEndpoint string
-	// LastRegion holds the region of the last created session
-	LastRegion string
-	// LastCredentials holds the credentials of the last created session
-	LastCredentials *s3client.ObjectStorageCredentials
-	// LastCheckedBucket stores the name of the last bucket that was checked
-	LastCheckedBucket string
-	// LastCreatedBucket stores the name of the last bucket that was created
-	LastCreatedBucket string
-	// LastDeletedBucket stores the name of the last bucket that was deleted
-	LastDeletedBucket string
+	FailCreateBucket      bool
+	FailDeleteBucket      bool
 }
 
-type fakeObjectStorageSession struct {
-	factory *ObjectStorageSessionFactory
+type fakeCOSSession struct {
+	factory *FakeCOSSessionFactory
 	logger  *zap.Logger
 }
 
 // NewObjectStorageSession method creates a new fake object store session
-func (f *ObjectStorageSessionFactory) NewObjectStorageSession(endpoint, region string, creds *s3client.ObjectStorageCredentials, lgr *zap.Logger) s3client.ObjectStorageSession {
-	f.LastEndpoint = endpoint
-	f.LastRegion = region
-	f.LastCredentials = creds
-	return &fakeObjectStorageSession{
+func (f *FakeCOSSessionFactory) NewObjectStorageSession(endpoint, region string, creds *s3client.ObjectStorageCredentials, lgr *zap.Logger) s3client.ObjectStorageSession {
+	return &fakeCOSSession{
 		factory: f,
 		logger:  lgr,
 	}
 }
 
-// ResetStats clears the details about previous sessions
-func (f *ObjectStorageSessionFactory) ResetStats() {
-	f.LastEndpoint = ""
-	f.LastRegion = ""
-	f.LastCredentials = &s3client.ObjectStorageCredentials{}
-	f.LastCheckedBucket = ""
-	f.LastCreatedBucket = ""
-	f.LastDeletedBucket = ""
-}
-
-func (s *fakeObjectStorageSession) CheckBucketAccess(bucket string) error {
-	s.factory.LastCheckedBucket = bucket
+func (s *fakeCOSSession) CheckBucketAccess(bucket string) error {
 	if s.factory.FailCheckBucketAccess {
-		return errors.New("")
+		return errors.New("failed to check bucket access")
 	}
 	return nil
 }
 
-func (s *fakeObjectStorageSession) CheckObjectPathExistence(bucket, objectpath string) (bool, error) {
-	if s.factory.CheckObjectPathExistenceError {
-		return false, errors.New("")
-	} else if s.factory.CheckObjectPathExistencePathNotFound {
-		return false, nil
-	}
+func (s *fakeCOSSession) CheckObjectPathExistence(bucket, objectpath string) (bool, error) {
 	return true, nil
 }
 
-func (s *fakeObjectStorageSession) CreateBucket(bucket, kpRootKeyCrn string) (string, error) {
-	s.factory.LastCreatedBucket = bucket
+func (s *fakeCOSSession) CreateBucket(bucket, kpRootKeyCrn string) (string, error) {
 	if s.factory.FailCreateBucket {
-		return "", errors.New("")
+		return "", errors.New("failed to create bucket")
 	}
 	return "", nil
 }
 
-func (s *fakeObjectStorageSession) DeleteBucket(bucket string) error {
-	s.factory.LastDeletedBucket = bucket
+func (s *fakeCOSSession) DeleteBucket(bucket string) error {
 	if s.factory.FailDeleteBucket {
-		return errors.New("")
+		return errors.New("failed to delete bucket")
 	}
 	return nil
 }
