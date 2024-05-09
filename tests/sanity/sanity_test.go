@@ -104,7 +104,7 @@ func initCSIDriverForSanity(t *testing.T) *csiDriver.S3Driver {
 	nodeID := "fakeNodeID"
 	session := FakeNewObjectStorageSessionFactory()
 	mountObj := FakeNewS3fsMounterFactory()
-	statsUtil := &FakeNewVolumeStatsUtils{}
+	statsUtil := &FakeNewDriverStatsUtils{}
 
 	// Creating test logger
 	logger, teardown := cloudProvider.GetTestLogger(t)
@@ -202,26 +202,30 @@ func (v providerIDGenerator) GenerateUniqueValidVolumeID() string {
 	return fmt.Sprintf("fake-vol-ID-%s", uuid.New().String()[:10])
 }
 
-// Fake VolumeStatsUtils
-type FakeNewVolumeStatsUtils struct {
+// Fake DriverStatsUtils
+type FakeNewDriverStatsUtils struct {
 }
 
-func (su *FakeNewVolumeStatsUtils) BucketToDelete(volumeID string) (string, error) {
+func (su *FakeNewDriverStatsUtils) BucketToDelete(volumeID string) (string, error) {
 	return "", nil
 }
 
-func (su *FakeNewVolumeStatsUtils) FSInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
+func (su *FakeNewDriverStatsUtils) FSInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 	if path == "some/path" {
 		return 0, 0, 0, 0, 0, 0, status.Error(codes.NotFound, "volume not found on some/path")
 	}
 	return 1, 1, 1, 1, 1, 1, nil
 }
 
-func (su *FakeNewVolumeStatsUtils) CheckMount(targetPath string) (bool, error) {
+func (su *FakeNewDriverStatsUtils) CheckMount(targetPath string) (bool, error) {
 	return true, nil
 }
 
-func (su *FakeNewVolumeStatsUtils) FuseUnmount(path string) error {
+func (su *FakeNewDriverStatsUtils) FuseUnmount(path string) error {
+	return nil
+}
+
+func (m *FakeNewDriverStatsUtils) FuseMount(path string, comm string, args []string) error {
 	return nil
 }
 

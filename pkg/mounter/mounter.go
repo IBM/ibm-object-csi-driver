@@ -3,7 +3,6 @@ package mounter
 import (
 	"errors"
 	"os"
-	"os/exec"
 	"syscall"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
@@ -15,8 +14,6 @@ type Mounter interface {
 	Mount(source string, target string) error
 	Unmount(target string) error
 }
-
-var command = exec.Command
 
 type S3fsMounterFactory struct{}
 
