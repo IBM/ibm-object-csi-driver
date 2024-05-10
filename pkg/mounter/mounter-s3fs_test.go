@@ -50,7 +50,6 @@ func TestNewS3fsMounter_Success(t *testing.T) {
 }
 
 func TestNewS3fsMounter_Success_Hmac(t *testing.T) {
-	// Fake the secretMap and mountOptions
 	secretMap := map[string]string{
 		"cosEndpoint":        "test-endpoint",
 		"locationConstraint": "test-loc-constraint",
@@ -86,6 +85,104 @@ func TestNewS3fsMounter_Success_Hmac(t *testing.T) {
 }
 
 func Test_Mount_Positive(t *testing.T) {
+	mounter, err := NewS3fsMounter(secretMap, mountOptions,
+		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseMountFn: func(path string, comm string, args []string) error {
+				return nil
+			},
+		}))
+	if err != nil {
+		t.Fatalf("NewS3fsMounter() returned an unexpected error: %v", err)
+	}
+	s3fsMounter, ok := mounter.(*S3fsMounter)
+	if !ok {
+		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
+	}
+
+	FakeMkdirAll := func(path string, perm os.FileMode) error {
+		return nil
+	}
+
+	// Replace mkdirAllFunc with the Fake function
+	mkdirAllFunc = FakeMkdirAll
+	defer func() { mkdirAllFunc = os.MkdirAll }()
+
+	FakeWritePass := func(pwFileName string, pwFileContent string) error {
+		return nil
+	}
+
+	// Replace writePassFunc with the Fake function
+	writePassFunc = FakeWritePass
+	defer func() { writePassFunc = writePass }()
+
+	target := "/tmp/test-mount"
+
+	err = s3fsMounter.Mount("source", target)
+	assert.NoError(t, err)
+	if err != nil {
+		t.Errorf("S3fsMounter_Mount() returned an unexpected error: %v", err)
+	}
+}
+
+func Test_Mount_Positive_Hmac(t *testing.T) {
+	secretMap := map[string]string{
+		"cosEndpoint":        "test-endpoint",
+		"locationConstraint": "test-loc-constraint",
+		"bucketName":         "test-bucket-name",
+		"objPath":            "test-obj-path",
+		"accessKey":          "test-access-key",
+		"secretKey":          "test-secret-key",
+		"kpRootKeyCRN":       "test-kp-root-key-crn",
+	}
+	mounter, err := NewS3fsMounter(secretMap, mountOptions,
+		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseMountFn: func(path string, comm string, args []string) error {
+				return nil
+			},
+		}))
+	if err != nil {
+		t.Fatalf("NewS3fsMounter() returned an unexpected error: %v", err)
+	}
+	s3fsMounter, ok := mounter.(*S3fsMounter)
+	if !ok {
+		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
+	}
+
+	FakeMkdirAll := func(path string, perm os.FileMode) error {
+		return nil
+	}
+
+	// Replace mkdirAllFunc with the Fake function
+	mkdirAllFunc = FakeMkdirAll
+	defer func() { mkdirAllFunc = os.MkdirAll }()
+
+	FakeWritePass := func(pwFileName string, pwFileContent string) error {
+		return nil
+	}
+
+	// Replace writePassFunc with the Fake function
+	writePassFunc = FakeWritePass
+	defer func() { writePassFunc = writePass }()
+
+	target := "/tmp/test-mount"
+
+	err = s3fsMounter.Mount("source", target)
+	assert.NoError(t, err)
+	if err != nil {
+		t.Errorf("S3fsMounter_Mount() returned an unexpected error: %v", err)
+	}
+}
+
+func Test_Mount_Positive_Empty_ObjPath(t *testing.T) {
+	secretMap = map[string]string{
+		"cosEndpoint":        "test-endpoint",
+		"locationConstraint": "test-loc-constraint",
+		"bucketName":         "test-bucket-name",
+		"accessKey":          "test-access-key",
+		"secretKey":          "test-secret-key",
+		"apiKey":             "test-api-key",
+		"kpRootKeyCRN":       "test-kp-root-key-crn",
+	}
 	mounter, err := NewS3fsMounter(secretMap, mountOptions,
 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path string, comm string, args []string) error {
@@ -354,5 +451,117 @@ func TestUpdateS3FSMountOptions(t *testing.T) {
 		"gid=1001",
 		"uid=1001",
 		"additional_option=value3",
+	})
+}
+
+func TestUpdateS3FSMountOptions_SecretMapUID(t *testing.T) {
+	defaultMountOp := []string{"option1=value1", "option2=value2"}
+	secretMap := map[string]string{
+		"tmpdir":       "/tmp",
+		"use_cache":    "true",
+		"gid":          "1001",
+		"uid":          "1001",
+		"mountOptions": "additional_option=value3",
+	}
+
+	updatedOptions, err := updateS3FSMountOptions(defaultMountOp, secretMap)
+
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, updatedOptions, []string{
+		"option1=value1",
+		"option2=value2",
+		"tmpdir=/tmp",
+		"use_cache=true",
+		"gid=1001",
+		"uid=1001",
+		"additional_option=value3",
+	})
+}
+
+func TestUpdateS3FSMountOptions_SingleMountOptions(t *testing.T) {
+	defaultMountOp := []string{"option1=value1", "option2=value2"}
+	secretMap := map[string]string{
+		"tmpdir":       "/tmp",
+		"use_cache":    "true",
+		"gid":          "1001",
+		"mountOptions": "value3",
+	}
+
+	updatedOptions, err := updateS3FSMountOptions(defaultMountOp, secretMap)
+
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, updatedOptions, []string{
+		"option1=value1",
+		"option2=value2",
+		"tmpdir=/tmp",
+		"use_cache=true",
+		"gid=1001",
+		"uid=1001",
+		"value3",
+	})
+}
+
+func TestUpdateS3FSMountOptions_Empty_Mount_Options(t *testing.T) {
+	defaultMountOp := []string{"option1=value1", "option2=value2"}
+	secretMap := map[string]string{
+		"tmpdir":       "/tmp",
+		"use_cache":    "true",
+		"gid":          "1001",
+		"mountOptions": "",
+	}
+
+	updatedOptions, err := updateS3FSMountOptions(defaultMountOp, secretMap)
+
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, updatedOptions, []string{
+		"option1=value1",
+		"option2=value2",
+		"tmpdir=/tmp",
+		"use_cache=true",
+		"gid=1001",
+		"uid=1001",
+	})
+}
+
+func TestUpdateS3FSMountOptions_Empty_Default_Mount_Options(t *testing.T) {
+	defaultMountOp := []string{}
+	secretMap := map[string]string{
+		"tmpdir":       "/tmp",
+		"use_cache":    "true",
+		"gid":          "1001",
+		"mountOptions": "additional_option=value3",
+	}
+
+	updatedOptions, err := updateS3FSMountOptions(defaultMountOp, secretMap)
+
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, updatedOptions, []string{
+		"tmpdir=/tmp",
+		"use_cache=true",
+		"gid=1001",
+		"uid=1001",
+		"additional_option=value3",
+	})
+}
+
+func TestUpdateS3FSMountOptions_Invalid_Mount_Options(t *testing.T) {
+	defaultMountOp := []string{"option1=value1", "option2=value2"}
+	secretMap := map[string]string{
+		"tmpdir":       "/tmp",
+		"use_cache":    "true",
+		"gid":          "1001",
+		"mountOptions": "additional=option=value3",
+	}
+
+	updatedOptions, err := updateS3FSMountOptions(defaultMountOp, secretMap)
+
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, updatedOptions, []string{
+		"option1=value1",
+		"option2=value2",
+		"tmpdir=/tmp",
+		"use_cache=true",
+		"gid=1001",
+		"uid=1001",
 	})
 }
