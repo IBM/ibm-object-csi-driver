@@ -3,6 +3,8 @@ apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: cos-s3-csi-s3fs-delete
+  labels:
+    app.kubernetes.io/part-of=ibm-object-csi-driver
 provisioner: cos.s3.csi.ibm.io
 mountOptions:
     - "multipart_size=62"
