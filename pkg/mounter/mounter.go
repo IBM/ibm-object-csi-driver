@@ -1,6 +1,7 @@
 package mounter
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
@@ -60,11 +61,23 @@ func fuseMount(path string, comm string, args []string) error {
 	klog.Info("-fuseMount-")
 	klog.Infof("fuseMount args:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%s>", path, comm, args)
 	cmd := command(comm, args...)
-	// Execute the command and capture its combined output
-	output, err := cmd.CombinedOutput()
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	// Start the command
+	err := cmd.Start()
 	if err != nil {
-		klog.Errorf("fuseMount: cmd failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, string(output))
-		return fmt.Errorf("fuseMount: cmd failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, string(output))
+		klog.Errorf("fuseMount: cmd start failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+		return fmt.Errorf("fuseMount: cmd start failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+	}
+	err = cmd.Wait()
+	if err != nil {
+		// Handle error
+		// Print the exit status and captured error message
+		fmt.Printf("Error: exit status %d, stderr:\n%s\n", err.(*exec.ExitError).ExitCode(), stderr.String())
+		klog.Errorf("fuseMount: cmd wait failed: <%s>\nargs: <%s>\nerror: <%s>", comm, args, stderr.String())
+                return fmt.Errorf("fuseMount: cmd wait failed: <%s>\nargs: <%s>\nerror: <%s>", comm, args, stderr.String())
+		klog.Errorf("fuseMount: cmd wait failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+		return fmt.Errorf("fuseMount: cmd wait failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
 	}
 
 	return waitForMount(path, 10*time.Second)
