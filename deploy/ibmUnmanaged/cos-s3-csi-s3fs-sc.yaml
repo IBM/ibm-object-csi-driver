@@ -4,7 +4,6 @@ kind: StorageClass
 metadata:
   name: cos-s3-csi-s3fs-sc
   labels:
-    app.kubernetes.io/part-of: ibm-object-csi-driver
     {{- if eq .Annotations.deployedVia "kustomize" }}
     app.kubernetes.io/managed-by: kustomize
     {{- else }}
