@@ -3,8 +3,6 @@ kind: PersistentVolumeClaim
 metadata:
   name: cos-s3-csi-pvc
   namespace: default
-  labels:
-    app.kubernetes.io/part-of=ibm-object-csi-driver
 spec:
   accessModes:
   - ReadWriteOnce

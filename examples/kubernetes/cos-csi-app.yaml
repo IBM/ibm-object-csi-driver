@@ -2,8 +2,6 @@ kind: Pod
 apiVersion: v1
 metadata:
   name: cos-csi-app
-  labels:
-    app.kubernetes.io/part-of=ibm-object-csi-driver
 spec:
   containers:
     - name: app-frontend

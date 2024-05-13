@@ -4,7 +4,12 @@ kind: StorageClass
 metadata:
   name: cos-s3-csi-rclone-sc
   labels:
-    app.kubernetes.io/part-of=ibm-object-csi-driver
+    app.kubernetes.io/part-of: ibm-object-csi-driver
+    {{- if eq .Annotations.deployedVia "kustomize" }}
+    app.kubernetes.io/managed-by: kustomize
+    {{- else }}
+    app.kubernetes.io/managed-by: addon
+    {{- end }}
 provisioner: cos.s3.csi.ibm.io
 mountOptions:
     - "acl=private"
