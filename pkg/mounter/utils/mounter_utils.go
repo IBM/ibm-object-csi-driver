@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/mitchellh/go-ps"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var unmount = syscall.Unmount

@@ -1,13 +1,16 @@
 package utils
 
+import (
+	"k8s.io/apimachinery/pkg/api/resource"
+)
+
 var _ StatsUtils = (*FakeStatsUtilsFuncStructImpl)(nil)
 
 type FakeStatsUtilsFuncStruct struct {
-	FuseMountFn      func(path string, comm string, args []string) error
 	FSInfoFn         func(path string) (int64, int64, int64, int64, int64, int64, error)
 	CheckMountFn     func(targetPath string) (bool, error)
-	FuseUnmountFn    func(path string) error
 	BucketToDeleteFn func(volumeID string) (string, error)
+	GetBucketUsageFn func(volumeID string) (int64, resource.Quantity, error)
 }
 
 type FakeStatsUtilsFuncStructImpl struct {
@@ -39,6 +42,13 @@ func (m *FakeStatsUtilsFuncStructImpl) CheckMount(targetPath string) (bool, erro
 func (m *FakeStatsUtilsFuncStructImpl) BucketToDelete(volumeID string) (string, error) {
 	if m.FuncStruct.BucketToDeleteFn != nil {
 		return m.FuncStruct.BucketToDeleteFn(volumeID)
+	}
+	panic("requested method should not be nil")
+}
+
+func (m *FakeStatsUtilsFuncStructImpl) GetBucketUsage(volumeID string) (int64, resource.Quantity, error) {
+	if m.FuncStruct.GetBucketUsageFn != nil {
+		return m.FuncStruct.GetBucketUsageFn(volumeID)
 	}
 	panic("requested method should not be nil")
 }
