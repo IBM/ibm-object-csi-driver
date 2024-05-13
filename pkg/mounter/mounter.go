@@ -3,14 +3,13 @@ package mounter
 import (
 	"errors"
 	"fmt"
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
+	"k8s.io/klog/v2"
 	"os"
 	"os/exec"
 	"strings"
 	"syscall"
 	"time"
-
-	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
-	"k8s.io/klog/v2"
 )
 
 type Mounter interface {
@@ -61,17 +60,11 @@ func fuseMount(path string, comm string, args []string) error {
 	klog.Info("-fuseMount-")
 	klog.Infof("fuseMount args:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%s>", path, comm, args)
 	cmd := command(comm, args...)
-	err := cmd.Start()
-
+	// Execute the command and capture its combined output
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		klog.Errorf("fuseMount: cmd start failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
-		return fmt.Errorf("fuseMount: cmd start failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
-	}
-	err = cmd.Wait()
-	if err != nil {
-		// Handle error
-		klog.Errorf("fuseMount: cmd wait failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
-		return fmt.Errorf("fuseMount: cmd wait failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+		klog.Errorf("fuseMount: cmd start failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, string(output))
+		return fmt.Errorf("fuseMount: cmd start failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, string(output))
 	}
 
 	return waitForMount(path, 10*time.Second)
