@@ -28,7 +28,7 @@ CORE_DRIVER_IMG ?= $(REGISTRY)/$(CORE_IMAGE_NAME)
 
 .PHONY: test
 test:
-	go test -v -race ./cmd/... ./pkg/...
+	go test -v -race ./cmd/... ./pkg/... -coverprofile=cover.out
 
 .PHONY: deps
 deps:
