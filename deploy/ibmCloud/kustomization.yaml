@@ -21,3 +21,5 @@ images:
 - newName: registry.k8s.io/sig-storage/livenessprobe
   newTag: v2.9.0
   name: liveness-probe-image
+commonAnnotations:
+  deployedVia: "kustomize"
