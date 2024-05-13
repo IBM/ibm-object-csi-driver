@@ -5,25 +5,20 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"k8s.io/klog/v2"
 )
 
 type Mounter interface {
-	Stage(stagePath string) error
-	Unstage(stagePath string) error
 	Mount(source string, target string) error
 	Unmount(target string) error
 }
 
 var command = exec.Command
-
-const (
-	s3fsMounterType   = "s3fs"
-	rcloneMounterType = "rclone"
-)
 
 type S3fsMounterFactory struct{}
 
@@ -52,9 +47,9 @@ func (s *S3fsMounterFactory) NewMounter(attrib map[string]string, secretMap map[
 		}
 	}
 	switch mounter {
-	case s3fsMounterType:
+	case constants.S3FS:
 		return newS3fsMounter(secretMap, mountFlags)
-	case rcloneMounterType:
+	case constants.RClone:
 		return newRcloneMounter(secretMap, mountFlags)
 	default:
 		// default to s3backer
@@ -93,9 +88,8 @@ func checkPath(path string) (bool, error) {
 		return false, nil
 	} else if isCorruptedMnt(err) {
 		return true, err
-	} else {
-		return false, err
 	}
+	return false, err
 }
 
 func isCorruptedMnt(err error) bool {
@@ -128,4 +122,26 @@ func writePass(pwFileName string, pwFileContent string) error {
 		return err
 	}
 	return nil
+}
+
+func waitForMount(path string, timeout time.Duration) error {
+	var elapsed time.Duration
+	var interval = 10 * time.Millisecond
+	for {
+		out, err := exec.Command("mountpoint", path).CombinedOutput()
+		outStr := strings.TrimSpace(string(out))
+		if err != nil {
+			return err
+		}
+		if strings.HasSuffix(outStr, "is a mountpoint") {
+			klog.Infof("Path is a mountpoint: pathname - %s", path)
+			return nil
+		}
+
+		time.Sleep(interval)
+		elapsed = elapsed + interval
+		if elapsed >= timeout {
+			return errors.New("timeout waiting for mount")
+		}
+	}
 }

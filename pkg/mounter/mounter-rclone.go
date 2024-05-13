@@ -19,6 +19,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"k8s.io/klog/v2"
 )
@@ -69,7 +70,6 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 			continue
 		}
 		mountOptsMap[strings.TrimSpace(opts[0])] = strings.TrimSpace(opts[1])
-
 	}
 
 	// Create array out of map
@@ -153,7 +153,6 @@ func newRcloneMounter(secretMap map[string]string, mountOptions []string) (Mount
 }
 
 const (
-	rcloneCmd      = "rclone"
 	metaRootRclone = "/var/lib/ibmc-rclone"
 	configPath     = "/root/.config/rclone"
 	configFileName = "rclone.conf"
@@ -162,14 +161,6 @@ const (
 	cosProvider    = "IBMCOS"
 	envAuth        = "true"
 )
-
-func (rclone *rcloneMounter) Stage(stagePath string) error {
-	return nil
-}
-
-func (rclone *rcloneMounter) Unstage(stagePath string) error {
-	return nil
-}
 
 func (rclone *rcloneMounter) Mount(source string, target string) error {
 	klog.Info("-RcloneMounter Mount-")
@@ -192,7 +183,8 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 		}
 	}
 
-	if err = rclone.createConfig(); err != nil {
+	configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
+	if err = rclone.createConfig(configPathWithVolID); err != nil {
 		klog.Errorf("RcloneMounter Mount: Cannot create rclone config file %v", err)
 		return err
 	}
@@ -209,7 +201,7 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 		target,
 		"--allow-other",
 		"--daemon",
-		"--config="+configPath + "/" + configFileName,
+		"--config=" + configPathWithVolID + "/" + configFileName,
 		"--log-file=/var/log/rclone.log",
 	}
 	if rclone.gid != "" {
@@ -220,7 +212,7 @@ func (rclone *rcloneMounter) Mount(source string, target string) error {
 		uidOpt := "--uid=" + rclone.uid
 		args = append(args, uidOpt)
 	}
-	return fuseMount(target, rcloneCmd, args)
+	return fuseMount(target, constants.RClone, args)
 }
 
 func (rclone *rcloneMounter) Unmount(target string) error {
@@ -230,11 +222,11 @@ func (rclone *rcloneMounter) Unmount(target string) error {
 	if err != nil {
 		return err
 	}
-	statsUtil := &(utils.VolumeStatsUtils{})
+	statsUtil := &(utils.DriverStatsUtils{})
 	return statsUtil.FuseUnmount(target)
 }
 
-func (rclone *rcloneMounter) createConfig() error {
+func (rclone *rcloneMounter) createConfig(configPathWithVolID string) error {
 	var accessKey string
 	var secretKey string
 	keys := strings.Split(rclone.accessKeys, ":")
@@ -255,13 +247,13 @@ func (rclone *rcloneMounter) createConfig() error {
 
 	configParams = append(configParams, rclone.mountOptions...)
 
-	if err := os.MkdirAll(configPath, 0755); // #nosec G301: used for rclone
+	if err := os.MkdirAll(configPathWithVolID, 0755); // #nosec G301: used for rclone
 	err != nil {
-		klog.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", configPath, err)
+		klog.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", configPathWithVolID, err)
 		return err
 	}
 
-	configFile := path.Join(configPath, configFileName)
+	configFile := path.Join(configPathWithVolID, configFileName)
 	file, err := os.Create(configFile) // #nosec G304 used for rclone
 	if err != nil {
 		klog.Errorf("RcloneMounter Mount: Cannot create file %s: %v", configFileName, err)

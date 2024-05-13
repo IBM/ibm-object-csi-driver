@@ -30,6 +30,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
 )
 
@@ -47,9 +48,9 @@ func TestSanity(t *testing.T) {
 
 	skipTests := strings.Join([]string{
 		"CreateVolume.*should fail when requesting to create a volume with already existing name and different capacity",
-		"NodeGetVolumeStats.*should fail when volume is not found",
+		"NodeGetVolumeStats.*should fail when volume is not found",                         // since volume_condition is supported, so instead of err, response is sent
 		"NodeGetVolumeStats.*should fail when volume does not exist on the specified path", // since volume_condition is supported, so instead of err, response is sent
-		"ValidateVolumeCapabilities.*should fail when the requested volume does not exist", // since volume_condition is supported, so instead of err, response is sent
+		"ValidateVolumeCapabilities.*should fail when the requested volume does not exist",
 	}, "|")
 	err := flag.Set("ginkgo.skip", skipTests)
 	if err != nil {
@@ -84,7 +85,6 @@ func TestSanity(t *testing.T) {
 		SecretsFile: "../../tests/secret.yaml",
 		TestVolumeParameters: map[string]string{
 			"bucketName": "fakeBucketName",
-			//			"mounter":    "s3fs",
 		},
 		CreateTargetDir: func(targetPath string) (string, error) {
 			return targetPath, createTargetDir(targetPath)
@@ -167,87 +167,11 @@ func FakeNewS3fsMounterFactory() *FakeS3fsMounterFactory {
 	return &FakeS3fsMounterFactory{}
 }
 
-type Fakes3fsMounter struct {
-	bucketName    string //From Secret in SC
-	objPath       string //From Secret in SC
-	endPoint      string //From Secret in SC
-	locConstraint string //From Secret in SC
-	authType      string
-	accessKeys    string
-	mountOptions  []string
-}
+type Fakes3fsMounter struct{}
 
 func (s *FakeS3fsMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) (mounter.Mounter, error) {
 	klog.Info("-New S3FS Fake Mounter-")
-
-	var val, accessKey, secretKey, apiKey, option string
-	var check bool
-
-	mounter := &Fakes3fsMounter{}
-	options := []string{}
-
-	if val, check = secretMap["cosEndpoint"]; check {
-		mounter.endPoint = val
-	}
-	if val, check = secretMap["locationConstraint"]; check {
-		mounter.locConstraint = val
-	}
-	if val, check = secretMap["bucketName"]; check {
-		mounter.bucketName = val
-	}
-	if val, check = secretMap["objPath"]; check {
-		mounter.objPath = val
-	}
-	if val, check = secretMap["accessKey"]; check {
-		accessKey = val
-	}
-	if val, check = secretMap["secretKey"]; check {
-		secretKey = val
-	}
-	if val, check = secretMap["apiKey"]; check {
-		apiKey = val
-	}
-	if apiKey != "" {
-		mounter.accessKeys = fmt.Sprintf(":%s", apiKey)
-		mounter.authType = "iam"
-	} else {
-		mounter.accessKeys = fmt.Sprintf("%s:%s", accessKey, secretKey)
-		mounter.authType = "hmac"
-	}
-
-	for _, val = range mountFlags {
-		option = val
-		isKeyValuePair := true
-		keys := strings.Split(val, "=")
-		if len(keys) == 2 {
-			if keys[0] == "cache" {
-				isKeyValuePair = false
-				option = keys[1]
-			}
-			if newVal, check := secretMap[keys[0]]; check {
-				if isKeyValuePair {
-					option = fmt.Sprintf("%s=%s", keys[0], newVal)
-				} else {
-					option = newVal
-				}
-			}
-		}
-		options = append(options, option)
-		klog.Infof("NewMounter mountOption: [%s]", option)
-	}
-	if val, check = secretMap["tmpdir"]; check {
-		option = fmt.Sprintf("tmpdir=%s", val)
-		options = append(options, option)
-	}
-	if val, check = secretMap["use_cache"]; check {
-		option = fmt.Sprintf("use_cache=%s", val)
-		options = append(options, option)
-	}
-	mounter.mountOptions = options
-
-	fmt.Println("$$$", mounter)
-
-	return mounter, nil
+	return &Fakes3fsMounter{}, nil
 }
 
 func (s3fs *Fakes3fsMounter) Mount(source string, target string) error {
@@ -255,18 +179,8 @@ func (s3fs *Fakes3fsMounter) Mount(source string, target string) error {
 	return nil
 }
 
-func (s3fs *Fakes3fsMounter) Stage(stageTarget string) error {
-	klog.Info("-S3FSMounter Stage-")
-	return nil
-}
-
 func (s3fs *Fakes3fsMounter) Unmount(target string) error {
 	klog.Info("-S3FSMounter Unmount-")
-	return nil
-}
-
-func (s3fs *Fakes3fsMounter) Unstage(stageTarget string) error {
-	klog.Info("-S3FSMounter Unstage-")
 	return nil
 }
 
@@ -293,6 +207,10 @@ func (v providerIDGenerator) GenerateUniqueValidVolumeID() string {
 type FakeNewVolumeStatsUtils struct {
 }
 
+func (su *FakeNewVolumeStatsUtils) BucketToDelete(volumeID string) (string, error) {
+	return "", nil
+}
+
 func (su *FakeNewVolumeStatsUtils) FSInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 	if path == "some/path" {
 		return 0, 0, 0, 0, 0, 0, status.Error(codes.NotFound, "volume not found on some/path")
@@ -306,6 +224,10 @@ func (su *FakeNewVolumeStatsUtils) CheckMount(targetPath string) (bool, error) {
 
 func (su *FakeNewVolumeStatsUtils) FuseUnmount(path string) error {
 	return nil
+}
+
+func (su *FakeNewVolumeStatsUtils) GetBucketUsage(volumeID string) (int64, resource.Quantity, error) {
+	return 0, resource.Quantity{}, nil
 }
 
 func createTargetDir(targetPath string) error {

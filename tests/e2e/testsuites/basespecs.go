@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	v2 "github.com/onsi/ginkgo/v2"
+	gomega "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -112,7 +112,7 @@ func NewSecret(c clientset.Interface, name, stype, ns, cosEndpoint, locationCons
 
 func (s *TestSecret) Create() {
 	var err error
-	By("creating Secret")
+	v2.By("creating Secret")
 	framework.Logf("creating Secret %q under %q", s.name, s.namespace)
 	secret := v1.Secret{
 		TypeMeta: metav1.TypeMeta{
@@ -136,7 +136,7 @@ func (s *TestSecret) Create() {
 }
 
 func (s *TestSecret) Cleanup() {
-	By("deleting Secret")
+	v2.By("deleting Secret")
 	framework.Logf("deleting Secret [%s]", s.secret.Name)
 	err := s.client.CoreV1().Secrets(s.namespace).Delete(context.Background(), s.secret.Name, metav1.DeleteOptions{})
 	framework.ExpectNoError(err)
@@ -150,7 +150,7 @@ func (t *TestPod) Create() {
 }
 
 func (t *TestPod) Delete() {
-	By("POD Delete: deleting POD")
+	v2.By("POD Delete: deleting POD")
 	framework.Logf("deleting POD [%s/%s]", t.namespace.Name, t.pod.Name)
 	e2eoutput.DumpDebugInfo(context.Background(), t.client, t.namespace.Name)
 	err := t.client.CoreV1().Pods(t.namespace.Name).Delete(context.Background(), t.pod.Name, metav1.DeleteOptions{})
@@ -158,22 +158,22 @@ func (t *TestPod) Delete() {
 }
 
 func (t *TestPod) Exec(command []string, expectedString string) {
-	By("POD Exec: executing cmd in POD")
+	v2.By("POD Exec: executing cmd in POD")
 	framework.Logf("executing cmd in POD [%s/%s]", t.namespace.Name, t.pod.Name)
 	_, err := e2eoutput.LookForStringInPodExec(t.namespace.Name, t.pod.Name, command, expectedString, execTimeout)
 	framework.ExpectNoError(err)
 }
 
 func (t *TestPod) WaitForSuccess() {
-	By(fmt.Sprintf("checking that the pods command exits with no error [%s/%s]", t.namespace.Name, t.pod.Name))
-	err := k8sDevPod.WaitForPodSuccessInNamespaceSlow(context.Background(), t.client, t.pod.Name, t.namespace.Name)
+	v2.By(fmt.Sprintf("checking that the pods command exits with no error [%s/%s]", t.namespace.Name, t.pod.Name))
+	err := k8sDevPod.WaitForPodSuccessInNamespaceTimeout(context.Background(), t.client, t.pod.Name, t.namespace.Name, 15*time.Minute)
 	framework.ExpectNoError(err)
 }
 
 var podRunningCondition = func(pod *v1.Pod) (bool, error) {
 	switch pod.Status.Phase {
 	case v1.PodRunning:
-		By("Saw pod running")
+		v2.By("Saw pod running")
 		return true, nil
 	case v1.PodSucceeded:
 		return true, fmt.Errorf("pod %q successed with reason: %q, message: %q", pod.Name, pod.Status.Reason, pod.Status.Message)
@@ -183,7 +183,7 @@ var podRunningCondition = func(pod *v1.Pod) (bool, error) {
 }
 
 func (t *TestPod) WaitForRunningSlow() {
-	By(fmt.Sprintf("checking that the pods status is running [%s/%s]", t.namespace.Name, t.pod.Name))
+	v2.By(fmt.Sprintf("checking that the pods status is running [%s/%s]", t.namespace.Name, t.pod.Name))
 	//err := framework.WaitTimeoutForPodRunningInNamespace(t.client, t.pod.Name, t.namespace.Name, slowPodStartTimeout)
 	err := k8sDevPod.WaitForPodCondition(context.Background(), t.client, t.namespace.Name, t.pod.Name, failedConditionDescription, slowPodStartTimeout, podRunningCondition)
 	framework.ExpectNoError(err)
@@ -217,7 +217,6 @@ func NewTestPersistentVolumeClaim(
 	c clientset.Interface, pvcName string, ns *v1.Namespace,
 	claimSize string, accessmode *v1.PersistentVolumeAccessMode,
 	sc *storagev1.StorageClass) *TestPersistentVolumeClaim {
-
 	pvcAccessMode := v1.ReadWriteOnce
 	if accessmode != nil {
 		pvcAccessMode = *accessmode
@@ -236,7 +235,7 @@ func NewTestPersistentVolumeClaim(
 func (t *TestPersistentVolumeClaim) Create() {
 	var err error
 
-	By("creating a PVC")
+	v2.By("creating a PVC")
 	storageClassName := ""
 	if t.storageClass != nil {
 		storageClassName = t.storageClass.Name
@@ -250,9 +249,9 @@ func (t *TestPersistentVolumeClaim) Create() {
 }
 
 func (t *TestPersistentVolumeClaim) Cleanup() {
-	By(fmt.Sprintf("deleting PVC [%s]", t.persistentVolumeClaim.Name))
+	v2.By(fmt.Sprintf("deleting PVC [%s]", t.persistentVolumeClaim.Name))
 	err := k8sDevPV.DeletePersistentVolumeClaim(context.Background(), t.client, t.persistentVolumeClaim.Name, t.namespace.Name)
-	By("Triggered DeletePersistentVolumeClaim call")
+	v2.By("Triggered DeletePersistentVolumeClaim call")
 	framework.ExpectNoError(err)
 	// Wait for the PV to get deleted if reclaim policy is Delete. (If it's
 	// Retain, there's no use waiting because the PV won't be auto-deleted and
@@ -262,7 +261,7 @@ func (t *TestPersistentVolumeClaim) Cleanup() {
 	// in a couple of minutes.
 	if t.persistentVolume != nil && t.persistentVolume.Spec.PersistentVolumeReclaimPolicy == v1.PersistentVolumeReclaimDelete {
 		framework.Logf("deleting PVC [%s/%s] using PV [%s]", t.namespace.Name, t.persistentVolumeClaim.Name, t.persistentVolume.Name)
-		By(fmt.Sprintf("waiting for claim's PV [%s] to be deleted", t.persistentVolume.Name))
+		v2.By(fmt.Sprintf("waiting for claim's PV [%s] to be deleted", t.persistentVolume.Name))
 		err := k8sDevPV.WaitForPersistentVolumeDeleted(context.Background(), t.client, t.persistentVolume.Name, 5*time.Second, 10*time.Minute)
 		framework.ExpectNoError(err)
 	}
@@ -274,11 +273,11 @@ func (t *TestPersistentVolumeClaim) Cleanup() {
 func (t *TestPersistentVolumeClaim) WaitForBound() v1.PersistentVolumeClaim {
 	var err error
 
-	By(fmt.Sprintf("waiting for PVC to be in phase %q", v1.ClaimBound))
+	v2.By(fmt.Sprintf("waiting for PVC to be in phase %q", v1.ClaimBound))
 	err = k8sDevPV.WaitForPersistentVolumeClaimPhase(context.Background(), v1.ClaimBound, t.client, t.namespace.Name, t.persistentVolumeClaim.Name, framework.Poll, framework.ClaimProvisionTimeout)
 	framework.ExpectNoError(err)
 
-	By("checking the PVC")
+	v2.By("checking the PVC")
 	// Get new copy of the claim
 	t.persistentVolumeClaim, err = t.client.CoreV1().PersistentVolumeClaims(t.namespace.Name).Get(context.Background(), t.persistentVolumeClaim.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
@@ -290,26 +289,26 @@ func (t *TestPersistentVolumeClaim) ValidateProvisionedPersistentVolume() {
 	var err error
 
 	// Get the bound PersistentVolume
-	By("validating provisioned PV")
+	v2.By("validating provisioned PV")
 	t.persistentVolume, err = t.client.CoreV1().PersistentVolumes().Get(context.Background(), t.persistentVolumeClaim.Spec.VolumeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	framework.Logf("validating provisioned PV [%s] for PVC [%s]", t.persistentVolume.Name, t.persistentVolumeClaim.Name)
 
 	// Check sizes
-	expectedCapacity := t.requestedPersistentVolumeClaim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	claimCapacity := t.persistentVolumeClaim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	Expect(claimCapacity.Value()).To(Equal(expectedCapacity.Value()), "claimCapacity is not equal to requestedCapacity")
+	expectedCapacity := t.requestedPersistentVolumeClaim.Spec.Resources.Requests[v1.ResourceStorage]
+	claimCapacity := t.persistentVolumeClaim.Spec.Resources.Requests[v1.ResourceStorage]
+	gomega.Expect(claimCapacity.Value()).To(gomega.Equal(expectedCapacity.Value()), "claimCapacity is not equal to requestedCapacity")
 
-	pvCapacity := t.persistentVolume.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
-	Expect(pvCapacity.Value()).To(Equal(expectedCapacity.Value()), "pvCapacity is not equal to requestedCapacity")
+	pvCapacity := t.persistentVolume.Spec.Capacity[v1.ResourceStorage]
+	gomega.Expect(pvCapacity.Value()).To(gomega.Equal(expectedCapacity.Value()), "pvCapacity is not equal to requestedCapacity")
 
 	// Check PV properties
-	By("checking PV")
+	v2.By("checking PV")
 	framework.Logf("checking PV [%s]", t.persistentVolume.Name)
 	expectedAccessModes := t.requestedPersistentVolumeClaim.Spec.AccessModes
-	Expect(t.persistentVolume.Spec.AccessModes).To(Equal(expectedAccessModes))
-	Expect(t.persistentVolume.Spec.ClaimRef.Name).To(Equal(t.persistentVolumeClaim.ObjectMeta.Name))
-	Expect(t.persistentVolume.Spec.ClaimRef.Namespace).To(Equal(t.persistentVolumeClaim.ObjectMeta.Namespace))
+	gomega.Expect(t.persistentVolume.Spec.AccessModes).To(gomega.Equal(expectedAccessModes))
+	gomega.Expect(t.persistentVolume.Spec.ClaimRef.Name).To(gomega.Equal(t.persistentVolumeClaim.ObjectMeta.Name))
+	gomega.Expect(t.persistentVolume.Spec.ClaimRef.Namespace).To(gomega.Equal(t.persistentVolumeClaim.ObjectMeta.Namespace))
 }
 
 func generatePVC(name, namespace,
@@ -339,7 +338,7 @@ func generatePVC(name, namespace,
 			},
 			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceStorage): resource.MustParse(claimSize),
+					v1.ResourceStorage: resource.MustParse(claimSize),
 				},
 			},
 		},
@@ -347,7 +346,7 @@ func generatePVC(name, namespace,
 }
 
 func (t *TestPod) Cleanup() {
-	By("POD Cleanup: deleting POD")
+	v2.By("POD Cleanup: deleting POD")
 	framework.Logf("deleting POD [%s/%s]", t.namespace.Name, t.pod.Name)
 	cleanupPodOrFail(t.client, t.pod.Name, t.namespace.Name, t.dumpDbgInfo, t.dumpLog)
 }
