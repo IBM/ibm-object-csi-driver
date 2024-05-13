@@ -63,8 +63,8 @@ func fuseMount(path string, comm string, args []string) error {
 	// Execute the command and capture its combined output
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		klog.Errorf("fuseMount: cmd start failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, string(output))
-		return fmt.Errorf("fuseMount: cmd start failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, string(output))
+		klog.Errorf("fuseMount: cmd failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, string(output))
+		return fmt.Errorf("fuseMount: cmd failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, string(output))
 	}
 
 	return waitForMount(path, 10*time.Second)
