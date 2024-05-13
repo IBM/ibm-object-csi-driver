@@ -17,7 +17,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: cos-s3-csi-driver-role
   namespace: kube-system
-  llabels:
+  labels:
     app.kubernetes.io/part-of: ibm-object-csi-driver
     {{- if eq .Annotations.deployedVia "kustomize" }}
     app.kubernetes.io/managed-by: kustomize
