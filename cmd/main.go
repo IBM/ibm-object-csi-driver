@@ -21,6 +21,7 @@ import (
 	csiConfig "github.com/IBM/ibm-object-csi-driver/config"
 	"github.com/IBM/ibm-object-csi-driver/pkg/driver"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
+	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
 	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	libMetrics "github.com/IBM/ibmcloud-volume-interface/lib/metrics"
@@ -113,8 +114,9 @@ func serverSetup(options *Options, logger *zap.Logger) {
 	}
 
 	statsUtil := &(utils.DriverStatsUtils{})
+	mounterUtil := &(mounterUtils.MounterOptsUtils{})
 
-	S3CSIDriver, err := csiDriver.NewS3CosDriver(options.NodeID, options.Endpoint, s3client.NewObjectStorageSessionFactory(), mounter.NewS3fsMounterFactory(), statsUtil)
+	S3CSIDriver, err := csiDriver.NewS3CosDriver(options.NodeID, options.Endpoint, s3client.NewObjectStorageSessionFactory(), mounter.NewS3fsMounterFactory(), statsUtil, mounterUtil)
 	if err != nil {
 		logger.Fatal("Failed in initialize s3 COS driver", zap.Error(err))
 		os.Exit(1)

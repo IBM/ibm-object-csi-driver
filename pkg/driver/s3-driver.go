@@ -21,6 +21,7 @@ import (
 
 	"github.com/IBM/ibm-csi-common/pkg/utils"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
+	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
 	pkgUtils "github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
@@ -127,16 +128,17 @@ func newControllerServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, s3cosSessio
 	}
 }
 
-func newNodeServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, nodeID string, mountObj mounter.NewMounterFactory) *nodeServer {
+func newNodeServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, nodeID string, mountObj mounter.NewMounterFactory, mounterUtil mounterUtils.MounterUtils) *nodeServer {
 	return &nodeServer{
-		S3Driver: d,
-		Stats:    statsUtil,
-		NodeID:   nodeID,
-		Mounter:  mountObj,
+		S3Driver:     d,
+		Stats:        statsUtil,
+		NodeID:       nodeID,
+		Mounter:      mountObj,
+		MounterUtils: mounterUtil,
 	}
 }
 
-func (driver *S3Driver) NewS3CosDriver(nodeID string, endpoint string, s3cosSession s3client.ObjectStorageSessionFactory, mountObj mounter.NewMounterFactory, statsUtil pkgUtils.StatsUtils) (*S3Driver, error) {
+func (driver *S3Driver) NewS3CosDriver(nodeID string, endpoint string, s3cosSession s3client.ObjectStorageSessionFactory, mountObj mounter.NewMounterFactory, statsUtil pkgUtils.StatsUtils, mounterUtil mounterUtils.MounterUtils) (*S3Driver, error) {
 	s3client, err := s3client.NewS3Client(driver.logger)
 	if err != nil {
 		return nil, err
@@ -162,10 +164,10 @@ func (driver *S3Driver) NewS3CosDriver(nodeID string, endpoint string, s3cosSess
 	if driver.mode == "controller" {
 		driver.cs = newControllerServer(driver, statsUtil, s3cosSession, driver.logger)
 	} else if driver.mode == "node" {
-		driver.ns = newNodeServer(driver, statsUtil, nodeID, mountObj)
+		driver.ns = newNodeServer(driver, statsUtil, nodeID, mountObj, mounterUtil)
 	} else if driver.mode == "controller-node" {
 		driver.cs = newControllerServer(driver, statsUtil, s3cosSession, driver.logger)
-		driver.ns = newNodeServer(driver, statsUtil, nodeID, mountObj)
+		driver.ns = newNodeServer(driver, statsUtil, nodeID, mountObj, mounterUtil)
 	}
 
 	return driver, nil
