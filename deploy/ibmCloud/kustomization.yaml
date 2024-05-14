@@ -13,8 +13,8 @@ images:
   newName: k8s.gcr.io/sig-storage/csi-provisioner
   newTag: v3.4.1
 - name: cos-driver-image
-  newName: docker.io/ashimagarg/labels
-  newTag: v01
+  newName: icr.io/ibm/ibm-object-csi-driver
+  newTag: v1.0.2-alpha
 - name: driver-registrar-image
   newName: k8s.gcr.io/sig-storage/csi-node-driver-registrar
   newTag: v2.6.3
