@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: cos-s3-csi-pvc
+  name: cos-s3-csi-rclone-pvc
   namespace: default
 spec:
   accessModes:

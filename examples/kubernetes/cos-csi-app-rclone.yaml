@@ -1,7 +1,7 @@
 kind: Pod
 apiVersion: v1
 metadata:
-  name: cos-csi-app
+  name: cos-csi-app-rclone
 spec:
   containers:
     - name: app-frontend
@@ -13,4 +13,4 @@ spec:
   volumes:
     - name: cos-csi-volume
       persistentVolumeClaim:
-        claimName: cos-s3-csi-pvc
+        claimName: cos-s3-csi-rclone-pvc
