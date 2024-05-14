@@ -23,5 +23,4 @@ images:
   name: liveness-probe-image
 commonLabels:
   app.kubernetes.io/part-of: ibm-object-csi-driver
-commonAnnotations:
-  deployedVia: "kustomize"
+  app.kubernetes.io/managed-by: kustomize

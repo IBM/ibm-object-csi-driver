@@ -3,12 +3,6 @@ apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: cos-s3-csi-rclone-sc
-  labels:
-    {{- if eq .Annotations.deployedVia "kustomize" }}
-    app.kubernetes.io/managed-by: kustomize
-    {{- else }}
-    app.kubernetes.io/managed-by: addon
-    {{- end }}
 provisioner: cos.s3.csi.ibm.io
 mountOptions:
     - "acl=private"

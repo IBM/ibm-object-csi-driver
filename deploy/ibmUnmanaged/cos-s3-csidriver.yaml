@@ -6,11 +6,6 @@ metadata:
   namespace: kube-system
   labels:
     app.kubernetes.io/name: cos-s3-csi-driver
-    {{- if eq .Annotations.deployedVia "kustomize" }}
-    app.kubernetes.io/managed-by: kustomize
-    {{- else }}
-    app.kubernetes.io/managed-by: addon
-    {{- end }}
 spec:
   attachRequired: false
   podInfoOnMount: true
