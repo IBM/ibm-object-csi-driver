@@ -18,7 +18,7 @@ package testsuites
 
 import (
 	"fmt"
-
+	"errors"
 	v2 "github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -31,7 +31,8 @@ type DynamicallyProvisionePodWithVolTest struct {
 	PodCheck *PodExecCheck
 }
 
-func (t *DynamicallyProvisionePodWithVolTest) Run(client clientset.Interface, namespace *v1.Namespace) {
+func (t *DynamicallyProvisionePodWithVolTest) Run(client clientset.Interface, namespace *v1.Namespace) error {
+	var testFailed bool
 	for n, pod := range t.Pods {
 		tpod, cleanup := pod.SetupWithDynamicVolumes(client, namespace)
 		// defer must be called here for resources not get removed before using them
@@ -45,14 +46,33 @@ func (t *DynamicallyProvisionePodWithVolTest) Run(client clientset.Interface, na
 
 		if !pod.CmdExits {
 			v2.By("checking that the pods status is running")
-			tpod.WaitForRunningSlow()
+			if err := tpod.WaitForRunningSlow(); err != nil {
+				// If WaitForRunningSlow fails, set testFailed to true
+				testFailed = true
+				break
+			}
 			if t.PodCheck != nil {
 				v2.By("checking pod exec after pod recreate")
-				tpod.Exec(t.PodCheck.Cmd, t.PodCheck.ExpectedString01)
+				if err := tpod.Exec(t.PodCheck.Cmd, t.PodCheck.ExpectedString01); err != nil {
+					v2.By("Pod Exec failed")
+					testFailed = true
+					break
+				}
 			}
 		} else {
 			v2.By("checking that the pods command exits with no error")
-			tpod.WaitForSuccess()
+			if err := tpod.WaitForSuccess(); err != nil {
+
+				testFailed = true
+				break
+			}
 		}
 	}
+	// If testFailed is true, return an error
+	if testFailed {
+		v2.By("Return Error")
+		return errors.New("test failed")
+	}
+	// Otherwise, return nil
+	return nil
 }
