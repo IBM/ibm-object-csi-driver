@@ -333,7 +333,7 @@ func TestDeleteVolume(t *testing.T) {
 				VolumeId: testVolumeID,
 				Secrets:  testSecret,
 			},
-			driverStatsUtils: utils.NewMockStatsUtilsImpl(utils.MockStatsUtilsFuncStruct{
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
 				BucketToDeleteFn: func(volumeID string) (string, error) {
 					return bucketName, nil
 				},
@@ -347,7 +347,7 @@ func TestDeleteVolume(t *testing.T) {
 			req: &csi.DeleteVolumeRequest{
 				VolumeId: "",
 			},
-			driverStatsUtils: utils.NewMockStatsUtilsImpl(utils.MockStatsUtilsFuncStruct{}),
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
 			cosSession:       &fakes3client.FakeCOSSessionFactory{},
 			expectedResp:     nil,
 			expectedErr:      errors.New("Volume ID missing"),
@@ -358,7 +358,7 @@ func TestDeleteVolume(t *testing.T) {
 				VolumeId: testVolumeID,
 				Secrets:  map[string]string{},
 			},
-			driverStatsUtils: utils.NewMockStatsUtilsImpl(utils.MockStatsUtilsFuncStruct{}),
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
 			cosSession:       &fakes3client.FakeCOSSessionFactory{},
 			expectedResp:     nil,
 			expectedErr:      errors.New("cannot get credentials"),
@@ -369,7 +369,7 @@ func TestDeleteVolume(t *testing.T) {
 				VolumeId: testVolumeID,
 				Secrets:  testSecret,
 			},
-			driverStatsUtils: utils.NewMockStatsUtilsImpl(utils.MockStatsUtilsFuncStruct{
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
 				BucketToDeleteFn: func(volumeID string) (string, error) {
 					return bucketName, nil
 				},
@@ -386,7 +386,7 @@ func TestDeleteVolume(t *testing.T) {
 				VolumeId: testVolumeID,
 				Secrets:  testSecret,
 			},
-			driverStatsUtils: utils.NewMockStatsUtilsImpl(utils.MockStatsUtilsFuncStruct{
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
 				BucketToDeleteFn: func(volumeID string) (string, error) {
 					return "", errors.New("failed to get bucket to delete")
 				},

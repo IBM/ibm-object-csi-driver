@@ -72,7 +72,6 @@ buildimage: build-binary
 	--build-arg git_commit_id=${REV} \
         --build-arg git_remote_url=${GIT_REMOTE_URL} \
         --build-arg build_date=${BUILD_DATE} \
-        --build-arg jenkins_build_number=${BUILD_NUMBER} \
         --build-arg REPO_SOURCE_URL=${REPO_SOURCE_URL} \
         --build-arg BUILD_URL=${BUILD_URL} \
 	-t $(CORE_DRIVER_IMG):$(ARCH)-$(TAG) -f Dockerfile .

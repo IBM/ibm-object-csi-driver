@@ -21,6 +21,7 @@ import (
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
+	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"golang.org/x/net/context"
@@ -35,9 +36,10 @@ import (
 // Implements Node Server csi.NodeServer
 type nodeServer struct {
 	*S3Driver
-	Stats   utils.StatsUtils
-	NodeID  string
-	Mounter mounter.NewMounterFactory
+	Stats        utils.StatsUtils
+	NodeID       string
+	Mounter      mounter.NewMounterFactory
+	MounterUtils mounterUtils.MounterUtils
 }
 
 var (
@@ -203,7 +205,7 @@ func (ns *nodeServer) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpubl
 	}
 	klog.Infof("Unmounting  target path %s", targetPath)
 
-	if err := ns.Stats.FuseUnmount(targetPath); err != nil {
+	if err := ns.MounterUtils.FuseUnmount(targetPath); err != nil {
 		//TODO: Need to handle the case with non existing mount separately - https://github.com/IBM/ibm-object-csi-driver/issues/46
 		klog.Infof("UNMOUNT ERROR: %v", err)
 		return nil, status.Error(codes.Internal, err.Error())
