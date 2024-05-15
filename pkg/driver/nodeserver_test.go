@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
@@ -63,6 +64,143 @@ func TestNodeStageVolume(t *testing.T) {
 
 		nodeServer := nodeServer{}
 		actualResp, actualErr := nodeServer.NodeStageVolume(ctx, tc.req)
+
+		if tc.expectedErr != nil {
+			assert.Error(t, actualErr)
+			assert.Contains(t, actualErr.Error(), tc.expectedErr.Error())
+		} else {
+			assert.NoError(t, actualErr)
+		}
+
+		if !reflect.DeepEqual(tc.expectedResp, actualResp) {
+			t.Errorf("Expected %v but got %v", tc.expectedResp, actualResp)
+		}
+	}
+}
+
+func TestNodeUnstageVolume(t *testing.T) {
+	testCases := []struct {
+		testCaseName string
+		req          *csi.NodeUnstageVolumeRequest
+		expectedResp *csi.NodeUnstageVolumeResponse
+		expectedErr  error
+	}{
+		{
+			testCaseName: "Positive: Successful",
+			req: &csi.NodeUnstageVolumeRequest{
+				VolumeId:          testVolumeID,
+				StagingTargetPath: testTargetPath,
+			},
+			expectedResp: &csi.NodeUnstageVolumeResponse{},
+			expectedErr:  nil,
+		},
+		{
+			testCaseName: "Negative: Volume ID is missing",
+			req:          &csi.NodeUnstageVolumeRequest{},
+			expectedResp: nil,
+			expectedErr:  errors.New("Volume ID missing in request"),
+		},
+		{
+			testCaseName: "Negative: Volume target path is missing",
+			req: &csi.NodeUnstageVolumeRequest{
+				VolumeId: testVolumeID,
+			},
+			expectedResp: nil,
+			expectedErr:  errors.New("Target path missing in request"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
+
+		nodeServer := nodeServer{}
+		actualResp, actualErr := nodeServer.NodeUnstageVolume(ctx, tc.req)
+
+		if tc.expectedErr != nil {
+			assert.Error(t, actualErr)
+			assert.Contains(t, actualErr.Error(), tc.expectedErr.Error())
+		} else {
+			assert.NoError(t, actualErr)
+		}
+
+		if !reflect.DeepEqual(tc.expectedResp, actualResp) {
+			t.Errorf("Expected %v but got %v", tc.expectedResp, actualResp)
+		}
+	}
+}
+
+func TestNodePublishVolume(t *testing.T) {
+	testCases := []struct {
+		testCaseName string
+		req          *csi.NodePublishVolumeRequest
+		expectedResp *csi.NodePublishVolumeResponse
+		expectedErr  error
+	}{}
+
+	for _, tc := range testCases {
+		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
+
+		nodeServer := nodeServer{}
+		actualResp, actualErr := nodeServer.NodePublishVolume(ctx, tc.req)
+
+		if tc.expectedErr != nil {
+			assert.Error(t, actualErr)
+			assert.Contains(t, actualErr.Error(), tc.expectedErr.Error())
+		} else {
+			assert.NoError(t, actualErr)
+		}
+
+		if !reflect.DeepEqual(tc.expectedResp, actualResp) {
+			t.Errorf("Expected %v but got %v", tc.expectedResp, actualResp)
+		}
+	}
+}
+
+func TestNodeUnpublishVolume(t *testing.T) {
+	testCases := []struct {
+		testCaseName string
+		req          *csi.NodeUnpublishVolumeRequest
+		mounterUtils mounterUtils.MounterUtils
+		expectedResp *csi.NodeUnpublishVolumeResponse
+		expectedErr  error
+	}{
+		{
+			testCaseName: "Positive: Successful",
+			req: &csi.NodeUnpublishVolumeRequest{
+				VolumeId:   testVolumeID,
+				TargetPath: testTargetPath,
+			},
+			mounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+				FuseUnmountFn: func(path string) error {
+					return nil
+				},
+			}),
+			expectedResp: &csi.NodeUnpublishVolumeResponse{},
+			expectedErr:  nil,
+		},
+		// {
+		// 	testCaseName: "Negative: Volume ID is missing",
+		// 	req:          &csi.NodeUnstageVolumeRequest{},
+		// 	expectedResp: nil,
+		// 	expectedErr:  errors.New("Volume ID missing in request"),
+		// },
+		// {
+		// 	testCaseName: "Negative: Volume target path is missing",
+		// 	req: &csi.NodeUnstageVolumeRequest{
+		// 		VolumeId: testVolumeID,
+		// 	},
+		// 	expectedResp: nil,
+		// 	expectedErr:  errors.New("Target path missing in request"),
+		// },
+	}
+
+	for _, tc := range testCases {
+		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
+
+		nodeServer := nodeServer{
+			MounterUtils: tc.mounterUtils,
+		}
+		actualResp, actualErr := nodeServer.NodeUnpublishVolume(ctx, tc.req)
 
 		if tc.expectedErr != nil {
 			assert.Error(t, actualErr)
