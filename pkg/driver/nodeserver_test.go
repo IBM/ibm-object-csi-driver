@@ -25,6 +25,8 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestNodeStageVolume(t *testing.T) {
@@ -178,20 +180,34 @@ func TestNodeUnpublishVolume(t *testing.T) {
 			expectedResp: &csi.NodeUnpublishVolumeResponse{},
 			expectedErr:  nil,
 		},
-		// {
-		// 	testCaseName: "Negative: Volume ID is missing",
-		// 	req:          &csi.NodeUnstageVolumeRequest{},
-		// 	expectedResp: nil,
-		// 	expectedErr:  errors.New("Volume ID missing in request"),
-		// },
-		// {
-		// 	testCaseName: "Negative: Volume target path is missing",
-		// 	req: &csi.NodeUnstageVolumeRequest{
-		// 		VolumeId: testVolumeID,
-		// 	},
-		// 	expectedResp: nil,
-		// 	expectedErr:  errors.New("Target path missing in request"),
-		// },
+		{
+			testCaseName: "Negative: Volume ID is missing",
+			req:          &csi.NodeUnpublishVolumeRequest{},
+			expectedResp: nil,
+			expectedErr:  errors.New("Volume ID missing in request"),
+		},
+		{
+			testCaseName: "Negative: Volume target path is missing",
+			req: &csi.NodeUnpublishVolumeRequest{
+				VolumeId: testVolumeID,
+			},
+			expectedResp: nil,
+			expectedErr:  errors.New("Target path missing in request"),
+		},
+		{
+			testCaseName: "Negative: Unmount failed",
+			req: &csi.NodeUnpublishVolumeRequest{
+				VolumeId:   testVolumeID,
+				TargetPath: testTargetPath,
+			},
+			mounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+				FuseUnmountFn: func(path string) error {
+					return errors.New("cannot force unmount")
+				},
+			}),
+			expectedResp: nil,
+			expectedErr:  errors.New("cannot force unmount"),
+		},
 	}
 
 	for _, tc := range testCases {
@@ -201,6 +217,97 @@ func TestNodeUnpublishVolume(t *testing.T) {
 			MounterUtils: tc.mounterUtils,
 		}
 		actualResp, actualErr := nodeServer.NodeUnpublishVolume(ctx, tc.req)
+
+		if tc.expectedErr != nil {
+			assert.Error(t, actualErr)
+			assert.Contains(t, actualErr.Error(), tc.expectedErr.Error())
+		} else {
+			assert.NoError(t, actualErr)
+		}
+
+		if !reflect.DeepEqual(tc.expectedResp, actualResp) {
+			t.Errorf("Expected %v but got %v", tc.expectedResp, actualResp)
+		}
+	}
+}
+
+func TestNodeGetVolumeStats(t *testing.T) {
+	testCases := []struct {
+		testCaseName string
+		req          *csi.NodeGetVolumeStatsRequest
+		expectedResp *csi.NodeGetVolumeStatsResponse
+		expectedErr  error
+	}{}
+
+	for _, tc := range testCases {
+		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
+
+		nodeServer := nodeServer{}
+		actualResp, actualErr := nodeServer.NodeGetVolumeStats(ctx, tc.req)
+
+		if tc.expectedErr != nil {
+			assert.Error(t, actualErr)
+			assert.Contains(t, actualErr.Error(), tc.expectedErr.Error())
+		} else {
+			assert.NoError(t, actualErr)
+		}
+
+		if !reflect.DeepEqual(tc.expectedResp, actualResp) {
+			t.Errorf("Expected %v but got %v", tc.expectedResp, actualResp)
+		}
+	}
+}
+
+func TestNodeExpandVolume(t *testing.T) {
+	t.Run("UnImplemented Method", func(t *testing.T) {
+		nodeServer := nodeServer{}
+		actualResp, actualErr := nodeServer.NodeExpandVolume(ctx, &csi.NodeExpandVolumeRequest{})
+		assert.Nil(t, actualResp)
+		assert.Error(t, actualErr)
+		assert.Contains(t, actualErr.Error(), status.Error(codes.Unimplemented, "").Error())
+	})
+}
+
+func TestNodeGetCapabilities(t *testing.T) {
+	testCases := []struct {
+		testCaseName string
+		req          *csi.NodeGetCapabilitiesRequest
+		expectedResp *csi.NodeGetCapabilitiesResponse
+		expectedErr  error
+	}{}
+
+	for _, tc := range testCases {
+		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
+
+		nodeServer := nodeServer{}
+		actualResp, actualErr := nodeServer.NodeGetCapabilities(ctx, tc.req)
+
+		if tc.expectedErr != nil {
+			assert.Error(t, actualErr)
+			assert.Contains(t, actualErr.Error(), tc.expectedErr.Error())
+		} else {
+			assert.NoError(t, actualErr)
+		}
+
+		if !reflect.DeepEqual(tc.expectedResp, actualResp) {
+			t.Errorf("Expected %v but got %v", tc.expectedResp, actualResp)
+		}
+	}
+}
+
+func TestNodeGetInfo(t *testing.T) {
+	testCases := []struct {
+		testCaseName string
+		req          *csi.NodeGetInfoRequest
+		expectedResp *csi.NodeGetInfoResponse
+		expectedErr  error
+	}{}
+
+	for _, tc := range testCases {
+		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
+
+		nodeServer := nodeServer{}
+		actualResp, actualErr := nodeServer.NodeGetInfo(ctx, tc.req)
 
 		if tc.expectedErr != nil {
 			assert.Error(t, actualErr)

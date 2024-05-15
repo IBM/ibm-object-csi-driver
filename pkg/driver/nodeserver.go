@@ -199,16 +199,18 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 	klog.V(2).Infof("NodeGetVolumeStats: Request: %+v", *req)
 
 	volumeID := req.GetVolumeId()
-	if req.VolumePath == "" {
-		return nil, status.Error(codes.InvalidArgument, "Path Doesn't exist")
-	}
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 
+	volumePath := req.VolumePath
+	if volumePath == "" {
+		return nil, status.Error(codes.InvalidArgument, "Path Doesn't exist")
+	}
+
 	klog.V(2).Info("NodeGetVolumeStats: Start getting Stats")
 	//  Making direct call to fs library for the sake of simplicity. That way we don't need to initialize VolumeStatsUtils. If there is a need for VolumeStatsUtils to grow bigger then we can use it
-	_, capacity, _, inodes, inodesFree, inodesUsed, err := ns.Stats.FSInfo(req.VolumePath)
+	_, capacity, _, inodes, inodesFree, inodesUsed, err := ns.Stats.FSInfo(volumePath)
 
 	if err != nil {
 		data := map[string]string{"VolumeId": volumeID, "Error": err.Error()}
@@ -260,7 +262,6 @@ func (ns *nodeServer) NodeExpandVolume(_ context.Context, _ *csi.NodeExpandVolum
 	return &csi.NodeExpandVolumeResponse{}, status.Error(codes.Unimplemented, "NodeExpandVolume is not implemented")
 }
 
-// NodeGetCapabilities returns the supported capabilities of the node server
 func (ns *nodeServer) NodeGetCapabilities(_ context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
 	// currently there is a single NodeServer capability according to the spec
 	klog.V(2).Infof("NodeGetCapabilities: Request: %+v", *req)
@@ -286,6 +287,6 @@ func (ns *nodeServer) NodeGetInfo(_ context.Context, req *csi.NodeGetInfoRequest
 		MaxVolumesPerNode:  constants.DefaultVolumesPerNode,
 		AccessibleTopology: top,
 	}
-	fmt.Println(resp)
+	klog.V(2).Info("NodeGetInfo: ", resp)
 	return resp, nil
 }
