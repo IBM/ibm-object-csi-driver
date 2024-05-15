@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-//Package driver ...
+
 package driver
 
 import (
@@ -37,6 +37,14 @@ var (
 	// controllerCapabilities represents the capability of controller service
 	controllerCapabilities = []csi.ControllerServiceCapability_RPC_Type{
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
+	}
+
+	// nodeServerCapabilities represents the capability of node service.
+	nodeServerCapabilities = []csi.NodeServiceCapability_RPC_Type{
+		csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
+		csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
+		csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
+		csi.NodeServiceCapability_RPC_VOLUME_MOUNT_GROUP,
 	}
 )
 
@@ -147,17 +155,9 @@ func (driver *S3Driver) NewS3CosDriver(nodeID string, endpoint string, s3cosSess
 	driver.endpoint = endpoint
 	driver.s3client = s3client
 
-	_ = driver.AddVolumeCapabilityAccessModes(volumeCapabilities) // #nosec G104: Attempt to AddVolumeCapabilityAccessModes only on best-effort basis.Error cannot be usefully handled.
-
+	_ = driver.AddVolumeCapabilityAccessModes(volumeCapabilities)       // #nosec G104: Attempt to AddVolumeCapabilityAccessModes only on best-effort basis.Error cannot be usefully handled.
 	_ = driver.AddControllerServiceCapabilities(controllerCapabilities) // #nosec G104: Attempt to AddControllerServiceCapabilities only on best-effort basis.Error cannot be usefully handled.
-
-	ns := []csi.NodeServiceCapability_RPC_Type{
-		csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
-		csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
-		csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
-		//csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
-	}
-	_ = driver.AddNodeServiceCapabilities(ns) // #nosec G104: Attempt to AddNodeServiceCapabilities only on best-effort basis.Error cannot be usefully handled.
+	_ = driver.AddNodeServiceCapabilities(nodeServerCapabilities)       // #nosec G104: Attempt to AddNodeServiceCapabilities only on best-effort basis.Error cannot be usefully handled.
 
 	// Create GRPC servers
 	driver.ids = newIdentityServer(driver)

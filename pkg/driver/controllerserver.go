@@ -11,18 +11,11 @@
 package driver
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"errors"
 	"fmt"
-	"io"
-	"strings"
-	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
 	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
@@ -37,56 +30,6 @@ type controllerServer struct {
 	Stats      utils.StatsUtils
 	cosSession s3client.ObjectStorageSessionFactory
 	Logger     *zap.Logger
-}
-
-func (cs *controllerServer) getCredentials(secretMap map[string]string) (*s3client.ObjectStorageCredentials, error) {
-	var (
-		accessKey         string
-		secretKey         string
-		apiKey            string
-		serviceInstanceID string
-		authType          string
-		iamEndpoint       string
-	)
-
-	if val, check := secretMap["iamEndpoint"]; check {
-		iamEndpoint = val
-	}
-	if iamEndpoint == "" {
-		iamEndpoint = constants.DefaultIAMEndPoint
-	}
-
-	if val, check := secretMap["apiKey"]; check {
-		apiKey = val
-	}
-
-	if apiKey == "" {
-		authType = "hmac"
-		accessKey = secretMap["accessKey"]
-		if accessKey == "" {
-			return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| accessKey unknown")
-		}
-
-		secretKey = secretMap["secretKey"]
-		if secretKey == "" {
-			return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| secretKey unknown")
-		}
-	} else {
-		authType = "iam"
-		serviceInstanceID = secretMap["serviceId"]
-		if serviceInstanceID == "" {
-			return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| serviceId  unknown")
-		}
-	}
-
-	return &s3client.ObjectStorageCredentials{
-		AuthType:          authType,
-		AccessKey:         accessKey,
-		SecretKey:         secretKey,
-		APIKey:            apiKey,
-		IAMEndpoint:       iamEndpoint,
-		ServiceInstanceID: serviceInstanceID,
-	}, nil
 }
 
 func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
@@ -130,7 +73,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	params := req.GetParameters()
 	secretMap := req.GetSecrets()
 	fmt.Println("CreateVolume Parameters:\n\t", params)
-	creds, err := cs.getCredentials(req.GetSecrets())
+	creds, err := getCredentials(req.GetSecrets())
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
 	}
@@ -207,7 +150,7 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 	klog.Infof("Deleting volume %v", volumeID)
 	secretMap := req.GetSecrets()
 
-	creds, err := cs.getCredentials(req.GetSecrets())
+	creds, err := getCredentials(req.GetSecrets())
 	if err != nil {
 		return nil, fmt.Errorf("cannot get credentials: %v", err)
 	}
@@ -320,65 +263,4 @@ func (cs *controllerServer) ControllerGetVolume(_ context.Context, req *csi.Cont
 func (cs *controllerServer) ControllerModifyVolume(_ context.Context, req *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
 	klog.V(3).Infof("ControllerModifyVolume: called with args %+v", *req)
 	return nil, status.Error(codes.Unimplemented, "ControllerModifyVolume")
-}
-
-func getTempBucketName(mounterType, volumeID string) string {
-	currentTime := time.Now()
-	timestamp := currentTime.Format("20060102150405")
-
-	name := fmt.Sprintf("%s%s-%s", mounterType, timestamp, volumeID)
-	return name
-}
-
-func createBucket(sess s3client.ObjectStorageSession, bucketName, kpRootKeyCrn string) error {
-	msg, err := sess.CreateBucket(bucketName, kpRootKeyCrn)
-	if msg != "" {
-		klog.Infof("Info:Create Volume module with user provided Bucket name: %v", msg)
-	}
-	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "BucketAlreadyExists" {
-			klog.Warning(fmt.Sprintf("bucket '%s' already exists", bucketName))
-		} else {
-			klog.Errorf("CreateVolume: Unable to create the bucket: %v", err)
-			return errors.New("unable to create the bucket")
-		}
-	}
-	if err := sess.CheckBucketAccess(bucketName); err != nil {
-		klog.Errorf("CreateVolume: Unable to access the bucket: %v", err)
-		return errors.New("unable to access the bucket")
-	}
-	return nil
-}
-
-func sanitizeVolumeID(volumeID string) (string, error) {
-	var err error
-	volumeID = strings.ToLower(volumeID)
-	if len(volumeID) > 63 {
-		h := sha256.New()
-		_, err = io.WriteString(h, volumeID) //nolint
-		volumeID = hex.EncodeToString(h.Sum(nil))
-	}
-	return volumeID, err
-}
-
-func isValidVolumeCapabilities(volCaps []*csi.VolumeCapability) bool {
-	hasSupport := func(cap *csi.VolumeCapability) bool {
-		for _, c := range volumeCapabilities {
-			volumeCap := csi.VolumeCapability_AccessMode{
-				Mode: c,
-			}
-			if volumeCap.GetMode() == cap.AccessMode.GetMode() {
-				return true
-			}
-		}
-		return false
-	}
-
-	foundAll := true
-	for _, c := range volCaps {
-		if !hasSupport(c) {
-			foundAll = false
-		}
-	}
-	return foundAll
 }

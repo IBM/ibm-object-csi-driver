@@ -1,18 +1,12 @@
-/**
- * Copyright 2021 IBM Corp.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/*******************************************************************************
+ * IBM Confidential
+ * OCO Source Materials
+ * IBM Cloud Kubernetes Service, 5737-D43
+ * (C) Copyright IBM Corp. 2023 All Rights Reserved.
+ * The source code for this program is not published or otherwise divested of
+ * its trade secrets, irrespective of what has been deposited with
+ * the U.S. Copyright Office.
+ ******************************************************************************/
 
 package driver
 
@@ -41,16 +35,6 @@ type nodeServer struct {
 	Mounter      mounter.NewMounterFactory
 	MounterUtils mounterUtils.MounterUtils
 }
-
-var (
-	mounterObj mounter.Mounter
-	// nodeCaps represents the capability of node service.
-	nodeCaps = []csi.NodeServiceCapability_RPC_Type{
-		csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
-		csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
-		csi.NodeServiceCapability_RPC_VOLUME_MOUNT_GROUP,
-	}
-)
 
 func (ns *nodeServer) NodeStageVolume(_ context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
 	klog.V(2).Infof("CSINodeServer-NodeStageVolume: Request %v", *req)
@@ -175,6 +159,7 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		secretMap["bucketName"] = tempBucketName
 	}
 
+	var mounterObj mounter.Mounter
 	if mounterObj, err = ns.Mounter.NewMounter(attrib, secretMap, mountFlags); err != nil {
 		return nil, err
 	}
@@ -285,7 +270,7 @@ func (ns *nodeServer) NodeGetCapabilities(_ context.Context, req *csi.NodeGetCap
 	// currently there is a single NodeServer capability according to the spec
 	klog.V(2).Infof("NodeGetCapabilities: Request: %+v", *req)
 	var caps []*csi.NodeServiceCapability
-	for _, cap := range nodeCaps {
+	for _, cap := range nodeServerCapabilities {
 		c := &csi.NodeServiceCapability{
 			Type: &csi.NodeServiceCapability_Rpc{
 				Rpc: &csi.NodeServiceCapability_RPC{
