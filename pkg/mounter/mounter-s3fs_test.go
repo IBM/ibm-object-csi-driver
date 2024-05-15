@@ -26,27 +26,17 @@ var mountOptions = []string{"opt1=val1", "opt2=val2"}
 
 func TestNewS3fsMounter_Success(t *testing.T) {
 	mounter, err := NewS3fsMounter(secretMap, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
-	if err != nil {
-		t.Errorf("NewS3fsMounter failed: %v", err)
-	}
+	assert.NoError(t, err)
 
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	if !ok {
 		t.Errorf("NewS3fsMounter() failed to return an instance of s3fsMounter")
 	}
 
-	if s3fsMounter.BucketName != secretMap["bucketName"] {
-		t.Errorf("Expected bucketName: %s, got: %s", secretMap["bucketName"], s3fsMounter.BucketName)
-	}
-	if s3fsMounter.ObjPath != secretMap["objPath"] {
-		t.Errorf("Expected objPath: %s, got %s ", secretMap["objPath"], s3fsMounter.ObjPath)
-	}
-	if s3fsMounter.EndPoint != secretMap["cosEndpoint"] {
-		t.Errorf("Expected endPoint: %s, got %s ", secretMap["cosEndpoint"], s3fsMounter.EndPoint)
-	}
-	if s3fsMounter.LocConstraint != secretMap["locationConstraint"] {
-		t.Errorf("Expected locationConstraint: %s, got %s ", secretMap["locationConstraint"], s3fsMounter.LocConstraint)
-	}
+	assert.Equal(t, s3fsMounter.BucketName, secretMap["bucketName"])
+	assert.Equal(t, s3fsMounter.ObjPath, secretMap["objPath"])
+	assert.Equal(t, s3fsMounter.EndPoint, secretMap["cosEndpoint"])
+	assert.Equal(t, s3fsMounter.LocConstraint, secretMap["locationConstraint"])
 }
 
 func TestNewS3fsMounter_Success_Hmac(t *testing.T) {
@@ -61,27 +51,17 @@ func TestNewS3fsMounter_Success_Hmac(t *testing.T) {
 	}
 
 	mounter, err := NewS3fsMounter(secretMap, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
-	if err != nil {
-		t.Errorf("NewS3fsMounter failed: %v", err)
-	}
+	assert.NoError(t, err)
 
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	if !ok {
 		t.Errorf("NewS3fsMounter() failed to return an instance of s3fsMounter")
 	}
 
-	if s3fsMounter.BucketName != secretMap["bucketName"] {
-		t.Errorf("Expected bucketName: %s, got: %s", secretMap["bucketName"], s3fsMounter.BucketName)
-	}
-	if s3fsMounter.ObjPath != secretMap["objPath"] {
-		t.Errorf("Expected objPath: %s, got %s ", secretMap["objPath"], s3fsMounter.ObjPath)
-	}
-	if s3fsMounter.EndPoint != secretMap["cosEndpoint"] {
-		t.Errorf("Expected endPoint: %s, got %s ", secretMap["cosEndpoint"], s3fsMounter.EndPoint)
-	}
-	if s3fsMounter.LocConstraint != secretMap["locationConstraint"] {
-		t.Errorf("Expected locationConstraint: %s, got %s ", secretMap["locationConstraint"], s3fsMounter.LocConstraint)
-	}
+	assert.Equal(t, s3fsMounter.BucketName, secretMap["bucketName"])
+	assert.Equal(t, s3fsMounter.ObjPath, secretMap["objPath"])
+	assert.Equal(t, s3fsMounter.EndPoint, secretMap["cosEndpoint"])
+	assert.Equal(t, s3fsMounter.LocConstraint, secretMap["locationConstraint"])
 }
 
 func Test_Mount_Positive(t *testing.T) {
@@ -91,9 +71,8 @@ func Test_Mount_Positive(t *testing.T) {
 				return nil
 			},
 		}))
-	if err != nil {
-		t.Fatalf("NewS3fsMounter() returned an unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
+
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	if !ok {
 		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
@@ -119,9 +98,6 @@ func Test_Mount_Positive(t *testing.T) {
 
 	err = s3fsMounter.Mount("source", target)
 	assert.NoError(t, err)
-	if err != nil {
-		t.Errorf("S3fsMounter_Mount() returned an unexpected error: %v", err)
-	}
 }
 
 func Test_Mount_Positive_Hmac(t *testing.T) {
@@ -140,9 +116,7 @@ func Test_Mount_Positive_Hmac(t *testing.T) {
 				return nil
 			},
 		}))
-	if err != nil {
-		t.Fatalf("NewS3fsMounter() returned an unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	if !ok {
 		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
@@ -168,9 +142,6 @@ func Test_Mount_Positive_Hmac(t *testing.T) {
 
 	err = s3fsMounter.Mount("source", target)
 	assert.NoError(t, err)
-	if err != nil {
-		t.Errorf("S3fsMounter_Mount() returned an unexpected error: %v", err)
-	}
 }
 
 func Test_Mount_Positive_Empty_ObjPath(t *testing.T) {
@@ -189,9 +160,7 @@ func Test_Mount_Positive_Empty_ObjPath(t *testing.T) {
 				return nil
 			},
 		}))
-	if err != nil {
-		t.Fatalf("NewS3fsMounter() returned an unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	if !ok {
 		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
@@ -217,9 +186,6 @@ func Test_Mount_Positive_Empty_ObjPath(t *testing.T) {
 
 	err = s3fsMounter.Mount("source", target)
 	assert.NoError(t, err)
-	if err != nil {
-		t.Errorf("S3fsMounter_Mount() returned an unexpected error: %v", err)
-	}
 }
 
 func Test_Mount_Positive_SingleMountOptions(t *testing.T) {
@@ -229,9 +195,7 @@ func Test_Mount_Positive_SingleMountOptions(t *testing.T) {
 				return nil
 			},
 		}))
-	if err != nil {
-		t.Fatalf("NewS3fsMounter() returned an unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	if !ok {
 		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
@@ -257,9 +221,6 @@ func Test_Mount_Positive_SingleMountOptions(t *testing.T) {
 
 	err = s3fsMounter.Mount("source", target)
 	assert.NoError(t, err)
-	if err != nil {
-		t.Errorf("S3fsMounter_Mount() returned an unexpected error: %v", err)
-	}
 }
 
 func Test_Mount_Error_Creating_Mount_Point(t *testing.T) {
@@ -269,9 +230,7 @@ func Test_Mount_Error_Creating_Mount_Point(t *testing.T) {
 				return nil
 			},
 		}))
-	if err != nil {
-		t.Fatalf("NewS3fsMounter() returned an unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	if !ok {
 		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
@@ -298,9 +257,7 @@ func Test_Mount_Error_Creating_PWFile(t *testing.T) {
 				return nil
 			},
 		}))
-	if err != nil {
-		t.Fatalf("NewS3fsMounter() returned an unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	if !ok {
 		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
@@ -335,9 +292,7 @@ func Test_Mount_ErrorMount(t *testing.T) {
 				return errors.New("error mounting volume")
 			},
 		}))
-	if err != nil {
-		t.Fatalf("NewS3fsMounter() returned an unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	if !ok {
 		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
@@ -372,9 +327,7 @@ func Test_Unmount_Positive(t *testing.T) {
 				return nil
 			},
 		}))
-	if err != nil {
-		t.Fatalf("Failed to create S3fsMounter: %v", err)
-	}
+	assert.NoError(t, err)
 
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	if !ok {
@@ -408,11 +361,12 @@ func Test_Unmount_Error(t *testing.T) {
 				return errors.New("error unmounting volume")
 			},
 		}))
-	if err != nil {
-		t.Fatalf("Failed to create S3fsMounter: %v", err)
-	}
+	assert.NoError(t, err)
 
-	s3fsMounter := mounter.(*S3fsMounter)
+	s3fsMounter, ok := mounter.(*S3fsMounter)
+	if !ok {
+		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
+	}
 
 	target := "/tmp/test-unmount"
 
