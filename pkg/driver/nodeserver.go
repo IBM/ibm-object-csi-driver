@@ -40,13 +40,11 @@ func (ns *nodeServer) NodeStageVolume(_ context.Context, req *csi.NodeStageVolum
 	klog.V(2).Infof("CSINodeServer-NodeStageVolume: Request %v", *req)
 
 	volumeID := req.GetVolumeId()
-	stagingTargetPath := req.GetStagingTargetPath()
-
-	// Check arguments
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 
+	stagingTargetPath := req.GetStagingTargetPath()
 	if len(stagingTargetPath) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
 	}
@@ -58,12 +56,11 @@ func (ns *nodeServer) NodeUnstageVolume(_ context.Context, req *csi.NodeUnstageV
 	klog.V(2).Infof("CSINodeServer-NodeUnstageVolume: Request %v", *req)
 
 	volumeID := req.GetVolumeId()
-	stagingTargetPath := req.GetStagingTargetPath()
-
-	// Check arguments
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
+
+	stagingTargetPath := req.GetStagingTargetPath()
 	if len(stagingTargetPath) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
 	}

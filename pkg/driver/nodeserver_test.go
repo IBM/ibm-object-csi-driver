@@ -14,29 +14,65 @@
  * limitations under the License.
  */
 
-// Package driver ...
 package driver
 
 import (
+	"errors"
+	"reflect"
 	"testing"
 
-	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/net/context"
+	"go.uber.org/zap"
 )
 
-func TestNodeGetCapabilities(t *testing.T) {
-	req := &csi.NodeGetCapabilitiesRequest{}
-
-	icDriver := inits3Driver(t)
-	_, err := icDriver.ns.NodeGetCapabilities(context.Background(), req)
-	if err != nil {
-		t.Fatalf("Unexpedted error: %v", err)
+func TestNodeStageVolume(t *testing.T) {
+	testCases := []struct {
+		testCaseName string
+		req          *csi.NodeStageVolumeRequest
+		expectedResp *csi.NodeStageVolumeResponse
+		expectedErr  error
+	}{
+		{
+			testCaseName: "Positive: Successful",
+			req: &csi.NodeStageVolumeRequest{
+				VolumeId:          testVolumeID,
+				StagingTargetPath: testTargetPath,
+			},
+			expectedResp: &csi.NodeStageVolumeResponse{},
+			expectedErr:  nil,
+		},
+		{
+			testCaseName: "Negative: Volume ID is missing",
+			req:          &csi.NodeStageVolumeRequest{},
+			expectedResp: nil,
+			expectedErr:  errors.New("Volume ID missing in request"),
+		},
+		{
+			testCaseName: "Negative: Volume target path is missing",
+			req: &csi.NodeStageVolumeRequest{
+				VolumeId: testVolumeID,
+			},
+			expectedResp: nil,
+			expectedErr:  errors.New("Target path missing in request"),
+		},
 	}
-}
 
-func TestNodeExpandVolume(t *testing.T) {
-	icDriver := inits3Driver(t)
-	_, err := icDriver.ns.NodeExpandVolume(context.Background(), &csi.NodeExpandVolumeRequest{})
-	assert.NotNil(t, err)
+	for _, tc := range testCases {
+		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
+
+		nodeServer := nodeServer{}
+		actualResp, actualErr := nodeServer.NodeStageVolume(ctx, tc.req)
+
+		if tc.expectedErr != nil {
+			assert.Error(t, actualErr)
+			assert.Contains(t, actualErr.Error(), tc.expectedErr.Error())
+		} else {
+			assert.NoError(t, actualErr)
+		}
+
+		if !reflect.DeepEqual(tc.expectedResp, actualResp) {
+			t.Errorf("Expected %v but got %v", tc.expectedResp, actualResp)
+		}
+	}
 }
