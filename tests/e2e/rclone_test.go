@@ -34,6 +34,8 @@ const (
 	rclonescName = "cos-s3-csi-rclone-delete"
 )
 
+var rcloneBucketName = os.Getenv("rcloneBucketName")
+
 var _ = Describe("rclone", func() {
 	f := framework.NewDefaultFramework("obj-e2e-rclone")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
@@ -58,7 +60,7 @@ var _ = Describe("rclone", func() {
 			panic(err)
 		}
 		defer fpointer.Close()
-		secret := testsuites.NewSecret(cs, ns.Name, driverName, ns.Name, cosEndpoint, locationConstraint, bucketName, accessKey, secretKey)
+		secret := testsuites.NewSecret(cs, ns.Name, driverName, ns.Name, cosEndpoint, locationConstraint, rcloneBucketName, accessKey, secretKey)
 		secret.Create()
 		defer secret.Cleanup()
 

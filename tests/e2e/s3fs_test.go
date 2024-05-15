@@ -34,7 +34,7 @@ import (
 var testResultFile = os.Getenv("E2E_TEST_RESULT")
 var cosEndpoint = os.Getenv("cosEndpoint")
 var locationConstraint = os.Getenv("locationConstraint")
-var bucketName = os.Getenv("s3fsbucketName")
+var s3fsBucketName = os.Getenv("s3fsBucketName")
 var accessKey = os.Getenv("accessKey")
 var secretKey = os.Getenv("secretKey")
 
@@ -70,7 +70,7 @@ var _ = Describe("s3fs", func() {
 			panic(err)
 		}
 		defer fpointer.Close()
-		secret := testsuites.NewSecret(cs, ns.Name, driverName, ns.Name, cosEndpoint, locationConstraint, bucketName, accessKey, secretKey)
+		secret := testsuites.NewSecret(cs, ns.Name, driverName, ns.Name, cosEndpoint, locationConstraint, s3fsBucketName, accessKey, secretKey)
 		secret.Create()
 		defer secret.Cleanup()
 
