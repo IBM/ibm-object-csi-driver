@@ -17,10 +17,9 @@ package e2e
 
 import (
 	"context"
-	"os"
 	"fmt"
-	gtypes "github.com/onsi/ginkgo/types"
 	"github.com/IBM/ibm-object-csi-driver/tests/e2e/testsuites"
+	gtypes "github.com/onsi/ginkgo/types"
 	. "github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,6 +28,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"os"
 )
 
 // ENV required for testsuite execution
@@ -43,8 +43,8 @@ var err error
 var fpointer *os.File
 
 const (
-	driverName = "cos-s3-csi-driver"
-	scName     = "cos-s3-csi-s3fs-delete"
+	driverName   = "cos-s3-csi-driver"
+	scName       = "cos-s3-csi-s3fs-delete"
 	rclonescName = "cos-s3-csi-rclone-delete"
 )
 
@@ -97,29 +97,29 @@ var _ = Describe("rclone", func() {
 			},
 		}
 		customReporter, err := NewCustomReporter("test_results.txt")
-                if err != nil {
-                        println("Failed to create file:", err)
-                        return
-                }
-                defer customReporter.Close()
+		if err != nil {
+			println("Failed to create file:", err)
+			return
+		}
+		defer customReporter.Close()
 
-                err = test.Run(cs, ns)
-                if err != nil {
-                        // If Run returns an error, report the failure
-                        fmt.Println("Test failed:", err)
-                        customReporter.SpecDidComplete(&gtypes.SpecSummary{
-                                State:           gtypes.SpecStateFailed,
-                                ComponentTexts: []string{"DynamicallyProvisionePodWithVolTest RCLONE"},
-                        })
-                } else {
-                        // If Run succeeds, report the success
-                        fmt.Println("Test passed")
-                        customReporter.SpecDidComplete(&gtypes.SpecSummary{
-                                State:           gtypes.SpecStatePassed,
-                                ComponentTexts: []string{"DynamicallyProvisionePodWithVolTest RCLONE"},
-                        })
-                }
-        })
+		err = test.Run(cs, ns)
+		if err != nil {
+			// If Run returns an error, report the failure
+			fmt.Println("Test failed:", err)
+			customReporter.SpecDidComplete(&gtypes.SpecSummary{
+				State:          gtypes.SpecStateFailed,
+				ComponentTexts: []string{"DynamicallyProvisionePodWithVolTest RCLONE"},
+			})
+		} else {
+			// If Run succeeds, report the success
+			fmt.Println("Test passed")
+			customReporter.SpecDidComplete(&gtypes.SpecSummary{
+				State:          gtypes.SpecStatePassed,
+				ComponentTexts: []string{"DynamicallyProvisionePodWithVolTest RCLONE"},
+			})
+		}
+	})
 
 })
 
@@ -183,14 +183,14 @@ var _ = Describe("s3fs", func() {
 			// If Run returns an error, report the failure
 			fmt.Println("Test failed:", err)
 			customReporter.SpecDidComplete(&gtypes.SpecSummary{
-				State:           gtypes.SpecStateFailed,
+				State:          gtypes.SpecStateFailed,
 				ComponentTexts: []string{"DynamicallyProvisionePodWithVolTest S3FS"},
 			})
 		} else {
 			// If Run succeeds, report the success
 			fmt.Println("Test passed")
 			customReporter.SpecDidComplete(&gtypes.SpecSummary{
-				State:           gtypes.SpecStatePassed,
+				State:          gtypes.SpecStatePassed,
 				ComponentTexts: []string{"DynamicallyProvisionePodWithVolTest S3FS"},
 			})
 		}

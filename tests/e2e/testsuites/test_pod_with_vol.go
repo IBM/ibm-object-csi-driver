@@ -17,8 +17,8 @@
 package testsuites
 
 import (
-	"fmt"
 	"errors"
+	"fmt"
 	v2 "github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
