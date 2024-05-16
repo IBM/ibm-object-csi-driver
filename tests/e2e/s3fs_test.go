@@ -32,15 +32,12 @@ import (
 )
 
 // ENV required for testsuite execution
-var testResultFile = os.Getenv("E2E_TEST_RESULT")
 var cosEndpoint = os.Getenv("cosEndpoint")
 var locationConstraint = os.Getenv("locationConstraint")
 var s3fsBucketName = os.Getenv("s3fsBucketName")
 var accessKey = os.Getenv("accessKey")
 var secretKey = os.Getenv("secretKey")
 var rcloneBucketName = os.Getenv("rcloneBucketName")
-var err error
-var fpointer *os.File
 
 const (
 	driverName   = "cos-s3-csi-driver"
