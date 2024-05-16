@@ -11,7 +11,7 @@ import (
 )
 
 // Mock the secretMap and mountOptions
-var secretMap = map[string]string{
+var secretMapRClone = map[string]string{
 	"cosEndpoint":        "test-endpoint",
 	"locationConstraint": "test-loc-constraint",
 	"bucketName":         "test-bucket-name",
@@ -24,37 +24,23 @@ var secretMap = map[string]string{
 	"uid":                "fake-uid",
 }
 
-var mountOptions = []string{"opt1=val1", "opt2=val2"}
+var mountOptionsRClone = []string{"opt1=val1", "opt2=val2"}
 
 func TestNewRcloneMounter_Success(t *testing.T) {
-	mounter, err := NewRcloneMounter(secretMap, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
-	if err != nil {
-		t.Errorf("NewS3fsMounter failed: %v", err)
-	}
+	mounter, err := NewRcloneMounter(secretMapRClone, mountOptionsRClone, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
+	assert.NoError(t, err)
 
 	rCloneMounter, ok := mounter.(*RcloneMounter)
 	if !ok {
-		t.Errorf("NewS3fsMounter() failed to return an instance of s3fsMounter")
+		t.Errorf("NewRCloneMounter() failed to return an instance of RCloneMounter")
 	}
 
-	if rCloneMounter.BucketName != secretMap["bucketName"] {
-		t.Errorf("Expected bucketName: %s, got: %s", secretMap["bucketName"], rCloneMounter.BucketName)
-	}
-	if rCloneMounter.ObjPath != secretMap["objPath"] {
-		t.Errorf("Expected objPath: %s, got %s ", secretMap["objPath"], rCloneMounter.ObjPath)
-	}
-	if rCloneMounter.EndPoint != secretMap["cosEndpoint"] {
-		t.Errorf("Expected endPoint: %s, got %s ", secretMap["cosEndpoint"], rCloneMounter.EndPoint)
-	}
-	if rCloneMounter.LocConstraint != secretMap["locationConstraint"] {
-		t.Errorf("Expected locationConstraint: %s, got %s ", secretMap["locationConstraint"], rCloneMounter.LocConstraint)
-	}
-	if rCloneMounter.UID != secretMap["uid"] {
-		t.Errorf("Expected UID: %s, got %s ", secretMap["uid"], rCloneMounter.UID)
-	}
-	if rCloneMounter.GID != secretMap["gid"] {
-		t.Errorf("Expected GID: %s, got %s ", secretMap["gid"], rCloneMounter.GID)
-	}
+	assert.Equal(t, rCloneMounter.BucketName, secretMapRClone["bucketName"])
+	assert.Equal(t, rCloneMounter.ObjPath, secretMapRClone["objPath"])
+	assert.Equal(t, rCloneMounter.EndPoint, secretMapRClone["cosEndpoint"])
+	assert.Equal(t, rCloneMounter.LocConstraint, secretMapRClone["locationConstraint"])
+	assert.Equal(t, rCloneMounter.UID, secretMapRClone["uid"])
+	assert.Equal(t, rCloneMounter.GID, secretMapRClone["gid"])
 }
 
 func TestNewRcloneMounter_Success_Hmac(t *testing.T) {
@@ -71,34 +57,20 @@ func TestNewRcloneMounter_Success_Hmac(t *testing.T) {
 		"uid":                "fake-uid",
 	}
 
-	mounter, err := NewRcloneMounter(secretMap, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
-	if err != nil {
-		t.Errorf("NewS3fsMounter failed: %v", err)
-	}
+	mounter, err := NewRcloneMounter(secretMap, mountOptionsRClone, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
+	assert.NoError(t, err)
 
 	rCloneMounter, ok := mounter.(*RcloneMounter)
 	if !ok {
-		t.Errorf("NewS3fsMounter() failed to return an instance of s3fsMounter")
+		t.Errorf("NewRCloneMounter() failed to return an instance of RCloneMounter")
 	}
 
-	if rCloneMounter.BucketName != secretMap["bucketName"] {
-		t.Errorf("Expected bucketName: %s, got: %s", secretMap["bucketName"], rCloneMounter.BucketName)
-	}
-	if rCloneMounter.ObjPath != secretMap["objPath"] {
-		t.Errorf("Expected objPath: %s, got %s ", secretMap["objPath"], rCloneMounter.ObjPath)
-	}
-	if rCloneMounter.EndPoint != secretMap["cosEndpoint"] {
-		t.Errorf("Expected endPoint: %s, got %s ", secretMap["cosEndpoint"], rCloneMounter.EndPoint)
-	}
-	if rCloneMounter.LocConstraint != secretMap["locationConstraint"] {
-		t.Errorf("Expected locationConstraint: %s, got %s ", secretMap["locationConstraint"], rCloneMounter.LocConstraint)
-	}
-	if rCloneMounter.UID != secretMap["uid"] {
-		t.Errorf("Expected UID: %s, got %s ", secretMap["uid"], rCloneMounter.UID)
-	}
-	if rCloneMounter.GID != secretMap["gid"] {
-		t.Errorf("Expected GID: %s, got %s ", secretMap["gid"], rCloneMounter.GID)
-	}
+	assert.Equal(t, rCloneMounter.BucketName, secretMap["bucketName"])
+	assert.Equal(t, rCloneMounter.ObjPath, secretMap["objPath"])
+	assert.Equal(t, rCloneMounter.EndPoint, secretMap["cosEndpoint"])
+	assert.Equal(t, rCloneMounter.LocConstraint, secretMap["locationConstraint"])
+	assert.Equal(t, rCloneMounter.UID, secretMap["uid"])
+	assert.Equal(t, rCloneMounter.GID, secretMap["gid"])
 }
 
 func TestNewRcloneMounter_Only_GID(t *testing.T) {
@@ -113,31 +85,19 @@ func TestNewRcloneMounter_Only_GID(t *testing.T) {
 		"kpRootKeyCRN":       "test-kp-root-key-crn",
 		"gid":                "1001",
 	}
-	mounter, err := NewRcloneMounter(secretMap, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
-	if err != nil {
-		t.Errorf("NewS3fsMounter failed: %v", err)
-	}
+	mounter, err := NewRcloneMounter(secretMap, mountOptionsRClone, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
+	assert.NoError(t, err)
 
 	rCloneMounter, ok := mounter.(*RcloneMounter)
 	if !ok {
-		t.Errorf("NewS3fsMounter() failed to return an instance of s3fsMounter")
+		t.Errorf("NewRCloneMounter() failed to return an instance of RCloneMounter")
 	}
 
-	if rCloneMounter.BucketName != secretMap["bucketName"] {
-		t.Errorf("Expected bucketName: %s, got: %s", secretMap["bucketName"], rCloneMounter.BucketName)
-	}
-	if rCloneMounter.ObjPath != secretMap["objPath"] {
-		t.Errorf("Expected objPath: %s, got %s ", secretMap["objPath"], rCloneMounter.ObjPath)
-	}
-	if rCloneMounter.EndPoint != secretMap["cosEndpoint"] {
-		t.Errorf("Expected endPoint: %s, got %s ", secretMap["cosEndpoint"], rCloneMounter.EndPoint)
-	}
-	if rCloneMounter.LocConstraint != secretMap["locationConstraint"] {
-		t.Errorf("Expected locationConstraint: %s, got %s ", secretMap["locationConstraint"], rCloneMounter.LocConstraint)
-	}
-	if rCloneMounter.GID != secretMap["gid"] {
-		t.Errorf("Expected GID: %s, got %s ", secretMap["gid"], rCloneMounter.GID)
-	}
+	assert.Equal(t, rCloneMounter.BucketName, secretMap["bucketName"])
+	assert.Equal(t, rCloneMounter.ObjPath, secretMap["objPath"])
+	assert.Equal(t, rCloneMounter.EndPoint, secretMap["cosEndpoint"])
+	assert.Equal(t, rCloneMounter.LocConstraint, secretMap["locationConstraint"])
+	assert.Equal(t, rCloneMounter.GID, secretMap["gid"])
 }
 
 func TestNewRcloneMounter_MountOptsInSecret_Invalid(t *testing.T) {
@@ -154,46 +114,31 @@ func TestNewRcloneMounter_MountOptsInSecret_Invalid(t *testing.T) {
 		"uid":                "1001",
 		"mountOptions":       "upload_concurrency",
 	}
-	mounter, err := NewRcloneMounter(secretMap, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
-	if err != nil {
-		t.Errorf("NewS3fsMounter failed: %v", err)
-	}
+	mounter, err := NewRcloneMounter(secretMap, mountOptionsRClone, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
+	assert.NoError(t, err)
 
 	rCloneMounter, ok := mounter.(*RcloneMounter)
 	if !ok {
-		t.Errorf("NewS3fsMounter() failed to return an instance of s3fsMounter")
+		t.Errorf("NewRCloneMounter() failed to return an instance of RCloneMounter")
 	}
 
-	if rCloneMounter.BucketName != secretMap["bucketName"] {
-		t.Errorf("Expected bucketName: %s, got: %s", secretMap["bucketName"], rCloneMounter.BucketName)
-	}
-	if rCloneMounter.ObjPath != secretMap["objPath"] {
-		t.Errorf("Expected objPath: %s, got %s ", secretMap["objPath"], rCloneMounter.ObjPath)
-	}
-	if rCloneMounter.EndPoint != secretMap["cosEndpoint"] {
-		t.Errorf("Expected endPoint: %s, got %s ", secretMap["cosEndpoint"], rCloneMounter.EndPoint)
-	}
-	if rCloneMounter.LocConstraint != secretMap["locationConstraint"] {
-		t.Errorf("Expected locationConstraint: %s, got %s ", secretMap["locationConstraint"], rCloneMounter.LocConstraint)
-	}
-	if rCloneMounter.UID != secretMap["uid"] {
-		t.Errorf("Expected UID: %s, got %s ", secretMap["uid"], rCloneMounter.UID)
-	}
-	if rCloneMounter.GID != secretMap["gid"] {
-		t.Errorf("Expected GID: %s, got %s ", secretMap["gid"], rCloneMounter.GID)
-	}
+	assert.Equal(t, rCloneMounter.BucketName, secretMap["bucketName"])
+	assert.Equal(t, rCloneMounter.ObjPath, secretMap["objPath"])
+	assert.Equal(t, rCloneMounter.EndPoint, secretMap["cosEndpoint"])
+	assert.Equal(t, rCloneMounter.LocConstraint, secretMap["locationConstraint"])
+	assert.Equal(t, rCloneMounter.UID, secretMap["uid"])
+	assert.Equal(t, rCloneMounter.GID, secretMap["gid"])
 }
 
 func Test_RcloneMount_Positive(t *testing.T) {
-	mounter, err := NewRcloneMounter(secretMap, mountOptions,
+	mounter, err := NewRcloneMounter(secretMapRClone, mountOptionsRClone,
 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path string, comm string, args []string) error {
 				return nil
 			},
 		}))
-	if err != nil {
-		t.Fatalf("NewS3fsMounter() returned an unexpected error: %v", err)
-	}
+
+	assert.NoError(t, err)
 	rCloneMounter, ok := mounter.(*RcloneMounter)
 	if !ok {
 		t.Fatal("NewRCloneMounter() did not return a RCloneMounter")
@@ -218,9 +163,6 @@ func Test_RcloneMount_Positive(t *testing.T) {
 
 	err = rCloneMounter.Mount("source", target)
 	assert.NoError(t, err)
-	if err != nil {
-		t.Errorf("S3fsMounter_Mount() returned an unexpected error: %v", err)
-	}
 }
 
 func Test_RcloneMount_Positive_Empty_ObjPath(t *testing.T) {
@@ -235,15 +177,13 @@ func Test_RcloneMount_Positive_Empty_ObjPath(t *testing.T) {
 		"gid":                "fake-gid",
 		"uid":                "fake-uid",
 	}
-	mounter, err := NewRcloneMounter(secretMap, mountOptions,
+	mounter, err := NewRcloneMounter(secretMap, mountOptionsRClone,
 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path string, comm string, args []string) error {
 				return nil
 			},
 		}))
-	if err != nil {
-		t.Fatalf("NewS3fsMounter() returned an unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 	rCloneMounter, ok := mounter.(*RcloneMounter)
 	if !ok {
 		t.Fatal("NewRCloneMounter() did not return a RCloneMounter")
@@ -268,24 +208,19 @@ func Test_RcloneMount_Positive_Empty_ObjPath(t *testing.T) {
 
 	err = rCloneMounter.Mount("source", target)
 	assert.NoError(t, err)
-	if err != nil {
-		t.Errorf("S3fsMounter_Mount() returned an unexpected error: %v", err)
-	}
 }
 
 func Test_RcloneMount_Error_Creating_Mount_Point(t *testing.T) {
-	mounter, err := NewRcloneMounter(secretMap, mountOptions,
+	mounter, err := NewRcloneMounter(secretMapRClone, mountOptionsRClone,
 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path string, comm string, args []string) error {
 				return nil
 			},
 		}))
-	if err != nil {
-		t.Fatalf("NewS3fsMounter() returned an unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 	rCloneMounter, ok := mounter.(*RcloneMounter)
 	if !ok {
-		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
+		t.Fatal("NewRCloneMounter() did not return a RCloneMounter")
 	}
 
 	mockMkdirAll := func(path string, perm os.FileMode) error {
@@ -303,18 +238,16 @@ func Test_RcloneMount_Error_Creating_Mount_Point(t *testing.T) {
 }
 
 func Test_RcloneMount_Error_Creating_ConfigFile(t *testing.T) {
-	mounter, err := NewRcloneMounter(secretMap, mountOptions,
+	mounter, err := NewRcloneMounter(secretMapRClone, mountOptionsRClone,
 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path string, comm string, args []string) error {
 				return nil
 			},
 		}))
-	if err != nil {
-		t.Fatalf("NewS3fsMounter() returned an unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 	rCloneMounter, ok := mounter.(*RcloneMounter)
 	if !ok {
-		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
+		t.Fatal("NewRCloneMounter() did not return a RCloneMounter")
 	}
 
 	mockMkdirAll := func(path string, perm os.FileMode) error {
@@ -340,18 +273,16 @@ func Test_RcloneMount_Error_Creating_ConfigFile(t *testing.T) {
 }
 
 func Test_RcloneMount_ErrorMount(t *testing.T) {
-	mounter, err := NewRcloneMounter(secretMap, mountOptions,
+	mounter, err := NewRcloneMounter(secretMapRClone, mountOptionsRClone,
 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path string, comm string, args []string) error {
 				return errors.New("error mounting volume")
 			},
 		}))
-	if err != nil {
-		t.Fatalf("NewS3fsMounter() returned an unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 	rCloneMounter, ok := mounter.(*RcloneMounter)
 	if !ok {
-		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
+		t.Fatal("NewRCloneMounter() did not return a RCloneMounter")
 	}
 
 	mockMkdirAll := func(path string, perm os.FileMode) error {
@@ -395,13 +326,11 @@ func Test_RcloneUnmount_Positive(t *testing.T) {
 				return nil
 			},
 		}))
-	if err != nil {
-		t.Fatalf("Failed to create S3fsMounter: %v", err)
-	}
+	assert.NoError(t, err)
 
 	rCloneMounter, ok := mounter.(*RcloneMounter)
 	if !ok {
-		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
+		t.Fatal("NewRCloneMounter() did not return a RCloneMounter")
 	}
 
 	target := "/tmp/test-unmount"
@@ -409,13 +338,13 @@ func Test_RcloneUnmount_Positive(t *testing.T) {
 	// Creating a directory to simulate a mounted path
 	err = os.MkdirAll(target, os.ModePerm)
 	if err != nil {
-		t.Fatalf("TestS3fsMounter_Unmount() failed to create directory: %v", err)
+		t.Fatalf("TestRCloneMounter_Unmount() failed to create directory: %v", err)
 	}
 
 	err = rCloneMounter.Unmount(target)
 	assert.NoError(t, err)
 	if err != nil {
-		t.Errorf("TestS3fsMounter_Unmount() failed to unmount: %v", err)
+		t.Errorf("TestRCloneMounter_Unmount() failed to unmount: %v", err)
 	}
 
 	err = os.RemoveAll(target)
@@ -443,9 +372,7 @@ func Test_RcloneUnmount_Error(t *testing.T) {
 				return errors.New("error unmounting volume")
 			},
 		}))
-	if err != nil {
-		t.Fatalf("Failed to create S3fsMounter: %v", err)
-	}
+	assert.NoError(t, err)
 
 	rCloneMounter := mounter.(*RcloneMounter)
 
@@ -454,7 +381,7 @@ func Test_RcloneUnmount_Error(t *testing.T) {
 	// Creating a directory to simulate a mounted path
 	err = os.MkdirAll(target, os.ModePerm)
 	if err != nil {
-		t.Fatalf("TestS3fsMounter_Unmount() failed to create directory: %v", err)
+		t.Fatalf("TestRCloneMounter_Unmount() failed to create directory: %v", err)
 	}
 
 	err = rCloneMounter.Unmount(target)

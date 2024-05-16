@@ -109,10 +109,7 @@ func TestNewMounter(t *testing.T) {
 			factory := &S3fsMounterFactory{}
 
 			result, err := factory.NewMounter(test.attrib, test.secretMap, test.mountOptions)
-
-			if err != test.expectedErr {
-				t.Errorf("Expected error: %v, but got: %v", test.expectedErr, err)
-			}
+			assert.NoError(t, err)
 
 			assert.Equal(t, result, test.expected)
 
