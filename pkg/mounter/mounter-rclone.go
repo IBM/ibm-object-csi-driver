@@ -179,7 +179,7 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 	}
 
 	if !pathExist {
-		if err = os.MkdirAll(metaPath, 0755); // #nosec G301: used for rclone
+		if err = mkdirAll(metaPath, 0755); // #nosec G301: used for rclone
 		err != nil {
 			klog.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", metaPath, err)
 			return err
@@ -187,7 +187,7 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 	}
 
 	configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
-	if err = rclone.createConfig(configPathWithVolID); err != nil {
+	if err = createConfigWrap(configPathWithVolID, rclone); err != nil {
 		klog.Errorf("RcloneMounter Mount: Cannot create rclone config file %v", err)
 		return err
 	}
@@ -228,7 +228,14 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 	return rclone.MounterUtils.FuseUnmount(target)
 }
 
-func (rclone *RcloneMounter) createConfig(configPathWithVolID string) error {
+var createConfigFunc = createConfig
+
+// Function that wraps writePass
+var createConfigWrap = func(configPathWithVolID string, rclone *RcloneMounter) error {
+	return createConfigFunc(configPathWithVolID, rclone)
+}
+
+func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
 	var accessKey string
 	var secretKey string
 	keys := strings.Split(rclone.AccessKeys, ":")
