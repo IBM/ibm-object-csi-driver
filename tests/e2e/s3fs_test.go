@@ -17,9 +17,9 @@ package e2e
 
 import (
 	"context"
-	"os"
-
+	"fmt"
 	"github.com/IBM/ibm-object-csi-driver/tests/e2e/testsuites"
+	gtypes "github.com/onsi/ginkgo/types"
 	. "github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,23 +28,97 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"os"
 )
 
 // ENV required for testsuite execution
-var testResultFile = os.Getenv("E2E_TEST_RESULT")
 var cosEndpoint = os.Getenv("cosEndpoint")
 var locationConstraint = os.Getenv("locationConstraint")
 var s3fsBucketName = os.Getenv("s3fsBucketName")
 var accessKey = os.Getenv("accessKey")
 var secretKey = os.Getenv("secretKey")
-
-var err error
-var fpointer *os.File
+var rcloneBucketName = os.Getenv("rcloneBucketName")
 
 const (
-	driverName = "cos-s3-csi-driver"
-	scName     = "cos-s3-csi-s3fs-delete"
+	driverName   = "cos-s3-csi-driver"
+	scName       = "cos-s3-csi-s3fs-delete"
+	rclonescName = "cos-s3-csi-rclone-delete"
 )
+
+var _ = Describe("rclone", func() {
+	f := framework.NewDefaultFramework("obj-e2e-rclone")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	var (
+		cs clientset.Interface
+		ns *v1.Namespace
+	)
+
+	BeforeEach(func() {
+		cs = f.ClientSet
+		ns = f.Namespace
+	})
+
+	It("with rclone SC, Create a volume - Attach to a Pod  - Read/Write", func() {
+		payload := `{"metadata": {"labels": {"security.openshift.io/scc.podSecurityLabelSync": "false","pod-security.kubernetes.io/enforce": "privileged"}}}`
+		_, labelerr := cs.CoreV1().Namespaces().Patch(context.TODO(), ns.Name, types.StrategicMergePatchType, []byte(payload), metav1.PatchOptions{})
+		if labelerr != nil {
+			panic(labelerr)
+		}
+		secret := testsuites.NewSecret(cs, ns.Name, driverName, ns.Name, cosEndpoint, locationConstraint, rcloneBucketName, accessKey, secretKey)
+		secret.Create()
+		defer secret.Cleanup()
+
+		pod := []testsuites.PodDetails{
+			{
+				Cmd:      "echo 'hello world' >> /mnt/test-1/data && while true; do sleep 2; done",
+				CmdExits: false,
+				Volumes: []testsuites.VolumeDetails{
+					{
+						PVCName:    ns.Name,
+						VolumeType: rclonescName,
+						ClaimSize:  "256Mi",
+						VolumeMount: testsuites.VolumeMountDetails{
+							NameGenerate:      "test-volume-",
+							MountPathGenerate: "/mnt/test-",
+						},
+					},
+				},
+			},
+		}
+		test := testsuites.DynamicallyProvisionePodWithVolTest{
+			Pods: pod,
+			PodCheck: &testsuites.PodExecCheck{
+				Cmd:              []string{"cat", "/mnt/test-1/data"},
+				ExpectedString01: "hello world\n",
+				ExpectedString02: "hello world\nhello world\n", // pod will be restarted so expect to see 2 instances of string
+			},
+		}
+		customReporter, err := NewCustomReporter("test_results.txt")
+		if err != nil {
+			println("Failed to create file:", err)
+			return
+		}
+		defer customReporter.Close()
+
+		err = test.Run(cs, ns)
+		if err != nil {
+			// If Run returns an error, report the failure
+			fmt.Println("Test failed:", err)
+			customReporter.SpecDidComplete(&gtypes.SpecSummary{
+				State:          gtypes.SpecStateFailed,
+				ComponentTexts: []string{"DynamicallyProvisionePodWithVolTest RCLONE"},
+			})
+		} else {
+			// If Run succeeds, report the success
+			fmt.Println("Test passed")
+			customReporter.SpecDidComplete(&gtypes.SpecSummary{
+				State:          gtypes.SpecStatePassed,
+				ComponentTexts: []string{"DynamicallyProvisionePodWithVolTest RCLONE"},
+			})
+		}
+	})
+
+})
 
 var _ = Describe("s3fs", func() {
 	f := framework.NewDefaultFramework("obj-e2e-s3fs")
@@ -65,11 +139,6 @@ var _ = Describe("s3fs", func() {
 		if labelerr != nil {
 			panic(labelerr)
 		}
-		fpointer, err = os.OpenFile(testResultFile, os.O_APPEND|os.O_WRONLY, 0644)
-		if err != nil {
-			panic(err)
-		}
-		defer fpointer.Close()
 		secret := testsuites.NewSecret(cs, ns.Name, driverName, ns.Name, cosEndpoint, locationConstraint, s3fsBucketName, accessKey, secretKey)
 		secret.Create()
 		defer secret.Cleanup()
@@ -99,9 +168,28 @@ var _ = Describe("s3fs", func() {
 				ExpectedString02: "hello world\nhello world\n", // pod will be restarted so expect to see 2 instances of string
 			},
 		}
-		test.Run(cs, ns)
-		if _, err = fpointer.WriteString("OBJECT-CSI-PLUGIN(s3fs): PVC CREATE, POD MOUNT, READ/WRITE, CLEANUP : PASS\n"); err != nil {
-			panic(err)
+		customReporter, err := NewCustomReporter("test_results.txt")
+		if err != nil {
+			println("Failed to create file:", err)
+			return
+		}
+		defer customReporter.Close()
+
+		err = test.Run(cs, ns)
+		if err != nil {
+			// If Run returns an error, report the failure
+			fmt.Println("Test failed:", err)
+			customReporter.SpecDidComplete(&gtypes.SpecSummary{
+				State:          gtypes.SpecStateFailed,
+				ComponentTexts: []string{"DynamicallyProvisionePodWithVolTest S3FS"},
+			})
+		} else {
+			// If Run succeeds, report the success
+			fmt.Println("Test passed")
+			customReporter.SpecDidComplete(&gtypes.SpecSummary{
+				State:          gtypes.SpecStatePassed,
+				ComponentTexts: []string{"DynamicallyProvisionePodWithVolTest S3FS"},
+			})
 		}
 	})
 
