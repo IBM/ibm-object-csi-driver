@@ -105,7 +105,6 @@ func TestNewMounter(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			factory := &S3fsMounterFactory{}
 
 			result, err := factory.NewMounter(test.attrib, test.secretMap, test.mountOptions)

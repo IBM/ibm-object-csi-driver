@@ -394,7 +394,6 @@ func Test_RcloneUnmount_Error(t *testing.T) {
 }
 
 func TestUpdateRCloneMountOptions(t *testing.T) {
-
 	defaultMountOp := []string{"option1=value1", "option2=value2"}
 	secretMap := map[string]string{
 		"mountOptions": "additional_option=value3",
