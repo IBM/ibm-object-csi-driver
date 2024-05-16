@@ -166,13 +166,8 @@ func (t *TestPod) Exec(command []string, expectedString string) error {
 
 func (t *TestPod) WaitForSuccess() error {
 	v2.By(fmt.Sprintf("checking that the pods command exits with no error [%s/%s]", t.namespace.Name, t.pod.Name))
-<<<<<<< HEAD
 	err := k8sDevPod.WaitForPodSuccessInNamespaceTimeout(context.Background(), t.client, t.pod.Name, t.namespace.Name, 15*time.Minute)
 	framework.ExpectNoError(err)
-=======
-	err := k8sDevPod.WaitForPodSuccessInNamespaceSlow(t.client, t.pod.Name, t.namespace.Name)
-	return err
->>>>>>> main
 }
 
 var podRunningCondition = func(pod *v1.Pod) (bool, error) {
@@ -190,13 +185,8 @@ var podRunningCondition = func(pod *v1.Pod) (bool, error) {
 func (t *TestPod) WaitForRunningSlow() error {
 	v2.By(fmt.Sprintf("checking that the pods status is running [%s/%s]", t.namespace.Name, t.pod.Name))
 	//err := framework.WaitTimeoutForPodRunningInNamespace(t.client, t.pod.Name, t.namespace.Name, slowPodStartTimeout)
-<<<<<<< HEAD
 	err := k8sDevPod.WaitForPodCondition(context.Background(), t.client, t.namespace.Name, t.pod.Name, failedConditionDescription, slowPodStartTimeout, podRunningCondition)
 	framework.ExpectNoError(err)
-=======
-	err := k8sDevPod.WaitForPodCondition(t.client, t.namespace.Name, t.pod.Name, failedConditionDescription, slowPodStartTimeout, podRunningCondition)
-	return err
->>>>>>> main
 }
 
 func (t *TestPod) WaitForRunning() {
