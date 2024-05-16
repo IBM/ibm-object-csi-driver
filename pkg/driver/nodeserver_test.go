@@ -23,11 +23,13 @@ import (
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
+	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 func TestNodeStageVolume(t *testing.T) {
@@ -234,16 +236,101 @@ func TestNodeUnpublishVolume(t *testing.T) {
 
 func TestNodeGetVolumeStats(t *testing.T) {
 	testCases := []struct {
-		testCaseName string
-		req          *csi.NodeGetVolumeStatsRequest
-		expectedResp *csi.NodeGetVolumeStatsResponse
-		expectedErr  error
-	}{}
+		testCaseName     string
+		req              *csi.NodeGetVolumeStatsRequest
+		driverStatsUtils utils.StatsUtils
+		expectedResp     *csi.NodeGetVolumeStatsResponse
+		expectedErr      error
+	}{
+		{
+			testCaseName: "Positive: Successful",
+			req: &csi.NodeGetVolumeStatsRequest{
+				VolumeId:   testVolumeID,
+				VolumePath: testTargetPath,
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				FSInfoFn: func(path string) (int64, int64, int64, int64, int64, int64, error) {
+					return 1, 1, 1, 1, 1, 1, nil
+				},
+				GetBucketUsageFn: func(volumeID string) (int64, resource.Quantity, error) {
+					return 1, resource.Quantity{}, nil
+				},
+			}),
+			expectedResp: &csi.NodeGetVolumeStatsResponse{
+				Usage: []*csi.VolumeUsage{
+					{
+						Available: -1,
+						Used:      1,
+						Unit:      csi.VolumeUsage_BYTES,
+					},
+					{
+						Available: 1,
+						Total:     1,
+						Used:      1,
+						Unit:      csi.VolumeUsage_INODES,
+					},
+				},
+			},
+			expectedErr: nil,
+		},
+		{
+			testCaseName: "Negative: Volume ID is missing",
+			req:          &csi.NodeGetVolumeStatsRequest{},
+			expectedResp: nil,
+			expectedErr:  errors.New("Volume ID missing in request"),
+		},
+		{
+			testCaseName: "Negative: Volume path is missing",
+			req: &csi.NodeGetVolumeStatsRequest{
+				VolumeId: testVolumeID,
+			},
+			expectedResp: nil,
+			expectedErr:  errors.New("Path Doesn't exist"),
+		},
+		{
+			testCaseName: "Negative: Failed to getg volume stats",
+			req: &csi.NodeGetVolumeStatsRequest{
+				VolumeId:   testVolumeID,
+				VolumePath: testTargetPath,
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				FSInfoFn: func(path string) (int64, int64, int64, int64, int64, int64, error) {
+					return 0, 0, 0, 0, 0, 0, errors.New("transpoint endpoint is not connected")
+				},
+			}),
+			expectedResp: &csi.NodeGetVolumeStatsResponse{
+				VolumeCondition: &csi.VolumeCondition{
+					Abnormal: true,
+					Message:  "transpoint endpoint is not connected",
+				},
+			},
+			expectedErr: nil,
+		},
+		{
+			testCaseName: "Negative: Failed to get Bucket Usage",
+			req: &csi.NodeGetVolumeStatsRequest{
+				VolumeId:   testVolumeID,
+				VolumePath: testTargetPath,
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				FSInfoFn: func(path string) (int64, int64, int64, int64, int64, int64, error) {
+					return 1, 1, 1, 1, 1, 1, nil
+				},
+				GetBucketUsageFn: func(volumeID string) (int64, resource.Quantity, error) {
+					return 0, resource.Quantity{}, errors.New("failed to get bucket usage")
+				},
+			}),
+			expectedResp: nil,
+			expectedErr:  errors.New("failed to get bucket usage"),
+		},
+	}
 
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		nodeServer := nodeServer{}
+		nodeServer := nodeServer{
+			Stats: tc.driverStatsUtils,
+		}
 		actualResp, actualErr := nodeServer.NodeGetVolumeStats(ctx, tc.req)
 
 		if tc.expectedErr != nil {
