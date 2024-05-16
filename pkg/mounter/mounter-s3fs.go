@@ -164,13 +164,6 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	return s3fs.MounterUtils.FuseMount(target, constants.S3FS, args)
 }
 
-var mkdirAllFunc = os.MkdirAll
-
-// Function that wraps os.MkdirAll
-var mkdirAll = func(path string, perm os.FileMode) error {
-	return mkdirAllFunc(path, perm)
-}
-
 var writePassFunc = writePass
 
 // Function that wraps writePass

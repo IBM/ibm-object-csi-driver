@@ -100,3 +100,10 @@ func writePass(pwFileName string, pwFileContent string) error {
 	}
 	return nil
 }
+
+var mkdirAllFunc = os.MkdirAll
+
+// Function that wraps os.MkdirAll
+var mkdirAll = func(path string, perm os.FileMode) error {
+	return mkdirAllFunc(path, perm)
+}
