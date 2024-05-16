@@ -19,6 +19,7 @@ package testsuites
 import (
 	"errors"
 	"fmt"
+
 	v2 "github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -62,7 +63,6 @@ func (t *DynamicallyProvisionePodWithVolTest) Run(client clientset.Interface, na
 		} else {
 			v2.By("checking that the pods command exits with no error")
 			if err := tpod.WaitForSuccess(); err != nil {
-
 				testFailed = true
 				break
 			}
