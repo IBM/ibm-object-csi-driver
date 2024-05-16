@@ -21,3 +21,6 @@ images:
 - newName: registry.k8s.io/sig-storage/livenessprobe
   newTag: v2.9.0
   name: liveness-probe-image
+commonLabels:
+  app.kubernetes.io/part-of: ibm-object-csi-driver
+  app.kubernetes.io/managed-by: kustomize

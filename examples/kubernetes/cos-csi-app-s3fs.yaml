@@ -1,0 +1,16 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: cos-csi-app-s3fs
+spec:
+  containers:
+    - name: app-frontend
+      image: gcr.io/google-samples/node-hello:1.0
+      imagePullPolicy: IfNotPresent
+      volumeMounts:
+      - mountPath: "/data"
+        name: cos-csi-volume
+  volumes:
+    - name: cos-csi-volume
+      persistentVolumeClaim:
+        claimName: cos-s3-csi-s3fs-pvc
