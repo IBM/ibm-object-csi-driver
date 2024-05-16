@@ -36,9 +36,13 @@ import (
 var (
 	ctx = context.Background()
 
+	driverName    = "testDriver"
+	driverVersion = "testDriverVersion"
+
 	testVolumeID   = "testVolumeID"
 	testVolumeName = "test-volume-name"
 	testTargetPath = "test/path"
+	testNodeID     = "testNodeID"
 	bucketName     = "testBucket"
 
 	testSecret = map[string]string{

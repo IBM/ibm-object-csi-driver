@@ -263,7 +263,6 @@ func (ns *nodeServer) NodeExpandVolume(_ context.Context, _ *csi.NodeExpandVolum
 }
 
 func (ns *nodeServer) NodeGetCapabilities(_ context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-	// currently there is a single NodeServer capability according to the spec
 	klog.V(2).Infof("NodeGetCapabilities: Request: %+v", *req)
 	var caps []*csi.NodeServiceCapability
 	for _, cap := range nodeServerCapabilities {

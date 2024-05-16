@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
@@ -262,7 +263,7 @@ func TestNodeExpandVolume(t *testing.T) {
 	t.Run("UnImplemented Method", func(t *testing.T) {
 		nodeServer := nodeServer{}
 		actualResp, actualErr := nodeServer.NodeExpandVolume(ctx, &csi.NodeExpandVolumeRequest{})
-		assert.Nil(t, actualResp)
+		assert.Equal(t, &csi.NodeExpandVolumeResponse{}, actualResp)
 		assert.Error(t, actualErr)
 		assert.Contains(t, actualErr.Error(), status.Error(codes.Unimplemented, "").Error())
 	})
@@ -274,7 +275,38 @@ func TestNodeGetCapabilities(t *testing.T) {
 		req          *csi.NodeGetCapabilitiesRequest
 		expectedResp *csi.NodeGetCapabilitiesResponse
 		expectedErr  error
-	}{}
+	}{
+		{
+			testCaseName: "Positive: Successful",
+			req:          &csi.NodeGetCapabilitiesRequest{},
+			expectedResp: &csi.NodeGetCapabilitiesResponse{
+				Capabilities: []*csi.NodeServiceCapability{
+					{
+						Type: &csi.NodeServiceCapability_Rpc{
+							Rpc: &csi.NodeServiceCapability_RPC{
+								Type: nodeServerCapabilities[0],
+							},
+						},
+					},
+					{
+						Type: &csi.NodeServiceCapability_Rpc{
+							Rpc: &csi.NodeServiceCapability_RPC{
+								Type: nodeServerCapabilities[1],
+							},
+						},
+					},
+					{
+						Type: &csi.NodeServiceCapability_Rpc{
+							Rpc: &csi.NodeServiceCapability_RPC{
+								Type: nodeServerCapabilities[2],
+							},
+						},
+					},
+				},
+			},
+			expectedErr: nil,
+		},
+	}
 
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
@@ -301,12 +333,25 @@ func TestNodeGetInfo(t *testing.T) {
 		req          *csi.NodeGetInfoRequest
 		expectedResp *csi.NodeGetInfoResponse
 		expectedErr  error
-	}{}
+	}{
+		{
+			testCaseName: "Positive: Successful",
+			req:          &csi.NodeGetInfoRequest{},
+			expectedResp: &csi.NodeGetInfoResponse{
+				NodeId:             testNodeID,
+				MaxVolumesPerNode:  constants.DefaultVolumesPerNode,
+				AccessibleTopology: &csi.Topology{},
+			},
+			expectedErr: nil,
+		},
+	}
 
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		nodeServer := nodeServer{}
+		nodeServer := nodeServer{
+			NodeID: testNodeID,
+		}
 		actualResp, actualErr := nodeServer.NodeGetInfo(ctx, tc.req)
 
 		if tc.expectedErr != nil {

@@ -1,5 +1,5 @@
 /**
- * Copyright 2021 IBM Corp.
+ * Copyright 2024 IBM Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,76 +14,150 @@
  * limitations under the License.
  */
 
-// Package driver ...
 package driver
 
 import (
+	"errors"
+	"reflect"
 	"testing"
 
-	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/net/context"
+	"go.uber.org/zap"
 )
 
 func TestGetPluginInfo(t *testing.T) {
-	vendorVersion := "test-vendor-version-1.1.2"
-	driver := "mydriver"
-
-	icDriver := inits3Driver(t)
-	if icDriver == nil {
-		t.Fatalf("Failed to setup CSI Driver")
+	testCases := []struct {
+		testCaseName string
+		req          *csi.GetPluginInfoRequest
+		s3Driver     *S3Driver
+		expectedResp *csi.GetPluginInfoResponse
+		expectedErr  error
+	}{
+		{
+			testCaseName: "Positive: Successful",
+			req:          &csi.GetPluginInfoRequest{},
+			s3Driver: &S3Driver{
+				name:    driverName,
+				version: driverVersion,
+			},
+			expectedResp: &csi.GetPluginInfoResponse{
+				Name:          driverName,
+				VendorVersion: driverVersion,
+			},
+			expectedErr: nil,
+		},
+		{
+			testCaseName: "Negative: Driver not configuraed",
+			req:          &csi.GetPluginInfoRequest{},
+			s3Driver:     nil,
+			expectedResp: nil,
+			expectedErr:  errors.New("Driver not configured"),
+		},
 	}
-	// Get the plugin response by using driver
-	resp, err := icDriver.ids.GetPluginInfo(context.Background(), &csi.GetPluginInfoRequest{})
-	if err != nil {
-		t.Fatalf("GetPluginInfo returned unexpected error: %v", err)
-	}
 
-	if resp.GetName() != driver {
-		t.Fatalf("Response name expected: %v, got: %v", driver, resp.GetName())
-	}
+	for _, tc := range testCases {
+		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-	respVer := resp.GetVendorVersion()
-	if respVer != vendorVersion {
-		t.Fatalf("Vendor version expected: %v, got: %v", vendorVersion, respVer)
-	}
+		identityServer := &identityServer{
+			S3Driver: tc.s3Driver,
+		}
+		actualResp, actualErr := identityServer.GetPluginInfo(ctx, tc.req)
 
-	// set driver as nil
-	icDriver.ids.S3Driver = nil
-	resp, err = icDriver.ids.GetPluginInfo(context.Background(), &csi.GetPluginInfoRequest{})
-	assert.NotNil(t, err)
-	assert.Nil(t, resp)
+		if tc.expectedErr != nil {
+			assert.Error(t, actualErr)
+			assert.Contains(t, actualErr.Error(), tc.expectedErr.Error())
+		} else {
+			assert.NoError(t, actualErr)
+		}
+
+		if !reflect.DeepEqual(tc.expectedResp, actualResp) {
+			t.Errorf("Expected %v but got %v", tc.expectedResp, actualResp)
+		}
+	}
 }
 
 func TestGetPluginCapabilities(t *testing.T) {
-	icDriver := inits3Driver(t)
-	if icDriver == nil {
-		t.Fatalf("Failed to setup CSI Driver")
+	testCases := []struct {
+		testCaseName string
+		req          *csi.GetPluginCapabilitiesRequest
+		expectedResp *csi.GetPluginCapabilitiesResponse
+		expectedErr  error
+	}{
+		{
+			testCaseName: "Positive: Successful",
+			req:          &csi.GetPluginCapabilitiesRequest{},
+			expectedResp: &csi.GetPluginCapabilitiesResponse{
+				Capabilities: []*csi.PluginCapability{
+					{
+						Type: &csi.PluginCapability_Service_{
+							Service: &csi.PluginCapability_Service{
+								Type: csi.PluginCapability_Service_CONTROLLER_SERVICE,
+							},
+						},
+					},
+					{
+						Type: &csi.PluginCapability_Service_{
+							Service: &csi.PluginCapability_Service{
+								Type: csi.PluginCapability_Service_VOLUME_ACCESSIBILITY_CONSTRAINTS,
+							},
+						},
+					},
+				},
+			},
+			expectedErr: nil,
+		},
 	}
 
-	resp, err := icDriver.ids.GetPluginCapabilities(context.Background(), &csi.GetPluginCapabilitiesRequest{})
-	if err != nil {
-		t.Fatalf("GetPluginCapabilities returned unexpected error: %v", err)
-	}
+	for _, tc := range testCases {
+		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-	for _, capability := range resp.GetCapabilities() {
-		switch capability.GetService().GetType() {
-		case csi.PluginCapability_Service_CONTROLLER_SERVICE:
-		case csi.PluginCapability_Service_VOLUME_ACCESSIBILITY_CONSTRAINTS:
-		default:
-			t.Fatalf("Unknown capability: %v", capability.GetService().GetType())
+		identityServer := &identityServer{}
+		actualResp, actualErr := identityServer.GetPluginCapabilities(ctx, tc.req)
+
+		if tc.expectedErr != nil {
+			assert.Error(t, actualErr)
+			assert.Contains(t, actualErr.Error(), tc.expectedErr.Error())
+		} else {
+			assert.NoError(t, actualErr)
+		}
+
+		if !reflect.DeepEqual(tc.expectedResp, actualResp) {
+			t.Errorf("Expected %v but got %v", tc.expectedResp, actualResp)
 		}
 	}
 }
 
 func TestProbe(t *testing.T) {
-	icDriver := inits3Driver(t)
-	if icDriver == nil {
-		t.Fatalf("Failed to setup CSI Driver")
+	testCases := []struct {
+		testCaseName string
+		req          *csi.ProbeRequest
+		expectedResp *csi.ProbeResponse
+		expectedErr  error
+	}{
+		{
+			testCaseName: "Positive: Successful",
+			req:          &csi.ProbeRequest{},
+			expectedResp: &csi.ProbeResponse{},
+			expectedErr:  nil,
+		},
 	}
 
-	_, err := icDriver.ids.Probe(context.Background(), &csi.ProbeRequest{})
-	if err != nil {
-		t.Fatalf("Probe returned unexpected error: %v", err)
+	for _, tc := range testCases {
+		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
+
+		identityServer := &identityServer{}
+		actualResp, actualErr := identityServer.Probe(ctx, tc.req)
+
+		if tc.expectedErr != nil {
+			assert.Error(t, actualErr)
+			assert.Contains(t, actualErr.Error(), tc.expectedErr.Error())
+		} else {
+			assert.NoError(t, actualErr)
+		}
+
+		if !reflect.DeepEqual(tc.expectedResp, actualResp) {
+			t.Errorf("Expected %v but got %v", tc.expectedResp, actualResp)
+		}
 	}
 }
