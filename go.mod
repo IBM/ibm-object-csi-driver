@@ -6,7 +6,7 @@ require (
 	github.com/IBM/ibm-cos-sdk-go v1.10.3
 	github.com/IBM/ibm-csi-common v1.1.13
 	github.com/IBM/ibmcloud-volume-interface v1.2.20
-	github.com/aws/aws-sdk-go v1.53.2
+	github.com/aws/aws-sdk-go v1.53.3
 	github.com/container-storage-interface/spec v1.9.0
 	github.com/google/uuid v1.6.0
 	github.com/kubernetes-csi/csi-test/v5 v5.2.0
@@ -18,12 +18,12 @@ require (
 	go.uber.org/zap v1.27.0
 	golang.org/x/net v0.25.0
 	google.golang.org/grpc v1.64.0
-	k8s.io/api v0.30.0
-	k8s.io/apimachinery v0.30.0
-	k8s.io/client-go v0.30.0
+	k8s.io/api v0.30.1
+	k8s.io/apimachinery v0.30.1
+	k8s.io/client-go v0.30.1
 	k8s.io/klog/v2 v2.120.1
 	k8s.io/kubernetes v1.30.1
-	k8s.io/pod-security-admission v0.30.0
+	k8s.io/pod-security-admission v0.30.1
 )
 
 require (
@@ -116,12 +116,12 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.28.6 // indirect
-	k8s.io/apiserver v0.30.0 // indirect
+	k8s.io/apiserver v0.30.1 // indirect
 	k8s.io/cloud-provider v0.28.6 // indirect
-	k8s.io/component-base v0.30.0 // indirect
+	k8s.io/component-base v0.30.1 // indirect
 	k8s.io/component-helpers v0.28.6 // indirect
 	k8s.io/controller-manager v0.28.6 // indirect
-	k8s.io/kms v0.30.0 // indirect
+	k8s.io/kms v0.30.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
 	k8s.io/kubectl v0.28.6 // indirect
 	k8s.io/kubelet v0.28.6 // indirect
