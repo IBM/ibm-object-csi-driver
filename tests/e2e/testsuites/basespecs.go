@@ -336,7 +336,7 @@ func generatePVC(name, namespace,
 			AccessModes: []v1.PersistentVolumeAccessMode{
 				accessMode,
 			},
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceStorage: resource.MustParse(claimSize),
 				},
