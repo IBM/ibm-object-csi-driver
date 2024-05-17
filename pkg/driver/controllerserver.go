@@ -290,7 +290,7 @@ func getCredentials(secretMap map[string]string) (*s3client.ObjectStorageCredent
 	}
 
 	if val, check := secretMap["apiKey"]; check {
-		apiKey = val // pragma: allowlist secret
+		apiKey = val
 	}
 
 	if apiKey == "" {
@@ -316,7 +316,7 @@ func getCredentials(secretMap map[string]string) (*s3client.ObjectStorageCredent
 		AuthType:          authType,
 		AccessKey:         accessKey,
 		SecretKey:         secretKey,
-		APIKey:            apiKey, // pragma: allowlist secret
+		APIKey:            apiKey,
 		IAMEndpoint:       iamEndpoint,
 		ServiceInstanceID: serviceInstanceID,
 	}, nil
