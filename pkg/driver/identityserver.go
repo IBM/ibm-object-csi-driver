@@ -54,12 +54,12 @@ func (csiIdentity *identityServer) GetPluginCapabilities(_ context.Context, req 
 				},
 			},
 			/* TODO Add Volume Expansion {
-				 Type: &csi.PluginCapability_Service_{
-					 Service: &csi.PluginCapability_Service{
-						 Type: csi.PluginCapability_VolumeExpansion_ONLINE,
-					 },
-				 },
-			 }, */
+				Type: &csi.PluginCapability_Service_{
+					Service: &csi.PluginCapability_Service{
+						Type: csi.PluginCapability_VolumeExpansion_ONLINE,
+					},
+				},
+			}, */
 		},
 	}, nil
 }
