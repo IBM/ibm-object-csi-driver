@@ -39,7 +39,7 @@ deps:
 
 
 .PHONY: fmt
-fmt:
+fmt: lint
 	gofmt -l ${GOFILES}
 
 .PHONY: coverage
