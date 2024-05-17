@@ -4,8 +4,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-var _ StatsUtils = (*FakeStatsUtilsFuncStructImpl)(nil)
-
 type FakeStatsUtilsFuncStruct struct {
 	FSInfoFn         func(path string) (int64, int64, int64, int64, int64, int64, error)
 	CheckMountFn     func(targetPath string) (bool, error)

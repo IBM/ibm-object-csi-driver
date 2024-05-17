@@ -39,56 +39,6 @@ type controllerServer struct {
 	Logger     *zap.Logger
 }
 
-func (cs *controllerServer) getCredentials(secretMap map[string]string) (*s3client.ObjectStorageCredentials, error) {
-	var (
-		accessKey         string
-		secretKey         string
-		apiKey            string
-		serviceInstanceID string
-		authType          string
-		iamEndpoint       string
-	)
-
-	if val, check := secretMap["iamEndpoint"]; check {
-		iamEndpoint = val
-	}
-	if iamEndpoint == "" {
-		iamEndpoint = constants.DefaultIAMEndPoint
-	}
-
-	if val, check := secretMap["apiKey"]; check {
-		apiKey = val
-	}
-
-	if apiKey == "" {
-		authType = "hmac"
-		accessKey = secretMap["accessKey"]
-		if accessKey == "" {
-			return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| accessKey unknown")
-		}
-
-		secretKey = secretMap["secretKey"]
-		if secretKey == "" {
-			return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| secretKey unknown")
-		}
-	} else {
-		authType = "iam"
-		serviceInstanceID = secretMap["serviceId"]
-		if serviceInstanceID == "" {
-			return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| serviceId  unknown")
-		}
-	}
-
-	return &s3client.ObjectStorageCredentials{
-		AuthType:          authType,
-		AccessKey:         accessKey,
-		SecretKey:         secretKey,
-		APIKey:            apiKey,
-		IAMEndpoint:       iamEndpoint,
-		ServiceInstanceID: serviceInstanceID,
-	}, nil
-}
-
 func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	var (
 		bucketName         string
@@ -96,7 +46,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		locationConstraint string
 		kpRootKeyCrn       string
 	)
-	modifiedRequest, err := ReplaceAndReturnCopy(req)
+	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
 	}
@@ -130,7 +80,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	params := req.GetParameters()
 	secretMap := req.GetSecrets()
 	fmt.Println("CreateVolume Parameters:\n\t", params)
-	creds, err := cs.getCredentials(req.GetSecrets())
+	creds, err := getCredentials(req.GetSecrets())
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
 	}
@@ -194,7 +144,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 }
 
 func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	modifiedRequest, err := ReplaceAndReturnCopy(req)
+	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
 	}
@@ -207,7 +157,7 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 	klog.Infof("Deleting volume %v", volumeID)
 	secretMap := req.GetSecrets()
 
-	creds, err := cs.getCredentials(req.GetSecrets())
+	creds, err := getCredentials(req.GetSecrets())
 	if err != nil {
 		return nil, fmt.Errorf("cannot get credentials: %v", err)
 	}
@@ -320,6 +270,56 @@ func (cs *controllerServer) ControllerGetVolume(_ context.Context, req *csi.Cont
 func (cs *controllerServer) ControllerModifyVolume(_ context.Context, req *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
 	klog.V(3).Infof("ControllerModifyVolume: called with args %+v", *req)
 	return nil, status.Error(codes.Unimplemented, "ControllerModifyVolume")
+}
+
+func getCredentials(secretMap map[string]string) (*s3client.ObjectStorageCredentials, error) {
+	var (
+		accessKey         string
+		secretKey         string
+		apiKey            string
+		serviceInstanceID string
+		authType          string
+		iamEndpoint       string
+	)
+
+	if val, check := secretMap["iamEndpoint"]; check {
+		iamEndpoint = val
+	}
+	if iamEndpoint == "" {
+		iamEndpoint = constants.DefaultIAMEndPoint
+	}
+
+	if val, check := secretMap["apiKey"]; check {
+		apiKey = val
+	}
+
+	if apiKey == "" {
+		authType = "hmac"
+		accessKey = secretMap["accessKey"]
+		if accessKey == "" {
+			return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| accessKey unknown")
+		}
+
+		secretKey = secretMap["secretKey"]
+		if secretKey == "" {
+			return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| secretKey unknown")
+		}
+	} else {
+		authType = "iam"
+		serviceInstanceID = secretMap["serviceId"]
+		if serviceInstanceID == "" {
+			return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| serviceId  unknown")
+		}
+	}
+
+	return &s3client.ObjectStorageCredentials{
+		AuthType:          authType,
+		AccessKey:         accessKey,
+		SecretKey:         secretKey,
+		APIKey:            apiKey,
+		IAMEndpoint:       iamEndpoint,
+		ServiceInstanceID: serviceInstanceID,
+	}, nil
 }
 
 func getTempBucketName(mounterType, volumeID string) string {
