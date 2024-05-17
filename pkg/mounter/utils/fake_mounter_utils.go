@@ -1,7 +1,5 @@
 package utils
 
-var _ MounterUtils = (*FakeMounterUtilsFuncStructImpl)(nil)
-
 type FakeMounterUtilsFuncStruct struct {
 	FuseMountFn   func(path string, comm string, args []string) error
 	FuseUnmountFn func(path string) error

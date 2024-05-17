@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -92,6 +93,79 @@ func (su *DriverStatsUtils) GetBucketUsage(volumeID string) (int64, resource.Qua
 	}
 
 	return usage, capacity, nil
+}
+
+func ReplaceAndReturnCopy(req interface{}) (interface{}, error) {
+	switch r := req.(type) {
+	case *csi.CreateVolumeRequest:
+		// Create a new CreateVolumeRequest and copy the original values
+		var inReq *csi.CreateVolumeRequest
+
+		newReq := &csi.CreateVolumeRequest{}
+		*newReq = *r
+
+		inReq = req.(*csi.CreateVolumeRequest)
+
+		// Modify the Secrets map in the new request
+		newReq.Secrets = make(map[string]string)
+		secretMap := inReq.GetSecrets()
+
+		for k, v := range secretMap {
+			if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
+				newReq.Secrets[k] = "xxxxxxx"
+				continue
+			}
+			newReq.Secrets[k] = v
+		}
+		return newReq, nil
+	case *csi.DeleteVolumeRequest:
+		// Create a new DeleteVolumeRequest and copy the original values
+		var inReq *csi.DeleteVolumeRequest
+
+		newReq := &csi.DeleteVolumeRequest{}
+		*newReq = *r
+
+		inReq = req.(*csi.DeleteVolumeRequest)
+
+		// Modify the Secrets map in the new request
+		newReq.Secrets = make(map[string]string)
+		secretMap := inReq.GetSecrets()
+
+		for k, v := range secretMap {
+			if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
+				newReq.Secrets[k] = "xxxxxxx"
+				continue
+			}
+			newReq.Secrets[k] = v
+		}
+
+		return newReq, nil
+	case *csi.NodePublishVolumeRequest:
+		// Create a new NodePublishVolumeRequest and copy the original values
+		var inReq *csi.NodePublishVolumeRequest
+
+		newReq := &csi.NodePublishVolumeRequest{}
+		*newReq = *r
+
+		inReq = req.(*csi.NodePublishVolumeRequest)
+
+		// Modify the Secrets map in the new request
+		newReq.Secrets = make(map[string]string)
+		secretMap := inReq.GetSecrets()
+
+		for k, v := range secretMap {
+			if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
+				newReq.Secrets[k] = "xxxxxxx"
+				continue
+			}
+			newReq.Secrets[k] = v
+		}
+
+		return newReq, nil
+
+	default:
+		return req, fmt.Errorf("unsupported request type")
+	}
 }
 
 func createK8sClient() (*kubernetes.Clientset, error) {

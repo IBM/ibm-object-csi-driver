@@ -36,6 +36,9 @@ import (
 var (
 	ctx = context.Background()
 
+	driverName    = "testDriver"
+	driverVersion = "testDriverVersion"
+
 	testVolumeID   = "testVolumeID"
 	testVolumeName = "test-volume-name"
 	bucketName     = "testBucket"
