@@ -5,21 +5,11 @@ import (
 
 	"os"
 
-	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/types"
 )
 
 type CustomReporter struct {
 	OutputFile *os.File
-}
-
-func (r *CustomReporter) SpecSuiteWillBegin(config config.GinkgoConfigType, summary *types.SuiteSummary) {
-}
-
-func (r *CustomReporter) BeforeSuiteDidRun(setupSummary *types.SetupSummary) {
-}
-
-func (r *CustomReporter) SpecWillRun(specSummary *types.SpecSummary) {
 }
 
 func (r *CustomReporter) SpecDidComplete(specSummary *types.SpecSummary) {
@@ -28,9 +18,6 @@ func (r *CustomReporter) SpecDidComplete(specSummary *types.SpecSummary) {
 	} else {
 		fmt.Fprintf(r.OutputFile, "PASS: %s\n", specSummary.ComponentTexts[0])
 	}
-}
-
-func (r *CustomReporter) AfterSuiteDidRun(setupSummary *types.SetupSummary) {
 }
 
 func NewCustomReporter(outputFilePath string) (*CustomReporter, error) {
