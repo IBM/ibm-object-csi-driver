@@ -2,10 +2,9 @@ package e2e
 
 import (
 	"fmt"
-
 	"os"
 
-	"github.com/onsi/ginkgo/types"
+	"github.com/onsi/ginkgo/v2/types"
 )
 
 type CustomReporter struct {

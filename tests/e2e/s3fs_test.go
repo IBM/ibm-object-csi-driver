@@ -18,12 +18,11 @@ package e2e
 import (
 	"context"
 	"fmt"
-
 	"os"
 
 	"github.com/IBM/ibm-object-csi-driver/tests/e2e/testsuites"
-	gtypes "github.com/onsi/ginkgo/types"
 	. "github.com/onsi/ginkgo/v2"
+	gtypes "github.com/onsi/ginkgo/v2/types"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
