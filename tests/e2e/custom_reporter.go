@@ -3,7 +3,6 @@ package e2e
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/onsi/ginkgo/v2/types"
 )
@@ -21,8 +20,7 @@ func (r *CustomReporter) SpecDidComplete(specSummary *types.SpecSummary) {
 }
 
 func NewCustomReporter(outputFilePath string) (*CustomReporter, error) {
-	outputFilePath = filepath.Clean(outputFilePath)
-	outputFile, err := os.OpenFile(outputFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666) // #nosec G302
+	outputFile, err := os.OpenFile(outputFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		return nil, err
 	}
