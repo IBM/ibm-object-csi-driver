@@ -19,6 +19,8 @@ import (
 	"context"
 	"fmt"
 
+	"os"
+
 	"github.com/IBM/ibm-object-csi-driver/tests/e2e/testsuites"
 	gtypes "github.com/onsi/ginkgo/types"
 	. "github.com/onsi/ginkgo/v2"
@@ -29,7 +31,6 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"os"
 )
 
 // ENV required for testsuite execution
