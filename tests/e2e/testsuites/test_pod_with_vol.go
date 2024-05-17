@@ -63,7 +63,6 @@ func (t *DynamicallyProvisionePodWithVolTest) Run(client clientset.Interface, na
 		} else {
 			v2.By("checking that the pods command exits with no error")
 			if err := tpod.WaitForSuccess(); err != nil {
-
 				testFailed = true
 				break
 			}
