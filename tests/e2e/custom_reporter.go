@@ -2,22 +2,14 @@ package e2e
 
 import (
 	"fmt"
-	"github.com/onsi/ginkgo/config"
-	"github.com/onsi/ginkgo/types"
+
 	"os"
+
+	"github.com/onsi/ginkgo/types"
 )
 
 type CustomReporter struct {
 	OutputFile *os.File
-}
-
-func (r *CustomReporter) SpecSuiteWillBegin(config config.GinkgoConfigType, summary *types.SuiteSummary) {
-}
-
-func (r *CustomReporter) BeforeSuiteDidRun(setupSummary *types.SetupSummary) {
-}
-
-func (r *CustomReporter) SpecWillRun(specSummary *types.SpecSummary) {
 }
 
 func (r *CustomReporter) SpecDidComplete(specSummary *types.SpecSummary) {
@@ -28,11 +20,8 @@ func (r *CustomReporter) SpecDidComplete(specSummary *types.SpecSummary) {
 	}
 }
 
-func (r *CustomReporter) AfterSuiteDidRun(setupSummary *types.SetupSummary) {
-}
-
 func NewCustomReporter(outputFilePath string) (*CustomReporter, error) {
-	outputFile, err := os.OpenFile(outputFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	outputFile, err := os.OpenFile(outputFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600) // #nosec G304 used for e2e
 	if err != nil {
 		return nil, err
 	}
