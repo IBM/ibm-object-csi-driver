@@ -20,7 +20,7 @@ func (r *CustomReporter) SpecDidComplete(specSummary *types.SpecSummary) {
 }
 
 func NewCustomReporter(outputFilePath string) (*CustomReporter, error) {
-	outputFile, err := os.OpenFile(outputFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	outputFile, err := os.OpenFile(outputFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600) // #nosec G304 used for e2e
 	if err != nil {
 		return nil, err
 	}
