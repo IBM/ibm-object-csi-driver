@@ -26,6 +26,7 @@ type StatsUtils interface {
 	FSInfo(path string) (int64, int64, int64, int64, int64, int64, error)
 	CheckMount(targetPath string) (bool, error)
 	GetBucketUsage(volumeID string) (int64, resource.Quantity, error)
+	GetBucketNameFromPV(volumeID string) (string, error)
 }
 
 type DriverStatsUtils struct {
@@ -93,6 +94,22 @@ func (su *DriverStatsUtils) GetBucketUsage(volumeID string) (int64, resource.Qua
 	}
 
 	return usage, capacity, nil
+}
+
+func (su *DriverStatsUtils) GetBucketNameFromPV(volumeID string) (string, error) {
+	k8sClient, err := createK8sClient()
+	if err != nil {
+		return "", err
+	}
+
+	pv, err := k8sClient.CoreV1().PersistentVolumes().Get(context.Background(), volumeID, metav1.GetOptions{})
+	if err != nil {
+		klog.Errorf("Unable to fetch pv %v", err)
+		return "", err
+	}
+
+	tempBucketName := pv.Spec.CSI.VolumeAttributes["bucketName"]
+	return tempBucketName, nil
 }
 
 func ReplaceAndReturnCopy(req interface{}) (interface{}, error) {

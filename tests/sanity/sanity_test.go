@@ -239,6 +239,10 @@ func (su *FakeNewDriverStatsUtils) GetBucketUsage(volumeID string) (int64, resou
 	return 0, resource.Quantity{}, nil
 }
 
+func (su *FakeNewDriverStatsUtils) GetBucketNameFromPV(volumeID string) (string, error) {
+	return "", nil
+}
+
 func createTargetDir(targetPath string) error {
 	fileInfo, err := os.Stat(targetPath)
 	if err != nil && os.IsNotExist(err) {
