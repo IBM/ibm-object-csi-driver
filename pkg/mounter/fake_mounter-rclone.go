@@ -1,5 +1,7 @@
 package mounter
 
+import "errors"
+
 type fakercloneMounter struct {
 	bucketName    string
 	objPath       string
@@ -10,9 +12,11 @@ type fakercloneMounter struct {
 	kpRootKeyCrn  string
 	uid           string
 	gid           string
+
+	isFailedMount bool
 }
 
-func fakenewRcloneMounter() Mounter {
+func fakenewRcloneMounter(isFailedMount bool) Mounter {
 	return &fakercloneMounter{
 		bucketName:    bucketName,
 		objPath:       objPath,
@@ -23,13 +27,17 @@ func fakenewRcloneMounter() Mounter {
 		kpRootKeyCrn:  "",
 		uid:           "",
 		gid:           "",
+		isFailedMount: isFailedMount,
 	}
 }
 
-func (s3fs *fakercloneMounter) Mount(source string, target string) error {
+func (rclone *fakercloneMounter) Mount(source string, target string) error {
+	if rclone.isFailedMount {
+		return errors.New("failed to mount rclone")
+	}
 	return nil
 }
 
-func (s3fs *fakercloneMounter) Unmount(target string) error {
+func (rclone *fakercloneMounter) Unmount(target string) error {
 	return nil
 }

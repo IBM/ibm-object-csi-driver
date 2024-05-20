@@ -140,6 +140,7 @@ func TestNodePublishVolume(t *testing.T) {
 		testCaseName     string
 		req              *csi.NodePublishVolumeRequest
 		driverStatsUtils utils.StatsUtils
+		Mounter          mounter.NewMounterFactoryFunc
 		expectedResp     *csi.NodePublishVolumeResponse
 		expectedErr      error
 	}{
@@ -163,22 +164,29 @@ func TestNodePublishVolume(t *testing.T) {
 					return bucketName, nil
 				},
 			}),
+			Mounter: &mounter.FakeMounterFactory{
+				Mounter: constants.S3FS,
+			},
 			expectedResp: &csi.NodePublishVolumeResponse{},
 			expectedErr:  nil,
 		},
 		{
-			testCaseName: "Negative: Volume ID is missing",
-			req:          &csi.NodePublishVolumeRequest{},
-			expectedResp: nil,
-			expectedErr:  errors.New("Volume ID missing in request"),
+			testCaseName:     "Negative: Volume ID is missing",
+			req:              &csi.NodePublishVolumeRequest{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			Mounter:          &mounter.FakeMounterFactory{},
+			expectedResp:     nil,
+			expectedErr:      errors.New("Volume ID missing in request"),
 		},
 		{
 			testCaseName: "Negative: Volume target path is missing",
 			req: &csi.NodePublishVolumeRequest{
 				VolumeId: testVolumeID,
 			},
-			expectedResp: nil,
-			expectedErr:  errors.New("Target path missing in request"),
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			Mounter:          &mounter.FakeMounterFactory{},
+			expectedResp:     nil,
+			expectedErr:      errors.New("Target path missing in request"),
 		},
 		{
 			testCaseName: "Negative: Missing Volume Capabilities",
@@ -186,8 +194,10 @@ func TestNodePublishVolume(t *testing.T) {
 				VolumeId:   testVolumeID,
 				TargetPath: testTargetPath,
 			},
-			expectedResp: nil,
-			expectedErr:  errors.New("Volume capability missing in request"),
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			Mounter:          &mounter.FakeMounterFactory{},
+			expectedResp:     nil,
+			expectedErr:      errors.New("Volume capability missing in request"),
 		},
 		{
 			testCaseName: "Negative: Failed to check Mount",
@@ -205,11 +215,12 @@ func TestNodePublishVolume(t *testing.T) {
 					return errors.New("failed to valid mount")
 				},
 			}),
+			Mounter:      &mounter.FakeMounterFactory{},
 			expectedResp: nil,
 			expectedErr:  errors.New("failed to valid mount"),
 		},
 		{
-			testCaseName: "Negative: Faield to fetch PV",
+			testCaseName: "Negative: Failed to fetch PV",
 			req: &csi.NodePublishVolumeRequest{
 				VolumeId:   testVolumeID,
 				TargetPath: testTargetPath,
@@ -233,8 +244,74 @@ func TestNodePublishVolume(t *testing.T) {
 					return "", errors.New("failed to get pv")
 				},
 			}),
+			Mounter: &mounter.FakeMounterFactory{
+				Mounter: constants.S3FS,
+			},
 			expectedResp: nil,
 			expectedErr:  errors.New("failed to get pv"),
+		},
+		{
+			testCaseName: "Negative: Failed to get bucket Name from PV",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:   testVolumeID,
+				TargetPath: testTargetPath,
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: volumeCapabilities[0],
+					},
+				},
+				Secrets: map[string]string{
+					"accessKey":          "testAccessKey",
+					"secretKey":          "testSecretKey",
+					"locationConstraint": "test-region",
+					"cosEndpoint":        "test-endpoint",
+				},
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				CheckMountFn: func(targetPath string) error {
+					return nil
+				},
+				GetBucketNameFromPVFn: func(volumeID string) (string, error) {
+					return "", nil
+				},
+			}),
+			Mounter: &mounter.FakeMounterFactory{
+				Mounter: constants.S3FS,
+			},
+			expectedResp: nil,
+			expectedErr:  errors.New("unable to fetch bucket name from pv"),
+		},
+		{
+			testCaseName: "Negative: Mount failed",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:   testVolumeID,
+				TargetPath: testTargetPath,
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: volumeCapabilities[0],
+					},
+				},
+				Secrets: map[string]string{
+					"accessKey":          "testAccessKey",
+					"secretKey":          "testSecretKey",
+					"locationConstraint": "test-region",
+					"cosEndpoint":        "test-endpoint",
+				},
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				CheckMountFn: func(targetPath string) error {
+					return nil
+				},
+				GetBucketNameFromPVFn: func(volumeID string) (string, error) {
+					return bucketName, nil
+				},
+			}),
+			Mounter: &mounter.FakeMounterFactory{
+				Mounter:       constants.S3FS,
+				IsFailedMount: true,
+			},
+			expectedResp: nil,
+			expectedErr:  errors.New("failed to mount s3fs"),
 		},
 	}
 
@@ -242,10 +319,8 @@ func TestNodePublishVolume(t *testing.T) {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
 		nodeServer := nodeServer{
-			Stats: tc.driverStatsUtils,
-			Mounter: &mounter.FakeMounterFactory{
-				Mounter: constants.S3FS,
-			},
+			Stats:   tc.driverStatsUtils,
+			Mounter: tc.Mounter,
 		}
 		actualResp, actualErr := nodeServer.NodePublishVolume(ctx, tc.req)
 
