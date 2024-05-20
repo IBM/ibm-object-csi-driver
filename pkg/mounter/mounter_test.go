@@ -107,8 +107,7 @@ func TestNewMounter(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			factory := &S3fsMounterFactory{}
 
-			result, err := factory.NewMounter(test.attrib, test.secretMap, test.mountOptions)
-			assert.NoError(t, err)
+			result := factory.NewMounter(test.attrib, test.secretMap, test.mountOptions)
 
 			assert.Equal(t, result, test.expected)
 

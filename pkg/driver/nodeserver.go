@@ -175,9 +175,7 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		secretMap["bucketName"] = tempBucketName
 	}
 
-	if mounterObj, err = ns.Mounter.NewMounter(attrib, secretMap, mountFlags); err != nil {
-		return nil, err
-	}
+	mounterObj = ns.Mounter.NewMounter(attrib, secretMap, mountFlags)
 
 	klog.Info("-NodePublishVolume-: Mount")
 
