@@ -89,13 +89,10 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		return nil, status.Error(codes.InvalidArgument, "Volume capability missing in request")
 	}
 
-	notMnt, err := ns.Stats.CheckMount(targetPath)
+	err = ns.Stats.CheckMount(targetPath)
 	if err != nil {
 		klog.Errorf("Can not validate target mount point: %s %v", targetPath, err)
 		return nil, status.Error(codes.Internal, err.Error())
-	}
-	if !notMnt {
-		return &csi.NodePublishVolumeResponse{}, nil
 	}
 
 	deviceID := ""
@@ -139,10 +136,7 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		secretMap["bucketName"] = tempBucketName
 	}
 
-	var mounterObj mounter.Mounter
-	if mounterObj, err = ns.Mounter.NewMounter(attrib, secretMap, mountFlags); err != nil {
-		return nil, err
-	}
+	mounterObj := ns.Mounter.NewMounter(attrib, secretMap, mountFlags)
 
 	klog.Info("-NodePublishVolume-: Mount")
 

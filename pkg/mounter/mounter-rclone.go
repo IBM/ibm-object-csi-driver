@@ -50,7 +50,7 @@ const (
 	envAuth        = "true"
 )
 
-func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) (Mounter, error) {
+func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
 	klog.Info("-newRcloneMounter-")
 
 	var (
@@ -117,7 +117,7 @@ func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounte
 
 	mounter.MounterUtils = mounterUtils
 
-	return mounter, nil
+	return mounter
 }
 
 func updateMountOptions(dafaultMountOptions []string, secretMap map[string]string) ([]string, error) {

@@ -42,7 +42,7 @@ const (
 	passFile = ".passwd-s3fs" // #nosec G101: not password
 )
 
-func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) (Mounter, error) {
+func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
 	klog.Info("-newS3fsMounter-")
 
 	var (
@@ -100,7 +100,7 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 
 	mounter.MounterUtils = mounterUtils
 
-	return mounter, nil
+	return mounter
 }
 
 func (s3fs *S3fsMounter) Mount(source string, target string) error {

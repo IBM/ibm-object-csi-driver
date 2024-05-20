@@ -6,7 +6,7 @@ import (
 
 type FakeStatsUtilsFuncStruct struct {
 	FSInfoFn              func(path string) (int64, int64, int64, int64, int64, int64, error)
-	CheckMountFn          func(targetPath string) (bool, error)
+	CheckMountFn          func(targetPath string) error
 	BucketToDeleteFn      func(volumeID string) (string, error)
 	GetBucketUsageFn      func(volumeID string) (int64, resource.Quantity, error)
 	GetBucketNameFromPVFn func(volumeID string) (string, error)
@@ -31,7 +31,7 @@ func (m *FakeStatsUtilsFuncStructImpl) FSInfo(path string) (int64, int64, int64,
 	panic("requested method should not be nil")
 }
 
-func (m *FakeStatsUtilsFuncStructImpl) CheckMount(targetPath string) (bool, error) {
+func (m *FakeStatsUtilsFuncStructImpl) CheckMount(targetPath string) error {
 	if m.FuncStruct.CheckMountFn != nil {
 		return m.FuncStruct.CheckMountFn(targetPath)
 	}

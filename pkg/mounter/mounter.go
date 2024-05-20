@@ -18,14 +18,14 @@ type Mounter interface {
 type MounterFactory struct{}
 
 type NewMounterFactoryFunc interface {
-	NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) (Mounter, error)
+	NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) Mounter
 }
 
 func NewMounterFactory() *MounterFactory {
 	return &MounterFactory{}
 }
 
-func (s *MounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) (Mounter, error) {
+func (s *MounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) Mounter {
 	klog.Info("-NewMounter-")
 	var mounter, val string
 	var check bool

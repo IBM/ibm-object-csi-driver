@@ -156,8 +156,8 @@ func TestNodePublishVolume(t *testing.T) {
 				Secrets: testSecret,
 			},
 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
-				CheckMountFn: func(targetPath string) (bool, error) {
-					return true, nil
+				CheckMountFn: func(targetPath string) error {
+					return nil
 				},
 				GetBucketNameFromPVFn: func(volumeID string) (string, error) {
 					return bucketName, nil
@@ -165,6 +165,76 @@ func TestNodePublishVolume(t *testing.T) {
 			}),
 			expectedResp: &csi.NodePublishVolumeResponse{},
 			expectedErr:  nil,
+		},
+		{
+			testCaseName: "Negative: Volume ID is missing",
+			req:          &csi.NodePublishVolumeRequest{},
+			expectedResp: nil,
+			expectedErr:  errors.New("Volume ID missing in request"),
+		},
+		{
+			testCaseName: "Negative: Volume target path is missing",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId: testVolumeID,
+			},
+			expectedResp: nil,
+			expectedErr:  errors.New("Target path missing in request"),
+		},
+		{
+			testCaseName: "Negative: Missing Volume Capabilities",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:   testVolumeID,
+				TargetPath: testTargetPath,
+			},
+			expectedResp: nil,
+			expectedErr:  errors.New("Volume capability missing in request"),
+		},
+		{
+			testCaseName: "Negative: Failed to check Mount",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:   testVolumeID,
+				TargetPath: testTargetPath,
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: volumeCapabilities[0],
+					},
+				},
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				CheckMountFn: func(targetPath string) error {
+					return errors.New("failed to valid mount")
+				},
+			}),
+			expectedResp: nil,
+			expectedErr:  errors.New("failed to valid mount"),
+		},
+		{
+			testCaseName: "Negative: Faield to fetch PV",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:   testVolumeID,
+				TargetPath: testTargetPath,
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: volumeCapabilities[0],
+					},
+				},
+				Secrets: map[string]string{
+					"accessKey":          "testAccessKey",
+					"secretKey":          "testSecretKey",
+					"locationConstraint": "test-region",
+					"cosEndpoint":        "test-endpoint",
+				},
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				CheckMountFn: func(targetPath string) error {
+					return nil
+				},
+				GetBucketNameFromPVFn: func(volumeID string) (string, error) {
+					return "", errors.New("failed to get pv")
+				},
+			}),
+			expectedResp: nil,
+			expectedErr:  errors.New("failed to get pv"),
 		},
 	}
 

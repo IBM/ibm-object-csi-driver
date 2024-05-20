@@ -10,7 +10,7 @@ type fakes3fsMounter struct {
 	kpRootKeyCrn  string
 }
 
-func fakenewS3fsMounter() (Mounter, error) {
+func fakenewS3fsMounter() Mounter {
 	return &fakes3fsMounter{
 		bucketName:    bucketName,
 		objPath:       objPath,
@@ -19,7 +19,7 @@ func fakenewS3fsMounter() (Mounter, error) {
 		accessKeys:    keys,
 		authType:      authType,
 		kpRootKeyCrn:  "",
-	}, nil
+	}
 }
 
 func (s3fs *fakes3fsMounter) Mount(source string, target string) error {

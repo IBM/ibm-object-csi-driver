@@ -12,7 +12,7 @@ type fakercloneMounter struct {
 	gid           string
 }
 
-func fakenewRcloneMounter() (Mounter, error) {
+func fakenewRcloneMounter() Mounter {
 	return &fakercloneMounter{
 		bucketName:    bucketName,
 		objPath:       objPath,
@@ -23,7 +23,7 @@ func fakenewRcloneMounter() (Mounter, error) {
 		kpRootKeyCrn:  "",
 		uid:           "",
 		gid:           "",
-	}, nil
+	}
 }
 
 func (s3fs *fakercloneMounter) Mount(source string, target string) error {

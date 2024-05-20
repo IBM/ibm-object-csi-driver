@@ -24,7 +24,7 @@ import (
 type StatsUtils interface {
 	BucketToDelete(volumeID string) (string, error)
 	FSInfo(path string) (int64, int64, int64, int64, int64, int64, error)
-	CheckMount(targetPath string) (bool, error)
+	CheckMount(targetPath string) error
 	GetBucketUsage(volumeID string) (int64, resource.Quantity, error)
 	GetBucketNameFromPV(volumeID string) (string, error)
 }
@@ -58,23 +58,21 @@ func (su *DriverStatsUtils) FSInfo(path string) (int64, int64, int64, int64, int
 	return fs.Info(path)
 }
 
-func (su *DriverStatsUtils) CheckMount(targetPath string) (bool, error) {
+func (su *DriverStatsUtils) CheckMount(targetPath string) error {
 	out, err := exec.Command("mountpoint", targetPath).CombinedOutput()
 	outStr := strings.TrimSpace(string(out))
-	notMnt := true
 	if err != nil {
 		klog.V(3).Infof("Output: Output string error %+v", outStr)
 		if strings.HasSuffix(outStr, "No such file or directory") {
 			if err = os.MkdirAll(targetPath, 0750); err != nil {
 				klog.V(2).Infof("checkMount: Error: %+v", err)
-				return false, err
+				return err
 			}
-			notMnt = true
 		} else {
-			return false, err
+			return err
 		}
 	}
-	return notMnt, nil
+	return nil
 }
 
 func (su *DriverStatsUtils) GetBucketUsage(volumeID string) (int64, resource.Quantity, error) {

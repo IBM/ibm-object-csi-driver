@@ -170,9 +170,9 @@ func FakeNewS3fsMounterFactory() *FakeS3fsMounterFactory {
 
 type Fakes3fsMounter struct{}
 
-func (s *FakeS3fsMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) (mounter.Mounter, error) {
+func (s *FakeS3fsMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) mounter.Mounter {
 	klog.Info("-New S3FS Fake Mounter-")
-	return &Fakes3fsMounter{}, nil
+	return &Fakes3fsMounter{}
 }
 
 func (s3fs *Fakes3fsMounter) Mount(source string, target string) error {
@@ -231,8 +231,8 @@ func (su *FakeNewDriverStatsUtils) FSInfo(path string) (int64, int64, int64, int
 	return 1, 1, 1, 1, 1, 1, nil
 }
 
-func (su *FakeNewDriverStatsUtils) CheckMount(targetPath string) (bool, error) {
-	return true, nil
+func (su *FakeNewDriverStatsUtils) CheckMount(targetPath string) error {
+	return nil
 }
 
 func (su *FakeNewDriverStatsUtils) GetBucketUsage(volumeID string) (int64, resource.Quantity, error) {
