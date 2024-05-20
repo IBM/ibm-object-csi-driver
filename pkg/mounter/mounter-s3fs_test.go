@@ -25,8 +25,7 @@ var secretMap = map[string]string{
 var mountOptions = []string{"opt1=val1", "opt2=val2"}
 
 func TestNewS3fsMounter_Success(t *testing.T) {
-	mounter, err := NewS3fsMounter(secretMap, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
-	assert.NoError(t, err)
+	mounter := NewS3fsMounter(secretMap, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
 
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	if !ok {
@@ -50,8 +49,7 @@ func TestNewS3fsMounter_Success_Hmac(t *testing.T) {
 		"kpRootKeyCRN":       "test-kp-root-key-crn",
 	}
 
-	mounter, err := NewS3fsMounter(secretMap, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
-	assert.NoError(t, err)
+	mounter := NewS3fsMounter(secretMap, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
 
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	if !ok {
@@ -65,13 +63,12 @@ func TestNewS3fsMounter_Success_Hmac(t *testing.T) {
 }
 
 func Test_Mount_Positive(t *testing.T) {
-	mounter, err := NewS3fsMounter(secretMap, mountOptions,
+	mounter := NewS3fsMounter(secretMap, mountOptions,
 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path string, comm string, args []string) error {
 				return nil
 			},
 		}))
-	assert.NoError(t, err)
 
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	if !ok {
@@ -96,7 +93,7 @@ func Test_Mount_Positive(t *testing.T) {
 
 	target := "/tmp/test-mount"
 
-	err = s3fsMounter.Mount("source", target)
+	err := s3fsMounter.Mount("source", target)
 	assert.NoError(t, err)
 }
 
@@ -110,13 +107,13 @@ func Test_Mount_Positive_Hmac(t *testing.T) {
 		"secretKey":          "test-secret-key",
 		"kpRootKeyCRN":       "test-kp-root-key-crn",
 	}
-	mounter, err := NewS3fsMounter(secretMap, mountOptions,
+	mounter := NewS3fsMounter(secretMap, mountOptions,
 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path string, comm string, args []string) error {
 				return nil
 			},
 		}))
-	assert.NoError(t, err)
+
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	if !ok {
 		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
@@ -140,7 +137,7 @@ func Test_Mount_Positive_Hmac(t *testing.T) {
 
 	target := "/tmp/test-mount"
 
-	err = s3fsMounter.Mount("source", target)
+	err := s3fsMounter.Mount("source", target)
 	assert.NoError(t, err)
 }
 
@@ -154,13 +151,13 @@ func Test_Mount_Positive_Empty_ObjPath(t *testing.T) {
 		"apiKey":             "test-api-key",
 		"kpRootKeyCRN":       "test-kp-root-key-crn",
 	}
-	mounter, err := NewS3fsMounter(secretMap, mountOptions,
+	mounter := NewS3fsMounter(secretMap, mountOptions,
 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path string, comm string, args []string) error {
 				return nil
 			},
 		}))
-	assert.NoError(t, err)
+
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	if !ok {
 		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
@@ -184,18 +181,18 @@ func Test_Mount_Positive_Empty_ObjPath(t *testing.T) {
 
 	target := "/tmp/test-mount"
 
-	err = s3fsMounter.Mount("source", target)
+	err := s3fsMounter.Mount("source", target)
 	assert.NoError(t, err)
 }
 
 func Test_Mount_Positive_SingleMountOptions(t *testing.T) {
-	mounter, err := NewS3fsMounter(secretMap, []string{"mountOption1", "mountOption2"},
+	mounter := NewS3fsMounter(secretMap, []string{"mountOption1", "mountOption2"},
 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path string, comm string, args []string) error {
 				return nil
 			},
 		}))
-	assert.NoError(t, err)
+
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	if !ok {
 		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
@@ -219,18 +216,18 @@ func Test_Mount_Positive_SingleMountOptions(t *testing.T) {
 
 	target := "/tmp/test-mount"
 
-	err = s3fsMounter.Mount("source", target)
+	err := s3fsMounter.Mount("source", target)
 	assert.NoError(t, err)
 }
 
 func Test_Mount_Error_Creating_Mount_Point(t *testing.T) {
-	mounter, err := NewS3fsMounter(secretMap, mountOptions,
+	mounter := NewS3fsMounter(secretMap, mountOptions,
 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path string, comm string, args []string) error {
 				return nil
 			},
 		}))
-	assert.NoError(t, err)
+
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	if !ok {
 		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
@@ -246,18 +243,18 @@ func Test_Mount_Error_Creating_Mount_Point(t *testing.T) {
 
 	target := "/tmp/test-mount"
 
-	err = s3fsMounter.Mount("source", target)
+	err := s3fsMounter.Mount("source", target)
 	assert.Error(t, err, "Cannot create directory")
 }
 
 func Test_Mount_Error_Creating_PWFile(t *testing.T) {
-	mounter, err := NewS3fsMounter(secretMap, mountOptions,
+	mounter := NewS3fsMounter(secretMap, mountOptions,
 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path string, comm string, args []string) error {
 				return nil
 			},
 		}))
-	assert.NoError(t, err)
+
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	if !ok {
 		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
@@ -281,18 +278,18 @@ func Test_Mount_Error_Creating_PWFile(t *testing.T) {
 
 	target := "/tmp/test-mount"
 
-	err = s3fsMounter.Mount("source", target)
+	err := s3fsMounter.Mount("source", target)
 	assert.Error(t, err, "Cannot create file")
 }
 
 func Test_Mount_ErrorMount(t *testing.T) {
-	mounter, err := NewS3fsMounter(secretMap, mountOptions,
+	mounter := NewS3fsMounter(secretMap, mountOptions,
 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path string, comm string, args []string) error {
 				return errors.New("error mounting volume")
 			},
 		}))
-	assert.NoError(t, err)
+
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	if !ok {
 		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
@@ -316,18 +313,17 @@ func Test_Mount_ErrorMount(t *testing.T) {
 
 	target := "/tmp/test-mount"
 
-	err = s3fsMounter.Mount("source", target)
+	err := s3fsMounter.Mount("source", target)
 	assert.Error(t, err, "error mounting volume")
 }
 
 func Test_Unmount_Positive(t *testing.T) {
-	mounter, err := NewS3fsMounter(secretMap, mountOptions,
+	mounter := NewS3fsMounter(secretMap, mountOptions,
 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseUnmountFn: func(path string) error {
 				return nil
 			},
 		}))
-	assert.NoError(t, err)
 
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	if !ok {
@@ -337,7 +333,7 @@ func Test_Unmount_Positive(t *testing.T) {
 	target := "/tmp/test-unmount"
 
 	// Creating a directory to simulate a mounted path
-	err = os.MkdirAll(target, os.ModePerm)
+	err := os.MkdirAll(target, os.ModePerm)
 	if err != nil {
 		t.Fatalf("TestS3fsMounter_Unmount() failed to create directory: %v", err)
 	}
@@ -355,13 +351,12 @@ func Test_Unmount_Positive(t *testing.T) {
 }
 
 func Test_Unmount_Error(t *testing.T) {
-	mounter, err := NewS3fsMounter(secretMap, mountOptions,
+	mounter := NewS3fsMounter(secretMap, mountOptions,
 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseUnmountFn: func(path string) error {
 				return errors.New("error unmounting volume")
 			},
 		}))
-	assert.NoError(t, err)
 
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	if !ok {
@@ -371,7 +366,7 @@ func Test_Unmount_Error(t *testing.T) {
 	target := "/tmp/test-unmount"
 
 	// Creating a directory to simulate a mounted path
-	err = os.MkdirAll(target, os.ModePerm)
+	err := os.MkdirAll(target, os.ModePerm)
 	if err != nil {
 		t.Fatalf("TestS3fsMounter_Unmount() failed to create directory: %v", err)
 	}
@@ -394,9 +389,8 @@ func TestUpdateS3FSMountOptions(t *testing.T) {
 		"mountOptions": "additional_option=value3",
 	}
 
-	updatedOptions, err := updateS3FSMountOptions(defaultMountOp, secretMap)
+	updatedOptions := updateS3FSMountOptions(defaultMountOp, secretMap)
 
-	assert.NoError(t, err)
 	assert.ElementsMatch(t, updatedOptions, []string{
 		"option1=value1",
 		"option2=value2",
@@ -418,9 +412,8 @@ func TestUpdateS3FSMountOptions_SecretMapUID(t *testing.T) {
 		"mountOptions": "additional_option=value3",
 	}
 
-	updatedOptions, err := updateS3FSMountOptions(defaultMountOp, secretMap)
+	updatedOptions := updateS3FSMountOptions(defaultMountOp, secretMap)
 
-	assert.NoError(t, err)
 	assert.ElementsMatch(t, updatedOptions, []string{
 		"option1=value1",
 		"option2=value2",
@@ -441,9 +434,8 @@ func TestUpdateS3FSMountOptions_SingleMountOptions(t *testing.T) {
 		"mountOptions": "value3",
 	}
 
-	updatedOptions, err := updateS3FSMountOptions(defaultMountOp, secretMap)
+	updatedOptions := updateS3FSMountOptions(defaultMountOp, secretMap)
 
-	assert.NoError(t, err)
 	assert.ElementsMatch(t, updatedOptions, []string{
 		"option1=value1",
 		"option2=value2",
@@ -464,9 +456,8 @@ func TestUpdateS3FSMountOptions_Empty_Mount_Options(t *testing.T) {
 		"mountOptions": "",
 	}
 
-	updatedOptions, err := updateS3FSMountOptions(defaultMountOp, secretMap)
+	updatedOptions := updateS3FSMountOptions(defaultMountOp, secretMap)
 
-	assert.NoError(t, err)
 	assert.ElementsMatch(t, updatedOptions, []string{
 		"option1=value1",
 		"option2=value2",
@@ -486,9 +477,8 @@ func TestUpdateS3FSMountOptions_Empty_Default_Mount_Options(t *testing.T) {
 		"mountOptions": "additional_option=value3",
 	}
 
-	updatedOptions, err := updateS3FSMountOptions(defaultMountOp, secretMap)
+	updatedOptions := updateS3FSMountOptions(defaultMountOp, secretMap)
 
-	assert.NoError(t, err)
 	assert.ElementsMatch(t, updatedOptions, []string{
 		"tmpdir=/tmp",
 		"use_cache=true",
@@ -507,9 +497,8 @@ func TestUpdateS3FSMountOptions_Invalid_Mount_Options(t *testing.T) {
 		"mountOptions": "additional=option=value3",
 	}
 
-	updatedOptions, err := updateS3FSMountOptions(defaultMountOp, secretMap)
+	updatedOptions := updateS3FSMountOptions(defaultMountOp, secretMap)
 
-	assert.NoError(t, err)
 	assert.ElementsMatch(t, updatedOptions, []string{
 		"option1=value1",
 		"option2=value2",

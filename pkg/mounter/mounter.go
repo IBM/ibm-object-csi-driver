@@ -18,7 +18,7 @@ type Mounter interface {
 type S3fsMounterFactory struct{}
 
 type NewMounterFactory interface {
-	NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) (Mounter, error)
+	NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) Mounter
 }
 
 func NewS3fsMounterFactory() *S3fsMounterFactory {
@@ -26,7 +26,7 @@ func NewS3fsMounterFactory() *S3fsMounterFactory {
 }
 
 // func newS3fsMounter(bucket string, objpath string, endpoint string, region string, keys string)
-func (s *S3fsMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) (Mounter, error) {
+func (s *S3fsMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) Mounter {
 	klog.Info("-NewMounter-")
 	var mounter, val string
 	var check bool
