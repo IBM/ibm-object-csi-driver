@@ -1,7 +1,5 @@
 package mounter
 
-import "github.com/IBM/ibm-object-csi-driver/pkg/mounter"
-
 type fakes3fsMounter struct {
 	bucketName    string
 	objPath       string
@@ -12,7 +10,7 @@ type fakes3fsMounter struct {
 	kpRootKeyCrn  string
 }
 
-func fakenewS3fsMounter() (mounter.Mounter, error) {
+func fakenewS3fsMounter() (Mounter, error) {
 	return &fakes3fsMounter{
 		bucketName:    bucketName,
 		objPath:       objPath,

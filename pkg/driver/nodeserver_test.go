@@ -172,8 +172,10 @@ func TestNodePublishVolume(t *testing.T) {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
 		nodeServer := nodeServer{
-			Stats:   tc.driverStatsUtils,
-			Mounter: mounter.NewMounterFactory(),
+			Stats: tc.driverStatsUtils,
+			Mounter: &mounter.FakeMounterFactory{
+				Mounter: constants.S3FS,
+			},
 		}
 		actualResp, actualErr := nodeServer.NodePublishVolume(ctx, tc.req)
 

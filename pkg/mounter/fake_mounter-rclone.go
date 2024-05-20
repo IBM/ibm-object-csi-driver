@@ -1,7 +1,5 @@
 package mounter
 
-import "github.com/IBM/ibm-object-csi-driver/pkg/mounter"
-
 type fakercloneMounter struct {
 	bucketName    string
 	objPath       string
@@ -14,7 +12,7 @@ type fakercloneMounter struct {
 	gid           string
 }
 
-func fakenewRcloneMounter() (mounter.Mounter, error) {
+func fakenewRcloneMounter() (Mounter, error) {
 	return &fakercloneMounter{
 		bucketName:    bucketName,
 		objPath:       objPath,

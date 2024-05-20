@@ -1,9 +1,6 @@
 package mounter
 
-import (
-	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
-	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
-)
+import "github.com/IBM/ibm-object-csi-driver/pkg/constants"
 
 const (
 	bucketName = "fakeBucketName"
@@ -14,14 +11,17 @@ const (
 	authType   = "fakeAuthType"
 )
 
-func NewMounter(mounter string) (mounter.Mounter, error) {
-	switch mounter {
+type FakeMounterFactory struct {
+	Mounter string
+}
+
+func (f *FakeMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) (Mounter, error) {
+	switch f.Mounter {
 	case constants.S3FS:
 		return fakenewS3fsMounter()
 	case constants.RClone:
 		return fakenewRcloneMounter()
 	default:
-		// default to s3backer
 		return fakenewS3fsMounter()
 	}
 }

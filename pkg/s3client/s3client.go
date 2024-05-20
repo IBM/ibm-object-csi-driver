@@ -50,7 +50,6 @@ type ObjectStorageCredentials struct {
 
 // ObjectStorageSession is an interface of an object store session
 type ObjectStorageSession interface {
-
 	// CheckBucketAccess method check that a bucket can be accessed
 	CheckBucketAccess(bucket string) error
 
@@ -69,7 +68,6 @@ type COSSessionFactory struct{}
 
 // ObjectStorageSessionFactory is an interface of an object store session factory
 type ObjectStorageSessionFactory interface {
-
 	// NewObjectStorageBackend method creates a new object store session
 	NewObjectStorageSession(endpoint, locationConstraint string, creds *ObjectStorageCredentials, lgr *zap.Logger) ObjectStorageSession
 }
