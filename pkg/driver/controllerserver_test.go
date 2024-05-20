@@ -23,7 +23,6 @@ import (
 	"strings"
 	"testing"
 
-	fakes3client "github.com/IBM/ibm-object-csi-driver/pkg/driver/fake/s3client"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
 	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -76,7 +75,7 @@ func TestCreateVolume(t *testing.T) {
 				Parameters: map[string]string{},
 				Secrets:    testSecret,
 			},
-			cosSession: &fakes3client.FakeCOSSessionFactory{},
+			cosSession: &s3client.FakeCOSSessionFactory{},
 			expectedResp: &csi.CreateVolumeResponse{
 				Volume: &csi.Volume{
 					VolumeId: testVolumeName,
@@ -108,7 +107,7 @@ func TestCreateVolume(t *testing.T) {
 					"kpRootKeyCRN":       "test-kpRootKeyCRN",
 				},
 			},
-			cosSession: &fakes3client.FakeCOSSessionFactory{},
+			cosSession: &s3client.FakeCOSSessionFactory{},
 			expectedResp: &csi.CreateVolumeResponse{
 				Volume: &csi.Volume{
 					VolumeId: testVolumeName,
@@ -124,7 +123,7 @@ func TestCreateVolume(t *testing.T) {
 			req: &csi.CreateVolumeRequest{
 				Name: "",
 			},
-			cosSession:   &fakes3client.FakeCOSSessionFactory{},
+			cosSession:   &s3client.FakeCOSSessionFactory{},
 			expectedResp: nil,
 			expectedErr:  errors.New("Volume name missing in request"),
 		},
@@ -133,7 +132,7 @@ func TestCreateVolume(t *testing.T) {
 			req: &csi.CreateVolumeRequest{
 				Name: testVolumeName,
 			},
-			cosSession:   &fakes3client.FakeCOSSessionFactory{},
+			cosSession:   &s3client.FakeCOSSessionFactory{},
 			expectedResp: nil,
 			expectedErr:  errors.New("Volume Capabilities missing in request"),
 		},
@@ -149,7 +148,7 @@ func TestCreateVolume(t *testing.T) {
 					},
 				},
 			},
-			cosSession:   &fakes3client.FakeCOSSessionFactory{},
+			cosSession:   &s3client.FakeCOSSessionFactory{},
 			expectedResp: nil,
 			expectedErr:  errors.New("Volume type block Volume not supported"),
 		},
@@ -168,7 +167,7 @@ func TestCreateVolume(t *testing.T) {
 					},
 				},
 			},
-			cosSession:   &fakes3client.FakeCOSSessionFactory{},
+			cosSession:   &s3client.FakeCOSSessionFactory{},
 			expectedResp: nil,
 			expectedErr:  errors.New("exceeds maximum allowed"),
 		},
@@ -187,7 +186,7 @@ func TestCreateVolume(t *testing.T) {
 					"accessKey": "testAccessKey",
 				},
 			},
-			cosSession:   &fakes3client.FakeCOSSessionFactory{},
+			cosSession:   &s3client.FakeCOSSessionFactory{},
 			expectedResp: nil,
 			expectedErr:  errors.New("Error in getting credentials"),
 		},
@@ -207,7 +206,7 @@ func TestCreateVolume(t *testing.T) {
 					"apiKey":      "testAPIKey",
 				},
 			},
-			cosSession:   &fakes3client.FakeCOSSessionFactory{},
+			cosSession:   &s3client.FakeCOSSessionFactory{},
 			expectedResp: nil,
 			expectedErr:  errors.New("Error in getting credentials"),
 		},
@@ -227,7 +226,7 @@ func TestCreateVolume(t *testing.T) {
 					"secretKey": "testSecretKey",
 				},
 			},
-			cosSession:   &fakes3client.FakeCOSSessionFactory{},
+			cosSession:   &s3client.FakeCOSSessionFactory{},
 			expectedResp: nil,
 			expectedErr:  errors.New("cosEndpoint unknown"),
 		},
@@ -248,7 +247,7 @@ func TestCreateVolume(t *testing.T) {
 					"cosEndpoint": "test-endpoint",
 				},
 			},
-			cosSession:   &fakes3client.FakeCOSSessionFactory{},
+			cosSession:   &s3client.FakeCOSSessionFactory{},
 			expectedResp: nil,
 			expectedErr:  errors.New("locationConstraint unknown"),
 		},
@@ -266,7 +265,7 @@ func TestCreateVolume(t *testing.T) {
 				Parameters: map[string]string{},
 				Secrets:    testSecret,
 			},
-			cosSession: &fakes3client.FakeCOSSessionFactory{
+			cosSession: &s3client.FakeCOSSessionFactory{
 				FailCheckBucketAccess: true,
 			},
 			expectedResp: nil,
@@ -286,7 +285,7 @@ func TestCreateVolume(t *testing.T) {
 				Parameters: map[string]string{},
 				Secrets:    testSecret,
 			},
-			cosSession: &fakes3client.FakeCOSSessionFactory{
+			cosSession: &s3client.FakeCOSSessionFactory{
 				FailCheckBucketAccess: true,
 				FailCreateBucket:      true,
 			},
@@ -343,7 +342,7 @@ func TestDeleteVolume(t *testing.T) {
 					return bucketName, nil
 				},
 			}),
-			cosSession:   &fakes3client.FakeCOSSessionFactory{},
+			cosSession:   &s3client.FakeCOSSessionFactory{},
 			expectedResp: &csi.DeleteVolumeResponse{},
 			expectedErr:  nil,
 		},
@@ -353,7 +352,7 @@ func TestDeleteVolume(t *testing.T) {
 				VolumeId: "",
 			},
 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
-			cosSession:       &fakes3client.FakeCOSSessionFactory{},
+			cosSession:       &s3client.FakeCOSSessionFactory{},
 			expectedResp:     nil,
 			expectedErr:      errors.New("Volume ID missing"),
 		},
@@ -364,7 +363,7 @@ func TestDeleteVolume(t *testing.T) {
 				Secrets:  map[string]string{},
 			},
 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
-			cosSession:       &fakes3client.FakeCOSSessionFactory{},
+			cosSession:       &s3client.FakeCOSSessionFactory{},
 			expectedResp:     nil,
 			expectedErr:      errors.New("cannot get credentials"),
 		},
@@ -379,7 +378,7 @@ func TestDeleteVolume(t *testing.T) {
 					return bucketName, nil
 				},
 			}),
-			cosSession: &fakes3client.FakeCOSSessionFactory{
+			cosSession: &s3client.FakeCOSSessionFactory{
 				FailDeleteBucket: true,
 			},
 			expectedResp: &csi.DeleteVolumeResponse{},
@@ -396,7 +395,7 @@ func TestDeleteVolume(t *testing.T) {
 					return "", errors.New("failed to get bucket to delete")
 				},
 			}),
-			cosSession:   &fakes3client.FakeCOSSessionFactory{},
+			cosSession:   &s3client.FakeCOSSessionFactory{},
 			expectedResp: &csi.DeleteVolumeResponse{},
 			expectedErr:  nil,
 		},
