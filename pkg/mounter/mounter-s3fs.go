@@ -92,10 +92,7 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 	klog.Infof("newS3fsMounter args:\n\tbucketName: [%s]\n\tobjPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]\n\tkpRootKeyCrn: [%s]",
 		mounter.BucketName, mounter.ObjPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType, mounter.KpRootKeyCrn)
 
-	updatedOptions, err := updateS3FSMountOptions(mountOptions, secretMap)
-	if err != nil {
-		klog.Infof("Problems with retrieving secret map dynamically %v", err)
-	}
+	updatedOptions := updateS3FSMountOptions(mountOptions, secretMap)
 	mounter.MountOptions = updatedOptions
 
 	mounter.MounterUtils = mounterUtils
@@ -182,7 +179,7 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 	return s3fs.MounterUtils.FuseUnmount(target)
 }
 
-func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string) ([]string, error) {
+func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string) []string {
 	mountOptsMap := make(map[string]string)
 
 	// Create map out of array
@@ -261,5 +258,5 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 	}
 
 	klog.Infof("S3fsMounter Options: %v", updatedOptions)
-	return updatedOptions, nil
+	return updatedOptions
 }

@@ -389,9 +389,8 @@ func TestUpdateS3FSMountOptions(t *testing.T) {
 		"mountOptions": "additional_option=value3",
 	}
 
-	updatedOptions, err := updateS3FSMountOptions(defaultMountOp, secretMap)
+	updatedOptions := updateS3FSMountOptions(defaultMountOp, secretMap)
 
-	assert.NoError(t, err)
 	assert.ElementsMatch(t, updatedOptions, []string{
 		"option1=value1",
 		"option2=value2",
@@ -413,9 +412,8 @@ func TestUpdateS3FSMountOptions_SecretMapUID(t *testing.T) {
 		"mountOptions": "additional_option=value3",
 	}
 
-	updatedOptions, err := updateS3FSMountOptions(defaultMountOp, secretMap)
+	updatedOptions := updateS3FSMountOptions(defaultMountOp, secretMap)
 
-	assert.NoError(t, err)
 	assert.ElementsMatch(t, updatedOptions, []string{
 		"option1=value1",
 		"option2=value2",
@@ -436,9 +434,8 @@ func TestUpdateS3FSMountOptions_SingleMountOptions(t *testing.T) {
 		"mountOptions": "value3",
 	}
 
-	updatedOptions, err := updateS3FSMountOptions(defaultMountOp, secretMap)
+	updatedOptions := updateS3FSMountOptions(defaultMountOp, secretMap)
 
-	assert.NoError(t, err)
 	assert.ElementsMatch(t, updatedOptions, []string{
 		"option1=value1",
 		"option2=value2",
@@ -459,9 +456,8 @@ func TestUpdateS3FSMountOptions_Empty_Mount_Options(t *testing.T) {
 		"mountOptions": "",
 	}
 
-	updatedOptions, err := updateS3FSMountOptions(defaultMountOp, secretMap)
+	updatedOptions := updateS3FSMountOptions(defaultMountOp, secretMap)
 
-	assert.NoError(t, err)
 	assert.ElementsMatch(t, updatedOptions, []string{
 		"option1=value1",
 		"option2=value2",
@@ -481,9 +477,8 @@ func TestUpdateS3FSMountOptions_Empty_Default_Mount_Options(t *testing.T) {
 		"mountOptions": "additional_option=value3",
 	}
 
-	updatedOptions, err := updateS3FSMountOptions(defaultMountOp, secretMap)
+	updatedOptions := updateS3FSMountOptions(defaultMountOp, secretMap)
 
-	assert.NoError(t, err)
 	assert.ElementsMatch(t, updatedOptions, []string{
 		"tmpdir=/tmp",
 		"use_cache=true",
@@ -502,9 +497,8 @@ func TestUpdateS3FSMountOptions_Invalid_Mount_Options(t *testing.T) {
 		"mountOptions": "additional=option=value3",
 	}
 
-	updatedOptions, err := updateS3FSMountOptions(defaultMountOp, secretMap)
+	updatedOptions := updateS3FSMountOptions(defaultMountOp, secretMap)
 
-	assert.NoError(t, err)
 	assert.ElementsMatch(t, updatedOptions, []string{
 		"option1=value1",
 		"option2=value2",

@@ -392,9 +392,8 @@ func TestUpdateRCloneMountOptions(t *testing.T) {
 		"mountOptions": "additional_option=value3",
 	}
 
-	updatedOptions, err := updateMountOptions(defaultMountOp, secretMap)
+	updatedOptions := updateMountOptions(defaultMountOp, secretMap)
 
-	assert.NoError(t, err)
 	assert.ElementsMatch(t, updatedOptions, []string{
 		"option1=value1",
 		"option2=value2",
