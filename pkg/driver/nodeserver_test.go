@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
+	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -136,16 +137,44 @@ func TestNodeUnstageVolume(t *testing.T) {
 
 func TestNodePublishVolume(t *testing.T) {
 	testCases := []struct {
-		testCaseName string
-		req          *csi.NodePublishVolumeRequest
-		expectedResp *csi.NodePublishVolumeResponse
-		expectedErr  error
-	}{}
+		testCaseName     string
+		req              *csi.NodePublishVolumeRequest
+		driverStatsUtils utils.StatsUtils
+		expectedResp     *csi.NodePublishVolumeResponse
+		expectedErr      error
+	}{
+		{
+			testCaseName: "Positive: Successful",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:   testVolumeID,
+				TargetPath: testTargetPath,
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: volumeCapabilities[0],
+					},
+				},
+				Secrets: testSecret,
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				CheckMountFn: func(targetPath string) (bool, error) {
+					return true, nil
+				},
+				GetBucketNameFromPVFn: func(volumeID string) (string, error) {
+					return bucketName, nil
+				},
+			}),
+			expectedResp: &csi.NodePublishVolumeResponse{},
+			expectedErr:  nil,
+		},
+	}
 
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		nodeServer := nodeServer{}
+		nodeServer := nodeServer{
+			Stats:   tc.driverStatsUtils,
+			Mounter: mounter.NewMounterFactory(),
+		}
 		actualResp, actualErr := nodeServer.NodePublishVolume(ctx, tc.req)
 
 		if tc.expectedErr != nil {

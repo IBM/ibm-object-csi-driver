@@ -15,18 +15,17 @@ type Mounter interface {
 	Unmount(target string) error
 }
 
-type S3fsMounterFactory struct{}
+type MounterFactory struct{}
 
-type NewMounterFactory interface {
+type NewMounterFactoryFunc interface {
 	NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) (Mounter, error)
 }
 
-func NewS3fsMounterFactory() *S3fsMounterFactory {
-	return &S3fsMounterFactory{}
+func NewMounterFactory() *MounterFactory {
+	return &MounterFactory{}
 }
 
-// func newS3fsMounter(bucket string, objpath string, endpoint string, region string, keys string)
-func (s *S3fsMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) (Mounter, error) {
+func (s *MounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) (Mounter, error) {
 	klog.Info("-NewMounter-")
 	var mounter, val string
 	var check bool

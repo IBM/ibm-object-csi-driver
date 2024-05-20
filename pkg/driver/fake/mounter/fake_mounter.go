@@ -16,23 +16,18 @@
 package fake
 
 import (
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
 	"k8s.io/klog/v2"
 )
 
-const (
-	s3fsMounterType   = "s3fs"
-	rcloneMounterType = "rclone"
-)
-
-// func newS3fsMounter(bucket string, objpath string, endpoint string, region string, keys string)
 func NewMounter(mounter string, bucket string, objpath string, endpoint string, region string, keys string, authType string, kpCrn string) (mounter.Mounter, error) {
 	klog.Info("-NewMounter-")
 	klog.Infof("NewMounter args:\n\tmounter: <%s>\n\tbucket: <%s>\n\tobjpath: <%s>\n\tendpoint: <%s>\n\tregion: <%s>", mounter, bucket, objpath, endpoint, region)
 	switch mounter {
-	case s3fsMounterType:
+	case constants.S3FS:
 		return fakenewS3fsMounter(bucket, objpath, endpoint, region, keys, authType, kpCrn)
-	case rcloneMounterType:
+	case constants.RClone:
 		return fakenewRcloneMounter(bucket, objpath, endpoint, region, keys, authType, kpCrn, "", "")
 	default:
 		// default to s3backer
