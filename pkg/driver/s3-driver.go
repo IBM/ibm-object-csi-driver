@@ -135,7 +135,7 @@ func newControllerServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, s3cosSessio
 	}
 }
 
-func newNodeServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, nodeID string, mountObj mounter.NewMounterFactoryFunc, mounterUtil mounterUtils.MounterUtils) *nodeServer {
+func newNodeServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, nodeID string, mountObj mounter.NewMounterFactory, mounterUtil mounterUtils.MounterUtils) *nodeServer {
 	return &nodeServer{
 		S3Driver:     d,
 		Stats:        statsUtil,
@@ -145,7 +145,7 @@ func newNodeServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, nodeID string, mo
 	}
 }
 
-func (driver *S3Driver) NewS3CosDriver(nodeID string, endpoint string, s3cosSession s3client.ObjectStorageSessionFactory, mountObj mounter.NewMounterFactoryFunc, statsUtil pkgUtils.StatsUtils, mounterUtil mounterUtils.MounterUtils) (*S3Driver, error) {
+func (driver *S3Driver) NewS3CosDriver(nodeID string, endpoint string, s3cosSession s3client.ObjectStorageSessionFactory, mountObj mounter.NewMounterFactory, statsUtil pkgUtils.StatsUtils, mounterUtil mounterUtils.MounterUtils) (*S3Driver, error) {
 	s3client, err := s3client.NewS3Client(driver.logger)
 	if err != nil {
 		return nil, err

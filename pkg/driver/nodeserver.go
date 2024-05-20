@@ -29,7 +29,7 @@ type nodeServer struct {
 	*S3Driver
 	Stats        utils.StatsUtils
 	NodeID       string
-	Mounter      mounter.NewMounterFactoryFunc
+	Mounter      mounter.NewMounterFactory
 	MounterUtils mounterUtils.MounterUtils
 }
 

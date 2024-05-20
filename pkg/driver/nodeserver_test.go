@@ -140,7 +140,7 @@ func TestNodePublishVolume(t *testing.T) {
 		testCaseName     string
 		req              *csi.NodePublishVolumeRequest
 		driverStatsUtils utils.StatsUtils
-		Mounter          mounter.NewMounterFactoryFunc
+		Mounter          mounter.NewMounterFactory
 		expectedResp     *csi.NodePublishVolumeResponse
 		expectedErr      error
 	}{
