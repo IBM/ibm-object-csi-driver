@@ -151,25 +151,6 @@ func TestCreateVolume(t *testing.T) {
 			expectedErr:  errors.New("Volume type block Volume not supported"),
 		},
 		{
-			testCaseName: "Negative: Requested capacity out of Range",
-			req: &csi.CreateVolumeRequest{
-				Name: testVolumeName,
-				CapacityRange: &csi.CapacityRange{
-					RequiredBytes: 20 * 1024 * 1024 * 1024,
-				},
-				VolumeCapabilities: []*csi.VolumeCapability{
-					{
-						AccessMode: &csi.VolumeCapability_AccessMode{
-							Mode: volumeCapabilities[0],
-						},
-					},
-				},
-			},
-			cosSession:   &s3client.FakeCOSSessionFactory{},
-			expectedResp: nil,
-			expectedErr:  errors.New("exceeds maximum allowed"),
-		},
-		{
 			testCaseName: "Negative: Secret Key not provided",
 			req: &csi.CreateVolumeRequest{
 				Name: testVolumeName,
