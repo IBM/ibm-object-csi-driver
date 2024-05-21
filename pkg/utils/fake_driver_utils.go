@@ -5,10 +5,11 @@ import (
 )
 
 type FakeStatsUtilsFuncStruct struct {
-	FSInfoFn         func(path string) (int64, int64, int64, int64, int64, int64, error)
-	CheckMountFn     func(targetPath string) (bool, error)
-	BucketToDeleteFn func(volumeID string) (string, error)
-	GetBucketUsageFn func(volumeID string) (int64, resource.Quantity, error)
+	FSInfoFn              func(path string) (int64, int64, int64, int64, int64, int64, error)
+	CheckMountFn          func(targetPath string) error
+	BucketToDeleteFn      func(volumeID string) (string, error)
+	GetBucketUsageFn      func(volumeID string) (int64, resource.Quantity, error)
+	GetBucketNameFromPVFn func(volumeID string) (string, error)
 }
 
 type FakeStatsUtilsFuncStructImpl struct {
@@ -30,7 +31,7 @@ func (m *FakeStatsUtilsFuncStructImpl) FSInfo(path string) (int64, int64, int64,
 	panic("requested method should not be nil")
 }
 
-func (m *FakeStatsUtilsFuncStructImpl) CheckMount(targetPath string) (bool, error) {
+func (m *FakeStatsUtilsFuncStructImpl) CheckMount(targetPath string) error {
 	if m.FuncStruct.CheckMountFn != nil {
 		return m.FuncStruct.CheckMountFn(targetPath)
 	}
@@ -47,6 +48,13 @@ func (m *FakeStatsUtilsFuncStructImpl) BucketToDelete(volumeID string) (string, 
 func (m *FakeStatsUtilsFuncStructImpl) GetBucketUsage(volumeID string) (int64, resource.Quantity, error) {
 	if m.FuncStruct.GetBucketUsageFn != nil {
 		return m.FuncStruct.GetBucketUsageFn(volumeID)
+	}
+	panic("requested method should not be nil")
+}
+
+func (m *FakeStatsUtilsFuncStructImpl) GetBucketNameFromPV(volumeID string) (string, error) {
+	if m.FuncStruct.GetBucketNameFromPVFn != nil {
+		return m.FuncStruct.GetBucketNameFromPVFn(volumeID)
 	}
 	panic("requested method should not be nil")
 }

@@ -231,12 +231,16 @@ func (su *FakeNewDriverStatsUtils) FSInfo(path string) (int64, int64, int64, int
 	return 1, 1, 1, 1, 1, 1, nil
 }
 
-func (su *FakeNewDriverStatsUtils) CheckMount(targetPath string) (bool, error) {
-	return true, nil
+func (su *FakeNewDriverStatsUtils) CheckMount(targetPath string) error {
+	return nil
 }
 
 func (su *FakeNewDriverStatsUtils) GetBucketUsage(volumeID string) (int64, resource.Quantity, error) {
 	return 0, resource.Quantity{}, nil
+}
+
+func (su *FakeNewDriverStatsUtils) GetBucketNameFromPV(volumeID string) (string, error) {
+	return "", nil
 }
 
 func createTargetDir(targetPath string) error {

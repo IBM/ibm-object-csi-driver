@@ -68,7 +68,7 @@ func inits3Driver(t *testing.T) *S3Driver {
 
 	//This has to be used as fake cosSession and fake Mounter
 	fakeSession := &s3client.COSSessionFactory{}
-	fakeMountObj := &mounter.S3fsMounterFactory{}
+	fakeMountObj := &mounter.CSIMounterFactory{}
 
 	// Creating test logger
 	logger, teardown := GetTestLogger(t)

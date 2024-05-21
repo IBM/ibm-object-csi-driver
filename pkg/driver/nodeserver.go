@@ -1,18 +1,12 @@
-/**
- * Copyright 2021 IBM Corp.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/*******************************************************************************
+ * IBM Confidential
+ * OCO Source Materials
+ * IBM Cloud Kubernetes Service, 5737-D43
+ * (C) Copyright IBM Corp. 2023 All Rights Reserved.
+ * The source code for this program is not published or otherwise divested of
+ * its trade secrets, irrespective of what has been deposited with
+ * the U.S. Copyright Office.
+ ******************************************************************************/
 
 package driver
 
@@ -27,9 +21,6 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 )
 
@@ -42,27 +33,15 @@ type nodeServer struct {
 	MounterUtils mounterUtils.MounterUtils
 }
 
-var (
-	mounterObj mounter.Mounter
-	// nodeCaps represents the capability of node service.
-	nodeCaps = []csi.NodeServiceCapability_RPC_Type{
-		csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
-		csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
-		csi.NodeServiceCapability_RPC_VOLUME_MOUNT_GROUP,
-	}
-)
-
 func (ns *nodeServer) NodeStageVolume(_ context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
 	klog.V(2).Infof("CSINodeServer-NodeStageVolume: Request %v", *req)
 
 	volumeID := req.GetVolumeId()
-	stagingTargetPath := req.GetStagingTargetPath()
-
-	// Check arguments
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 
+	stagingTargetPath := req.GetStagingTargetPath()
 	if len(stagingTargetPath) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
 	}
@@ -74,12 +53,11 @@ func (ns *nodeServer) NodeUnstageVolume(_ context.Context, req *csi.NodeUnstageV
 	klog.V(2).Infof("CSINodeServer-NodeUnstageVolume: Request %v", *req)
 
 	volumeID := req.GetVolumeId()
-	stagingTargetPath := req.GetStagingTargetPath()
-
-	// Check arguments
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
+
+	stagingTargetPath := req.GetStagingTargetPath()
 	if len(stagingTargetPath) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
 	}
@@ -96,8 +74,8 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 
 	volumeMountGroup := req.GetVolumeCapability().GetMount().GetVolumeMountGroup()
 	klog.V(2).Infof("CSINodeServer-NodePublishVolume-: volumeMountGroup: %v", volumeMountGroup)
-	volumeID := req.GetVolumeId()
 
+	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
@@ -107,18 +85,14 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
 	}
 
-	// Check arguments
 	if req.GetVolumeCapability() == nil {
 		return nil, status.Error(codes.InvalidArgument, "Volume capability missing in request")
 	}
 
-	notMnt, err := ns.Stats.CheckMount(targetPath)
+	err = ns.Stats.CheckMount(targetPath)
 	if err != nil {
 		klog.Errorf("Can not validate target mount point: %s %v", targetPath, err)
 		return nil, status.Error(codes.Internal, err.Error())
-	}
-	if !notMnt {
-		return &csi.NodePublishVolumeResponse{}, nil
 	}
 
 	deviceID := ""
@@ -148,24 +122,11 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 
 	// If bucket name wasn't provided by user, we use temp bucket created for volume.
 	if secretMap["bucketName"] == "" {
-		config, err := rest.InClusterConfig()
-		if err != nil {
-			klog.Errorf("Unable to get cluster config %v", err)
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-		clientset, err := kubernetes.NewForConfig(config)
-		if err != nil {
-			klog.Errorf("Unable to create client %v", err)
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-
-		pv, err := clientset.CoreV1().PersistentVolumes().Get(context.Background(), volumeID, metav1.GetOptions{})
+		tempBucketName, err := ns.Stats.GetBucketNameFromPV(volumeID)
 		if err != nil {
 			klog.Errorf("Unable to fetch pv %v", err)
 			return nil, status.Error(codes.Internal, err.Error())
 		}
-
-		tempBucketName := pv.Spec.CSI.VolumeAttributes["bucketName"]
 
 		if tempBucketName == "" {
 			klog.Errorf("Unable to fetch bucket name from pv")
@@ -175,7 +136,7 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		secretMap["bucketName"] = tempBucketName
 	}
 
-	mounterObj = ns.Mounter.NewMounter(attrib, secretMap, mountFlags)
+	mounterObj := ns.Mounter.NewMounter(attrib, secretMap, mountFlags)
 
 	klog.Info("-NodePublishVolume-: Mount")
 
@@ -192,12 +153,11 @@ func (ns *nodeServer) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpubl
 	klog.V(2).Infof("CSINodeServer-NodeUnpublishVolume: Request: %v", *req)
 
 	volumeID := req.GetVolumeId()
-	targetPath := req.GetTargetPath()
-
-	// Check arguments
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
+
+	targetPath := req.GetTargetPath()
 	if len(targetPath) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
 	}
@@ -217,16 +177,18 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 	klog.V(2).Infof("NodeGetVolumeStats: Request: %+v", *req)
 
 	volumeID := req.GetVolumeId()
-	if req.VolumePath == "" {
-		return nil, status.Error(codes.InvalidArgument, "Path Doesn't exist")
-	}
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 
+	volumePath := req.VolumePath
+	if volumePath == "" {
+		return nil, status.Error(codes.InvalidArgument, "Path Doesn't exist")
+	}
+
 	klog.V(2).Info("NodeGetVolumeStats: Start getting Stats")
 	//  Making direct call to fs library for the sake of simplicity. That way we don't need to initialize VolumeStatsUtils. If there is a need for VolumeStatsUtils to grow bigger then we can use it
-	_, capacity, _, inodes, inodesFree, inodesUsed, err := ns.Stats.FSInfo(req.VolumePath)
+	_, capacity, _, inodes, inodesFree, inodesUsed, err := ns.Stats.FSInfo(volumePath)
 
 	if err != nil {
 		data := map[string]string{"VolumeId": volumeID, "Error": err.Error()}
@@ -278,12 +240,10 @@ func (ns *nodeServer) NodeExpandVolume(_ context.Context, _ *csi.NodeExpandVolum
 	return &csi.NodeExpandVolumeResponse{}, status.Error(codes.Unimplemented, "NodeExpandVolume is not implemented")
 }
 
-// NodeGetCapabilities returns the supported capabilities of the node server
 func (ns *nodeServer) NodeGetCapabilities(_ context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-	// currently there is a single NodeServer capability according to the spec
 	klog.V(2).Infof("NodeGetCapabilities: Request: %+v", *req)
 	var caps []*csi.NodeServiceCapability
-	for _, cap := range nodeCaps {
+	for _, cap := range nodeServerCapabilities {
 		c := &csi.NodeServiceCapability{
 			Type: &csi.NodeServiceCapability_Rpc{
 				Rpc: &csi.NodeServiceCapability_RPC{
@@ -304,6 +264,6 @@ func (ns *nodeServer) NodeGetInfo(_ context.Context, req *csi.NodeGetInfoRequest
 		MaxVolumesPerNode:  constants.DefaultVolumesPerNode,
 		AccessibleTopology: top,
 	}
-	fmt.Println(resp)
+	klog.V(2).Info("NodeGetInfo: ", resp)
 	return resp, nil
 }

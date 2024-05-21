@@ -40,6 +40,8 @@ var (
 
 	testVolumeID   = "testVolumeID"
 	testVolumeName = "test-volume-name"
+	testTargetPath = "test/path"
+	testNodeID     = "testNodeID"
 	bucketName     = "testBucket"
 
 	testSecret = map[string]string{
