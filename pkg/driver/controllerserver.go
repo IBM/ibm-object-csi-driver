@@ -60,6 +60,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume name missing in request")
 	}
+	klog.Infof("Got a request to create volume: %s", volumeID)
 
 	caps := req.GetVolumeCapabilities()
 	if caps == nil {
@@ -71,15 +72,10 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		}
 	}
 
-	// Check for maximum available capacity
-	capacity := req.GetCapacityRange().GetRequiredBytes()
-	if capacity >= constants.MaxStorageCapacity {
-		return nil, status.Error(codes.OutOfRange, fmt.Sprintf("Requested capacity %d exceeds maximum allowed %d", capacity, constants.MaxStorageCapacity))
-	}
-	klog.Infof("Got a request to create volume: %s", volumeID)
 	params := req.GetParameters()
+	klog.Info("CreateVolume Parameters:\n\t", params)
+
 	secretMap := req.GetSecrets()
-	fmt.Println("CreateVolume Parameters:\n\t", params)
 	creds, err := getCredentials(req.GetSecrets())
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
