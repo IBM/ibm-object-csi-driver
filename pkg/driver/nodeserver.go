@@ -31,11 +31,11 @@ var capAvailable, capAsInt64, capUsed int64
 // Implements Node Server csi.NodeServer
 type nodeServer struct {
 	*S3Driver
-	Stats        utils.StatsUtils
-	NodeID       string
-	Mounter      mounter.NewMounterFactory
-	MounterUtils mounterUtils.MounterUtils
-	SetTime      time.Time
+	Stats              utils.StatsUtils
+	NodeID             string
+	Mounter            mounter.NewMounterFactory
+	MounterUtils       mounterUtils.MounterUtils
+	VolumeIDAndTimeMap map[string]time.Time
 }
 
 func (ns *nodeServer) NodeStageVolume(_ context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
@@ -206,8 +206,9 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 		}, nil
 	}
 
-	if ns.SetTime.Second() == 0 || time.Since(ns.SetTime).Minutes() >= constants.TimeDelayInMin {
-		ns.SetTime = time.Now()
+	timeSetInMap := ns.VolumeIDAndTimeMap[volumeID]
+	if timeSetInMap.Second() == 0 || time.Since(timeSetInMap).Minutes() >= constants.TimeDelayInMin {
+		ns.VolumeIDAndTimeMap[volumeID] = time.Now()
 
 		var totalCap resource.Quantity
 		var converted bool

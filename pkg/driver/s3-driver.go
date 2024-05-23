@@ -138,12 +138,12 @@ func newControllerServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, s3cosSessio
 
 func newNodeServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, nodeID string, mountObj mounter.NewMounterFactory, mounterUtil mounterUtils.MounterUtils) *nodeServer {
 	return &nodeServer{
-		S3Driver:     d,
-		Stats:        statsUtil,
-		NodeID:       nodeID,
-		Mounter:      mountObj,
-		MounterUtils: mounterUtil,
-		SetTime:      time.Time{},
+		S3Driver:           d,
+		Stats:              statsUtil,
+		NodeID:             nodeID,
+		Mounter:            mountObj,
+		MounterUtils:       mounterUtil,
+		VolumeIDAndTimeMap: map[string]time.Time{},
 	}
 }
 
