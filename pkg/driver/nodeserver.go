@@ -26,6 +26,7 @@ import (
 )
 
 var setTime time.Time
+var timeDelayInMin float64 = 5
 
 // Implements Node Server csi.NodeServer
 type nodeServer struct {
@@ -246,7 +247,7 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 	timeDiff := currentTime.Sub(setTime).Minutes()
 	klog.V(2).Info("NodeGetVolumeStats: Time Difference ", timeDiff, " min")
 
-	if timeDiff >= 2 {
+	if timeDiff >= timeDelayInMin {
 		capUsed, totalCap, err := ns.Stats.GetBucketUsage(volumeID)
 		if err != nil {
 			return nil, err
@@ -277,6 +278,8 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 				},
 			},
 		}
+
+		setTime = currentTime
 
 		klog.V(2).Info("NodeGetVolumeStats: Volume Stats ", resp)
 		return resp, nil
