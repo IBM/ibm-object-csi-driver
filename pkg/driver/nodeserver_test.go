@@ -509,7 +509,6 @@ func TestNodeGetVolumeStats(t *testing.T) {
 			Stats:              tc.driverStatsUtils,
 			VolumeIDAndTimeMap: map[string]time.Time{},
 		}
-
 		actualResp, actualErr := nodeServer.NodeGetVolumeStats(ctx, tc.req)
 
 		if tc.expectedErr != nil {
