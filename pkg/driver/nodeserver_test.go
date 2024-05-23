@@ -20,7 +20,6 @@ import (
 	"errors"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
@@ -507,7 +506,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 
 		nodeServer := nodeServer{
 			Stats:              tc.driverStatsUtils,
-			VolumeIDAndTimeMap: map[string]time.Time{},
+			VolumeIDAndTimeMap: map[string]NodeVolStats{},
 		}
 		actualResp, actualErr := nodeServer.NodeGetVolumeStats(ctx, tc.req)
 
