@@ -20,6 +20,7 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
@@ -464,7 +465,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 			expectedErr:  errors.New("Path Doesn't exist"),
 		},
 		{
-			testCaseName: "Negative: Failed to getg volume stats",
+			testCaseName: "Negative: Failed to get volume stats",
 			req: &csi.NodeGetVolumeStatsRequest{
 				VolumeId:   testVolumeID,
 				VolumePath: testTargetPath,
@@ -507,6 +508,8 @@ func TestNodeGetVolumeStats(t *testing.T) {
 		nodeServer := nodeServer{
 			Stats: tc.driverStatsUtils,
 		}
+
+		setTime = time.Time{}
 		actualResp, actualErr := nodeServer.NodeGetVolumeStats(ctx, tc.req)
 
 		if tc.expectedErr != nil {

@@ -27,7 +27,6 @@ import (
 )
 
 var setTime time.Time
-var timeDelayInMin float64 = 5
 var capAvailable, capAsInt64, capUsed int64
 
 // Implements Node Server csi.NodeServer
@@ -207,7 +206,7 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 		}, nil
 	}
 
-	if setTime.Second() == 0 || time.Since(setTime).Minutes() >= timeDelayInMin {
+	if setTime.Second() == 0 || time.Since(setTime).Minutes() >= constants.TimeDelayInMin {
 		setTime = time.Now()
 
 		var totalCap resource.Quantity
