@@ -12,6 +12,7 @@ package driver
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
@@ -186,6 +187,9 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 		return nil, status.Error(codes.InvalidArgument, "Path Doesn't exist")
 	}
 
+	var err error
+	var resp *csi.NodeGetVolumeStatsResponse
+
 	klog.V(2).Info("NodeGetVolumeStats: Start getting Stats")
 	//  Making direct call to fs library for the sake of simplicity. That way we don't need to initialize VolumeStatsUtils. If there is a need for VolumeStatsUtils to grow bigger then we can use it
 	_, capacity, _, inodes, inodesFree, inodesUsed, err := ns.Stats.FSInfo(volumePath)
@@ -201,36 +205,82 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 		}, nil
 	}
 
-	capUsed, totalCap, err := ns.Stats.GetBucketUsage(volumeID)
-	if err != nil {
-		return nil, err
-	}
+	timeDelay := time.NewTicker(1 * time.Minute)
+	quit := make(chan struct{})
 
-	capAsInt64, converted := totalCap.AsInt64()
-	if !converted {
-		capAsInt64 = capacity
-	}
+	go func() {
+		for {
+			select {
+			case <-timeDelay.C:
+				capUsed, totalCap, err := ns.Stats.GetBucketUsage(volumeID)
+				if err != nil {
+					return
+				}
 
-	klog.Info("NodeGetVolumeStats: Total Capacity of Volume: ", capAsInt64)
+				capAsInt64, converted := totalCap.AsInt64()
+				if !converted {
+					capAsInt64 = capacity
+				}
 
-	capAvailable := capAsInt64 - capUsed
+				klog.Info("NodeGetVolumeStats: Total Capacity of Volume: ", capAsInt64)
 
-	resp := &csi.NodeGetVolumeStatsResponse{
-		Usage: []*csi.VolumeUsage{
-			{
-				Available: capAvailable,
-				Total:     capAsInt64,
-				Used:      capUsed,
-				Unit:      csi.VolumeUsage_BYTES,
-			},
-			{
-				Available: inodesFree,
-				Total:     inodes,
-				Used:      inodesUsed,
-				Unit:      csi.VolumeUsage_INODES,
-			},
-		},
-	}
+				capAvailable := capAsInt64 - capUsed
+
+				resp = &csi.NodeGetVolumeStatsResponse{
+					Usage: []*csi.VolumeUsage{
+						{
+							Available: capAvailable,
+							Total:     capAsInt64,
+							Used:      capUsed,
+							Unit:      csi.VolumeUsage_BYTES,
+						},
+						{
+							Available: inodesFree,
+							Total:     inodes,
+							Used:      inodesUsed,
+							Unit:      csi.VolumeUsage_INODES,
+						},
+					},
+				}
+				return
+
+			case <-quit:
+				timeDelay.Stop()
+				return
+			}
+		}
+	}()
+
+	// capUsed, totalCap, err := ns.Stats.GetBucketUsage(volumeID)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// capAsInt64, converted := totalCap.AsInt64()
+	// if !converted {
+	// 	capAsInt64 = capacity
+	// }
+
+	// klog.Info("NodeGetVolumeStats: Total Capacity of Volume: ", capAsInt64)
+
+	// capAvailable := capAsInt64 - capUsed
+
+	// resp := &csi.NodeGetVolumeStatsResponse{
+	// 	Usage: []*csi.VolumeUsage{
+	// 		{
+	// 			Available: capAvailable,
+	// 			Total:     capAsInt64,
+	// 			Used:      capUsed,
+	// 			Unit:      csi.VolumeUsage_BYTES,
+	// 		},
+	// 		{
+	// 			Available: inodesFree,
+	// 			Total:     inodes,
+	// 			Used:      inodesUsed,
+	// 			Unit:      csi.VolumeUsage_INODES,
+	// 		},
+	// 	},
+	// }
 
 	klog.V(2).Info("NodeGetVolumeStats: Volume Stats ", resp)
 	return resp, nil
