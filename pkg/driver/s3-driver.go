@@ -18,6 +18,7 @@ package driver
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/IBM/ibm-csi-common/pkg/utils"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
@@ -142,6 +143,7 @@ func newNodeServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, nodeID string, mo
 		NodeID:       nodeID,
 		Mounter:      mountObj,
 		MounterUtils: mounterUtil,
+		SetTime:      time.Time{},
 	}
 }
 

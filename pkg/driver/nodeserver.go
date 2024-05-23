@@ -26,7 +26,6 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var setTime time.Time
 var capAvailable, capAsInt64, capUsed int64
 
 // Implements Node Server csi.NodeServer
@@ -36,6 +35,7 @@ type nodeServer struct {
 	NodeID       string
 	Mounter      mounter.NewMounterFactory
 	MounterUtils mounterUtils.MounterUtils
+	SetTime      time.Time
 }
 
 func (ns *nodeServer) NodeStageVolume(_ context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
@@ -206,8 +206,8 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 		}, nil
 	}
 
-	if setTime.Second() == 0 || time.Since(setTime).Minutes() >= constants.TimeDelayInMin {
-		setTime = time.Now()
+	if ns.SetTime.Second() == 0 || time.Since(ns.SetTime).Minutes() >= constants.TimeDelayInMin {
+		ns.SetTime = time.Now()
 
 		var totalCap resource.Quantity
 		var converted bool

@@ -506,10 +506,10 @@ func TestNodeGetVolumeStats(t *testing.T) {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
 		nodeServer := nodeServer{
-			Stats: tc.driverStatsUtils,
+			Stats:   tc.driverStatsUtils,
+			SetTime: time.Time{},
 		}
 
-		setTime = time.Time{}
 		actualResp, actualErr := nodeServer.NodeGetVolumeStats(ctx, tc.req)
 
 		if tc.expectedErr != nil {
