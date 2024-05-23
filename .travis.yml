@@ -16,7 +16,7 @@ matrix:
     - os: linux
       env: MAKE_TASK="test-sanity"
     - os: linux
-      env: MAKE_TASK="test"
+      env: MAKE_TASK="coverage"
 
 cache:
   bundler: true
