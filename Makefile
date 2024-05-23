@@ -28,7 +28,7 @@ CORE_DRIVER_IMG ?= $(REGISTRY)/$(CORE_IMAGE_NAME)
 
 .PHONY: test
 test:
-	go test -v -race ./cmd/... ./pkg/... -coverprofile=cover.out
+	go test -v -race `go list ./... | grep -v ./tests/...` -coverprofile=coverage.out 
 
 .PHONY: deps
 deps:
@@ -43,7 +43,8 @@ fmt: lint
 	gofmt -l ${GOFILES}
 
 .PHONY: coverage
-coverage:
+coverage: test
+	cat coverage.out | grep -v /fake > cover.out;
 	go tool cover -html=cover.out -o=cover.html
 
 clean:
