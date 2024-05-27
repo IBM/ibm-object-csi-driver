@@ -197,15 +197,15 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 			Usage: []*csi.VolumeUsage{
 				{
 					Available: -1,
-					Total: -1,
-					Used: -1,
-					Unit: csi.VolumeUsage_BYTES,
+					Total:     -1,
+					Used:      -1,
+					Unit:      csi.VolumeUsage_BYTES,
 				},
 				{
 					Available: -1,
-					Total: -1,
-					Used: -1,
-				Unit:      csi.VolumeUsage_INODES,
+					Total:     -1,
+					Used:      -1,
+					Unit:      csi.VolumeUsage_INODES,
 				},
 			},
 			VolumeCondition: &csi.VolumeCondition{
