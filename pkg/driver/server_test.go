@@ -1,5 +1,5 @@
 /**
- * Copyright 2021 IBM Corp.
+ * Copyright 2024 IBM Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,74 +13,145 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package driver
 
 import (
+	"errors"
 	"flag"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
 )
 
-func TestSetup(t *testing.T) {
-	goodEndpoint := flag.String("endpoint", "unix:/tmp/testcsi.sock", "Test CSI endpoint")
-	logger, teardown := GetTestLogger(t)
-	defer teardown()
+func TestNonBlockingGRPCServer(t *testing.T) {
+	t.Run("Positive", func(t *testing.T) {
+		lgr, teardown := GetTestLogger(t)
+		defer teardown()
 
-	s := NewNonBlockingGRPCServer(defaultMode, logger)
-	nonBlockingServer, ok := s.(*nonBlockingGRPCServer)
-	assert.Equal(t, true, ok)
-	ids := &identityServer{}
-	cs := &controllerServer{}
-	ns := &nodeServer{}
+		s := NewNonBlockingGRPCServer("controller", lgr)
+		nonBlockingServer, ok := s.(*nonBlockingGRPCServer)
+		assert.Equal(t, true, ok)
 
-	{
-		t.Logf("Good setup")
-		ls, err := nonBlockingServer.Setup(*goodEndpoint, ids, cs, ns)
-		assert.Nil(t, err)
-		assert.NotNil(t, ls)
-	}
+		listener, err := nonBlockingServer.Setup(*testEndpoint, &identityServer{}, &controllerServer{}, &nodeServer{})
+		assert.NoError(t, err)
+		assert.NotNil(t, listener)
 
-	// Call other methods as well just to execute all line of code
-	nonBlockingServer.Wait()
-	nonBlockingServer.Stop()
-	nonBlockingServer.ForceStop()
-
-	{
-		t.Logf("Wrong endpoint format")
-
-		wrongEndpointFormat := flag.String("wrongendpoint", "---:/tmp/testcsi.sock", "Test CSI endpoint")
-		_, err := nonBlockingServer.Setup(*wrongEndpointFormat, ids, cs, ns)
-		assert.NotNil(t, err)
-		t.Logf("---------> error %v", err)
-	}
-
-	{
-		t.Logf("Wrong Scheme")
-		wrongEndpointScheme := flag.String("wrongschemaendpoint", "wrong-scheme:/tmp/testcsi.sock", "Test CSI endpoint")
-		_, err := nonBlockingServer.Setup(*wrongEndpointScheme, nil, nil, nil)
-		assert.NotNil(t, err)
-		t.Logf("---------> error %v", err)
-	}
-
-	{
-		t.Logf("tcp Scheme")
-		tcpEndpointSchema := flag.String("tcpendpoint", "tcp:/tmp/testtcpcsi.sock", "Test CSI endpoint")
-		_, err := nonBlockingServer.Setup(*tcpEndpointSchema, nil, nil, nil)
-		assert.Nil(t, err)
-		t.Logf("---------> error %v", err)
+		nonBlockingServer.Wait()
+		nonBlockingServer.Stop()
 		nonBlockingServer.ForceStop()
+	})
+}
+
+func TestSetup(t *testing.T) {
+	testCases := []struct {
+		testCaseName string
+		endpoint     *string
+		mode         string
+		expectedErr  error
+	}{
+		{
+			testCaseName: "Positive: Successful",
+			endpoint:     testEndpoint,
+			mode:         "controller",
+			expectedErr:  nil,
+		},
+		{
+			testCaseName: "Positive: TCP Scheme",
+			endpoint:     flag.String("tcpendpoint", "tcp:/tmp/testtcpcsi.sock", "Test CSI endpoint"),
+			mode:         "node",
+			expectedErr:  nil,
+		},
+		{
+			testCaseName: "Positive: controller-node mode",
+			endpoint:     testEndpoint,
+			mode:         "controller-node",
+			expectedErr:  nil,
+		},
+		{
+			testCaseName: "Negative: Wrong endpoint format",
+			endpoint:     flag.String("wrongendpoint", "---:/tmp/testcsi.sock", "Test CSI endpoint"),
+			mode:         "controller",
+			expectedErr:  errors.New("first path segment in URL cannot contain colon"),
+		},
+		{
+			testCaseName: "Negative: Wrong Scheme",
+			endpoint:     flag.String("wrongschemaendpoint", "wrong-scheme:/tmp/testcsi.sock", "Test CSI endpoint"),
+			mode:         "controller",
+			expectedErr:  errors.New("endpoint scheme not supported"),
+		},
+		{
+			testCaseName: "Negative: Wrong address",
+			endpoint:     flag.String("wrongaddressendpoint", "unix:443", "Test CSI endpoint"),
+			mode:         "controller",
+			expectedErr:  errors.New("failed to listen GRPC server"),
+		},
 	}
 
-	{
-		t.Logf("Wrong address")
-		wrongAddressEndpointAddress := flag.String("wrongaddressendpoint", "unix:443", "Test CSI endpoint")
-		_, err := nonBlockingServer.Setup(*wrongAddressEndpointAddress, nil, nil, nil)
-		//assert.Nil(t, err) // Its working on local system
-		t.Logf("---------> error %v", err)
+	for _, tc := range testCases {
+		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
+
+		lgr, teardown := GetTestLogger(t)
+		defer teardown()
+
+		server := nonBlockingGRPCServer{
+			mode:   tc.mode,
+			logger: lgr,
+		}
+		_, actualErr := server.Setup(*tc.endpoint, &identityServer{}, &controllerServer{}, &nodeServer{})
+
+		if tc.expectedErr != nil {
+			assert.Error(t, actualErr)
+			assert.Contains(t, actualErr.Error(), tc.expectedErr.Error())
+		} else {
+			assert.NoError(t, actualErr)
+		}
 	}
 }
 
 func TestLogGRPC(t *testing.T) {
-	t.Logf("TODO:~ TestLogGRPC")
+	testCases := []struct {
+		testCaseName string
+		handler      grpc.UnaryHandler
+		expectedResp interface{}
+		expectedErr  error
+	}{
+		{
+			testCaseName: "Positive: Successful",
+			handler: func(ctx context.Context, req any) (any, error) {
+				return zap.Logger{}, nil
+			},
+			expectedResp: zap.Logger{},
+			expectedErr:  nil,
+		},
+		{
+			testCaseName: "Negative: Error occurred",
+			handler: func(ctx context.Context, req any) (any, error) {
+				return nil, errors.New("failed")
+			},
+			expectedResp: nil,
+			expectedErr:  errors.New("failed"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
+
+		actualResp, actualErr := logGRPC(ctx, nil, &grpc.UnaryServerInfo{}, tc.handler)
+
+		if tc.expectedErr != nil {
+			assert.Error(t, actualErr)
+			assert.Contains(t, actualErr.Error(), tc.expectedErr.Error())
+		} else {
+			assert.NoError(t, actualErr)
+		}
+
+		if !reflect.DeepEqual(tc.expectedResp, actualResp) {
+			t.Errorf("Expected %v but got %v", tc.expectedResp, actualResp)
+		}
+	}
 }
