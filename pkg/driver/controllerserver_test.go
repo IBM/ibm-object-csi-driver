@@ -19,6 +19,7 @@ package driver
 import (
 	"context"
 	"errors"
+	"flag"
 	"reflect"
 	"strings"
 	"testing"
@@ -51,6 +52,8 @@ var (
 		"cosEndpoint":        "test-endpoint",
 		"bucketName":         bucketName,
 	}
+
+	testEndpoint = flag.String("endpoint", "unix:/tmp/testcsi.sock", "Test CSI endpoint")
 )
 
 func TestCreateVolume(t *testing.T) {
