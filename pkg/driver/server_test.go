@@ -102,7 +102,7 @@ func TestSetup(t *testing.T) {
 			mode:   tc.mode,
 			logger: lgr,
 		}
-		_, actualErr := server.Setup(*tc.endpoint, &identityServer{}, &controllerServer{}, &nodeServer{})
+		_, actualErr := server.Setup(*tc.endpoint, nil, nil, nil)
 
 		if tc.expectedErr != nil {
 			assert.Error(t, actualErr)
