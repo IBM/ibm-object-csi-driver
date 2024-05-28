@@ -12,6 +12,7 @@ package driver
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"net/url"
 	"os"
@@ -105,6 +106,7 @@ func (s *nonBlockingGRPCServer) Setup(endpoint string, ids csi.IdentityServer, c
 	s.logger.Info("start listening GRPC server", zap.Reflect("Scheme", u.Scheme), zap.Reflect("Addr", addr))
 
 	listener, err := net.Listen(u.Scheme, addr)
+	fmt.Println("---", err)
 	if err != nil {
 		msg := "failed to listen GRPC server"
 		s.logger.Error(msg, zap.Reflect("Error", err))
