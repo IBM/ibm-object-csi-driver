@@ -86,9 +86,9 @@ func TestSetup(t *testing.T) {
 		},
 		{
 			testCaseName: "Negative: Wrong address",
-			endpoint:     flag.String("wrongaddressendpoint", "unix:443", "Test CSI endpoint"),
+			endpoint:     flag.String("wrongaddressendpoint", "unix:wrong-address", "Test CSI endpoint"),
 			mode:         "controller",
-			// expectedErr:  errors.New("failed to listen GRPC server"),
+			expectedErr:  errors.New("failed to listen GRPC server"),
 		},
 	}
 
