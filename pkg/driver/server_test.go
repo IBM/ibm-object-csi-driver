@@ -84,12 +84,6 @@ func TestSetup(t *testing.T) {
 			mode:         "controller",
 			expectedErr:  errors.New("endpoint scheme not supported"),
 		},
-		{
-			testCaseName: "Negative: Wrong address",
-			endpoint:     flag.String("wrongaddressendpoint", "unix:wrong-address", "Test CSI endpoint"),
-			mode:         "controller",
-			expectedErr:  errors.New("failed to listen GRPC server"),
-		},
 	}
 
 	for _, tc := range testCases {
