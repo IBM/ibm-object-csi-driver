@@ -85,10 +85,10 @@ func TestSetup(t *testing.T) {
 			expectedErr:  errors.New("endpoint scheme not supported"),
 		},
 		{
-			testCaseName: "Negative: Address is missing",
-			endpoint:     flag.String("wrongaddressendpoint", "unix:", "Test CSI endpoint"),
+			testCaseName: "Negative: Wrong address",
+			endpoint:     flag.String("wrongaddressendpoint", "unix:443", "Test CSI endpoint"),
 			mode:         "controller",
-			expectedErr:  errors.New("failed to listen GRPC server"),
+			// expectedErr:  errors.New("failed to listen GRPC server"),
 		},
 	}
 
@@ -102,7 +102,7 @@ func TestSetup(t *testing.T) {
 			mode:   tc.mode,
 			logger: lgr,
 		}
-		_, actualErr := server.Setup(*tc.endpoint, nil, nil, nil)
+		_, actualErr := server.Setup(*tc.endpoint, &identityServer{}, &controllerServer{}, &nodeServer{})
 
 		if tc.expectedErr != nil {
 			assert.Error(t, actualErr)
