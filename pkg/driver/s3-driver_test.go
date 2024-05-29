@@ -1,5 +1,5 @@
 /**
- * Copyright 2021 IBM Corp.
+ * Copyright 2024 IBM Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package driver
 
 import (
@@ -32,23 +33,12 @@ const defaultMode = "controller"
 
 // GetTestLogger ...
 func GetTestLogger(t *testing.T) (logger *zap.Logger, teardown func()) {
-	atom := zap.NewAtomicLevel()
-	atom.SetLevel(zap.DebugLevel)
 
-	encoderCfg := zap.NewProductionEncoderConfig()
-	encoderCfg.TimeKey = "timestamp"
-	encoderCfg.EncodeTime = zapcore.ISO8601TimeEncoder
-
+	config := zap.NewDevelopmentConfig()
+	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	buf := &bytes.Buffer{}
 
-	logger = zap.New(
-		zapcore.NewCore(
-			zapcore.NewJSONEncoder(encoderCfg),
-			zapcore.AddSync(buf),
-			atom,
-		),
-		zap.AddCaller(),
-	)
+	logger, _ = config.Build()
 
 	teardown = func() {
 		_ = logger.Sync()
@@ -56,52 +46,154 @@ func GetTestLogger(t *testing.T) (logger *zap.Logger, teardown func()) {
 			t.Log(buf)
 		}
 	}
-	return
+
+	return logger, teardown
 }
 
-func inits3Driver(t *testing.T) *S3Driver {
+func TestAddVolumeCapabilityAccessModes(t *testing.T) {
+	logger, teardown := GetTestLogger(t)
+	driver := &S3Driver{
+		logger: logger,
+	}
+	defer teardown()
+	err := driver.AddVolumeCapabilityAccessModes(volumeCapabilities)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(driver.vcap) != len(volumeCapabilities) {
+		t.Errorf("expected %d volume capabilities, got %d", len(volumeCapabilities), len(driver.vcap))
+	}
+}
+
+func TestAddControllerServiceCapabilities(t *testing.T) {
+	logger, teardown := GetTestLogger(t)
+	driver := &S3Driver{
+		logger: logger,
+	}
+	defer teardown()
+	err := driver.AddControllerServiceCapabilities(controllerCapabilities)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(driver.cscap) != len(controllerCapabilities) {
+		t.Errorf("expected %d controller capabilities, got %d", len(controllerCapabilities), len(driver.cscap))
+	}
+}
+
+func TestAddNodeServiceCapabilities(t *testing.T) {
+	logger, teardown := GetTestLogger(t)
+	driver := &S3Driver{
+		logger: logger,
+	}
+	defer teardown()
+	err := driver.AddNodeServiceCapabilities(nodeServerCapabilities)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(driver.nscap) != len(nodeServerCapabilities) {
+		t.Errorf("expected %d node capabilities, got %d", len(nodeServerCapabilities), len(driver.nscap))
+	}
+}
+
+func TestNewS3CosDriver(t *testing.T) {
 	vendorVersion := "test-vendor-version-1.1.2"
 	driverName := "mydriver"
 
 	endpoint := "test-endpoint"
 	nodeID := "test-nodeID"
 
-	//This has to be used as fake cosSession and fake Mounter
-	fakeSession := &s3client.COSSessionFactory{}
-	fakeMountObj := &mounter.CSIMounterFactory{}
+	fakeCosSession := &s3client.FakeCOSSessionFactory{}
+	fakeMountObj := &mounter.FakeMounterFactory{}
 
-	// Creating test logger
 	logger, teardown := GetTestLogger(t)
 	defer teardown()
 
 	// Setup the CSI driver
-	icDriver, err := Setups3Driver(defaultMode, driverName, vendorVersion, logger)
-	if err != nil {
-		t.Fatalf("Failed to setup CSI Driver: %v", err)
-	}
+	driver, err := Setups3Driver(defaultMode, driverName, vendorVersion, logger)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, driver)
 
-	statsUtil := &(utils.DriverStatsUtils{})
-	mounterUtil := &(mounterUtils.MounterOptsUtils{})
-	icsDriver, err := icDriver.NewS3CosDriver(nodeID, endpoint, fakeSession, fakeMountObj, statsUtil, mounterUtil)
-	if err != nil {
-		t.Fatalf("Failed to create New COS CSI Driver: %v", err)
-	}
+	statsUtil := utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{})
+	mounterUtil := mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{})
 
-	return icsDriver
+	csiDriver, err := driver.NewS3CosDriver(nodeID, endpoint, fakeCosSession, fakeMountObj, statsUtil, mounterUtil)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, csiDriver)
 }
 
-func TestSetups3Driver(t *testing.T) {
-	// success setting up driver
-	driver := inits3Driver(t)
-	assert.NotNil(t, driver)
-
-	// Creating test logger
+func TestNewS3CosDriver_mode_node(t *testing.T) {
 	vendorVersion := "test-vendor-version-1.1.2"
+	driverName := "mydriver"
+
+	endpoint := "test-endpoint"
+	nodeID := "test-nodeID"
+
+	fakeCosSession := &s3client.FakeCOSSessionFactory{}
+	fakeMountObj := &mounter.FakeMounterFactory{}
+
+	logger, teardown := GetTestLogger(t)
+	defer teardown()
+
+	// Setup the CSI driver
+	driver, err := Setups3Driver("node", driverName, vendorVersion, logger)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, driver)
+
+	statsUtil := utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{})
+	mounterUtil := mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{})
+
+	csiDriver, err := driver.NewS3CosDriver(nodeID, endpoint, fakeCosSession, fakeMountObj, statsUtil, mounterUtil)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, csiDriver)
+}
+
+func TestNewS3CosDriver_mode_controller_node(t *testing.T) {
+	vendorVersion := "test-vendor-version-1.1.2"
+	driverName := "mydriver"
+
+	endpoint := "test-endpoint"
+	nodeID := "test-nodeID"
+
+	fakeCosSession := &s3client.FakeCOSSessionFactory{}
+	fakeMountObj := &mounter.FakeMounterFactory{}
+
+	logger, teardown := GetTestLogger(t)
+	defer teardown()
+
+	// Setup the CSI driver
+	driver, err := Setups3Driver("controller-node", driverName, vendorVersion, logger)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, driver)
+
+	statsUtil := utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{})
+	mounterUtil := mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{})
+
+	csiDriver, err := driver.NewS3CosDriver(nodeID, endpoint, fakeCosSession, fakeMountObj, statsUtil, mounterUtil)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, csiDriver)
+}
+
+func TestSetups3Driver_Positive(t *testing.T) {
+	vendorVersion := "test-vendor"
+	driverName := "test-driver"
+	logger, teardown := GetTestLogger(t)
+	defer teardown()
+
+	csiDriver, err := Setups3Driver(defaultMode, driverName, vendorVersion, logger)
+	assert.Nil(t, err)
+	assert.NotEmpty(t, csiDriver)
+
+	assert.Equal(t, csiDriver.name, driverName)
+	assert.Equal(t, csiDriver.version, vendorVersion)
+	assert.Equal(t, csiDriver.mode, defaultMode)
+}
+
+func TestSetups3Driver_Negative(t *testing.T) {
+	vendorVersion := "test-vendor"
 	driverName := ""
 	logger, teardown := GetTestLogger(t)
 	defer teardown()
 
-	// Failed setting up driver, name  nil
 	_, err := Setups3Driver(defaultMode, driverName, vendorVersion, logger)
 	assert.NotNil(t, err)
 }
