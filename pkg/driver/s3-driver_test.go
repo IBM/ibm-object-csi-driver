@@ -33,7 +33,6 @@ const defaultMode = "controller"
 
 // GetTestLogger ...
 func GetTestLogger(t *testing.T) (logger *zap.Logger, teardown func()) {
-
 	config := zap.NewDevelopmentConfig()
 	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	buf := &bytes.Buffer{}
