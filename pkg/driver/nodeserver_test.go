@@ -30,6 +30,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 func TestNodeStageVolume(t *testing.T) {
@@ -417,37 +418,40 @@ func TestNodeGetVolumeStats(t *testing.T) {
 		expectedResp     *csi.NodeGetVolumeStatsResponse
 		expectedErr      error
 	}{
-		// 		{
-		// 			testCaseName: "Positive: Successful",
-		// 			req: &csi.NodeGetVolumeStatsRequest{
-		// 				VolumeId:   testVolumeID,
-		// 				VolumePath: testTargetPath,
-		// 			},
-		// 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
-		// 				FSInfoFn: func(path string) (int64, int64, int64, int64, int64, int64, error) {
-		// 					return 1, 1, 1, 1, 1, 1, nil
-		// 				},
-		// 				GetBucketUsageFn: func(volumeID string) (int64, resource.Quantity, error) {
-		// 					return 1, resource.Quantity{}, nil
-		// 				},
-		// 			}),
-		// 			expectedResp: &csi.NodeGetVolumeStatsResponse{
-		// 				Usage: []*csi.VolumeUsage{
-		// 					{
-		// 						Available: -1,
-		// 						Used:      1,
-		// 						Unit:      csi.VolumeUsage_BYTES,
-		// 					},
-		// 					{
-		// 						Available: 1,
-		// 						Total:     1,
-		// 						Used:      1,
-		// 						Unit:      csi.VolumeUsage_INODES,
-		// 					},
-		// 				},
-		// 			},
-		// 			expectedErr: nil,
-		// 		},
+		{
+			testCaseName: "Positive: Successful",
+			req: &csi.NodeGetVolumeStatsRequest{
+				VolumeId:   testVolumeID,
+				VolumePath: testTargetPath,
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				FSInfoFn: func(path string) (int64, int64, int64, int64, int64, int64, error) {
+					return 1, 1, 1, 1, 1, 1, nil
+				},
+				GetTotalCapacityFromPVFn: func(volumeID string) (resource.Quantity, error) {
+					return resource.Quantity{}, nil
+				},
+				GetBucketUsageFn: func(volumeID string) (int64, error) {
+					return 1, nil
+				},
+			}),
+			expectedResp: &csi.NodeGetVolumeStatsResponse{
+				Usage: []*csi.VolumeUsage{
+					{
+						Available: -1,
+						Used:      1,
+						Unit:      csi.VolumeUsage_BYTES,
+					},
+					{
+						Available: 1,
+						Total:     1,
+						Used:      1,
+						Unit:      csi.VolumeUsage_INODES,
+					},
+				},
+			},
+			expectedErr: nil,
+		},
 		{
 			testCaseName: "Negative: Volume ID is missing",
 			req:          &csi.NodeGetVolumeStatsRequest{},
@@ -481,23 +485,43 @@ func TestNodeGetVolumeStats(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
-		// 		{
-		// 			testCaseName: "Negative: Failed to get Bucket Usage",
-		// 			req: &csi.NodeGetVolumeStatsRequest{
-		// 				VolumeId:   testVolumeID,
-		// 				VolumePath: testTargetPath,
-		// 			},
-		// 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
-		// 				FSInfoFn: func(path string) (int64, int64, int64, int64, int64, int64, error) {
-		// 					return 1, 1, 1, 1, 1, 1, nil
-		// 				},
-		// 				GetBucketUsageFn: func(volumeID string) (int64, resource.Quantity, error) {
-		// 					return 0, resource.Quantity{}, errors.New("failed to get bucket usage")
-		// 				},
-		// 			}),
-		// 			expectedResp: nil,
-		// 			expectedErr:  errors.New("failed to get bucket usage"),
-		// 		},
+		{
+			testCaseName: "Negative: Failed to get total PV storage",
+			req: &csi.NodeGetVolumeStatsRequest{
+				VolumeId:   testVolumeID,
+				VolumePath: testTargetPath,
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				FSInfoFn: func(path string) (int64, int64, int64, int64, int64, int64, error) {
+					return 1, 1, 1, 1, 1, 1, nil
+				},
+				GetTotalCapacityFromPVFn: func(volumeID string) (resource.Quantity, error) {
+					return resource.Quantity{}, errors.New("failed to get pv")
+				},
+			}),
+			expectedResp: nil,
+			expectedErr:  errors.New("failed to get pv"),
+		},
+		{
+			testCaseName: "Negative: Failed to get Bucket Usage",
+			req: &csi.NodeGetVolumeStatsRequest{
+				VolumeId:   testVolumeID,
+				VolumePath: testTargetPath,
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				FSInfoFn: func(path string) (int64, int64, int64, int64, int64, int64, error) {
+					return 1, 1, 1, 1, 1, 1, nil
+				},
+				GetTotalCapacityFromPVFn: func(volumeID string) (resource.Quantity, error) {
+					return resource.Quantity{}, nil
+				},
+				GetBucketUsageFn: func(volumeID string) (int64, error) {
+					return 1, errors.New("failed to get bucket usage")
+				},
+			}),
+			expectedResp: nil,
+			expectedErr:  errors.New("failed to get bucket usage"),
+		},
 	}
 
 	for _, tc := range testCases {
