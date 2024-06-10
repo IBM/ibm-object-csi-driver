@@ -448,39 +448,39 @@ func TestNodeGetVolumeStats(t *testing.T) {
 		// 			},
 		// 			expectedErr: nil,
 		// 		},
-		// 		{
-		// 			testCaseName: "Negative: Volume ID is missing",
-		// 			req:          &csi.NodeGetVolumeStatsRequest{},
-		// 			expectedResp: nil,
-		// 			expectedErr:  errors.New("Volume ID missing in request"),
-		// 		},
-		// 		{
-		// 			testCaseName: "Negative: Volume path is missing",
-		// 			req: &csi.NodeGetVolumeStatsRequest{
-		// 				VolumeId: testVolumeID,
-		// 			},
-		// 			expectedResp: nil,
-		// 			expectedErr:  errors.New("Path Doesn't exist"),
-		// 		},
-		// 		{
-		// 			testCaseName: "Negative: Failed to getg volume stats",
-		// 			req: &csi.NodeGetVolumeStatsRequest{
-		// 				VolumeId:   testVolumeID,
-		// 				VolumePath: testTargetPath,
-		// 			},
-		// 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
-		// 				FSInfoFn: func(path string) (int64, int64, int64, int64, int64, int64, error) {
-		// 					return 0, 0, 0, 0, 0, 0, errors.New("transpoint endpoint is not connected")
-		// 				},
-		// 			}),
-		// 			expectedResp: &csi.NodeGetVolumeStatsResponse{
-		// 				VolumeCondition: &csi.VolumeCondition{
-		// 					Abnormal: true,
-		// 					Message:  "transpoint endpoint is not connected",
-		// 				},
-		// 			},
-		// 			expectedErr: nil,
-		// 		},
+		{
+			testCaseName: "Negative: Volume ID is missing",
+			req:          &csi.NodeGetVolumeStatsRequest{},
+			expectedResp: nil,
+			expectedErr:  errors.New("Volume ID missing in request"),
+		},
+		{
+			testCaseName: "Negative: Volume path is missing",
+			req: &csi.NodeGetVolumeStatsRequest{
+				VolumeId: testVolumeID,
+			},
+			expectedResp: nil,
+			expectedErr:  errors.New("Path Doesn't exist"),
+		},
+		{
+			testCaseName: "Negative: Failed to getg volume stats",
+			req: &csi.NodeGetVolumeStatsRequest{
+				VolumeId:   testVolumeID,
+				VolumePath: testTargetPath,
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				FSInfoFn: func(path string) (int64, int64, int64, int64, int64, int64, error) {
+					return 0, 0, 0, 0, 0, 0, errors.New("transpoint endpoint is not connected")
+				},
+			}),
+			expectedResp: &csi.NodeGetVolumeStatsResponse{
+				VolumeCondition: &csi.VolumeCondition{
+					Abnormal: true,
+					Message:  "transpoint endpoint is not connected",
+				},
+			},
+			expectedErr: nil,
+		},
 		// 		{
 		// 			testCaseName: "Negative: Failed to get Bucket Usage",
 		// 			req: &csi.NodeGetVolumeStatsRequest{
