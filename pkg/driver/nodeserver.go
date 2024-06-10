@@ -201,7 +201,12 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 		}, nil
 	}
 
-	capUsed, totalCap, err := ns.Stats.GetBucketUsage(volumeID)
+	totalCap, err := ns.Stats.GetTotalCapacityFromPV(volumeID)
+	if err != nil {
+		return nil, err
+	}
+
+	capUsed, err := ns.Stats.GetBucketUsage(volumeID)
 	if err != nil {
 		return nil, err
 	}
