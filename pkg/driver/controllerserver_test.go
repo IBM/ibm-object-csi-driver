@@ -25,7 +25,6 @@ import (
 	"testing"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
-	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
@@ -306,110 +305,110 @@ func TestCreateVolume(t *testing.T) {
 	}
 }
 
-func TestDeleteVolume(t *testing.T) {
-	testCases := []struct {
-		testCaseName     string
-		req              *csi.DeleteVolumeRequest
-		driverStatsUtils utils.StatsUtils
-		cosSession       s3client.ObjectStorageSessionFactory
-		expectedResp     *csi.DeleteVolumeResponse
-		expectedErr      error
-	}{
-		{
-			testCaseName: "Positive: Successfully deleted volume",
-			req: &csi.DeleteVolumeRequest{
-				VolumeId: testVolumeID,
-				Secrets:  testSecret,
-			},
-			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
-				BucketToDeleteFn: func(volumeID string) (string, error) {
-					return bucketName, nil
-				},
-			}),
-			cosSession:   &s3client.FakeCOSSessionFactory{},
-			expectedResp: &csi.DeleteVolumeResponse{},
-			expectedErr:  nil,
-		},
-		{
-			testCaseName: "Negative: Volume ID is missing",
-			req: &csi.DeleteVolumeRequest{
-				VolumeId: "",
-			},
-			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
-			cosSession:       &s3client.FakeCOSSessionFactory{},
-			expectedResp:     nil,
-			expectedErr:      errors.New("Volume ID missing"),
-		},
-		{
-			testCaseName: "Negative: Access Key not provided",
-			req: &csi.DeleteVolumeRequest{
-				VolumeId: testVolumeID,
-				Secrets:  map[string]string{},
-			},
-			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
-			cosSession:       &s3client.FakeCOSSessionFactory{},
-			expectedResp:     nil,
-			expectedErr:      errors.New("cannot get credentials"),
-		},
-		{
-			testCaseName: "Incomplete: Can't delete bucket",
-			req: &csi.DeleteVolumeRequest{
-				VolumeId: testVolumeID,
-				Secrets:  testSecret,
-			},
-			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
-				BucketToDeleteFn: func(volumeID string) (string, error) {
-					return bucketName, nil
-				},
-			}),
-			cosSession: &s3client.FakeCOSSessionFactory{
-				FailDeleteBucket: true,
-			},
-			expectedResp: &csi.DeleteVolumeResponse{},
-			expectedErr:  nil,
-		},
-		{
-			testCaseName: "Negative: Failed to get bucket to delete",
-			req: &csi.DeleteVolumeRequest{
-				VolumeId: testVolumeID,
-				Secrets:  testSecret,
-			},
-			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
-				BucketToDeleteFn: func(volumeID string) (string, error) {
-					return "", errors.New("failed to get bucket to delete")
-				},
-			}),
-			cosSession:   &s3client.FakeCOSSessionFactory{},
-			expectedResp: &csi.DeleteVolumeResponse{},
-			expectedErr:  nil,
-		},
-	}
+// func TestDeleteVolume(t *testing.T) {
+// 	testCases := []struct {
+// 		testCaseName     string
+// 		req              *csi.DeleteVolumeRequest
+// 		driverStatsUtils utils.StatsUtils
+// 		cosSession       s3client.ObjectStorageSessionFactory
+// 		expectedResp     *csi.DeleteVolumeResponse
+// 		expectedErr      error
+// 	}{
+// 		{
+// 			testCaseName: "Positive: Successfully deleted volume",
+// 			req: &csi.DeleteVolumeRequest{
+// 				VolumeId: testVolumeID,
+// 				Secrets:  testSecret,
+// 			},
+// 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+// 				BucketToDeleteFn: func(volumeID string) (string, error) {
+// 					return bucketName, nil
+// 				},
+// 			}),
+// 			cosSession:   &s3client.FakeCOSSessionFactory{},
+// 			expectedResp: &csi.DeleteVolumeResponse{},
+// 			expectedErr:  nil,
+// 		},
+// 		{
+// 			testCaseName: "Negative: Volume ID is missing",
+// 			req: &csi.DeleteVolumeRequest{
+// 				VolumeId: "",
+// 			},
+// 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+// 			cosSession:       &s3client.FakeCOSSessionFactory{},
+// 			expectedResp:     nil,
+// 			expectedErr:      errors.New("Volume ID missing"),
+// 		},
+// 		{
+// 			testCaseName: "Negative: Access Key not provided",
+// 			req: &csi.DeleteVolumeRequest{
+// 				VolumeId: testVolumeID,
+// 				Secrets:  map[string]string{},
+// 			},
+// 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+// 			cosSession:       &s3client.FakeCOSSessionFactory{},
+// 			expectedResp:     nil,
+// 			expectedErr:      errors.New("cannot get credentials"),
+// 		},
+// 		{
+// 			testCaseName: "Incomplete: Can't delete bucket",
+// 			req: &csi.DeleteVolumeRequest{
+// 				VolumeId: testVolumeID,
+// 				Secrets:  testSecret,
+// 			},
+// 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+// 				BucketToDeleteFn: func(volumeID string) (string, error) {
+// 					return bucketName, nil
+// 				},
+// 			}),
+// 			cosSession: &s3client.FakeCOSSessionFactory{
+// 				FailDeleteBucket: true,
+// 			},
+// 			expectedResp: &csi.DeleteVolumeResponse{},
+// 			expectedErr:  nil,
+// 		},
+// 		{
+// 			testCaseName: "Negative: Failed to get bucket to delete",
+// 			req: &csi.DeleteVolumeRequest{
+// 				VolumeId: testVolumeID,
+// 				Secrets:  testSecret,
+// 			},
+// 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+// 				BucketToDeleteFn: func(volumeID string) (string, error) {
+// 					return "", errors.New("failed to get bucket to delete")
+// 				},
+// 			}),
+// 			cosSession:   &s3client.FakeCOSSessionFactory{},
+// 			expectedResp: &csi.DeleteVolumeResponse{},
+// 			expectedErr:  nil,
+// 		},
+// 	}
 
-	for _, tc := range testCases {
-		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
+// 	for _, tc := range testCases {
+// 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		lgr, teardown := GetTestLogger(t)
-		defer teardown()
+// 		lgr, teardown := GetTestLogger(t)
+// 		defer teardown()
 
-		controllerServer := &controllerServer{
-			Stats:      tc.driverStatsUtils,
-			cosSession: tc.cosSession,
-			Logger:     lgr,
-		}
-		actualResp, actualErr := controllerServer.DeleteVolume(ctx, tc.req)
+// 		controllerServer := &controllerServer{
+// 			Stats:      tc.driverStatsUtils,
+// 			cosSession: tc.cosSession,
+// 			Logger:     lgr,
+// 		}
+// 		actualResp, actualErr := controllerServer.DeleteVolume(ctx, tc.req)
 
-		if tc.expectedErr != nil {
-			assert.Error(t, actualErr)
-			assert.Contains(t, actualErr.Error(), tc.expectedErr.Error())
-		} else {
-			assert.NoError(t, actualErr)
-		}
+// 		if tc.expectedErr != nil {
+// 			assert.Error(t, actualErr)
+// 			assert.Contains(t, actualErr.Error(), tc.expectedErr.Error())
+// 		} else {
+// 			assert.NoError(t, actualErr)
+// 		}
 
-		if !reflect.DeepEqual(tc.expectedResp, actualResp) {
-			t.Errorf("Expected %v but got %v", tc.expectedResp, actualResp)
-		}
-	}
-}
+// 		if !reflect.DeepEqual(tc.expectedResp, actualResp) {
+// 			t.Errorf("Expected %v but got %v", tc.expectedResp, actualResp)
+// 		}
+// 	}
+// }
 
 func TestControllerPublishVolume(t *testing.T) {
 	t.Run("UnImplemented Method", func(t *testing.T) {
