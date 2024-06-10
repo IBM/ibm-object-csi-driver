@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	rc "github.com/IBM/ibm-cos-sdk-go-config/v2/resourceconfigurationv1"
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -84,8 +85,10 @@ func (su *DriverStatsUtils) GetTotalCapacityFromPV(volumeID string) (resource.Qu
 }
 
 func (su *DriverStatsUtils) GetBucketUsage(volumeID string) (int64, error) {
-	rcOptions := &rc.ResourceConfigurationV1Options{}
-	resourceConfig, err := rc.NewResourceConfigurationV1(rcOptions)
+	rcOptions := &rc.ResourceConfigurationV1Options{
+		URL: constants.ResourceConfigEPPrivate,
+	}
+	resourceConfig, err := rc.NewResourceConfigurationV1UsingExternalConfig(rcOptions)
 	if err != nil {
 		klog.Error("Failed to create resource config")
 		return 0, err
