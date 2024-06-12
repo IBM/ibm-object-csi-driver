@@ -25,10 +25,11 @@ ALL_ARCH ?= amd64 ppc64le
 
 CORE_IMAGE_NAME ?= $(EXE_DRIVER_NAME)
 CORE_DRIVER_IMG ?= $(REGISTRY)/$(CORE_IMAGE_NAME)
+GOPACKAGES=$(shell go list ./... | grep -v ./tests/... | grep -v /cmd | grep -v /mounter/utils | grep -v /pkg/utils)
 
 .PHONY: test
 test:
-	go test -v -race `go list ./... | grep -v ./tests/...` -coverprofile=coverage.out 
+	go test -v -race ${GOPACKAGES} -coverprofile=coverage.out
 
 .PHONY: deps
 deps:
@@ -45,7 +46,7 @@ fmt: lint
 .PHONY: coverage
 coverage: test
 	cat coverage.out | grep -v /fake > cover.out;
-	# go tool cover -html=cover.out -o=cover.html 
+	# go tool cover -html=cover.out -o=cover.html
 	go tool cover -func=cover.out | fgrep total
 
 clean:
