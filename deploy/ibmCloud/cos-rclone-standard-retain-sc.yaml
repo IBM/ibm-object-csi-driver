@@ -2,7 +2,9 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: cos-s3-csi-rclone-sc
+  name: ibm-object-storage-standard-rclone-retain-sc
+  labels:
+    ibm.cos.storageclass/teir: standard
 provisioner: cos.s3.csi.ibm.io
 mountOptions:
     - "acl=private"
@@ -17,6 +19,8 @@ mountOptions:
 parameters:
   mounter: "rclone"
   client: "awss3"
+  cosEndpoint: "https://s3.direct.us-west.cloud-object-storage.appdomain.cloud"
+  locationConstraint: "us-west-standard"
   csi.storage.k8s.io/provisioner-secret-name: ${pvc.name}
   csi.storage.k8s.io/provisioner-secret-namespace: ${pvc.namespace}
   csi.storage.k8s.io/node-publish-secret-name: ${pvc.name}
