@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -85,8 +86,13 @@ func (su *DriverStatsUtils) GetTotalCapacityFromPV(volumeID string) (resource.Qu
 }
 
 func (su *DriverStatsUtils) GetBucketUsage(volumeID string) (int64, error) {
+	ep, err := getEPBasedOnCluserInfra()
+	if err != nil {
+		return 0, err
+	}
+
 	rcOptions := &rc.ResourceConfigurationV1Options{
-		URL: constants.ResourceConfigEPPrivate,
+		URL: ep,
 	}
 	resourceConfig, err := rc.NewResourceConfigurationV1UsingExternalConfig(rcOptions)
 	if err != nil {
@@ -241,6 +247,34 @@ func getSecret(pvcName, pvcNamespace string) (*v1.Secret, error) {
 	}
 
 	return secret, nil
+}
+
+func getEPBasedOnCluserInfra() (string, error) {
+	k8sClient, err := createK8sClient()
+	if err != nil {
+		return "", err
+	}
+
+	configMap, err := k8sClient.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "cluster-info", metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("error getting ConfigMap: %v", err)
+	}
+
+	clusterConfigStr := configMap.Data["cluster-config.json"]
+	klog.Info("Successfully fetched Cluster Config", clusterConfigStr)
+
+	var clusterConfig map[string]string
+	if err = json.Unmarshal([]byte(clusterConfigStr), &clusterConfig); err != nil {
+		return "", fmt.Errorf("error unmarshalling cluster config: %v", err)
+	}
+
+	clusterType := clusterConfig["cluster_type"]
+	klog.Info("Cluster Type", clusterType)
+
+	if strings.Contains(clusterType, "vpc") {
+		return constants.ResourceConfigEPDirect, nil
+	}
+	return constants.ResourceConfigEPPrivate, nil
 }
 
 func fetchSecretUsingPV(volumeID string) (*v1.Secret, error) {
