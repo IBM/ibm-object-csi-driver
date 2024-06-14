@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/IBM/go-sdk-core/v5/core"
 	rc "github.com/IBM/ibm-cos-sdk-go-config/v2/resourceconfigurationv1"
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -91,21 +92,27 @@ func (su *DriverStatsUtils) GetBucketUsage(volumeID string) (int64, error) {
 		return 0, err
 	}
 
-	rcOptions := &rc.ResourceConfigurationV1Options{
-		URL: ep,
-	}
-	resourceConfig, err := rc.NewResourceConfigurationV1UsingExternalConfig(rcOptions)
-	if err != nil {
-		klog.Error("Failed to create resource config")
-		return 0, err
-	}
-
 	secret, err := fetchSecretUsingPV(volumeID)
 	if err != nil {
 		return 0, err
 	}
 
+	apiKey := string(secret.Data["apiKey"])
 	bucketName := string(secret.Data["bucketName"])
+
+	rcOptions := &rc.ResourceConfigurationV1Options{
+		URL: ep,
+		Authenticator: &core.IamAuthenticator{
+			ApiKey: apiKey, // pragma: allowlist secret
+			URL:    constants.IAMEP,
+		},
+	}
+	resourceConfig, err := rc.NewResourceConfigurationV1(rcOptions)
+	if err != nil {
+		klog.Error("Failed to create resource config")
+		return 0, err
+	}
+
 	bucketOptions := &rc.GetBucketConfigOptions{
 		Bucket: &bucketName,
 	}
@@ -261,7 +268,7 @@ func getEPBasedOnCluserInfra() (string, error) {
 	}
 
 	clusterConfigStr := configMap.Data["cluster-config.json"]
-	klog.Info("Successfully fetched Cluster Config", clusterConfigStr)
+	klog.Info("Successfully fetched Cluster Config ", clusterConfigStr)
 
 	var clusterConfig map[string]string
 	if err = json.Unmarshal([]byte(clusterConfigStr), &clusterConfig); err != nil {
@@ -269,7 +276,7 @@ func getEPBasedOnCluserInfra() (string, error) {
 	}
 
 	clusterType := clusterConfig["cluster_type"]
-	klog.Info("Cluster Type", clusterType)
+	klog.Info("Cluster Type ", clusterType)
 
 	if strings.Contains(clusterType, "vpc") {
 		return constants.ResourceConfigEPDirect, nil
