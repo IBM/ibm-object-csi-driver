@@ -58,8 +58,8 @@ func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounte
 		check     bool
 		accessKey string
 		secretKey string
-		apiKey    string
-		mounter   *RcloneMounter
+		// apiKey    string
+		mounter *RcloneMounter
 	)
 
 	mounter = &RcloneMounter{}
@@ -85,16 +85,21 @@ func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounte
 	if val, check = secretMap["kpRootKeyCRN"]; check {
 		mounter.KpRootKeyCrn = val
 	}
-	if val, check = secretMap["apiKey"]; check {
-		apiKey = val
-	}
-	if apiKey != "" {
-		mounter.AccessKeys = fmt.Sprintf(":%s", apiKey)
-		mounter.AuthType = "iam"
-	} else {
-		mounter.AccessKeys = fmt.Sprintf("%s:%s", accessKey, secretKey)
-		mounter.AuthType = "hmac"
-	}
+
+	// Since IAM support for rClone is not there and api key is required param now, commented below piece of code
+	// Uncommnet when IAM support for rClone is available
+
+	// if val, check = secretMap["apiKey"]; check {
+	// 	apiKey = val
+	// }
+
+	// if apiKey != "" {
+	// 	mounter.AccessKeys = fmt.Sprintf(":%s", apiKey)
+	// 	mounter.AuthType = "iam"
+	// } else {
+	mounter.AccessKeys = fmt.Sprintf("%s:%s", accessKey, secretKey)
+	mounter.AuthType = "hmac"
+	// }
 
 	if val, check = secretMap["gid"]; check {
 		mounter.GID = val
