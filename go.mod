@@ -3,6 +3,7 @@ module github.com/IBM/ibm-object-csi-driver
 go 1.22.3
 
 require (
+	github.com/IBM/go-sdk-core/v5 v5.17.0
 	github.com/IBM/ibm-cos-sdk-go v1.10.3
 	github.com/IBM/ibm-cos-sdk-go-config/v2 v2.0.6
 	github.com/IBM/ibm-csi-common v1.1.13
@@ -29,7 +30,6 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.0.0 // indirect
-	github.com/IBM/go-sdk-core/v5 v5.17.0 // indirect
 	github.com/IBM/secret-utils-lib v1.1.8 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230305170008-8188dc5388df // indirect
