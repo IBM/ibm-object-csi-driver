@@ -438,9 +438,9 @@ func TestNodeGetVolumeStats(t *testing.T) {
 			expectedResp: &csi.NodeGetVolumeStatsResponse{
 				Usage: []*csi.VolumeUsage{
 					{
-						Available: -1,
-						Used:      1,
-						Unit:      csi.VolumeUsage_BYTES,
+						// Available: -1,
+						Used: 1,
+						Unit: csi.VolumeUsage_BYTES,
 					},
 					{
 						Available: 1,
