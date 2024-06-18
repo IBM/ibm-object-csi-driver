@@ -217,15 +217,16 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 		return nil, err
 	}
 
-	capAvailable := capAsInt64 - capUsed
+	// Since `capAvailable` can be negative and K8s will roundoff from int64 to uint64 resulting in misleading value
+	// capAvailable := capAsInt64 - capUsed
 
 	resp := &csi.NodeGetVolumeStatsResponse{
 		Usage: []*csi.VolumeUsage{
 			{
-				Available: capAvailable,
-				Total:     capAsInt64,
-				Used:      capUsed,
-				Unit:      csi.VolumeUsage_BYTES,
+				// Available: capAvailable,
+				Total: capAsInt64,
+				Used:  capUsed,
+				Unit:  csi.VolumeUsage_BYTES,
 			},
 			{
 				Available: inodesFree,
