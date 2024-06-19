@@ -2,14 +2,28 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: cos-s3-csi-controller
-  namespace: kube-system
+  name: ibm-object-csi-controller
+  namespace: ibm-object-csi-driver
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ibm-object-csi-controller-allow-anyuid
+  namespace: ibm-object-csi-driver
+subjects:
+  - kind: ServiceAccount
+    name: ibm-object-csi-controller
+    namespace: ibm-object-csi-driver
+roleRef:
+  kind: ClusterRole
+  name: system:openshift:scc:anyuid
+  apiGroup: rbac.authorization.k8s.io
 ---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: cos-s3-csi-controller-role
-  namespace: kube-system
+  name: ibm-object-csi-controller-role
+  namespace: ibm-object-csi-driver
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
@@ -39,35 +53,52 @@ rules:
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: cos-s3-csi-controller-rolebind
-  namespace: kube-system
+  name: ibm-object-csi-controller-rolebind
+  namespace: ibm-object-csi-driver
 subjects:
   - kind: ServiceAccount
-    name: cos-s3-csi-controller
-    namespace: kube-system
+    name: ibm-object-csi-controller
+    namespace: ibm-object-csi-driver
 roleRef:
   kind: ClusterRole
-  name: cos-s3-csi-controller-role
+  name: ibm-object-csi-controller-role
   apiGroup: rbac.authorization.k8s.io
 ---
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: cos-s3-csi-controller
-  namespace: kube-system
+  name: ibm-object-csi-controller
+  namespace: ibm-object-csi-driver
+  labels:
+    app.kubernetes.io/component: cos-csi-controller
 spec:
+  progressDeadlineSeconds: 600
   replicas: 1
+  revisionHistoryLimit: 10
   selector:
     matchLabels:
-      app: cos-s3-csi-controller
+      app.kubernetes.io/component: cos-csi-controller
   template:
     metadata:
       labels:
-        app: cos-s3-csi-controller
+        app.kubernetes.io/component: cos-csi-controller
     spec:
-      serviceAccountName: cos-s3-csi-controller
+      serviceAccount: ibm-object-csi-controller
+      serviceAccountName: ibm-object-csi-controller
+      hostNetwork: false
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 2121
       containers:
         - name: csi-provisioner
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
           image: csi-provisioner-image
           args:
             - "--csi-address=$(ADDRESS)"
@@ -81,7 +112,13 @@ spec:
             - mountPath: /csi
               name: socket-dir
         - name: cos-csi-provisioner
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
           image: cos-driver-image
+          imagePullPolicy: "Always"
           args:
             - "--servermode=controller"
             - "--endpoint=$(CSI_ENDPOINT)"
@@ -95,7 +132,6 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-          imagePullPolicy: "Always"
           volumeMounts:
             - mountPath: /csi
               name: socket-dir
@@ -110,7 +146,5 @@ spec:
             - name: socket-dir
               mountPath: /csi
       volumes:
-        - hostPath:
-            path: /var/lib/kubelet/csi-plugins/cos.s3.csi.ibm.io
-            type: DirectoryOrCreate
+        - emptyDir: {}
           name: socket-dir

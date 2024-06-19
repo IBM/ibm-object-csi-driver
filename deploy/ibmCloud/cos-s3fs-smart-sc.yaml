@@ -2,9 +2,9 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: ibm-object-storage-smart-s3fs-sc
+  name: ibm-object-storage-smart-s3fs
   labels:
-    ibm.cos.storageclass/teir: smart
+    ibm.cos.storageclass/tier: smart
 provisioner: cos.s3.csi.ibm.io
 mountOptions:
     - "multipart_size=62"

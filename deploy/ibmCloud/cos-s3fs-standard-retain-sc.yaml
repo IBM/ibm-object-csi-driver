@@ -2,9 +2,9 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: ibm-object-storage-standard-s3fs-retain-sc
+  name: ibm-object-storage-standard-s3fs-retain
   labels:
-    ibm.cos.storageclass/teir: standard
+    ibm.cos.storageclass/tier: standard
 provisioner: cos.s3.csi.ibm.io
 mountOptions:
     - "multipart_size=62"
