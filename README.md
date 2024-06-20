@@ -31,11 +31,25 @@ An image named `ibm-object-csi-driver:latest` is created. Please retag and push 
 
 # Deploy CSI driver on your cluster
 
-Update images if required in `deploy/ibmCloud/kustomization.yaml` file. 
 
 Deploy the resources
 
 ## For IBM Managed clusters 
+
+Review `deploy/ibmCloud/kustomization.yaml` file.
+
+Update images if required
+```
+- name: cos-driver-image
+  newName: icr.io/ibm/ibm-object-csi-driver
+  newTag: v1.0.1
+```
+
+Update IBM COS endpoint and locationconstraint as per the region of your cluster
+```
+value: "https://s3.direct.au-syd.cloud-object-storage.appdomain.cloud"
+value: "au-syd-standard"
+```
 
 `kubectl apply -k deploy/ibmCloud/`
 
@@ -44,6 +58,18 @@ To clean up the deployment
 
 `kubectl delete -k deploy/ibmCloud/`
 
+After deployment following storage classes will be available in the cluster 
+```
+NAME                                          PROVISIONER            RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+ibm-object-storage-smart-rclone               cos.s3.csi.ibm.io      Delete          Immediate              false
+ibm-object-storage-smart-rclone-retain        cos.s3.csi.ibm.io      Retain          Immediate              false
+ibm-object-storage-smart-s3fs                 cos.s3.csi.ibm.io      Delete          Immediate              false
+ibm-object-storage-smart-s3fs-retain          cos.s3.csi.ibm.io      Retain          Immediate              false
+ibm-object-storage-standard-rclone            cos.s3.csi.ibm.io      Delete          Immediate              false
+ibm-object-storage-standard-rclone-retain     cos.s3.csi.ibm.io      Retain          Immediate              false
+ibm-object-storage-standard-s3fs              cos.s3.csi.ibm.io      Delete          Immediate              false
+ibm-object-storage-standard-s3fs-retain       cos.s3.csi.ibm.io      Retain          Immediate              false
+```
 
 
 ## For unmanaged clusters
