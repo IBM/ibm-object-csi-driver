@@ -80,11 +80,20 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
 	}
+
 	endPoint = secretMap["cosEndpoint"]
+	locationConstraint = secretMap["locationConstraint"]
+
+	if endPoint == "" {
+		endPoint = params["cosEndpoint"]
+	}
+	if locationConstraint == "" {
+		locationConstraint = params["locationConstraint"]
+	}
+
 	if endPoint == "" {
 		return nil, status.Error(codes.InvalidArgument, "cosEndpoint unknown")
 	}
-	locationConstraint = secretMap["locationConstraint"]
 	if locationConstraint == "" {
 		return nil, status.Error(codes.InvalidArgument, "locationConstraint unknown")
 	}

@@ -48,7 +48,7 @@ func (s *CSIMounterFactory) NewMounter(attrib map[string]string, secretMap map[s
 	case constants.RClone:
 		return NewRcloneMounter(secretMap, mountFlags, mounterUtils)
 	default:
-		// default to s3backer
+		// default to s3fs
 		return NewS3fsMounter(secretMap, mountFlags, mounterUtils)
 	}
 }
