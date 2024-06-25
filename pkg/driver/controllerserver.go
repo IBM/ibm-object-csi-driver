@@ -298,23 +298,16 @@ func getCredentials(secretMap map[string]string) (*s3client.ObjectStorageCredent
 		apiKey = val
 	}
 
-	if apiKey == "" {
-		authType = "hmac"
+	// Add In Docs APIKEY is require param in secret
+	authType = "iam"
+	serviceInstanceID = secretMap["serviceId"]
+	if serviceInstanceID == "" {
 		accessKey = secretMap["accessKey"]
-		if accessKey == "" {
-			return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| accessKey unknown")
-		}
-
 		secretKey = secretMap["secretKey"]
-		if secretKey == "" {
-			return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| secretKey unknown")
+		if accessKey == "" || secretKey == "" {
+			return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| serviceId/accessKey/secretKey unknown")
 		}
-	} else {
-		authType = "iam"
-		serviceInstanceID = secretMap["serviceId"]
-		if serviceInstanceID == "" {
-			return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| serviceId  unknown")
-		}
+		authType = "hmac"
 	}
 
 	return &s3client.ObjectStorageCredentials{

@@ -428,16 +428,19 @@ func TestNodeGetVolumeStats(t *testing.T) {
 				FSInfoFn: func(path string) (int64, int64, int64, int64, int64, int64, error) {
 					return 1, 1, 1, 1, 1, 1, nil
 				},
-				GetBucketUsageFn: func(volumeID string) (int64, resource.Quantity, error) {
-					return 1, resource.Quantity{}, nil
+				GetTotalCapacityFromPVFn: func(volumeID string) (resource.Quantity, error) {
+					return resource.Quantity{}, nil
+				},
+				GetBucketUsageFn: func(volumeID string) (int64, error) {
+					return 1, nil
 				},
 			}),
 			expectedResp: &csi.NodeGetVolumeStatsResponse{
 				Usage: []*csi.VolumeUsage{
 					{
-						Available: -1,
-						Used:      1,
-						Unit:      csi.VolumeUsage_BYTES,
+						// Available: -1,
+						Used: 1,
+						Unit: csi.VolumeUsage_BYTES,
 					},
 					{
 						Available: 1,
@@ -483,6 +486,23 @@ func TestNodeGetVolumeStats(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
+			testCaseName: "Negative: Failed to get total PV storage",
+			req: &csi.NodeGetVolumeStatsRequest{
+				VolumeId:   testVolumeID,
+				VolumePath: testTargetPath,
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				FSInfoFn: func(path string) (int64, int64, int64, int64, int64, int64, error) {
+					return 1, 1, 1, 1, 1, 1, nil
+				},
+				GetTotalCapacityFromPVFn: func(volumeID string) (resource.Quantity, error) {
+					return resource.Quantity{}, errors.New("failed to get pv")
+				},
+			}),
+			expectedResp: nil,
+			expectedErr:  errors.New("failed to get pv"),
+		},
+		{
 			testCaseName: "Negative: Failed to get Bucket Usage",
 			req: &csi.NodeGetVolumeStatsRequest{
 				VolumeId:   testVolumeID,
@@ -492,8 +512,11 @@ func TestNodeGetVolumeStats(t *testing.T) {
 				FSInfoFn: func(path string) (int64, int64, int64, int64, int64, int64, error) {
 					return 1, 1, 1, 1, 1, 1, nil
 				},
-				GetBucketUsageFn: func(volumeID string) (int64, resource.Quantity, error) {
-					return 0, resource.Quantity{}, errors.New("failed to get bucket usage")
+				GetTotalCapacityFromPVFn: func(volumeID string) (resource.Quantity, error) {
+					return resource.Quantity{}, nil
+				},
+				GetBucketUsageFn: func(volumeID string) (int64, error) {
+					return 1, errors.New("failed to get bucket usage")
 				},
 			}),
 			expectedResp: nil,
