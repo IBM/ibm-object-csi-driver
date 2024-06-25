@@ -10,4 +10,8 @@ const (
 
 	S3FS   = "s3fs"
 	RClone = "rclone"
+
+	IAMEP                   = "https://private.iam.cloud.ibm.com/identity/token"
+	ResourceConfigEPPrivate = "https://config.private.cloud-object-storage.cloud.ibm.com/v1"
+	ResourceConfigEPDirect  = "https://config.direct.cloud-object-storage.cloud.ibm.com/v1"
 )

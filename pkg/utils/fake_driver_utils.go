@@ -1,15 +1,14 @@
 package utils
 
-import (
-	"k8s.io/apimachinery/pkg/api/resource"
-)
+import "k8s.io/apimachinery/pkg/api/resource"
 
 type FakeStatsUtilsFuncStruct struct {
-	FSInfoFn              func(path string) (int64, int64, int64, int64, int64, int64, error)
-	CheckMountFn          func(targetPath string) error
-	BucketToDeleteFn      func(volumeID string) (string, error)
-	GetBucketUsageFn      func(volumeID string) (int64, resource.Quantity, error)
-	GetBucketNameFromPVFn func(volumeID string) (string, error)
+	FSInfoFn                 func(path string) (int64, int64, int64, int64, int64, int64, error)
+	CheckMountFn             func(targetPath string) error
+	BucketToDeleteFn         func(volumeID string) (string, error)
+	GetTotalCapacityFromPVFn func(volumeID string) (resource.Quantity, error)
+	GetBucketUsageFn         func(volumeID string) (int64, error)
+	GetBucketNameFromPVFn    func(volumeID string) (string, error)
 }
 
 type FakeStatsUtilsFuncStructImpl struct {
@@ -45,7 +44,14 @@ func (m *FakeStatsUtilsFuncStructImpl) BucketToDelete(volumeID string) (string, 
 	panic("requested method should not be nil")
 }
 
-func (m *FakeStatsUtilsFuncStructImpl) GetBucketUsage(volumeID string) (int64, resource.Quantity, error) {
+func (m *FakeStatsUtilsFuncStructImpl) GetTotalCapacityFromPV(volumeID string) (resource.Quantity, error) {
+	if m.FuncStruct.GetTotalCapacityFromPVFn != nil {
+		return m.FuncStruct.GetTotalCapacityFromPVFn(volumeID)
+	}
+	panic("requested method should not be nil")
+}
+
+func (m *FakeStatsUtilsFuncStructImpl) GetBucketUsage(volumeID string) (int64, error) {
 	if m.FuncStruct.GetBucketUsageFn != nil {
 		return m.FuncStruct.GetBucketUsageFn(volumeID)
 	}

@@ -1,10 +1,16 @@
 resources:
+- cos-s3-csi-driver-ns.yaml
 - cos-s3-csi-controller.yaml 
 - cos-s3-csi-driver.yaml
-- cos-s3-csi-sc.yaml
-- cos-s3-csi-rclone-sc.yaml
-- cos-s3-csi-s3fs-sc.yaml
 - cos-s3-csidriver.yaml
+- cos-rclone-smart-sc.yaml
+- cos-rclone-smart-retain-sc.yaml
+- cos-rclone-standard-sc.yaml
+- cos-rclone-standard-retain-sc.yaml
+- cos-s3fs-smart-sc.yaml
+- cos-s3fs-smart-retain-sc.yaml
+- cos-s3fs-standard-sc.yaml
+- cos-s3fs-standard-retain-sc.yaml
 images:
 - name: csi-attacher-image
   newName: k8s.gcr.io/sig-storage/csi-attacher
@@ -24,3 +30,24 @@ images:
 commonLabels:
   app.kubernetes.io/part-of: ibm-object-csi-driver
   app.kubernetes.io/managed-by: kustomize
+patches:
+  - target:
+      kind: StorageClass
+      labelSelector: ibm.cos.storageclass/tier=standard
+    patch: |-
+      - op: replace
+        path: /parameters/cosEndpoint
+        value: "https://s3.direct.au-syd.cloud-object-storage.appdomain.cloud"
+      - op: replace
+        path: /parameters/locationConstraint
+        value: "au-syd-standard"
+  - target:
+      kind: StorageClass
+      labelSelector:  ibm.cos.storageclass/tier=smart
+    patch: |-
+      - op: replace
+        path: /parameters/cosEndpoint
+        value: "https://s3.direct.au-syd.cloud-object-storage.appdomain.cloud"
+      - op: replace
+        path: /parameters/locationConstraint
+        value: "au-syd-smart"

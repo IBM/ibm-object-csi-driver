@@ -26,10 +26,10 @@ import (
 )
 
 type NodeVolStats struct {
-	setTime      time.Time
-	capAvailable int64
-	capTotal     int64
-	capUsed      int64
+	setTime time.Time
+	// capAvailable int64
+	capTotal int64
+	capUsed  int64
 }
 
 // Implements Node Server csi.NodeServer
@@ -212,7 +212,7 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 
 	timeSetInMap := ns.VolumeIDAndTimeMap[volumeID].setTime
 	if timeSetInMap.Second() == 0 || time.Since(timeSetInMap).Minutes() >= constants.TimeDelayInMin {
-		capUsed, totalCap, err := ns.Stats.GetBucketUsage(volumeID)
+		totalCap, err := ns.Stats.GetTotalCapacityFromPV(volumeID)
 		if err != nil {
 			return nil, err
 		}
@@ -223,23 +223,29 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 		}
 		klog.Info("NodeGetVolumeStats: Total Capacity of Volume: ", capAsInt64)
 
-		capAvailable := capAsInt64 - capUsed
+		capUsed, err := ns.Stats.GetBucketUsage(volumeID)
+		if err != nil {
+			return nil, err
+		}
+
+		// Since `capAvailable` can be negative and K8s will roundoff from int64 to uint64 resulting in misleading value
+		// capAvailable := capAsInt64 - capUsed
 
 		ns.VolumeIDAndTimeMap[volumeID] = NodeVolStats{
-			setTime:      time.Now(),
-			capAvailable: capAvailable,
-			capTotal:     capAsInt64,
-			capUsed:      capUsed,
+			setTime: time.Now(),
+			// capAvailable: capAvailable,
+			capTotal: capAsInt64,
+			capUsed:  capUsed,
 		}
 	}
 
 	resp := &csi.NodeGetVolumeStatsResponse{
 		Usage: []*csi.VolumeUsage{
 			{
-				Available: ns.VolumeIDAndTimeMap[volumeID].capAvailable,
-				Total:     ns.VolumeIDAndTimeMap[volumeID].capTotal,
-				Used:      ns.VolumeIDAndTimeMap[volumeID].capUsed,
-				Unit:      csi.VolumeUsage_BYTES,
+				// Available: ns.VolumeIDAndTimeMap[volumeID].capAvailable,
+				Total: ns.VolumeIDAndTimeMap[volumeID].capTotal,
+				Used:  ns.VolumeIDAndTimeMap[volumeID].capUsed,
+				Unit:  csi.VolumeUsage_BYTES,
 			},
 			{
 				Available: inodesFree,

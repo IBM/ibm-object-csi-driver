@@ -2,7 +2,9 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: cos-s3-csi-s3fs-sc
+  name: ibm-object-storage-standard-s3fs
+  labels:
+    ibm.cos.storageclass/tier: standard
 provisioner: cos.s3.csi.ibm.io
 mountOptions:
     - "multipart_size=62"
@@ -14,8 +16,10 @@ mountOptions:
 parameters:
   mounter: "s3fs"
   client: "awss3"
+  cosEndpoint: "https://s3.direct.us-west.cloud-object-storage.appdomain.cloud"
+  locationConstraint: "us-west-standard"
   csi.storage.k8s.io/provisioner-secret-name: ${pvc.name}
   csi.storage.k8s.io/provisioner-secret-namespace: ${pvc.namespace}
   csi.storage.k8s.io/node-publish-secret-name: ${pvc.name}
   csi.storage.k8s.io/node-publish-secret-namespace: ${pvc.namespace}
-reclaimPolicy: Retain
+reclaimPolicy: Delete
