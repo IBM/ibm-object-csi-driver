@@ -12,6 +12,14 @@ export accessKey=xxx
 export secretKey=yyy
 ```
 
+## Create StorageClass
+
+```
+kubectl create -f tests/e2e/sc
+```
+
+Above steps need to be updated as per new SC added
+
 ## Run E2E
 ```
 ginkgo -v -nodes=1 ./tests/e2e -- -e2e-verify-service-account=false
