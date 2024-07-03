@@ -42,8 +42,8 @@ var rcloneBucketName = os.Getenv("rcloneBucketName")
 
 const (
 	driverName   = "cos-s3-csi-driver"
-	s3fsscName       = "ibm-object-storage-s3fs"
-	rclonescName = "ibm-object-storage-rclone"
+	s3fsscName       = "ibm-object-storage-smart-s3fs"
+	rclonescName = "ibm-object-storage-smart-rclone"
 )
 
 var _ = Describe("rclone", func() {
