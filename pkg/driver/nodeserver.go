@@ -120,6 +120,18 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		secretMap["gid"] = volumeMountGroup
 	}
 
+	if len(secretMap["cosEndpoint"]) == 0 {
+		secretMap["cosEndpoint"] = attrib["cosEndpoint"]
+	}
+
+	if len(secretMap["locationConstraint"]) == 0 {
+		secretMap["locationConstraint"] = attrib["locationConstraint"]
+	}
+
+	if len(secretMap["cosEndpoint"]) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "S3 Service endpoint not provided")
+	}
+
 	// If bucket name wasn't provided by user, we use temp bucket created for volume.
 	if secretMap["bucketName"] == "" {
 		tempBucketName, err := ns.Stats.GetBucketNameFromPV(volumeID)
