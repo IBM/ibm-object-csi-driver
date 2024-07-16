@@ -42,7 +42,7 @@ var rcloneBucketName = os.Getenv("rcloneBucketName")
 
 const (
 	driverName   = "cos-s3-csi-driver"
-	s3fsscName       = "ibm-object-storage-smart-s3fs"
+	s3fsscName   = "ibm-object-storage-smart-s3fs"
 	rclonescName = "ibm-object-storage-smart-rclone"
 )
 
