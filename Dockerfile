@@ -1,7 +1,40 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.6-941 as s3fs-builder
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.6-941 as mountpoint-builder
 
 ARG   RHSM_PASS=blank
 ARG   RHSM_USER=blank
+
+ENV   RHSM_PASS "${RHSM_PASS}"
+ENV   RHSM_USER "${RHSM_USER}"
+
+ADD   register-sys.sh /usr/bin/
+RUN   microdnf update --setopt=tsflags=nodocs && \
+      microdnf install -y --nodocs hostname subscription-manager
+RUN   hostname; chmod 755 /usr/bin/register-sys.sh &&  /usr/bin/register-sys.sh
+# Install build tools
+RUN microdnf update --setopt=tsflags=nodocs && \
+      microdnf install -y --nodocs \
+        fuse \
+        fuse-devel \
+        cmake3 \
+        clang \
+        git \
+        pkgconf && \
+    microdnf clean all
+
+# Install rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+    source "$HOME/.cargo/env"
+
+# Build mountpoint-s3
+RUN git clone --recurse-submodules https://github.com/awslabs/mountpoint-s3.git && \
+    source "$HOME/.cargo/env" && \
+    cd mountpoint-s3 && \
+    cargo build --release
+
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.6-941 as s3fs-builder
+
+ARG   RHSM_PASS="alexander.minbaev@ibm.com"
+ARG   RHSM_USER="bonbon14011401!!"
 
 ENV   RHSM_PASS "${RHSM_PASS}"
 ENV   RHSM_USER "${RHSM_USER}"
@@ -35,9 +68,9 @@ ENV GO_VERSION=1.19
 RUN echo $ARCH $GO_VERSION
 
 RUN wget -q https://dl.google.com/go/go$GO_VERSION.linux-$ARCH.tar.gz && \
-  tar -xf go$GO_VERSION.linux-$ARCH.tar.gz && \
-  rm go$GO_VERSION.linux-$ARCH.tar.gz && \
-  mv go /usr/local
+tar -xf go$GO_VERSION.linux-$ARCH.tar.gz && \
+rm go$GO_VERSION.linux-$ARCH.tar.gz && \
+mv go /usr/local
 
 ENV GOROOT /usr/local/go
 ENV GOPATH /go
@@ -61,6 +94,7 @@ LABEL description="IBM CSI Object Storage Plugin"
 LABEL build-date=${build_date}
 LABEL git-commit-id=${git_commit_id}
 RUN yum update -y && yum install fuse fuse-libs fuse3 fuse3-libs -y
+COPY --from=mountpoint-builder /mountpoint-s3/target/release/mount-s3 /usr/bin/mount-s3
 COPY --from=s3fs-builder /usr/local/bin/s3fs /usr/bin/s3fs
 COPY --from=rclone-builder /usr/local/bin/rclone /usr/bin/rclone
 COPY ibm-object-csi-driver ibm-object-csi-driver
