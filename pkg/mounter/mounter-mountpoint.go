@@ -23,53 +23,48 @@ import (
 )
 
 // Mounter interface defined in mounter.go
-// mntS3Mounter Implements Mounter
-type mntS3Mounter struct {
-	bucketName    string //From Secret in SC
-	objPath       string //From Secret in SC
-	endPoint      string //From Secret in SC
-	locConstraint string //From Secret in SC
-	authType      string
-	accessKey     string
-	secretKey     string
-	mountOptions  []string
-	MounterUtils  utils.MounterUtils
+// MountpointMounter Implements Mounter
+type MountpointMounter struct {
+	BucketName   string //From Secret in SC
+	ObjPath      string //From Secret in SC
+	EndPoint     string //From Secret in SC
+	AccessKey    string
+	SecretKey    string
+	MountOptions []string
+	MounterUtils utils.MounterUtils
 }
 
-func NewMntS3Mounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
-	klog.Info("-newMntS3Mounter-")
+func NewMountpointMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
+	klog.Info("-newMountpointMounter-")
 
 	var (
 		val     string
 		check   bool
-		mounter *mntS3Mounter
+		mounter *MountpointMounter
 	)
 
-	mounter = &mntS3Mounter{}
+	mounter = &MountpointMounter{}
 
 	if val, check = secretMap["cosEndpoint"]; check {
-		mounter.endPoint = val
-	}
-	if val, check = secretMap["locationConstraint"]; check {
-		mounter.locConstraint = val
+		mounter.EndPoint = val
 	}
 	if val, check = secretMap["bucketName"]; check {
-		mounter.bucketName = val
+		mounter.BucketName = val
 	}
 	if val, check = secretMap["objPath"]; check {
-		mounter.objPath = val
+		mounter.ObjPath = val
 	}
 	if val, check = secretMap["accessKey"]; check {
-		mounter.accessKey = val
+		mounter.AccessKey = val
 	}
 	if val, check = secretMap["secretKey"]; check {
-		mounter.secretKey = val
+		mounter.SecretKey = val
 	}
 
-	klog.Infof("newMntS3Mounter args:\n\tbucketName: [%s]\n\tobjPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
-		mounter.bucketName, mounter.objPath, mounter.endPoint, mounter.locConstraint, mounter.authType)
+	klog.Infof("newMntS3Mounter args:\n\tbucketName: [%s]\n\tobjPath: [%s]\n\tendPoint: [%s]",
+		mounter.BucketName, mounter.ObjPath, mounter.EndPoint)
 
-	mounter.mountOptions = mountOptions
+	mounter.MountOptions = mountOptions
 	mounter.MounterUtils = mounterUtils
 
 	return mounter
@@ -80,48 +75,48 @@ const (
 	metaRootMntS3 = "/var/lib/ibmc-mntS3"
 )
 
-func (mntS3 *mntS3Mounter) Stage(stagePath string) error {
+func (mntS3 *MountpointMounter) Stage(stagePath string) error {
 	return nil
 }
-func (mntS3 *mntS3Mounter) Unstage(stagePath string) error {
+func (mntS3 *MountpointMounter) Unstage(stagePath string) error {
 	return nil
 }
-func (mntS3 *mntS3Mounter) Mount(source string, target string) error {
-	klog.Info("-MntS3Mounter Mount-")
+func (mntS3 *MountpointMounter) Mount(source string, target string) error {
+	klog.Info("-MountpointMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
 	var pathExist bool
 	var err error
 	metaPath := path.Join(metaRootMntS3, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 
 	if pathExist, err = checkPath(metaPath); err != nil {
-		klog.Errorf("MntS3Mounter Mount: Cannot stat directory %s: %v", metaPath, err)
+		klog.Errorf("MountpointMounter Mount: Cannot stat directory %s: %v", metaPath, err)
 		return err
 	}
 
 	if !pathExist {
-		if err = os.MkdirAll(metaPath, 0755); // #nosec G301: used for mntS3
+		if err = mkdirAll(metaPath, 0755); // #nosec G301: used for mntS3
 		err != nil {
-			klog.Errorf("MntS3Mounter Mount: Cannot create directory %s: %v", metaPath, err)
+			klog.Errorf("MountpointMounter Mount: Cannot create directory %s: %v", metaPath, err)
 			return err
 		}
 	}
 
-	os.Setenv("AWS_ACCESS_KEY_ID", mntS3.accessKey)
-	os.Setenv("AWS_SECRET_ACCESS_KEY", mntS3.secretKey)
+	os.Setenv("AWS_ACCESS_KEY_ID", mntS3.AccessKey)
+	os.Setenv("AWS_SECRET_ACCESS_KEY", mntS3.SecretKey)
 
 	args := []string{
-		fmt.Sprintf("--endpoint-url=%v", mntS3.endPoint),
-		mntS3.bucketName,
+		fmt.Sprintf("--endpoint-url=%v", mntS3.EndPoint),
+		mntS3.BucketName,
 		target,
 	}
 
-	if mntS3.objPath != "" {
-		args = append(args, fmt.Sprintf("--prefix %s", mntS3.objPath))
+	if mntS3.ObjPath != "" {
+		args = append(args, fmt.Sprintf("--prefix %s", mntS3.ObjPath))
 	}
 	return mntS3.MounterUtils.FuseMount(target, mntS3Cmd, args)
 }
-func (mntS3 *mntS3Mounter) Unmount(target string) error {
-	klog.Info("-MntS3Mounter Unmount-")
+func (mntS3 *MountpointMounter) Unmount(target string) error {
+	klog.Info("-MountpointMounter Unmount-")
 	metaPath := path.Join(metaRootMntS3, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 	err := os.RemoveAll(metaPath)
 	if err != nil {
