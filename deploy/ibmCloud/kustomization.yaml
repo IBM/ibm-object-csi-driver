@@ -20,7 +20,7 @@ images:
   newTag: v3.4.1
 - name: cos-driver-image
   newName: icr.io/ibm/ibm-object-csi-driver
-  newTag: v1.0.2-alpha
+  newTag: v0.1.11
 - name: driver-registrar-image
   newName: k8s.gcr.io/sig-storage/csi-node-driver-registrar
   newTag: v2.6.3

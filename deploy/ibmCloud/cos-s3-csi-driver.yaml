@@ -88,6 +88,7 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 2121
+      priorityClassName: system-node-critical
       containers:
         - name: driver-registrar
           securityContext:
