@@ -50,8 +50,8 @@ Update IBM COS endpoint and locationconstraint as per the region of your cluster
 value: "https://s3.direct.au-syd.cloud-object-storage.appdomain.cloud"
 value: "au-syd-standard"
 ```
-Deploy the driver
 
+Deploy the driver
 `kubectl apply -k deploy/ibmCloud/`
 
 
@@ -87,6 +87,7 @@ Then review `deploy/ibmUnmanaged/kustomization.yaml` and update images if requir
   newTag: v0.1.11
 ```
 
+Deploy the driver
 `kubectl apply -k deploy/ibmUnmanaged/`
 
 

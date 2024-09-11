@@ -37,17 +37,17 @@ patches:
     patch: |-
       - op: replace
         path: /parameters/cosEndpoint
-        value: "https://s3.direct.us-south.cloud-object-storage.appdomain.cloud"
+        value: "https://s3.direct.au-syd.cloud-object-storage.appdomain.cloud"
       - op: replace
         path: /parameters/locationConstraint
-        value: "us-south-standard"
+        value: "au-syd-standard"
   - target:
       kind: StorageClass
       labelSelector:  ibm.cos.storageclass/tier=smart
     patch: |-
       - op: replace
         path: /parameters/cosEndpoint
-        value: "https://s3.direct.us-south.cloud-object-storage.appdomain.cloud"
+        value: "https://s3.direct.au-syd.cloud-object-storage.appdomain.cloud"
       - op: replace
         path: /parameters/locationConstraint
-        value: "us-south-smart"
+        value: "au-syd-smart"
