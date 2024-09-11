@@ -31,8 +31,7 @@ An image named `ibm-object-csi-driver:latest` is created. Please retag and push 
 
 # Deploy CSI driver on your cluster
 
-
-Deploy the resources
+Deploy the resources as below based on managed and unmanaged clusters.
 
 ## For IBM Managed clusters 
 
