@@ -66,6 +66,7 @@ spec:
     spec:
       serviceAccountName: cos-s3-csi-driver
       hostNetwork: false
+      priorityClassName: system-node-critical
       containers:
         - name: driver-registrar
           image: driver-registrar-image
