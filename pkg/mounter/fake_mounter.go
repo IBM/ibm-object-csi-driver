@@ -22,6 +22,8 @@ func (f *FakeMounterFactory) NewMounter(attrib map[string]string, secretMap map[
 		return fakenewS3fsMounter(f.IsFailedMount)
 	case constants.RClone:
 		return fakenewRcloneMounter(f.IsFailedMount)
+	case constants.MNTS3:
+		return fakenewMountpointMounter(f.IsFailedMount)
 	default:
 		return fakenewS3fsMounter(f.IsFailedMount)
 	}

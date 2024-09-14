@@ -6,27 +6,18 @@ type fakemountpointMounter struct {
 	bucketName    string
 	objPath       string
 	endPoint      string
-	locConstraint string
-	authType      string
-	accessKeys    string
-	kpRootKeyCrn  string
-	uid           string
-	gid           string
-
+	accessKey     string
+	secretKey     string
 	isFailedMount bool
 }
 
 func fakenewMountpointMounter(isFailedMount bool) Mounter {
-	return &fakercloneMounter{
+	return &fakemountpointMounter{
 		bucketName:    bucketName,
 		objPath:       objPath,
 		endPoint:      endPoint,
-		locConstraint: region,
-		accessKeys:    keys,
-		authType:      authType,
-		kpRootKeyCrn:  "",
-		uid:           "",
-		gid:           "",
+		accessKey:     keys,
+		secretKey:     keys,
 		isFailedMount: isFailedMount,
 	}
 }
