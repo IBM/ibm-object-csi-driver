@@ -31,8 +31,7 @@ An image named `ibm-object-csi-driver:latest` is created. Please retag and push 
 
 # Deploy CSI driver on your cluster
 
-
-Deploy the resources
+Deploy the resources as below based on managed and unmanaged clusters.
 
 ## For IBM Managed clusters 
 
@@ -42,7 +41,7 @@ Update images if required
 ```
 - name: cos-driver-image
   newName: icr.io/ibm/ibm-object-csi-driver
-  newTag: v1.0.1
+  newTag: v0.1.11
 ```
 
 Update IBM COS endpoint and locationconstraint as per the region of your cluster
@@ -51,6 +50,7 @@ value: "https://s3.direct.au-syd.cloud-object-storage.appdomain.cloud"
 value: "au-syd-standard"
 ```
 
+Deploy the driver
 `kubectl apply -k deploy/ibmCloud/`
 
 
@@ -74,6 +74,19 @@ ibm-object-storage-standard-s3fs-retain       cos.s3.csi.ibm.io      Retain     
 
 ## For unmanaged clusters
 
+First review `deploy/ibmCloud/kustomization.yaml` file and update IBM COS endpoint and locationconstraint as per the region of your cluster
+```
+value: "https://s3.direct.au-syd.cloud-object-storage.appdomain.cloud"
+value: "au-syd-standard"
+```
+Then review `deploy/ibmUnmanaged/kustomization.yaml` and update images if required
+```
+- name: cos-driver-image
+  newName: quay.io/containerstorage/ibm-object-csi-driver
+  newTag: v0.1.11
+```
+
+Deploy the driver
 `kubectl apply -k deploy/ibmUnmanaged/`
 
 
@@ -83,20 +96,20 @@ To clean up the deployment
 
 # Testing
 
-Provide proper values for parameters in secret under examples/cos-s3-csi-pvc-secret.yaml
+Provide proper values for parameters in secret under examples/kubernetes/cos-s3-csi-<mounter_type>-secret.yaml
 
 1. Create Secret, PVC and POD 
-
-      `kubectl create -f examples/cos-s3-csi-pvc-secret.yaml`
+   Pick the respective files based on the mounter you want to deploy. Below is for s3fs mounter.
+      `kubectl create -f examples/kubernetes/cos-s3-csi-s3fs-secret.yaml`
 
       If you want to use your own bucket, bucketName should be specified in the secret. If left empty, a temp bucket will be generated.
 
-      `kubectl create -f examples/cos-s3-csi-pvc.yaml`
+      `kubectl create -f examples/kubernetes/cos-s3-csi-s3fs-pvc.yaml`
 
-      `kubectl create -f examples/cos-csi-app.yaml`
+      `kubectl create -f examples/kubernetes/cos-csi-app-s3fs.yaml`
     
-    If rclone mount options need to be provided they can be provided in Secret using StringData field.
-    For example
+    For rclone mounter, if any other rclone mount options need to be provided, they can be passed in Secret using StringData field.
+    For example -
     ```
     stringData: 
         mountOptions: |
@@ -105,7 +118,7 @@ Provide proper values for parameters in secret under examples/cos-s3-csi-pvc-sec
     ```
 
     For non-root user support, in the Secret  user can add `uid` which must match `RunAsUser` in Pod spec.
-    
+    Example -
     ```
     stringData:
       uid: "3000" # Provide uid to run as non root user. This must match runAsUser in SecurityContext of pod spec.
@@ -114,19 +127,19 @@ Provide proper values for parameters in secret under examples/cos-s3-csi-pvc-sec
 
 2. Verify PVC is in `Bound` state
 
-3. Check for successful mount
+3. Check for successful mount as below:
 
-If mounter type is `rclone`, you will see
+If mounter type is `rclone`, verify using command
    ```
-   mount | grep rclone
+   # mount | grep rclone
    rclone-remote:rcloneambfail on /data type fuse.rclone (rw,nosuid,nodev,relatime,user_id=0,group_id=0)
 
    ```
-If mounter type is `s3fs`, you will see
+If mounter type is `s3fs`, verify using command
 
 
    ```
-    root@cos-csi-app:/# mount | grep s3fs
+    # mount | grep s3fs
     s3fs on /data type fuse.s3fs (rw,nosuid,nodev,relatime,user_id=0,group_id=0,allow_other)
 
    ```
