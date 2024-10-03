@@ -20,7 +20,7 @@ images:
   newTag: v3.4.1
 - name: cos-driver-image
   newName: icr.io/ibm/ibm-object-csi-driver
-  newTag: v0.1.11
+  newTag: v0.1.12
 - name: driver-registrar-image
   newName: k8s.gcr.io/sig-storage/csi-node-driver-registrar
   newTag: v2.6.3
@@ -37,17 +37,17 @@ patches:
     patch: |-
       - op: replace
         path: /parameters/cosEndpoint
-        value: "https://s3.direct.au-syd.cloud-object-storage.appdomain.cloud"
+        value: "https://s3.direct.us-south.cloud-object-storage.appdomain.cloud"
       - op: replace
         path: /parameters/locationConstraint
-        value: "au-syd-standard"
+        value: "us-south-standard"
   - target:
       kind: StorageClass
       labelSelector:  ibm.cos.storageclass/tier=smart
     patch: |-
       - op: replace
         path: /parameters/cosEndpoint
-        value: "https://s3.direct.au-syd.cloud-object-storage.appdomain.cloud"
+        value: "https://s3.direct.us-south.cloud-object-storage.appdomain.cloud"
       - op: replace
         path: /parameters/locationConstraint
-        value: "au-syd-smart"
+        value: "us-south-smart"

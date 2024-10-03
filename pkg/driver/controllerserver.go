@@ -28,6 +28,10 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 )
 
@@ -39,7 +43,7 @@ type controllerServer struct {
 	Logger     *zap.Logger
 }
 
-func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	var (
 		bucketName         string
 		endPoint           string
@@ -76,9 +80,24 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	klog.Info("CreateVolume Parameters:\n\t", params)
 
 	secretMap := req.GetSecrets()
+	klog.Info("Secret Parameters:\n\t", secretMap)
 	creds, err := getCredentials(req.GetSecrets())
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
+		// add logic to parse secret from secretname
+		client, err := createK8sClient()
+		if err != nil {
+			klog.Error("Error creating Kubernetes clientset: ", err)
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
+		}
+
+		secretName := "custom-secret"
+		secretNamespace := "default"
+
+		accessKey, secretKey, apiKey, kpRootKeyCrn, err := getCredentialsCustom(ctx, secretName, secretNamespace, client)
+		klog.Info("Custom secret Parameters:\n\t", accessKey, secretKey, apiKey, kpRootKeyCrn)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
+		}
 	}
 
 	endPoint = secretMap["cosEndpoint"]
@@ -146,6 +165,24 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			VolumeContext: params,
 		},
 	}, nil
+}
+
+func createK8sClient() (*kubernetes.Clientset, error) {
+	// Create a Kubernetes client configuration
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		klog.Error("Error creating Kubernetes client configuration: ", err)
+		return nil, err
+	}
+
+	// Create a Kubernetes clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		klog.Error("Error creating Kubernetes clientset: ", err)
+		return nil, err
+	}
+
+	return clientset, nil
 }
 
 func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
@@ -318,6 +355,49 @@ func getCredentials(secretMap map[string]string) (*s3client.ObjectStorageCredent
 		IAMEndpoint:       iamEndpoint,
 		ServiceInstanceID: serviceInstanceID,
 	}, nil
+}
+
+func getCredentialsCustom(ctx context.Context, secretName, secretNamespace string, k8sClient *kubernetes.Clientset) (accessKey string, secretKey string, apiKey string, kpRootKeyCrn string, err error) {
+	secrets, err := k8sClient.CoreV1().Secrets(secretNamespace).Get(ctx, secretName, metav1.GetOptions{})
+	if err != nil {
+		return "", "", "", "", fmt.Errorf("cannot retrieve secret %s: %v", secretName, err)
+	}
+
+	if strings.TrimSpace(string(secrets.Type)) != "cos-s3-csi-driver" {
+		return "", "", "", "", fmt.Errorf("Wrong Secret Type. Provided secret of type %s. Expected type %s", string(secrets.Type), "cos-s3-csi-driver")
+	}
+
+	//var serviceInstanceID string
+
+	apiKey, err = parseSecret(secrets, "apiKey")
+	if err != nil {
+		accessKey, err = parseSecret(secrets, "accessKey")
+		if err != nil {
+			return "", "", "", "", err
+		}
+
+		secretKey, err = parseSecret(secrets, "secretKey")
+		if err != nil {
+			return "", "", "", "", err
+		}
+	} else {
+		return "", "", "", "", err
+		//serviceInstanceID, err = parseSecret(secrets, "service-instance-id")
+	}
+
+	if bytesVal, ok := secrets.Data["kpRootKeyCRN"]; ok {
+		kpRootKeyCrn = string(bytesVal)
+	}
+
+	return accessKey, secretKey, apiKey, kpRootKeyCrn, nil
+}
+
+func parseSecret(secret *v1.Secret, keyName string) (string, error) {
+	bytesVal, ok := secret.Data[keyName]
+	if !ok {
+		return "", fmt.Errorf("%s secret missing", keyName)
+	}
+	return string(bytesVal), nil
 }
 
 func getTempBucketName(mounterType, volumeID string) string {

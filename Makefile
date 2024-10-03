@@ -64,7 +64,7 @@ driver: deps buildimage
 
 .PHONY: build
 build:
-	CGO_ENABLED=0 GOOS=linux go build -mod=vendor -v -ldflags '-X main.version=${git_commit_id} -extldflags "-static"' -o ${GOPATH}/bin/${EXE_DRIVER_NAME} ./cmd/$*
+	CGO_ENABLED=0 GOOS=linux go build -mod=mod -v -ldflags '-X main.version=${git_commit_id} -extldflags "-static"' -o ${GOPATH}/bin/${EXE_DRIVER_NAME} ./cmd/$*
 
 
 .PHONY: buildimage
