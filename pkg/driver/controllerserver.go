@@ -77,12 +77,13 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	params := req.GetParameters()
-	klog.Info("CreateVolume Parameters:\n\t", params)
+	klog.Infof("CreateVolume Parameters:\n\t", params)
 
 	secretMap := req.GetSecrets()
-	klog.Info("Secret Parameters:\n\t", secretMap)
+	klog.Infof("Secret Parameters:\n\t", secretMap)
 	creds, err := getCredentials(req.GetSecrets())
 	if err != nil {
+		klog.Info("Got error with getCredentials, trying to pull custom secret\n\t")
 		// add logic to parse secret from secretname
 		client, err := createK8sClient()
 		if err != nil {
@@ -94,7 +95,18 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		secretNamespace := "default"
 
 		accessKey, secretKey, apiKey, kpRootKeyCrn, err := getCredentialsCustom(ctx, secretName, secretNamespace, client)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
+		}
 		klog.Info("Custom secret Parameters:\n\t", accessKey, secretKey, apiKey, kpRootKeyCrn)
+		//frame secretmap with all the above values and pass to getCrdentials as it is used to initialise cos session
+		secretMap = make(map[string]string)
+		secretMap["accessKey"] = accessKey
+		secretMap["secretKey"] = secretKey
+		secretMap["apiKey"] = apiKey
+		secretMap["kpRootKeyCrn"] = kpRootKeyCrn
+
+		creds, err = getCredentials(secretMap)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
 		}
@@ -362,6 +374,7 @@ func getCredentialsCustom(ctx context.Context, secretName, secretNamespace strin
 	if err != nil {
 		return "", "", "", "", fmt.Errorf("cannot retrieve secret %s: %v", secretName, err)
 	}
+	klog.Info("secret retrieved: \n", secrets)
 
 	if strings.TrimSpace(string(secrets.Type)) != "cos-s3-csi-driver" {
 		return "", "", "", "", fmt.Errorf("Wrong Secret Type. Provided secret of type %s. Expected type %s", string(secrets.Type), "cos-s3-csi-driver")
