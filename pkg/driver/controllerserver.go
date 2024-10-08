@@ -383,11 +383,13 @@ func getCredentialsCustom(ctx context.Context, secretName, secretNamespace strin
 	//var serviceInstanceID string
 
 	apiKey, err = parseSecret(secrets, "apiKey")
+	klog.Info("api key found: \n", apiKey)
 	if err != nil {
 		accessKey, err = parseSecret(secrets, "accessKey")
 		if err != nil {
 			return "", "", "", "", err
 		}
+		klog.Info("accessKey found: \n", accessKey)
 
 		secretKey, err = parseSecret(secrets, "secretKey")
 		if err != nil {
