@@ -388,44 +388,39 @@ func getCredentialsCustom(ctx context.Context, secretName, secretNamespace strin
 		return "", "", "", "", "", fmt.Errorf("Wrong Secret Type. Provided secret of type %s. Expected type %s", string(secrets.Type), "cos-s3-csi-driver")
 	}
 
-	serviceInstanceID, _ = parseSecret(secrets, "serviceId")
-
-	apiKey, err = parseSecret(secrets, "apiKey")
-	if err != nil {
-		klog.Info("api key found: \n", apiKey)
-		accessKey, err = parseSecret(secrets, "accessKey")
-		if err != nil {
-			return "", "", "", "", "", err
-		}
-		klog.Info("accessKey found: \n", accessKey)
-
-		secretKey, err = parseSecret(secrets, "secretKey")
-		if err != nil {
-			return "", "", "", "", "", err
-		}
-		klog.Info("secretKey found: \n", secretKey)
-	} else {
-		return "", "", "", "", "", err
+	if bytesVal, ok := secrets.Data["apiKey"]; ok {
+		apiKey = string(bytesVal)
 	}
 
 	if bytesVal, ok := secrets.Data["kpRootKeyCRN"]; ok {
 		kpRootKeyCrn = string(bytesVal)
 	}
 
+	if bytesVal, ok := secrets.Data["serviceId"]; ok {
+		serviceInstanceID = string(bytesVal)
+	}
+
+	accessKey, err = parseSecret(secrets, "accessKey")
+	if err != nil {
+		return "", "", "", "", "", err
+	}
+
+	secretKey, err = parseSecret(secrets, "secretKey")
+	if err != nil {
+		return "", "", "", "", "", err
+	}
+
 	return accessKey, secretKey, apiKey, kpRootKeyCrn, serviceInstanceID, nil
 }
 
 func parseSecret(secret *v1.Secret, keyName string) (string, error) {
-	klog.Infof("secret in parseSecret: %v", secret)
-	klog.Infof("secret.Data in parseSecret: %v", secret.Data)
-	klog.Infof("keyName parseSecret: %v", keyName)
-	klog.Infof("secret.Data for keyName: %v", secret.Data[keyName])
+
 	bytesVal, ok := secret.Data[keyName]
 	if !ok {
 		klog.Infof("if not okay, return error")
 		return "", fmt.Errorf("%s secret missing", keyName)
 	}
-	klog.Infof("if not okay, return error")
+	klog.Infof("if okay, return string(bytesVal)")
 	return string(bytesVal), nil
 }
 
