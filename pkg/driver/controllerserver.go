@@ -395,6 +395,7 @@ func getCredentialsCustom(ctx context.Context, secretName, secretNamespace strin
 		if err != nil {
 			return "", "", "", "", err
 		}
+		klog.Info("secretKey found: \n", secretKey)
 	} else {
 		return "", "", "", "", err
 		//serviceInstanceID, err = parseSecret(secrets, "service-instance-id")
@@ -408,6 +409,7 @@ func getCredentialsCustom(ctx context.Context, secretName, secretNamespace strin
 }
 
 func parseSecret(secret *v1.Secret, keyName string) (string, error) {
+	klog.Infof("secret in parseSecret: %v", secret)
 	bytesVal, ok := secret.Data[keyName]
 	if !ok {
 		return "", fmt.Errorf("%s secret missing", keyName)
