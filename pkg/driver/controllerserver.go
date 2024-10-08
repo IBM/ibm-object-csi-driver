@@ -410,13 +410,15 @@ func getCredentialsCustom(ctx context.Context, secretName, secretNamespace strin
 
 func parseSecret(secret *v1.Secret, keyName string) (string, error) {
 	klog.Infof("secret in parseSecret: %v", secret)
-	klog.Infof("\nsecret.Data in parseSecret: %v", secret.Data)
-	klog.Infof("keyName parseSecret: %v", keyName)
+	klog.Infof("secret.Data in parseSecret: %v", secret.Data)
+	klog.Infof("keyName in parseSecret: %v", keyName)
 	klog.Infof("secret.Data for keyName: %v", secret.Data[keyName])
 	bytesVal, ok := secret.Data[keyName]
 	if !ok {
+		klog.Infof("if not okay, return error")
 		return "", fmt.Errorf("%s secret missing", keyName)
 	}
+	klog.Infof("okay, return string(bytesVal): %v", string(bytesVal))
 	return string(bytesVal), nil
 }
 
