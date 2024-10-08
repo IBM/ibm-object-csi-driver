@@ -104,6 +104,7 @@ spec:
             - "--csi-address=$(ADDRESS)"
             - "--timeout=180s"
             - "--v=5"
+            - "--extra-create-metadata=true" 
           env:
             - name: ADDRESS
               value: /csi/csi.sock
