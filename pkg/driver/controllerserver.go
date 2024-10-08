@@ -94,19 +94,27 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		secretName := "custom-secret"
 		secretNamespace := "default"
 
-		accessKey, secretKey, apiKey, kpRootKeyCrn, err := getCredentialsCustom(ctx, secretName, secretNamespace, client)
+		accessKey, secretKey, apiKey, kpRootKeyCrn, serviceInstanceID, err := getCredentialsCustom(ctx, secretName, secretNamespace, client)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
 		}
 		klog.Info("Custom secret Parameters:\n\t", accessKey, secretKey, apiKey, kpRootKeyCrn)
 		//frame secretmap with all the above values and pass to getCrdentials as it is used to initialise cos session
-		secretMap = make(map[string]string)
-		secretMap["accessKey"] = accessKey
-		secretMap["secretKey"] = secretKey
-		secretMap["apiKey"] = apiKey
-		secretMap["kpRootKeyCrn"] = kpRootKeyCrn
+		secretMapCustom := make(map[string]string)
+		secretMapCustom["accessKey"] = accessKey
+		secretMapCustom["secretKey"] = secretKey
+		secretMapCustom["apiKey"] = apiKey
+		secretMapCustom["kpRootKeyCrn"] = kpRootKeyCrn
+		secretMapCustom["serviceId"] = serviceInstanceID
 
-		creds, err = getCredentials(secretMap)
+		iamEndpoint := secretMap["iamEndpoint"]
+		if iamEndpoint == "" {
+			iamEndpoint = constants.DefaultIAMEndPoint
+		}
+
+		secretMapCustom["iamEndpoint"] = iamEndpoint
+
+		creds, err = getCredentials(secretMapCustom)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
 		}
@@ -369,56 +377,55 @@ func getCredentials(secretMap map[string]string) (*s3client.ObjectStorageCredent
 	}, nil
 }
 
-func getCredentialsCustom(ctx context.Context, secretName, secretNamespace string, k8sClient *kubernetes.Clientset) (accessKey string, secretKey string, apiKey string, kpRootKeyCrn string, err error) {
+func getCredentialsCustom(ctx context.Context, secretName, secretNamespace string, k8sClient *kubernetes.Clientset) (accessKey, secretKey, apiKey, serviceInstanceID, kpRootKeyCrn string, err error) {
 	secrets, err := k8sClient.CoreV1().Secrets(secretNamespace).Get(ctx, secretName, metav1.GetOptions{})
 	if err != nil {
-		return "", "", "", "", fmt.Errorf("cannot retrieve secret %s: %v", secretName, err)
+		return "", "", "", "", "", fmt.Errorf("cannot retrieve secret %s: %v", secretName, err)
 	}
 	klog.Info("secret retrieved: \n", secrets)
 
 	if strings.TrimSpace(string(secrets.Type)) != "cos-s3-csi-driver" {
-		return "", "", "", "", fmt.Errorf("Wrong Secret Type. Provided secret of type %s. Expected type %s", string(secrets.Type), "cos-s3-csi-driver")
+		return "", "", "", "", "", fmt.Errorf("Wrong Secret Type. Provided secret of type %s. Expected type %s", string(secrets.Type), "cos-s3-csi-driver")
 	}
 
-	//var serviceInstanceID string
+	serviceInstanceID, _ = parseSecret(secrets, "serviceId")
 
 	apiKey, err = parseSecret(secrets, "apiKey")
 	if err != nil {
 		klog.Info("api key found: \n", apiKey)
 		accessKey, err = parseSecret(secrets, "accessKey")
 		if err != nil {
-			return "", "", "", "", err
+			return "", "", "", "", "", err
 		}
 		klog.Info("accessKey found: \n", accessKey)
 
 		secretKey, err = parseSecret(secrets, "secretKey")
 		if err != nil {
-			return "", "", "", "", err
+			return "", "", "", "", "", err
 		}
 		klog.Info("secretKey found: \n", secretKey)
 	} else {
-		//serviceInstanceID, err = parseSecret(secrets, "service-instance-id")
-		return "", "", "", "", err
+		return "", "", "", "", "", err
 	}
 
 	if bytesVal, ok := secrets.Data["kpRootKeyCRN"]; ok {
 		kpRootKeyCrn = string(bytesVal)
 	}
 
-	return accessKey, secretKey, apiKey, kpRootKeyCrn, nil
+	return accessKey, secretKey, apiKey, kpRootKeyCrn, serviceInstanceID, nil
 }
 
 func parseSecret(secret *v1.Secret, keyName string) (string, error) {
 	klog.Infof("secret in parseSecret: %v", secret)
 	klog.Infof("secret.Data in parseSecret: %v", secret.Data)
-	klog.Infof("keyName in parseSecret: %v", keyName)
+	klog.Infof("keyName parseSecret: %v", keyName)
 	klog.Infof("secret.Data for keyName: %v", secret.Data[keyName])
 	bytesVal, ok := secret.Data[keyName]
 	if !ok {
 		klog.Infof("if not okay, return error")
 		return "", fmt.Errorf("%s secret missing", keyName)
 	}
-	klog.Infof("okay, return string(bytesVal): %v", string(bytesVal))
+	klog.Infof("if not okay, return error")
 	return string(bytesVal), nil
 }
 
