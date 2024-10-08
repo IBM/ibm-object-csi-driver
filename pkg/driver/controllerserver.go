@@ -49,6 +49,8 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		endPoint           string
 		locationConstraint string
 		kpRootKeyCrn       string
+		pvcName            string
+		pvcNamespace       string
 	)
 	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
 	if err != nil {
@@ -91,8 +93,27 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
 		}
 
-		secretName := "custom-secret"
-		secretNamespace := "default"
+		pvcName = params["csi.storage.k8s.io/pvc/name"]
+		pvcNamespace = params["csi.storage.k8s.io/pvc/namespace"]
+
+		if pvcName == "" || pvcNamespace == "" {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("pvcName or pvcNamespcae not specified %v", err))
+		}
+
+		pvcRes, err := getPVC(pvcName, pvcNamespace)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("PVC resource not found %v", err))
+		}
+
+		klog.Infof("pvc Resource details:\n\t", pvcRes)
+
+		pvcAnnotations := pvcRes.Annotations
+
+		secretName := pvcAnnotations["cos.csi.driver/secret"]
+		secretNamespace := pvcAnnotations["cos.csi.driver/secret-namespace"]
+
+		//secretName := "custom-secret"
+		//secretNamespace := "default"
 
 		accessKey, secretKey, apiKey, kpRootKeyCrn, serviceInstanceID, err := getCredentialsCustom(ctx, secretName, secretNamespace, client)
 		if err != nil {
@@ -203,6 +224,21 @@ func createK8sClient() (*kubernetes.Clientset, error) {
 	}
 
 	return clientset, nil
+}
+
+func getPVC(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error) {
+	k8sClient, err := createK8sClient()
+	if err != nil {
+		return nil, err
+	}
+
+	pvc, err := k8sClient.CoreV1().PersistentVolumeClaims(pvcNamespace).Get(context.TODO(), pvcName, metav1.GetOptions{})
+	if err != nil {
+		klog.Errorf("Unable to fetch pvc %v", err)
+		return nil, fmt.Errorf("error getting PVC: %v", err)
+	}
+
+	return pvc, nil
 }
 
 func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
