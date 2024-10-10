@@ -86,18 +86,16 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	creds, err := getCredentials(req.GetSecrets())
 	if err != nil {
 		klog.Info("Got error with getCredentials, trying to pull custom secret\n\t")
-		// add logic to parse secret from secretname
-		client, err := createK8sClient()
-		if err != nil {
-			klog.Error("Error creating Kubernetes clientset: ", err)
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
-		}
 
 		pvcName = params["csi.storage.k8s.io/pvc/name"]
 		pvcNamespace = params["csi.storage.k8s.io/pvc/namespace"]
 
-		if pvcName == "" || pvcNamespace == "" {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("pvcName or pvcNamespcae not specified %v", err))
+		if pvcName == "" {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("pvcName not specified %v", err))
+		}
+
+		if pvcNamespace == "" {
+			pvcNamespace = "default"
 		}
 
 		pvcRes, err := getPVC(pvcName, pvcNamespace)
@@ -112,10 +110,12 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		secretName := pvcAnnotations["cos.csi.driver/secret"]
 		secretNamespace := pvcAnnotations["cos.csi.driver/secret-namespace"]
 
-		//secretName := "custom-secret"
-		//secretNamespace := "default"
+		secret, err := getSecret(secretName, secretNamespace)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret resource not found %v", err))
+		}
 
-		accessKey, secretKey, apiKey, kpRootKeyCrn, serviceInstanceID, err := getCredentialsCustom(ctx, secretName, secretNamespace, client)
+		accessKey, secretKey, apiKey, kpRootKeyCrn, serviceInstanceID, err := getCredentialsCustom(secret)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
 		}
@@ -241,6 +241,72 @@ func getPVC(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error) {
 	return pvc, nil
 }
 
+func getPV(volumeID string) (*v1.PersistentVolume, error) {
+	k8sClient, err := createK8sClient()
+	if err != nil {
+		return nil, err
+	}
+
+	pv, err := k8sClient.CoreV1().PersistentVolumes().Get(context.Background(), volumeID, metav1.GetOptions{})
+	if err != nil {
+		klog.Errorf("Unable to fetch pv %v", err)
+		return nil, fmt.Errorf("error getting PV: %v", err)
+	}
+
+	return pv, nil
+}
+
+func getSecret(pvcName, pvcNamespace string) (*v1.Secret, error) {
+	k8sClient, err := createK8sClient()
+	if err != nil {
+		return nil, err
+	}
+
+	secret, err := k8sClient.CoreV1().Secrets(pvcNamespace).Get(context.TODO(), pvcName, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("error getting Secret: %v", err)
+	}
+
+	return secret, nil
+}
+
+func fetchSecretUsingPV(volumeID string) (*v1.Secret, error) {
+	pv, err := getPV(volumeID)
+	if err != nil {
+		return nil, err
+	}
+
+	pvcName := pv.Spec.ClaimRef.Name
+	if pvcName == "" {
+		return nil, fmt.Errorf("PVC name not found for PV with ID: %s", volumeID)
+	}
+	pvcNamespace := pv.Spec.ClaimRef.Namespace
+	if pvcNamespace == "" {
+		pvcNamespace = "default"
+	}
+
+	pvcRes, err := getPVC(pvcName, pvcNamespace)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("PVC resource not found %v", err))
+	}
+
+	klog.Infof("pvc Resource details:\n\t", pvcRes)
+
+	pvcAnnotations := pvcRes.Annotations
+
+	secretName := pvcAnnotations["cos.csi.driver/secret"]
+	secretNamespace := pvcAnnotations["cos.csi.driver/secret-namespace"]
+
+	klog.Info("secret details found. secret-name: ", secretName, "secret-namespace: ", secretNamespace)
+
+	secret, err := getSecret(secretName, secretNamespace)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("PSecret resource not found %v", err))
+	}
+
+	return secret, err
+}
+
 func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
 	if err != nil {
@@ -257,7 +323,37 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 
 	creds, err := getCredentials(req.GetSecrets())
 	if err != nil {
-		return nil, fmt.Errorf("cannot get credentials: %v", err)
+		klog.Info("Got error with getCredentials, trying to pull custom secret\n\t")
+		// add logic to parse secret from secretname
+		secret, err := fetchSecretUsingPV(volumeID)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
+		}
+
+		accessKey, secretKey, apiKey, kpRootKeyCrn, serviceInstanceID, err := getCredentialsCustom(secret)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
+		}
+		klog.Info("Custom secret Parameters:\n\t", accessKey, secretKey, apiKey, kpRootKeyCrn)
+		//frame secretmap with all the above values and pass to getCrdentials as it is used to initialise cos session
+		secretMapCustom := make(map[string]string)
+		secretMapCustom["accessKey"] = accessKey
+		secretMapCustom["secretKey"] = secretKey
+		secretMapCustom["apiKey"] = apiKey
+		secretMapCustom["kpRootKeyCrn"] = kpRootKeyCrn
+		secretMapCustom["serviceId"] = serviceInstanceID
+
+		iamEndpoint := secretMap["iamEndpoint"]
+		if iamEndpoint == "" {
+			iamEndpoint = constants.DefaultIAMEndPoint
+		}
+
+		secretMapCustom["iamEndpoint"] = iamEndpoint
+
+		creds, err = getCredentials(secretMapCustom)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
+		}
 	}
 
 	endPoint := secretMap["cosEndpoint"]
@@ -413,35 +509,29 @@ func getCredentials(secretMap map[string]string) (*s3client.ObjectStorageCredent
 	}, nil
 }
 
-func getCredentialsCustom(ctx context.Context, secretName, secretNamespace string, k8sClient *kubernetes.Clientset) (accessKey, secretKey, apiKey, serviceInstanceID, kpRootKeyCrn string, err error) {
-	secrets, err := k8sClient.CoreV1().Secrets(secretNamespace).Get(ctx, secretName, metav1.GetOptions{})
-	if err != nil {
-		return "", "", "", "", "", fmt.Errorf("cannot retrieve secret %s: %v", secretName, err)
-	}
-	klog.Info("secret retrieved: \n", secrets)
-
-	if strings.TrimSpace(string(secrets.Type)) != "cos-s3-csi-driver" {
-		return "", "", "", "", "", fmt.Errorf("Wrong Secret Type. Provided secret of type %s. Expected type %s", string(secrets.Type), "cos-s3-csi-driver")
+func getCredentialsCustom(secret *v1.Secret) (accessKey, secretKey, apiKey, serviceInstanceID, kpRootKeyCrn string, err error) {
+	if strings.TrimSpace(string(secret.Type)) != "cos-s3-csi-driver" {
+		return "", "", "", "", "", fmt.Errorf("Wrong Secret Type. Provided secret of type %s. Expected type %s", string(secret.Type), "cos-s3-csi-driver")
 	}
 
-	if bytesVal, ok := secrets.Data["apiKey"]; ok {
+	if bytesVal, ok := secret.Data["apiKey"]; ok {
 		apiKey = string(bytesVal)
 	}
 
-	if bytesVal, ok := secrets.Data["kpRootKeyCRN"]; ok {
+	if bytesVal, ok := secret.Data["kpRootKeyCRN"]; ok {
 		kpRootKeyCrn = string(bytesVal)
 	}
 
-	if bytesVal, ok := secrets.Data["serviceId"]; ok {
+	if bytesVal, ok := secret.Data["serviceId"]; ok {
 		serviceInstanceID = string(bytesVal)
 	}
 
-	accessKey, err = parseSecret(secrets, "accessKey")
+	accessKey, err = parseSecret(secret, "accessKey")
 	if err != nil {
 		return "", "", "", "", "", err
 	}
 
-	secretKey, err = parseSecret(secrets, "secretKey")
+	secretKey, err = parseSecret(secret, "secretKey")
 	if err != nil {
 		return "", "", "", "", "", err
 	}
