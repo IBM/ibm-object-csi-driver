@@ -163,6 +163,11 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		klog.Infof("key protect root key crn provided for bucket creation")
 	}
 
+	mounter := secretMap["mounter"]
+	if mounter == "" {
+		mounter = params["mounter"]
+	}
+
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
 	bucketName = secretMap["bucketName"]
 	params["userProvidedBucket"] = "true"
@@ -182,7 +187,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	} else {
 		// Generate random temp bucket name based on volume id
 		klog.Infof("Bucket name not provided")
-		tempBucketName := getTempBucketName(secretMap["mounter"], volumeID)
+		tempBucketName := getTempBucketName(mounter, volumeID)
 		if tempBucketName == "" {
 			klog.Errorf("CreateVolume: Unable to generate the bucket name")
 			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to access the bucket: %v", tempBucketName))
@@ -270,27 +275,6 @@ func getSecret(pvcName, pvcNamespace string) (*v1.Secret, error) {
 	return secret, nil
 }
 
-func fetchSecretUsingPV(volumeID string) (*v1.Secret, error) {
-	pv, err := getPV(volumeID)
-	if err != nil {
-		return nil, err
-	}
-
-	klog.Infof("pv Resource details:\n\t", pv)
-
-	secretName := pv.Spec.CSI.NodePublishSecretRef.Name
-	secretNamespace := pv.Spec.CSI.NodePublishSecretRef.Namespace
-
-	klog.Info("secret details found. secret-name: ", secretName, "secret-namespace: ", secretNamespace)
-
-	secret, err := getSecret(secretName, secretNamespace)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("PSecret resource not found %v", err))
-	}
-
-	return secret, err
-}
-
 func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
 	if err != nil {
@@ -305,13 +289,30 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 	klog.Infof("Deleting volume %v", volumeID)
 	secretMap := req.GetSecrets()
 
+	var endPoint, locationConstraint string
+
 	creds, err := getCredentials(req.GetSecrets())
 	if err != nil {
 		klog.Info("Got error with getCredentials, trying to pull custom secret\n\t")
-		// add logic to parse secret from secretname
-		secret, err := fetchSecretUsingPV(volumeID)
+
+		pv, err := getPV(volumeID)
 		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
+			return nil, err
+		}
+
+		klog.Infof("pv Resource details:\n\t", pv)
+
+		secretName := pv.Spec.CSI.NodePublishSecretRef.Name
+		secretNamespace := pv.Spec.CSI.NodePublishSecretRef.Namespace
+
+		endPoint = pv.Spec.CSI.VolumeAttributes["cosEndpoint"]
+		locationConstraint = pv.Spec.CSI.VolumeAttributes["locationConstraint"]
+
+		klog.Info("secret details found. secret-name: ", secretName, "\tsecret-namespace: ", secretNamespace)
+
+		secret, err := getSecret(secretName, secretNamespace)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("PSecret resource not found %v", err))
 		}
 
 		accessKey, secretKey, apiKey, kpRootKeyCrn, serviceInstanceID, err := getCredentialsCustom(secret)
@@ -340,8 +341,6 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 		}
 	}
 
-	endPoint := secretMap["cosEndpoint"]
-	locationConstraint := secretMap["locationConstraint"]
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
 
 	bucketToDelete, err := cs.Stats.BucketToDelete(volumeID)
@@ -535,6 +534,7 @@ func parseSecret(secret *v1.Secret, keyName string) (string, error) {
 }
 
 func getTempBucketName(mounterType, volumeID string) string {
+	klog.Infof("mounterType %v:", mounterType)
 	currentTime := time.Now()
 	timestamp := currentTime.Format("20060102150405")
 
