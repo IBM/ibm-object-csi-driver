@@ -276,26 +276,10 @@ func fetchSecretUsingPV(volumeID string) (*v1.Secret, error) {
 		return nil, err
 	}
 
-	pvcName := pv.Spec.ClaimRef.Name
-	if pvcName == "" {
-		return nil, fmt.Errorf("PVC name not found for PV with ID: %s", volumeID)
-	}
-	pvcNamespace := pv.Spec.ClaimRef.Namespace
-	if pvcNamespace == "" {
-		pvcNamespace = "default"
-	}
+	klog.Infof("pv Resource details:\n\t", pv)
 
-	pvcRes, err := getPVC(pvcName, pvcNamespace)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("PVC resource not found %v", err))
-	}
-
-	klog.Infof("pvc Resource details:\n\t", pvcRes)
-
-	pvcAnnotations := pvcRes.Annotations
-
-	secretName := pvcAnnotations["cos.csi.driver/secret"]
-	secretNamespace := pvcAnnotations["cos.csi.driver/secret-namespace"]
+	secretName := pv.Spec.CSI.NodePublishSecretRef.Name
+	secretNamespace := pv.Spec.CSI.NodePublishSecretRef.Namespace
 
 	klog.Info("secret details found. secret-name: ", secretName, "secret-namespace: ", secretNamespace)
 
