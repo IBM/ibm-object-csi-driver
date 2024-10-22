@@ -76,6 +76,28 @@ func TestNewMounter(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
+			name:   "Mountpoint Mounter",
+			attrib: map[string]string{"mounter": constants.MNTS3},
+			secretMap: map[string]string{
+				"cosEndpoint": "test-endpoint",
+				"bucketName":  "test-bucket-name",
+				"objPath":     "test-obj-path",
+				"accessKey":   "test-access-key",
+				"secretKey":   "test-secret-key",
+			},
+			mountOptions: []string{"opt1=val1", "opt2=val2"},
+			expected: &MountpointMounter{
+				BucketName:   "test-bucket-name",
+				ObjPath:      "test-obj-path",
+				EndPoint:     "test-endpoint",
+				AccessKey:    "test-access-key",
+				SecretKey:    "test-secret-key",
+				MountOptions: []string{"opt1=val1", "opt2=val2"},
+				MounterUtils: &(mounterUtils.MounterOptsUtils{}),
+			},
+			expectedErr: nil,
+		},
+		{
 			name:   "Default Mounter",
 			attrib: map[string]string{},
 			secretMap: map[string]string{
