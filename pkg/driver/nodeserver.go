@@ -206,20 +206,6 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 		data := map[string]string{"VolumeId": volumeID, "Error": err.Error()}
 		klog.Error("NodeGetVolumeStats: error occurred while getting volume stats ", data)
 		return &csi.NodeGetVolumeStatsResponse{
-			Usage: []*csi.VolumeUsage{
-				{
-					Available: -1,
-					Total:     -1,
-					Used:      -1,
-					Unit:      csi.VolumeUsage_BYTES,
-				},
-				{
-					Available: -1,
-					Total:     -1,
-					Used:      -1,
-					Unit:      csi.VolumeUsage_INODES,
-				},
-			},
 			VolumeCondition: &csi.VolumeCondition{
 				Abnormal: true,
 				Message:  err.Error(),
