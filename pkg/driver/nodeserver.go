@@ -120,6 +120,18 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		secretMap["gid"] = volumeMountGroup
 	}
 
+	if len(secretMap["cosEndpoint"]) == 0 {
+		secretMap["cosEndpoint"] = attrib["cosEndpoint"]
+	}
+
+	if len(secretMap["locationConstraint"]) == 0 {
+		secretMap["locationConstraint"] = attrib["locationConstraint"]
+	}
+
+	if len(secretMap["cosEndpoint"]) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "S3 Service endpoint not provided")
+	}
+
 	// If bucket name wasn't provided by user, we use temp bucket created for volume.
 	if secretMap["bucketName"] == "" {
 		tempBucketName, err := ns.Stats.GetBucketNameFromPV(volumeID)
@@ -215,7 +227,7 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 		}, nil
 	}
 
-	capUsed, totalCap, err := ns.Stats.GetBucketUsage(volumeID)
+	totalCap, err := ns.Stats.GetTotalCapacityFromPV(volumeID)
 	if err != nil {
 		return nil, err
 	}
@@ -224,18 +236,23 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 	if !converted {
 		capAsInt64 = capacity
 	}
-
 	klog.Info("NodeGetVolumeStats: Total Capacity of Volume: ", capAsInt64)
 
-	capAvailable := capAsInt64 - capUsed
+	capUsed, err := ns.Stats.GetBucketUsage(volumeID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Since `capAvailable` can be negative and K8s will roundoff from int64 to uint64 resulting in misleading value
+	// capAvailable := capAsInt64 - capUsed
 
 	resp := &csi.NodeGetVolumeStatsResponse{
 		Usage: []*csi.VolumeUsage{
 			{
-				Available: capAvailable,
-				Total:     capAsInt64,
-				Used:      capUsed,
-				Unit:      csi.VolumeUsage_BYTES,
+				// Available: capAvailable,
+				Total: capAsInt64,
+				Used:  capUsed,
+				Unit:  csi.VolumeUsage_BYTES,
 			},
 			{
 				Available: inodesFree,

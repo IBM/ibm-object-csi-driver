@@ -235,8 +235,12 @@ func (su *FakeNewDriverStatsUtils) CheckMount(targetPath string) error {
 	return nil
 }
 
-func (su *FakeNewDriverStatsUtils) GetBucketUsage(volumeID string) (int64, resource.Quantity, error) {
-	return 0, resource.Quantity{}, nil
+func (su *FakeNewDriverStatsUtils) GetTotalCapacityFromPV(volumeID string) (resource.Quantity, error) {
+	return resource.Quantity{}, nil
+}
+
+func (su *FakeNewDriverStatsUtils) GetBucketUsage(volumeID string) (int64, error) {
+	return 0, nil
 }
 
 func (su *FakeNewDriverStatsUtils) GetBucketNameFromPV(volumeID string) (string, error) {

@@ -42,8 +42,8 @@ var rcloneBucketName = os.Getenv("rcloneBucketName")
 
 const (
 	driverName   = "cos-s3-csi-driver"
-	scName       = "cos-s3-csi-s3fs-delete"
-	rclonescName = "cos-s3-csi-rclone-delete"
+	s3fsscName   = "ibm-object-storage-smart-s3fs"
+	rclonescName = "ibm-object-storage-smart-rclone"
 )
 
 var _ = Describe("rclone", func() {
@@ -151,7 +151,7 @@ var _ = Describe("s3fs", func() {
 				Volumes: []testsuites.VolumeDetails{
 					{
 						PVCName:    ns.Name,
-						VolumeType: scName,
+						VolumeType: s3fsscName,
 						ClaimSize:  "256Mi",
 						VolumeMount: testsuites.VolumeMountDetails{
 							NameGenerate:      "test-volume-",

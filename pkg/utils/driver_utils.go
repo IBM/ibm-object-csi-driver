@@ -2,15 +2,15 @@ package utils
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/IBM/go-sdk-core/v5/core"
+	rc "github.com/IBM/ibm-cos-sdk-go-config/v2/resourceconfigurationv1"
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -25,7 +25,8 @@ type StatsUtils interface {
 	BucketToDelete(volumeID string) (string, error)
 	FSInfo(path string) (int64, int64, int64, int64, int64, int64, error)
 	CheckMount(targetPath string) error
-	GetBucketUsage(volumeID string) (int64, resource.Quantity, error)
+	GetTotalCapacityFromPV(volumeID string) (resource.Quantity, error)
+	GetBucketUsage(volumeID string) (int64, error)
 	GetBucketNameFromPV(volumeID string) (string, error)
 }
 
@@ -75,34 +76,59 @@ func (su *DriverStatsUtils) CheckMount(targetPath string) error {
 	return nil
 }
 
-func (su *DriverStatsUtils) GetBucketUsage(volumeID string) (int64, resource.Quantity, error) {
-	k8sClient, err := createK8sClient()
+func (su *DriverStatsUtils) GetTotalCapacityFromPV(volumeID string) (resource.Quantity, error) {
+	pv, err := getPV(volumeID)
 	if err != nil {
-		return 0, resource.Quantity{}, err
+		return resource.Quantity{}, err
 	}
 
-	secert, capacity, err := fetchSecret(k8sClient, volumeID)
+	capacity := pv.Spec.Capacity["storage"]
+	return capacity, nil
+}
+
+func (su *DriverStatsUtils) GetBucketUsage(volumeID string) (int64, error) {
+	ep, err := getEPBasedOnCluserInfra()
 	if err != nil {
-		return 0, resource.Quantity{}, err
+		return 0, err
 	}
 
-	usage, err := bucketSizeUsed(secert)
+	secret, err := fetchSecretUsingPV(volumeID)
 	if err != nil {
-		return 0, resource.Quantity{}, err
+		return 0, err
 	}
 
-	return usage, capacity, nil
+	apiKey := string(secret.Data["apiKey"])
+	bucketName := string(secret.Data["bucketName"])
+
+	rcOptions := &rc.ResourceConfigurationV1Options{
+		URL: ep,
+		Authenticator: &core.IamAuthenticator{
+			ApiKey: apiKey, // pragma: allowlist secret
+			URL:    constants.IAMEP,
+		},
+	}
+	resourceConfig, err := rc.NewResourceConfigurationV1(rcOptions)
+	if err != nil {
+		klog.Error("Failed to create resource config")
+		return 0, err
+	}
+
+	bucketOptions := &rc.GetBucketConfigOptions{
+		Bucket: &bucketName,
+	}
+
+	res, _, err := resourceConfig.GetBucketConfig(bucketOptions)
+	if err != nil {
+		klog.Error("Failed to get bucket config")
+		return 0, err
+	}
+
+	return *res.BytesUsed, nil
 }
 
 func (su *DriverStatsUtils) GetBucketNameFromPV(volumeID string) (string, error) {
-	k8sClient, err := createK8sClient()
+	pv, err := getPV(volumeID)
 	if err != nil {
-		return "", err
-	}
-
-	pv, err := k8sClient.CoreV1().PersistentVolumes().Get(context.Background(), volumeID, metav1.GetOptions{})
-	if err != nil {
-		klog.Errorf("Unable to fetch pv %v", err)
 		return "", err
 	}
 
@@ -201,92 +227,87 @@ func createK8sClient() (*kubernetes.Clientset, error) {
 	return clientset, nil
 }
 
-func fetchSecret(clientset *kubernetes.Clientset, volumeID string) (*v1.Secret, resource.Quantity, error) {
-	pvcName, pvcNamespace, capacity, err := getPVCNameFromPVID(clientset, volumeID)
+func getPV(volumeID string) (*v1.PersistentVolume, error) {
+	k8sClient, err := createK8sClient()
 	if err != nil {
-		return nil, resource.Quantity{}, err
+		return nil, err
 	}
-	klog.Info("pvc details found. pvc-name: ", pvcName, ", pvc-namespace: ", pvcNamespace)
 
-	secret, err := clientset.CoreV1().Secrets(pvcNamespace).Get(context.TODO(), pvcName, metav1.GetOptions{})
+	pv, err := k8sClient.CoreV1().PersistentVolumes().Get(context.Background(), volumeID, metav1.GetOptions{})
 	if err != nil {
-		return nil, resource.Quantity{}, fmt.Errorf("error getting Secret: %v", err)
+		klog.Errorf("Unable to fetch pv %v", err)
+		return nil, fmt.Errorf("error getting PV: %v", err)
 	}
 
-	if secret == nil {
-		return nil, resource.Quantity{}, fmt.Errorf("secret not found with name: %v", pvcName)
-	}
-
-	klog.Info("secret details found. secret-name: ", secret.Name)
-	return secret, capacity, nil
+	return pv, nil
 }
 
-func getPVCNameFromPVID(clientset *kubernetes.Clientset, volumeID string) (string, string, resource.Quantity, error) {
-	pv, err := clientset.CoreV1().PersistentVolumes().Get(context.TODO(), volumeID, metav1.GetOptions{})
+func getSecret(pvcName, pvcNamespace string) (*v1.Secret, error) {
+	k8sClient, err := createK8sClient()
 	if err != nil {
-		return "", "", resource.Quantity{}, fmt.Errorf("error getting PV: %v", err)
+		return nil, err
+	}
+
+	secret, err := k8sClient.CoreV1().Secrets(pvcNamespace).Get(context.TODO(), pvcName, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("error getting Secret: %v", err)
+	}
+
+	return secret, nil
+}
+
+func getEPBasedOnCluserInfra() (string, error) {
+	k8sClient, err := createK8sClient()
+	if err != nil {
+		return "", err
+	}
+
+	configMap, err := k8sClient.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "cluster-info", metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("error getting ConfigMap: %v", err)
+	}
+
+	clusterConfigStr := configMap.Data["cluster-config.json"]
+	klog.Info("Successfully fetched Cluster Config ", clusterConfigStr)
+
+	var clusterConfig map[string]string
+	if err = json.Unmarshal([]byte(clusterConfigStr), &clusterConfig); err != nil {
+		return "", fmt.Errorf("error unmarshalling cluster config: %v", err)
+	}
+
+	clusterType := clusterConfig["cluster_type"]
+	klog.Info("Cluster Type ", clusterType)
+
+	if strings.Contains(clusterType, "vpc") {
+		return constants.ResourceConfigEPDirect, nil
+	}
+	return constants.ResourceConfigEPPrivate, nil
+}
+
+func fetchSecretUsingPV(volumeID string) (*v1.Secret, error) {
+	pv, err := getPV(volumeID)
+	if err != nil {
+		return nil, err
 	}
 
 	pvcName := pv.Spec.ClaimRef.Name
 	if pvcName == "" {
-		return "", "", resource.Quantity{}, fmt.Errorf("PVC name not found for PV with ID: %s", volumeID)
+		return nil, fmt.Errorf("PVC name not found for PV with ID: %s", volumeID)
 	}
-
 	pvcNamespace := pv.Spec.ClaimRef.Namespace
 	if pvcNamespace == "" {
 		pvcNamespace = "default"
 	}
 
-	capacity := pv.Spec.Capacity["storage"]
-
-	return pvcName, pvcNamespace, capacity, nil
-}
-
-func getDataFromSecret(secret *v1.Secret, key string) string {
-	secretData := string(secret.Data[key])
-	return secretData
-}
-
-func bucketSizeUsed(secret *v1.Secret) (int64, error) {
-	locationConstraint := getDataFromSecret(secret, "locationConstraint")
-	accessKey := getDataFromSecret(secret, "accessKey")
-	secretKey := getDataFromSecret(secret, "secretKey")
-	endpoint := getDataFromSecret(secret, "cosEndpoint")
-	bucketName := getDataFromSecret(secret, "bucketName")
-
-	// AWS Service configuration
-	awsConfig := &aws.Config{
-		Region:      aws.String(locationConstraint),
-		Credentials: credentials.NewStaticCredentials(accessKey, secretKey, ""),
-		Endpoint:    aws.String(endpoint),
-	}
-
-	// Initialize a new AWS session
-	session, err := session.NewSession(awsConfig)
+	secret, err := getSecret(pvcName, pvcNamespace)
 	if err != nil {
-		klog.Error("Failed to initialize aws session")
-		return 0, err
+		return nil, fmt.Errorf("error getting Secret: %v", err)
 	}
 
-	// Create an S3 client
-	client := s3.New(session)
-
-	// List objects in a bucket
-	input := &s3.ListObjectsV2Input{
-		Bucket: aws.String(bucketName),
+	if secret == nil {
+		return nil, fmt.Errorf("secret not found with name: %v", pvcName)
 	}
 
-	data, err := client.ListObjectsV2(input)
-	if err != nil {
-		klog.Error("Failed to list objects present in bucket")
-		return 0, err
-	}
-
-	// Get summary
-	var usage int64
-	for _, item := range data.Contents {
-		usage += *item.Size
-	}
-
-	return usage, nil
+	klog.Info("secret details found. secret-name: ", secret.Name)
+	return secret, nil
 }
