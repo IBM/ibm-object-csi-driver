@@ -467,7 +467,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 			expectedErr:  errors.New("Path Doesn't exist"),
 		},
 		{
-			testCaseName: "Negative: Failed to getg volume stats",
+			testCaseName: "Negative: Failed to get volume stats",
 			req: &csi.NodeGetVolumeStatsRequest{
 				VolumeId:   testVolumeID,
 				VolumePath: testTargetPath,
