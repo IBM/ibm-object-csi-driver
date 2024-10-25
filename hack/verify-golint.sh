@@ -26,6 +26,6 @@ fi
 
 echo "Verifying golint"
 
-golangci-lint run --timeout=15m -v
+golangci-lint run --timeout=10m -v
 
 echo "Congratulations! Lint check completed for all Go source files."
