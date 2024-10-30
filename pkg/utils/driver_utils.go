@@ -77,7 +77,7 @@ func (su *DriverStatsUtils) CheckMount(targetPath string) error {
 }
 
 func (su *DriverStatsUtils) GetTotalCapacityFromPV(volumeID string) (resource.Quantity, error) {
-	pv, err := getPV(volumeID)
+	pv, err := GetPV(volumeID)
 	if err != nil {
 		return resource.Quantity{}, err
 	}
@@ -127,7 +127,7 @@ func (su *DriverStatsUtils) GetBucketUsage(volumeID string) (int64, error) {
 }
 
 func (su *DriverStatsUtils) GetBucketNameFromPV(volumeID string) (string, error) {
-	pv, err := getPV(volumeID)
+	pv, err := GetPV(volumeID)
 	if err != nil {
 		return "", err
 	}
@@ -209,7 +209,7 @@ func ReplaceAndReturnCopy(req interface{}) (interface{}, error) {
 	}
 }
 
-func createK8sClient() (*kubernetes.Clientset, error) {
+func CreateK8sClient() (*kubernetes.Clientset, error) {
 	// Create a Kubernetes client configuration
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -227,8 +227,8 @@ func createK8sClient() (*kubernetes.Clientset, error) {
 	return clientset, nil
 }
 
-func getPV(volumeID string) (*v1.PersistentVolume, error) {
-	k8sClient, err := createK8sClient()
+func GetPV(volumeID string) (*v1.PersistentVolume, error) {
+	k8sClient, err := CreateK8sClient()
 	if err != nil {
 		return nil, err
 	}
@@ -242,8 +242,23 @@ func getPV(volumeID string) (*v1.PersistentVolume, error) {
 	return pv, nil
 }
 
-func getSecret(pvcName, pvcNamespace string) (*v1.Secret, error) {
-	k8sClient, err := createK8sClient()
+func GetPVC(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error) {
+	k8sClient, err := CreateK8sClient()
+	if err != nil {
+		return nil, err
+	}
+
+	pvc, err := k8sClient.CoreV1().PersistentVolumeClaims(pvcNamespace).Get(context.TODO(), pvcName, metav1.GetOptions{})
+	if err != nil {
+		klog.Errorf("Unable to fetch pvc %v", err)
+		return nil, fmt.Errorf("error getting PVC: %v", err)
+	}
+
+	return pvc, nil
+}
+
+func GetSecret(pvcName, pvcNamespace string) (*v1.Secret, error) {
+	k8sClient, err := CreateK8sClient()
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +272,7 @@ func getSecret(pvcName, pvcNamespace string) (*v1.Secret, error) {
 }
 
 func getEPBasedOnCluserInfra() (string, error) {
-	k8sClient, err := createK8sClient()
+	k8sClient, err := CreateK8sClient()
 	if err != nil {
 		return "", err
 	}
@@ -285,7 +300,7 @@ func getEPBasedOnCluserInfra() (string, error) {
 }
 
 func fetchSecretUsingPV(volumeID string) (*v1.Secret, error) {
-	pv, err := getPV(volumeID)
+	pv, err := GetPV(volumeID)
 	if err != nil {
 		return nil, err
 	}
@@ -299,7 +314,7 @@ func fetchSecretUsingPV(volumeID string) (*v1.Secret, error) {
 		pvcNamespace = "default"
 	}
 
-	secret, err := getSecret(pvcName, pvcNamespace)
+	secret, err := GetSecret(pvcName, pvcNamespace)
 	if err != nil {
 		return nil, fmt.Errorf("error getting Secret: %v", err)
 	}
