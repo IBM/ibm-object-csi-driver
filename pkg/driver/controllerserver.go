@@ -40,7 +40,7 @@ type controllerServer struct {
 	Logger     *zap.Logger
 }
 
-func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	var (
 		bucketName         string
 		endPoint           string
@@ -77,10 +77,10 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	params := req.GetParameters()
-	klog.Infof("CreateVolume Parameters:\n\t", params)
+	klog.Info("CreateVolume Parameters:\n\t", params)
 
 	secretMap := req.GetSecrets()
-	klog.Infof("Secret Parameters length:\t", len(secretMap))
+	klog.Info("Secret Parameters length:\t", len(secretMap))
 
 	if secretMap == nil || len(secretMap) == 0 {
 		klog.Info("Did not find the secret that matches pvc name. Fetching custom secret from PVC annotations\n\t")
@@ -102,7 +102,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		}
 
 		//klog.Infof("pvc Resource details:\n\t", pvcRes)
-		klog.Infof("pvc annotations:\n\t", pvcRes.Annotations)
+		klog.Info("pvc annotations:\n\t", pvcRes.Annotations)
 
 		pvcAnnotations := pvcRes.Annotations
 
@@ -235,7 +235,7 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 			return nil, err
 		}
 
-		klog.Infof("pv Resource details:\n\t", pv)
+		klog.Info("pv Resource details:\n\t", pv)
 
 		secretName := pv.Spec.CSI.NodePublishSecretRef.Name
 		secretNamespace := pv.Spec.CSI.NodePublishSecretRef.Namespace

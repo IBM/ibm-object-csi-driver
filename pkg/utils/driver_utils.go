@@ -34,7 +34,7 @@ type DriverStatsUtils struct {
 }
 
 func (su *DriverStatsUtils) BucketToDelete(volumeID string) (string, error) {
-	clientset, err := createK8sClient()
+	clientset, err := CreateK8sClient()
 	if err != nil {
 		return "", err
 	}
