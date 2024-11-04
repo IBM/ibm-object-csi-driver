@@ -49,6 +49,8 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		pvcName            string
 		pvcNamespace       string
 	)
+	secretMapCustom := make(map[string]string)
+
 	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
@@ -83,7 +85,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	klog.Info("Secret Parameters length:\t", len(secretMap))
 
 	if len(secretMap) == 0 {
-		klog.Info("Did not find the secret that matches pvc name. Fetching custom secret from PVC annotations\n\t")
+		klog.Info("Did not find the secret that matches pvc name. Fetching custom secret from PVC annotations")
 
 		pvcName = params["csi.storage.k8s.io/pvc/name"]
 		pvcNamespace = params["csi.storage.k8s.io/pvc/namespace"]
@@ -123,30 +125,19 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret resource not found %v", err))
 		}
 
-		accessKey, secretKey, apiKey, kpRootKeyCrn, serviceInstanceID, err := parseSecretParamas(secret)
+		secretMapCustom, err := parseCustomSecret(secret)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in reading secret parameters %v", err))
 		}
 
-		klog.Info("custom secret parameters parsed successfully:\n\t")
+		klog.Info("custom secret parameters parsed successfully")
 		//frame secretmap with all the above values and pass to getCrdentials as it is used to initialise cos session
-		//secretMapCustom := make(map[string]string)
-		secretMap["accessKey"] = accessKey
-		secretMap["secretKey"] = secretKey
-		secretMap["apiKey"] = apiKey
-		secretMap["kpRootKeyCrn"] = kpRootKeyCrn
-		secretMap["serviceId"] = serviceInstanceID
 
 		iamEndpoint := secretMap["iamEndpoint"]
 		if iamEndpoint == "" {
 			iamEndpoint = constants.DefaultIAMEndPoint
 		}
-		secretMap["iamEndpoint"] = iamEndpoint
-	}
-
-	creds, err := getCredentials(secretMap)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
+		secretMapCustom["iamEndpoint"] = iamEndpoint
 	}
 
 	endPoint = secretMap["cosEndpoint"]
@@ -166,6 +157,9 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	}
 
 	kpRootKeyCrn = secretMap["kpRootKeyCRN"]
+	if kpRootKeyCrn == "" {
+		kpRootKeyCrn = secretMapCustom["kpRootKeyCRN"]
+	}
 	if kpRootKeyCrn != "" {
 		klog.Infof("key protect root key crn provided for bucket creation")
 	}
@@ -173,6 +167,11 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	mounter := secretMap["mounter"]
 	if mounter == "" {
 		mounter = params["mounter"]
+	}
+
+	creds, err := getCredentials(secretMapCustom)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
 	}
 
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
@@ -221,6 +220,8 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 }
 
 func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
+	secretMapCustom := make(map[string]string)
+
 	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
@@ -237,7 +238,7 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 	var endPoint, locationConstraint string
 
 	if len(secretMap) == 0 {
-		klog.Info("Did not find the secret that matches pvc name. Fetching custom secret from PVC annotations\n\t")
+		klog.Info("Did not find the secret that matches pvc name. Fetching custom secret from PVC annotations")
 
 		pv, err := utils.GetPV(volumeID)
 		if err != nil {
@@ -268,18 +269,14 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret resource not found %v", err))
 		}
 
-		accessKey, secretKey, apiKey, kpRootKeyCrn, serviceInstanceID, err := parseSecretParamas(secret)
+		secretMapCustom, err = parseCustomSecret(secret)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in reading secret parameters %v", err))
 		}
-		klog.Info("custom secret parameters parsed successfully:\n\t")
+
+		klog.Info("custom secret parameters parsed successfully")
+
 		//frame secretmap with all the above values and pass to getCrdentials as it is used to initialise cos session
-		//secretMapCustom := make(map[string]string)
-		secretMap["accessKey"] = accessKey
-		secretMap["secretKey"] = secretKey
-		secretMap["apiKey"] = apiKey
-		secretMap["kpRootKeyCrn"] = kpRootKeyCrn
-		secretMap["serviceId"] = serviceInstanceID
 
 		iamEndpoint := secretMap["iamEndpoint"]
 		if iamEndpoint == "" {
@@ -288,7 +285,7 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 		secretMap["iamEndpoint"] = iamEndpoint
 	}
 
-	creds, err := getCredentials(secretMap)
+	creds, err := getCredentials(secretMapCustom)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
 	}
@@ -444,10 +441,17 @@ func getCredentials(secretMap map[string]string) (*s3client.ObjectStorageCredent
 	}, nil
 }
 
-func parseSecretParamas(secret *v1.Secret) (accessKey, secretKey, apiKey, serviceInstanceID, kpRootKeyCrn string, err error) {
-	if strings.TrimSpace(string(secret.Type)) != "cos-s3-csi-driver" {
-		return "", "", "", "", "", fmt.Errorf("Wrong Secret Type. Provided secret of type %s. Expected type %s", string(secret.Type), "cos-s3-csi-driver")
-	}
+func parseCustomSecret(secret *v1.Secret) (secretMapCustom map[string]string, err error) {
+
+	//secretMapCustom := make(map[string]string)
+
+	var (
+		accessKey         string
+		secretKey         string
+		apiKey            string
+		serviceInstanceID string
+		kpRootKeyCrn      string
+	)
 
 	if bytesVal, ok := secret.Data["apiKey"]; ok {
 		apiKey = string(bytesVal)
@@ -461,28 +465,25 @@ func parseSecretParamas(secret *v1.Secret) (accessKey, secretKey, apiKey, servic
 		serviceInstanceID = string(bytesVal)
 	}
 
-	accessKey, err = parseSecret(secret, "accessKey")
-	if err != nil {
-		return "", "", "", "", "", err
-	}
-
-	secretKey, err = parseSecret(secret, "secretKey")
-	if err != nil {
-		return "", "", "", "", "", err
-	}
-
-	return accessKey, secretKey, apiKey, kpRootKeyCrn, serviceInstanceID, nil
-}
-
-func parseSecret(secret *v1.Secret, keyName string) (string, error) {
-
-	bytesVal, ok := secret.Data[keyName]
+	accessKeyBytes, ok := secret.Data["accessKey"]
 	if !ok {
-		//klog.Infof("if not okay, return error")
-		return "", fmt.Errorf("%s secret missing", keyName)
+		return nil, fmt.Errorf("%s secret parameter missing", accessKey)
 	}
-	//klog.Infof("if okay, return string(bytesVal)")
-	return string(bytesVal), nil
+	accessKey = string(accessKeyBytes)
+
+	secretKeyBytes, ok := secret.Data["secretKey"]
+	if !ok {
+		return nil, fmt.Errorf("%s secret parameter missing", secretKey)
+	}
+	secretKey = string(secretKeyBytes)
+
+	secretMapCustom["accessKey"] = accessKey
+	secretMapCustom["secretKey"] = secretKey
+	secretMapCustom["apiKey"] = apiKey
+	secretMapCustom["kpRootKeyCrn"] = kpRootKeyCrn
+	secretMapCustom["serviceId"] = serviceInstanceID
+
+	return secretMapCustom, nil
 }
 
 func getTempBucketName(mounterType, volumeID string) string {
