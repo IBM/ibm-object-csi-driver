@@ -126,7 +126,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret resource not found %v", err))
 		}
 
-		secretMapCustom, err := parseCustomSecret(secret)
+		secretMapCustom, err = parseCustomSecret(secret)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in reading secret parameters %v", err))
 		}
@@ -134,11 +134,12 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		klog.Info("custom secret parameters parsed successfully")
 		//frame secretmap with all the above values and pass to getCrdentials as it is used to initialise cos session
 
-		iamEndpoint := secretMap["iamEndpoint"]
-		if iamEndpoint == "" {
-			iamEndpoint = constants.DefaultIAMEndPoint
-		}
-		secretMapCustom["iamEndpoint"] = iamEndpoint
+		secretMap = secretMapCustom
+	}
+
+	iamEndpoint := secretMap["iamEndpoint"]
+	if iamEndpoint == "" {
+		iamEndpoint = constants.DefaultIAMEndPoint
 	}
 
 	endPoint = secretMap["cosEndpoint"]
@@ -170,14 +171,19 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		mounter = params["mounter"]
 	}
 
-	klog.Info("secretMapCustom:\t", secretMapCustom)
-	creds, err := getCredentials(secretMapCustom)
+	bucketName = secretMap["bucketName"]
+	if bucketName == "" {
+		bucketName = secretMapCustom["bucketName"]
+	}
+
+	klog.Info("secretMapCustom:\t", secretMap)
+	creds, err := getCredentials(secretMap)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
 	}
 
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
-	bucketName = secretMap["bucketName"]
+
 	params["userProvidedBucket"] = "true"
 	if bucketName != "" {
 		// User Provided bucket. Check its existence and create if not present
@@ -277,17 +283,16 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 		}
 
 		klog.Info("custom secret parameters parsed successfully")
-
+		secretMap = secretMapCustom
 		//frame secretmap with all the above values and pass to getCrdentials as it is used to initialise cos session
-
-		iamEndpoint := secretMap["iamEndpoint"]
-		if iamEndpoint == "" {
-			iamEndpoint = constants.DefaultIAMEndPoint
-		}
-		secretMap["iamEndpoint"] = iamEndpoint
 	}
 
-	creds, err := getCredentials(secretMapCustom)
+	iamEndpoint := secretMap["iamEndpoint"]
+	if iamEndpoint == "" {
+		iamEndpoint = constants.DefaultIAMEndPoint
+	}
+
+	creds, err := getCredentials(secretMap)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
 	}
@@ -444,29 +449,21 @@ func getCredentials(secretMap map[string]string) (*s3client.ObjectStorageCredent
 	}, nil
 }
 
-func parseCustomSecret(secret *v1.Secret) (secretMapCustom map[string]string, err error) {
+func parseCustomSecret(secret *v1.Secret) (map[string]string, error) {
 	klog.Infof("In: parseCustomSecret")
-	secretMapCustom = make(map[string]string)
+	secretMapCustom := make(map[string]string)
 
 	var (
-		accessKey         string
-		secretKey         string
-		apiKey            string
-		serviceInstanceID string
-		kpRootKeyCrn      string
+		accessKey          string
+		secretKey          string
+		apiKey             string
+		serviceInstanceID  string
+		kpRootKeyCrn       string
+		bucketName         string
+		iamEndpoint        string
+		cosEndpoint        string
+		locationConstraint string
 	)
-
-	if bytesVal, ok := secret.Data["apiKey"]; ok {
-		apiKey = string(bytesVal)
-	}
-
-	if bytesVal, ok := secret.Data["kpRootKeyCRN"]; ok {
-		kpRootKeyCrn = string(bytesVal)
-	}
-
-	if bytesVal, ok := secret.Data["serviceId"]; ok {
-		serviceInstanceID = string(bytesVal)
-	}
 
 	accessKeyBytes, ok := secret.Data["accessKey"]
 	if !ok {
@@ -480,12 +477,45 @@ func parseCustomSecret(secret *v1.Secret) (secretMapCustom map[string]string, er
 	}
 	secretKey = string(secretKeyBytes)
 
+	if bytesVal, ok := secret.Data["apiKey"]; ok {
+		apiKey = string(bytesVal)
+	}
+
+	if bytesVal, ok := secret.Data["kpRootKeyCRN"]; ok {
+		kpRootKeyCrn = string(bytesVal)
+	}
+
+	if bytesVal, ok := secret.Data["serviceId"]; ok {
+		serviceInstanceID = string(bytesVal)
+	}
+
+	if bytesVal, ok := secret.Data["bucketName"]; ok {
+		bucketName = string(bytesVal)
+	}
+
+	if bytesVal, ok := secret.Data["iamEndpoint"]; ok {
+		iamEndpoint = string(bytesVal)
+	}
+
+	if bytesVal, ok := secret.Data["cosEndpoint"]; ok {
+		cosEndpoint = string(bytesVal)
+	}
+
+	if bytesVal, ok := secret.Data["locationConstraint"]; ok {
+		locationConstraint = string(bytesVal)
+	}
+
 	secretMapCustom["accessKey"] = accessKey
 	secretMapCustom["secretKey"] = secretKey
 	secretMapCustom["apiKey"] = apiKey
 	secretMapCustom["kpRootKeyCrn"] = kpRootKeyCrn
 	secretMapCustom["serviceId"] = serviceInstanceID
+	secretMapCustom["bucketName"] = bucketName
+	secretMapCustom["iamEndpoint"] = iamEndpoint
+	secretMapCustom["cosEndpoint"] = cosEndpoint
+	secretMapCustom["locationConstraint"] = locationConstraint
 
+	klog.Info("secretMapCustom in parseCustomSecret:\t", secretMapCustom)
 	return secretMapCustom, nil
 }
 
