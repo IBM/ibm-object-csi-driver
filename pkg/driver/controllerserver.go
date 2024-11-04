@@ -443,7 +443,7 @@ func getCredentials(secretMap map[string]string) (*s3client.ObjectStorageCredent
 
 func parseCustomSecret(secret *v1.Secret) (secretMapCustom map[string]string, err error) {
 
-	//secretMapCustom := make(map[string]string)
+	secretMapCustom = make(map[string]string)
 
 	var (
 		accessKey         string
