@@ -82,6 +82,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	klog.Info("CreateVolume Parameters:\n\t", params)
 
 	secretMap := req.GetSecrets()
+	klog.Info("SecretMap:\t", secretMap)
 	klog.Info("Secret Parameters length:\t", len(secretMap))
 
 	if len(secretMap) == 0 {
@@ -169,6 +170,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		mounter = params["mounter"]
 	}
 
+	klog.Info("secretMapCustom:\t", secretMapCustom)
 	creds, err := getCredentials(secretMapCustom)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
@@ -399,6 +401,7 @@ func (cs *controllerServer) ControllerModifyVolume(_ context.Context, req *csi.C
 }
 
 func getCredentials(secretMap map[string]string) (*s3client.ObjectStorageCredentials, error) {
+	klog.Infof("In: getCredentials")
 	var (
 		accessKey         string
 		secretKey         string
@@ -442,7 +445,7 @@ func getCredentials(secretMap map[string]string) (*s3client.ObjectStorageCredent
 }
 
 func parseCustomSecret(secret *v1.Secret) (secretMapCustom map[string]string, err error) {
-
+	klog.Infof("In: parseCustomSecret")
 	secretMapCustom = make(map[string]string)
 
 	var (
