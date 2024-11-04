@@ -24,7 +24,7 @@ For building the driver `docker` and `GO` should be installed on the system
    export RHSM_USER=<RHSM_USER>
    export RHSM_PASS=<RHSM_PASS>
 
-   make container
+   make buildimage
    ```
 
 An image named `ibm-object-csi-driver:latest` is created. Please retag and push the image to suitable registries to deploy in cluster.

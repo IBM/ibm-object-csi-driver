@@ -82,7 +82,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	secretMap := req.GetSecrets()
 	klog.Info("Secret Parameters length:\t", len(secretMap))
 
-	if secretMap == nil || len(secretMap) == 0 {
+	if len(secretMap) == 0 {
 		klog.Info("Did not find the secret that matches pvc name. Fetching custom secret from PVC annotations\n\t")
 
 		pvcName = params["csi.storage.k8s.io/pvc/name"]
@@ -93,7 +93,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		}
 
 		if pvcNamespace == "" {
-			pvcNamespace = "default"
+			pvcNamespace = constants.DefaultNamespace
 		}
 
 		pvcRes, err := utils.GetPVC(pvcName, pvcNamespace)
@@ -109,6 +109,15 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		secretName := pvcAnnotations["cos.csi.driver/secret"]
 		secretNamespace := pvcAnnotations["cos.csi.driver/secret-namespace"]
 
+		if secretName == "" {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("secretName annotation 'cos.csi.driver/secret' not specified in the PVC annotations, could not fetch the secret %v", err))
+		}
+
+		if secretNamespace == "" {
+			klog.Info("secretNamespace annotation 'cos.csi.driver/secret-namespace' not specified in PVC annotations:\t", pvcRes.Annotations, "\t trying to fetch the secret in default namespace")
+			secretNamespace = constants.DefaultNamespace
+		}
+
 		secret, err := utils.GetSecret(secretName, secretNamespace)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret resource not found %v", err))
@@ -118,8 +127,8 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in reading secret parameters %v", err))
 		}
-		//delete later
-		klog.Info("Custom secret Parameters:\n\t", accessKey, secretKey, apiKey, kpRootKeyCrn)
+
+		klog.Info("custom secret parameters parsed successfully:\n\t")
 		//frame secretmap with all the above values and pass to getCrdentials as it is used to initialise cos session
 		//secretMapCustom := make(map[string]string)
 		secretMap["accessKey"] = accessKey
@@ -227,7 +236,7 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 
 	var endPoint, locationConstraint string
 
-	if secretMap == nil || len(secretMap) == 0 {
+	if len(secretMap) == 0 {
 		klog.Info("Did not find the secret that matches pvc name. Fetching custom secret from PVC annotations\n\t")
 
 		pv, err := utils.GetPV(volumeID)
@@ -239,6 +248,15 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 
 		secretName := pv.Spec.CSI.NodePublishSecretRef.Name
 		secretNamespace := pv.Spec.CSI.NodePublishSecretRef.Namespace
+
+		if secretName == "" {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret details not found, could not fetch the secret %v", err))
+		}
+
+		if secretNamespace == "" {
+			klog.Info("secret Namespace not found. trying to fetch the secret in default namespace")
+			secretNamespace = constants.DefaultNamespace
+		}
 
 		endPoint = pv.Spec.CSI.VolumeAttributes["cosEndpoint"]
 		locationConstraint = pv.Spec.CSI.VolumeAttributes["locationConstraint"]
@@ -254,8 +272,7 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in reading secret parameters %v", err))
 		}
-		//delete later
-		klog.Info("Custom secret Parameters:\n\t", accessKey, secretKey, apiKey, kpRootKeyCrn)
+		klog.Info("custom secret parameters parsed successfully:\n\t")
 		//frame secretmap with all the above values and pass to getCrdentials as it is used to initialise cos session
 		//secretMapCustom := make(map[string]string)
 		secretMap["accessKey"] = accessKey
@@ -461,10 +478,10 @@ func parseSecret(secret *v1.Secret, keyName string) (string, error) {
 
 	bytesVal, ok := secret.Data[keyName]
 	if !ok {
-		klog.Infof("if not okay, return error")
+		//klog.Infof("if not okay, return error")
 		return "", fmt.Errorf("%s secret missing", keyName)
 	}
-	klog.Infof("if okay, return string(bytesVal)")
+	//klog.Infof("if okay, return string(bytesVal)")
 	return string(bytesVal), nil
 }
 
