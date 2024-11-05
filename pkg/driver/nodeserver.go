@@ -107,6 +107,7 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		targetPath, deviceID, readOnly, volumeID, attrib, mountFlags)
 
 	secretMap := req.GetSecrets()
+	klog.V(2).Infof("-NodePublishVolume-: req.GetSecrets(): %v", req.GetSecrets())
 	secretMapCopy := make(map[string]string)
 	for k, v := range secretMap {
 		if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
@@ -157,7 +158,7 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		return nil, err
 	}
 
-	klog.Infof("s3: bucket %s successfully mounted to %s", secretMap["bucket-name"], targetPath)
+	klog.Infof("s3: bucket %s successfully mounted to %s", secretMap["bucketName"], targetPath)
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
