@@ -104,7 +104,6 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("PVC resource not found %v", err))
 		}
 
-		//klog.Infof("pvc Resource details:\n\t", pvcRes)
 		klog.Info("pvc annotations:\n\t", pvcRes.Annotations)
 
 		pvcAnnotations := pvcRes.Annotations
@@ -132,7 +131,6 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		}
 
 		klog.Info("custom secret parameters parsed successfully")
-		//frame secretmap with all the above values and pass to getCrdentials as it is used to initialise cos session
 
 		secretMap = secretMapCustom
 	}
@@ -284,7 +282,6 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 
 		klog.Info("custom secret parameters parsed successfully")
 		secretMap = secretMapCustom
-		//frame secretmap with all the above values and pass to getCrdentials as it is used to initialise cos session
 	}
 
 	iamEndpoint := secretMap["iamEndpoint"]
@@ -450,7 +447,7 @@ func getCredentials(secretMap map[string]string) (*s3client.ObjectStorageCredent
 }
 
 func parseCustomSecret(secret *v1.Secret) (map[string]string, error) {
-	klog.Infof("In: parseCustomSecret")
+	klog.Infof("-parseCustomSecret-")
 	secretMapCustom := make(map[string]string)
 
 	var (
