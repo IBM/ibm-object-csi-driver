@@ -82,8 +82,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	klog.Info("CreateVolume Parameters:\n\t", params)
 
 	secretMap := req.GetSecrets()
-	klog.Info("SecretMap:\t", secretMap)
-	klog.Info("Secret Parameters length:\t", len(secretMap))
+	klog.Info("req.GetSecrets() length:\t", len(secretMap))
 
 	if len(secretMap) == 0 {
 		klog.Info("Did not find the secret that matches pvc name. Fetching custom secret from PVC annotations")
@@ -174,7 +173,6 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		bucketName = secretMapCustom["bucketName"]
 	}
 
-	klog.Info("secretMapCustom:\t", secretMap)
 	creds, err := getCredentials(secretMap)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
@@ -185,7 +183,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	params["userProvidedBucket"] = "true"
 	if bucketName != "" {
 		// User Provided bucket. Check its existence and create if not present
-		klog.Infof("Bucket name provided")
+		klog.Infof("Bucket name provided: %v", bucketName)
 		if err := sess.CheckBucketAccess(bucketName); err != nil {
 			klog.Infof("CreateVolume: Unable to access the bucket: %v, Creating with given name", err)
 			err = createBucket(sess, bucketName, kpRootKeyCrn)
@@ -512,7 +510,6 @@ func parseCustomSecret(secret *v1.Secret) (map[string]string, error) {
 	secretMapCustom["cosEndpoint"] = cosEndpoint
 	secretMapCustom["locationConstraint"] = locationConstraint
 
-	klog.Info("secretMapCustom in parseCustomSecret:\t", secretMapCustom)
 	return secretMapCustom, nil
 }
 

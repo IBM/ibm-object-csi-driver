@@ -304,7 +304,7 @@ func fetchSecretUsingPV(volumeID string) (*v1.Secret, error) {
 	if err != nil {
 		return nil, err
 	}
-	klog.Info("pv Resource details:\n\t", pv)
+	klog.Info("secret fetched from PV:\n\t", pv.Spec.CSI.NodePublishSecretRef)
 
 	secretName := pv.Spec.CSI.NodePublishSecretRef.Name
 	secretNamespace := pv.Spec.CSI.NodePublishSecretRef.Namespace
