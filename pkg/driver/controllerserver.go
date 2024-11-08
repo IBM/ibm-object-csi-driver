@@ -401,7 +401,7 @@ func (cs *controllerServer) ControllerModifyVolume(_ context.Context, req *csi.C
 }
 
 func getCredentials(secretMap map[string]string) (*s3client.ObjectStorageCredentials, error) {
-	klog.Infof("In: getCredentials")
+	klog.Infof("- getCredentials-")
 	var (
 		accessKey         string
 		secretKey         string

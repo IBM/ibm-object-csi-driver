@@ -20,7 +20,7 @@ images:
   newTag: v3.4.1
 - name: cos-driver-image
   newName: icr.io/ibm/ibm-object-csi-driver
-  newTag: v0.1.12
+  newTag: v0.1.14
 - name: driver-registrar-image
   newName: k8s.gcr.io/sig-storage/csi-node-driver-registrar
   newTag: v2.6.3
@@ -51,3 +51,15 @@ patches:
       - op: replace
         path: /parameters/locationConstraint
         value: "us-south-smart"
+  - target:
+      kind: StorageClass
+    patch: |-
+      - op: replace
+        path: /parameters/csi.storage.k8s.io~1node-publish-secret-name
+        value: "${pvc.name}"
+      - op: add
+        path: /parameters/csi.storage.k8s.io~1provisioner-secret-name
+        value: "${pvc.name}"
+      - op: add
+        path: /parameters/csi.storage.k8s.io~1provisioner-secret-namespace
+        value: "${pvc.namespace}"
