@@ -348,6 +348,7 @@ func TestDeleteVolume(t *testing.T) {
 				VolumeId: testVolumeID,
 				Secrets: map[string]string{
 					"cosEndpoint": "test-endpoint",
+					"secretKey":   "testSecretKey",
 				},
 			},
 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
