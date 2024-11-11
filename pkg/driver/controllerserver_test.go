@@ -167,7 +167,8 @@ func TestCreateVolume(t *testing.T) {
 					},
 				},
 				Secrets: map[string]string{
-					"accessKey": "testAccessKey",
+					"accessKey":   "testAccessKey",
+					"cosEndpoint": "test-endpoint",
 				},
 			},
 			cosSession:   &s3client.FakeCOSSessionFactory{},
@@ -188,6 +189,7 @@ func TestCreateVolume(t *testing.T) {
 				Secrets: map[string]string{
 					"iamEndpoint": "testIAMEndpoint",
 					"apiKey":      "testAPIKey",
+					"cosEndpoint": "test-endpoint",
 				},
 			},
 			cosSession:   &s3client.FakeCOSSessionFactory{},
@@ -344,7 +346,9 @@ func TestDeleteVolume(t *testing.T) {
 			testCaseName: "Negative: Access Key not provided",
 			req: &csi.DeleteVolumeRequest{
 				VolumeId: testVolumeID,
-				Secrets:  map[string]string{},
+				Secrets: map[string]string{
+					"cosEndpoint": "test-endpoint",
+				},
 			},
 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
 			cosSession:       &s3client.FakeCOSSessionFactory{},

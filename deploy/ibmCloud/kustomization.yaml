@@ -51,15 +51,15 @@ patches:
       - op: replace
         path: /parameters/locationConstraint
         value: "us-south-smart"
-  - target:
-      kind: StorageClass
-    patch: |-
-      - op: replace
-        path: /parameters/csi.storage.k8s.io~1node-publish-secret-name
-        value: "${pvc.name}"
-      - op: add
-        path: /parameters/csi.storage.k8s.io~1provisioner-secret-name
-        value: "${pvc.name}"
-      - op: add
-        path: /parameters/csi.storage.k8s.io~1provisioner-secret-namespace
-        value: "${pvc.namespace}"
+  # - target:
+  #     kind: StorageClass
+  #   patch: |-
+  #     - op: replace
+  #       path: /parameters/csi.storage.k8s.io~1node-publish-secret-name
+  #       value: "${pvc.name}"
+  #     - op: add
+  #       path: /parameters/csi.storage.k8s.io~1provisioner-secret-name
+  #       value: "${pvc.name}"
+  #     - op: add
+  #       path: /parameters/csi.storage.k8s.io~1provisioner-secret-namespace
+  #       value: "${pvc.namespace}"

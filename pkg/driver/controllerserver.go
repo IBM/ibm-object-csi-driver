@@ -134,10 +134,10 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		secretMap = secretMapCustom
 	}
 
-	iamEndpoint := secretMap["iamEndpoint"]
-	if iamEndpoint == "" {
-		iamEndpoint = constants.DefaultIAMEndPoint
-	}
+	// iamEndpoint := secretMap["iamEndpoint"]
+	// if iamEndpoint == "" {
+	// 	iamEndpoint = constants.DefaultIAMEndPoint
+	// }
 
 	endPoint = secretMap["cosEndpoint"]
 	if endPoint == "" {
@@ -224,7 +224,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 }
 
 func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	secretMapCustom := make(map[string]string)
+	//secretMapCustom := make(map[string]string)
 
 	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
 	if err != nil {
@@ -273,7 +273,7 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret resource not found %v", err))
 		}
 
-		secretMapCustom, err = parseCustomSecret(secret)
+		secretMapCustom, err := parseCustomSecret(secret)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in reading secret parameters %v", err))
 		}
@@ -282,10 +282,10 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 		secretMap = secretMapCustom
 	}
 
-	iamEndpoint := secretMap["iamEndpoint"]
-	if iamEndpoint == "" {
-		iamEndpoint = constants.DefaultIAMEndPoint
-	}
+	// iamEndpoint := secretMap["iamEndpoint"]
+	// if iamEndpoint == "" {
+	// 	iamEndpoint = constants.DefaultIAMEndPoint
+	// }
 
 	creds, err := getCredentials(secretMap)
 	if err != nil {
