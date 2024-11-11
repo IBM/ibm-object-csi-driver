@@ -134,11 +134,6 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		secretMap = secretMapCustom
 	}
 
-	// iamEndpoint := secretMap["iamEndpoint"]
-	// if iamEndpoint == "" {
-	// 	iamEndpoint = constants.DefaultIAMEndPoint
-	// }
-
 	endPoint = secretMap["cosEndpoint"]
 	if endPoint == "" {
 		endPoint = params["cosEndpoint"]
@@ -281,11 +276,6 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 		klog.Info("custom secret parameters parsed successfully")
 		secretMap = secretMapCustom
 	}
-
-	// iamEndpoint := secretMap["iamEndpoint"]
-	// if iamEndpoint == "" {
-	// 	iamEndpoint = constants.DefaultIAMEndPoint
-	// }
 
 	creds, err := getCredentials(secretMap)
 	if err != nil {
