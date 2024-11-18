@@ -96,8 +96,6 @@ spec:
         - name: csi-provisioner
           securityContext:
             allowPrivilegeEscalation: false
-            seccompProfile:
-              type: RuntimeDefault
             capabilities:
               drop:
               - ALL
@@ -120,8 +118,6 @@ spec:
               drop:
               - ALL
             allowPrivilegeEscalation: false
-            seccompProfile:
-              type: RuntimeDefault
           image: cos-driver-image
           imagePullPolicy: "Always"
           args:
@@ -146,8 +142,6 @@ spec:
               drop:
               - ALL
             allowPrivilegeEscalation: false
-            seccompProfile:
-              type: RuntimeDefault
           image: liveness-probe-image
           args:
             - "--csi-address=/csi/csi.sock"
