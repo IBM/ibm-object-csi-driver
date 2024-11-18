@@ -450,17 +450,13 @@ func parseCustomSecret(secret *v1.Secret) (map[string]string, error) {
 		locationConstraint string
 	)
 
-	accessKeyBytes, ok := secret.Data["accessKey"]
-	if !ok {
-		return nil, fmt.Errorf("%s secret parameter missing", accessKey)
+	if bytesVal, ok := secret.Data["accessKey"]; ok {
+		accessKey = string(bytesVal)
 	}
-	accessKey = string(accessKeyBytes)
 
-	secretKeyBytes, ok := secret.Data["secretKey"]
-	if !ok {
-		return nil, fmt.Errorf("%s secret parameter missing", secretKey)
+	if bytesVal, ok := secret.Data["secretKey"]; ok {
+		secretKey = string(bytesVal)
 	}
-	secretKey = string(secretKeyBytes)
 
 	if bytesVal, ok := secret.Data["apiKey"]; ok {
 		apiKey = string(bytesVal)
