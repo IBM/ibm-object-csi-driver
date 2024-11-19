@@ -99,8 +99,6 @@ spec:
             allowPrivilegeEscalation: false
             runAsNonRoot: false
             runAsUser: 0
-            seccompProfile:
-              type: RuntimeDefault
           image: driver-registrar-image
           args:
             - --v=5
@@ -169,10 +167,6 @@ spec:
               - ALL
             privileged: false
             allowPrivilegeEscalation: false
-            runAsNonRoot: true
-            runAsUser: 2121
-            seccompProfile:
-              type: RuntimeDefault
           image: liveness-probe-image
           args:
             - "--csi-address=/csi/csi.sock"
