@@ -230,7 +230,8 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 	klog.Infof("Deleting volume %v", volumeID)
 	secretMap := req.GetSecrets()
 
-	var endPoint, locationConstraint string
+	endPoint := secretMap["cosEndpoint"]
+	locationConstraint := secretMap["locationConstraint"]
 
 	if len(secretMap) == 0 {
 		klog.Info("Did not find the secret that matches pvc name. Fetching custom secret from PVC annotations")
@@ -268,9 +269,6 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 		klog.Info("custom secret parameters parsed successfully, length of custom secret: ", len(secretMapCustom))
 		secretMap = secretMapCustom
 	}
-
-	endPoint = secretMap["cosEndpoint"]
-	locationConstraint = secretMap["locationConstraint"]
 
 	creds, err := getCredentials(secretMap)
 	if err != nil {
