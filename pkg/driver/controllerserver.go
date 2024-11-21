@@ -124,12 +124,8 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret resource not found %v", err))
 		}
 
-		secretMapCustom, err = parseCustomSecret(secret)
-		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in reading secret parameters %v", err))
-		}
-
-		klog.Info("custom secret parameters parsed successfully")
+		secretMapCustom = parseCustomSecret(secret)
+		klog.Info("custom secret parameters parsed successfully, length of custom secret: ", len(secretMapCustom))
 
 		secretMap = secretMapCustom
 	}
@@ -268,14 +264,13 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret resource not found %v", err))
 		}
 
-		secretMapCustom, err := parseCustomSecret(secret)
-		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in reading secret parameters %v", err))
-		}
-
-		klog.Info("custom secret parameters parsed successfully")
+		secretMapCustom := parseCustomSecret(secret)
+		klog.Info("custom secret parameters parsed successfully, length of custom secret: ", len(secretMapCustom))
 		secretMap = secretMapCustom
 	}
+
+	endPoint = secretMap["cosEndpoint"]
+	locationConstraint = secretMap["locationConstraint"]
 
 	creds, err := getCredentials(secretMap)
 	if err != nil {
@@ -434,7 +429,7 @@ func getCredentials(secretMap map[string]string) (*s3client.ObjectStorageCredent
 	}, nil
 }
 
-func parseCustomSecret(secret *v1.Secret) (map[string]string, error) {
+func parseCustomSecret(secret *v1.Secret) map[string]string {
 	klog.Infof("-parseCustomSecret-")
 	secretMapCustom := make(map[string]string)
 
@@ -496,7 +491,7 @@ func parseCustomSecret(secret *v1.Secret) (map[string]string, error) {
 	secretMapCustom["cosEndpoint"] = cosEndpoint
 	secretMapCustom["locationConstraint"] = locationConstraint
 
-	return secretMapCustom, nil
+	return secretMapCustom
 }
 
 func getTempBucketName(mounterType, volumeID string) string {
