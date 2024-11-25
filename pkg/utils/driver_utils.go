@@ -34,7 +34,7 @@ type DriverStatsUtils struct {
 }
 
 func (su *DriverStatsUtils) BucketToDelete(volumeID string) (string, error) {
-	clientset, err := createK8sClient()
+	clientset, err := CreateK8sClient()
 	if err != nil {
 		return "", err
 	}
@@ -77,7 +77,7 @@ func (su *DriverStatsUtils) CheckMount(targetPath string) error {
 }
 
 func (su *DriverStatsUtils) GetTotalCapacityFromPV(volumeID string) (resource.Quantity, error) {
-	pv, err := getPV(volumeID)
+	pv, err := GetPV(volumeID)
 	if err != nil {
 		return resource.Quantity{}, err
 	}
@@ -127,7 +127,7 @@ func (su *DriverStatsUtils) GetBucketUsage(volumeID string) (int64, error) {
 }
 
 func (su *DriverStatsUtils) GetBucketNameFromPV(volumeID string) (string, error) {
-	pv, err := getPV(volumeID)
+	pv, err := GetPV(volumeID)
 	if err != nil {
 		return "", err
 	}
@@ -209,7 +209,7 @@ func ReplaceAndReturnCopy(req interface{}) (interface{}, error) {
 	}
 }
 
-func createK8sClient() (*kubernetes.Clientset, error) {
+func CreateK8sClient() (*kubernetes.Clientset, error) {
 	// Create a Kubernetes client configuration
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -227,8 +227,8 @@ func createK8sClient() (*kubernetes.Clientset, error) {
 	return clientset, nil
 }
 
-func getPV(volumeID string) (*v1.PersistentVolume, error) {
-	k8sClient, err := createK8sClient()
+func GetPV(volumeID string) (*v1.PersistentVolume, error) {
+	k8sClient, err := CreateK8sClient()
 	if err != nil {
 		return nil, err
 	}
@@ -242,13 +242,28 @@ func getPV(volumeID string) (*v1.PersistentVolume, error) {
 	return pv, nil
 }
 
-func getSecret(pvcName, pvcNamespace string) (*v1.Secret, error) {
-	k8sClient, err := createK8sClient()
+func GetPVC(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error) {
+	k8sClient, err := CreateK8sClient()
 	if err != nil {
 		return nil, err
 	}
 
-	secret, err := k8sClient.CoreV1().Secrets(pvcNamespace).Get(context.TODO(), pvcName, metav1.GetOptions{})
+	pvc, err := k8sClient.CoreV1().PersistentVolumeClaims(pvcNamespace).Get(context.TODO(), pvcName, metav1.GetOptions{})
+	if err != nil {
+		klog.Errorf("Unable to fetch pvc %v", err)
+		return nil, fmt.Errorf("error getting PVC: %v", err)
+	}
+
+	return pvc, nil
+}
+
+func GetSecret(secretName, secretNamespace string) (*v1.Secret, error) {
+	k8sClient, err := CreateK8sClient()
+	if err != nil {
+		return nil, err
+	}
+
+	secret, err := k8sClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error getting Secret: %v", err)
 	}
@@ -257,7 +272,7 @@ func getSecret(pvcName, pvcNamespace string) (*v1.Secret, error) {
 }
 
 func getEPBasedOnCluserInfra() (string, error) {
-	k8sClient, err := createK8sClient()
+	k8sClient, err := CreateK8sClient()
 	if err != nil {
 		return "", err
 	}
@@ -285,29 +300,33 @@ func getEPBasedOnCluserInfra() (string, error) {
 }
 
 func fetchSecretUsingPV(volumeID string) (*v1.Secret, error) {
-	pv, err := getPV(volumeID)
+	pv, err := GetPV(volumeID)
 	if err != nil {
 		return nil, err
 	}
+	klog.Info("secret fetched from PV:\n\t", pv.Spec.CSI.NodePublishSecretRef)
 
-	pvcName := pv.Spec.ClaimRef.Name
-	if pvcName == "" {
-		return nil, fmt.Errorf("PVC name not found for PV with ID: %s", volumeID)
-	}
-	pvcNamespace := pv.Spec.ClaimRef.Namespace
-	if pvcNamespace == "" {
-		pvcNamespace = "default"
+	secretName := pv.Spec.CSI.NodePublishSecretRef.Name
+	secretNamespace := pv.Spec.CSI.NodePublishSecretRef.Namespace
+
+	if secretName == "" {
+		return nil, fmt.Errorf("Secret details not found in the PV, could not fetch the secret")
 	}
 
-	secret, err := getSecret(pvcName, pvcNamespace)
+	if secretNamespace == "" {
+		klog.Info("secret Namespace not found. trying to fetch the secret in default namespace")
+		secretNamespace = constants.DefaultNamespace
+	}
+
+	secret, err := GetSecret(secretName, secretNamespace)
 	if err != nil {
 		return nil, fmt.Errorf("error getting Secret: %v", err)
 	}
 
 	if secret == nil {
-		return nil, fmt.Errorf("secret not found with name: %v", pvcName)
+		return nil, fmt.Errorf("secret not found with name: %v", secretNamespace)
 	}
 
-	klog.Info("secret details found. secret-name: ", secret.Name)
+	klog.Info("secret details found. secretName: ", secret.Name)
 	return secret, nil
 }
