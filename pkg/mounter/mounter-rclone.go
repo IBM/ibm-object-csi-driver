@@ -161,7 +161,7 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 		updatedOptions = append(updatedOptions, option)
 	}
 
-	klog.Infof("Updated Options: %v", updatedOptions)
+	klog.Infof("Updated rclone Options: %v", updatedOptions)
 
 	return updatedOptions
 }

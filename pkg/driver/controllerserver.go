@@ -28,6 +28,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 )
 
@@ -45,7 +46,11 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		endPoint           string
 		locationConstraint string
 		kpRootKeyCrn       string
+		pvcName            string
+		pvcNamespace       string
 	)
+	secretMapCustom := make(map[string]string)
+
 	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
@@ -67,6 +72,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		return nil, status.Error(codes.InvalidArgument, "Volume Capabilities missing in request")
 	}
 	for _, cap := range caps {
+		klog.Infof("Volume capability: %s", cap)
 		if cap.GetBlock() != nil {
 			return nil, status.Error(codes.InvalidArgument, "Volume type block Volume not supported")
 		}
@@ -76,39 +82,99 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	klog.Info("CreateVolume Parameters:\n\t", params)
 
 	secretMap := req.GetSecrets()
-	creds, err := getCredentials(req.GetSecrets())
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
+	klog.Info("req.GetSecrets() length:\t", len(secretMap))
+
+	if len(secretMap) == 0 {
+		klog.Info("Did not find the secret that matches pvc name. Fetching custom secret from PVC annotations")
+
+		pvcName = params["csi.storage.k8s.io/pvc/name"]
+		pvcNamespace = params["csi.storage.k8s.io/pvc/namespace"]
+
+		if pvcName == "" {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("pvcName not specified, could not fetch the secret %v", err))
+		}
+
+		if pvcNamespace == "" {
+			pvcNamespace = constants.DefaultNamespace
+		}
+
+		pvcRes, err := utils.GetPVC(pvcName, pvcNamespace)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("PVC resource not found %v", err))
+		}
+
+		klog.Info("pvc annotations:\n\t", pvcRes.Annotations)
+
+		pvcAnnotations := pvcRes.Annotations
+
+		secretName := pvcAnnotations["cos.csi.driver/secret"]
+		secretNamespace := pvcAnnotations["cos.csi.driver/secret-namespace"]
+
+		if secretName == "" {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("secretName annotation 'cos.csi.driver/secret' not specified in the PVC annotations, could not fetch the secret %v", err))
+		}
+
+		if secretNamespace == "" {
+			klog.Info("secretNamespace annotation 'cos.csi.driver/secret-namespace' not specified in PVC annotations:\t", pvcRes.Annotations, "\t trying to fetch the secret in default namespace")
+			secretNamespace = constants.DefaultNamespace
+		}
+
+		secret, err := utils.GetSecret(secretName, secretNamespace)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret resource not found %v", err))
+		}
+
+		secretMapCustom = parseCustomSecret(secret)
+		klog.Info("custom secret parameters parsed successfully, length of custom secret: ", len(secretMapCustom))
+
+		secretMap = secretMapCustom
 	}
 
 	endPoint = secretMap["cosEndpoint"]
-	locationConstraint = secretMap["locationConstraint"]
-
 	if endPoint == "" {
 		endPoint = params["cosEndpoint"]
 	}
-	if locationConstraint == "" {
-		locationConstraint = params["locationConstraint"]
-	}
-
 	if endPoint == "" {
 		return nil, status.Error(codes.InvalidArgument, "cosEndpoint unknown")
+	}
+
+	locationConstraint = secretMap["locationConstraint"]
+	if locationConstraint == "" {
+		locationConstraint = params["locationConstraint"]
 	}
 	if locationConstraint == "" {
 		return nil, status.Error(codes.InvalidArgument, "locationConstraint unknown")
 	}
 
 	kpRootKeyCrn = secretMap["kpRootKeyCRN"]
+	if kpRootKeyCrn == "" {
+		kpRootKeyCrn = secretMapCustom["kpRootKeyCRN"]
+	}
 	if kpRootKeyCrn != "" {
 		klog.Infof("key protect root key crn provided for bucket creation")
 	}
 
-	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
+	mounter := secretMap["mounter"]
+	if mounter == "" {
+		mounter = params["mounter"]
+	}
+
 	bucketName = secretMap["bucketName"]
+	if bucketName == "" {
+		bucketName = secretMapCustom["bucketName"]
+	}
+
+	creds, err := getCredentials(secretMap)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
+	}
+
+	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
+
 	params["userProvidedBucket"] = "true"
 	if bucketName != "" {
 		// User Provided bucket. Check its existence and create if not present
-		klog.Infof("Bucket name provided")
+		klog.Infof("Bucket name provided: %v", bucketName)
 		if err := sess.CheckBucketAccess(bucketName); err != nil {
 			klog.Infof("CreateVolume: Unable to access the bucket: %v, Creating with given name", err)
 			err = createBucket(sess, bucketName, kpRootKeyCrn)
@@ -122,7 +188,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	} else {
 		// Generate random temp bucket name based on volume id
 		klog.Infof("Bucket name not provided")
-		tempBucketName := getTempBucketName(secretMap["mounter"], volumeID)
+		tempBucketName := getTempBucketName(mounter, volumeID)
 		if tempBucketName == "" {
 			klog.Errorf("CreateVolume: Unable to generate the bucket name")
 			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to access the bucket: %v", tempBucketName))
@@ -149,6 +215,8 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 }
 
 func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
+	//secretMapCustom := make(map[string]string)
+
 	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
@@ -162,13 +230,51 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 	klog.Infof("Deleting volume %v", volumeID)
 	secretMap := req.GetSecrets()
 
-	creds, err := getCredentials(req.GetSecrets())
-	if err != nil {
-		return nil, fmt.Errorf("cannot get credentials: %v", err)
-	}
-
 	endPoint := secretMap["cosEndpoint"]
 	locationConstraint := secretMap["locationConstraint"]
+
+	if len(secretMap) == 0 {
+		klog.Info("Did not find the secret that matches pvc name. Fetching custom secret from PVC annotations")
+
+		pv, err := utils.GetPV(volumeID)
+		if err != nil {
+			return nil, err
+		}
+
+		klog.Info("pv Resource details:\n\t", pv)
+
+		secretName := pv.Spec.CSI.NodePublishSecretRef.Name
+		secretNamespace := pv.Spec.CSI.NodePublishSecretRef.Namespace
+
+		if secretName == "" {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret details not found, could not fetch the secret %v", err))
+		}
+
+		if secretNamespace == "" {
+			klog.Info("secret Namespace not found. trying to fetch the secret in default namespace")
+			secretNamespace = constants.DefaultNamespace
+		}
+
+		endPoint = pv.Spec.CSI.VolumeAttributes["cosEndpoint"]
+		locationConstraint = pv.Spec.CSI.VolumeAttributes["locationConstraint"]
+
+		klog.Info("secret details found. secret-name: ", secretName, "\tsecret-namespace: ", secretNamespace)
+
+		secret, err := utils.GetSecret(secretName, secretNamespace)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret resource not found %v", err))
+		}
+
+		secretMapCustom := parseCustomSecret(secret)
+		klog.Info("custom secret parameters parsed successfully, length of custom secret: ", len(secretMapCustom))
+		secretMap = secretMapCustom
+	}
+
+	creds, err := getCredentials(secretMap)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
+	}
+
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
 
 	bucketToDelete, err := cs.Stats.BucketToDelete(volumeID)
@@ -278,6 +384,7 @@ func (cs *controllerServer) ControllerModifyVolume(_ context.Context, req *csi.C
 }
 
 func getCredentials(secretMap map[string]string) (*s3client.ObjectStorageCredentials, error) {
+	klog.Infof("- getCredentials-")
 	var (
 		accessKey         string
 		secretKey         string
@@ -320,7 +427,73 @@ func getCredentials(secretMap map[string]string) (*s3client.ObjectStorageCredent
 	}, nil
 }
 
+func parseCustomSecret(secret *v1.Secret) map[string]string {
+	klog.Infof("-parseCustomSecret-")
+	secretMapCustom := make(map[string]string)
+
+	var (
+		accessKey          string
+		secretKey          string
+		apiKey             string
+		serviceInstanceID  string
+		kpRootKeyCrn       string
+		bucketName         string
+		iamEndpoint        string
+		cosEndpoint        string
+		locationConstraint string
+	)
+
+	if bytesVal, ok := secret.Data["accessKey"]; ok {
+		accessKey = string(bytesVal)
+	}
+
+	if bytesVal, ok := secret.Data["secretKey"]; ok {
+		secretKey = string(bytesVal)
+	}
+
+	if bytesVal, ok := secret.Data["apiKey"]; ok {
+		apiKey = string(bytesVal)
+	}
+
+	if bytesVal, ok := secret.Data["kpRootKeyCRN"]; ok {
+		kpRootKeyCrn = string(bytesVal)
+	}
+
+	if bytesVal, ok := secret.Data["serviceId"]; ok {
+		serviceInstanceID = string(bytesVal)
+	}
+
+	if bytesVal, ok := secret.Data["bucketName"]; ok {
+		bucketName = string(bytesVal)
+	}
+
+	if bytesVal, ok := secret.Data["iamEndpoint"]; ok {
+		iamEndpoint = string(bytesVal)
+	}
+
+	if bytesVal, ok := secret.Data["cosEndpoint"]; ok {
+		cosEndpoint = string(bytesVal)
+	}
+
+	if bytesVal, ok := secret.Data["locationConstraint"]; ok {
+		locationConstraint = string(bytesVal)
+	}
+
+	secretMapCustom["accessKey"] = accessKey
+	secretMapCustom["secretKey"] = secretKey
+	secretMapCustom["apiKey"] = apiKey
+	secretMapCustom["kpRootKeyCrn"] = kpRootKeyCrn
+	secretMapCustom["serviceId"] = serviceInstanceID
+	secretMapCustom["bucketName"] = bucketName
+	secretMapCustom["iamEndpoint"] = iamEndpoint
+	secretMapCustom["cosEndpoint"] = cosEndpoint
+	secretMapCustom["locationConstraint"] = locationConstraint
+
+	return secretMapCustom
+}
+
 func getTempBucketName(mounterType, volumeID string) string {
+	klog.Infof("mounterType: %v", mounterType)
 	currentTime := time.Now()
 	timestamp := currentTime.Format("20060102150405")
 
