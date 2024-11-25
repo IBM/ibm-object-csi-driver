@@ -533,12 +533,12 @@ func sanitizeVolumeID(volumeID string) (string, error) {
 }
 
 func isValidVolumeCapabilities(volCaps []*csi.VolumeCapability) bool {
-	hasSupport := func(cap *csi.VolumeCapability) bool {
+	hasSupport := func(capacity *csi.VolumeCapability) bool {
 		for _, c := range volumeCapabilities {
 			volumeCap := csi.VolumeCapability_AccessMode{
 				Mode: c,
 			}
-			if volumeCap.GetMode() == cap.AccessMode.GetMode() {
+			if volumeCap.GetMode() == capacity.AccessMode.GetMode() {
 				return true
 			}
 		}
