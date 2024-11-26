@@ -12,6 +12,7 @@ package driver
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
@@ -24,13 +25,21 @@ import (
 	"k8s.io/klog/v2"
 )
 
+type NodeVolStats struct {
+	setTime time.Time
+	// capAvailable int64
+	capTotal int64
+	capUsed  int64
+}
+
 // Implements Node Server csi.NodeServer
 type nodeServer struct {
 	*S3Driver
-	Stats        utils.StatsUtils
-	NodeID       string
-	Mounter      mounter.NewMounterFactory
-	MounterUtils mounterUtils.MounterUtils
+	Stats              utils.StatsUtils
+	NodeID             string
+	Mounter            mounter.NewMounterFactory
+	MounterUtils       mounterUtils.MounterUtils
+	VolumeIDAndTimeMap map[string]NodeVolStats
 }
 
 func (ns *nodeServer) NodeStageVolume(_ context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
@@ -214,31 +223,41 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 		}, nil
 	}
 
-	totalCap, err := ns.Stats.GetTotalCapacityFromPV(volumeID)
-	if err != nil {
-		return nil, err
-	}
+	timeSetInMap := ns.VolumeIDAndTimeMap[volumeID].setTime
+	if timeSetInMap.Second() == 0 || time.Since(timeSetInMap).Minutes() >= constants.TimeDelayInMin {
+		totalCap, err := ns.Stats.GetTotalCapacityFromPV(volumeID)
+		if err != nil {
+			return nil, err
+		}
 
-	capAsInt64, converted := totalCap.AsInt64()
-	if !converted {
-		capAsInt64 = capacity
-	}
-	klog.Info("NodeGetVolumeStats: Total Capacity of Volume: ", capAsInt64)
+		capAsInt64, converted := totalCap.AsInt64()
+		if !converted {
+			capAsInt64 = capacity
+		}
+		klog.Info("NodeGetVolumeStats: Total Capacity of Volume: ", capAsInt64)
 
-	capUsed, err := ns.Stats.GetBucketUsage(volumeID)
-	if err != nil {
-		return nil, err
-	}
+		capUsed, err := ns.Stats.GetBucketUsage(volumeID)
+		if err != nil {
+			return nil, err
+		}
 
-	// Since `capAvailable` can be negative and K8s will roundoff from int64 to uint64 resulting in misleading value
-	// capAvailable := capAsInt64 - capUsed
+		// Since `capAvailable` can be negative and K8s will roundoff from int64 to uint64 resulting in misleading value
+		// capAvailable := capAsInt64 - capUsed
+
+		ns.VolumeIDAndTimeMap[volumeID] = NodeVolStats{
+			setTime: time.Now(),
+			// capAvailable: capAvailable,
+			capTotal: capAsInt64,
+			capUsed:  capUsed,
+		}
+	}
 
 	resp := &csi.NodeGetVolumeStatsResponse{
 		Usage: []*csi.VolumeUsage{
 			{
-				// Available: capAvailable,
-				Total: capAsInt64,
-				Used:  capUsed,
+				// Available: ns.VolumeIDAndTimeMap[volumeID].capAvailable,
+				Total: ns.VolumeIDAndTimeMap[volumeID].capTotal,
+				Used:  ns.VolumeIDAndTimeMap[volumeID].capUsed,
 				Unit:  csi.VolumeUsage_BYTES,
 			},
 			{
