@@ -37,7 +37,7 @@ func TestNonBlockingGRPCServer(t *testing.T) {
 		nonBlockingServer, ok := s.(*nonBlockingGRPCServer)
 		assert.Equal(t, true, ok)
 
-		listener, err := nonBlockingServer.Setup(*testEndpoint, &identityServer{}, &controllerServer{}, &nodeServer{})
+		listener, err := nonBlockingServer.Setup(*testEndpoint, &identityServer{}, &controllerServer{}, &NodeServer{})
 		assert.NoError(t, err)
 		assert.NotNil(t, listener)
 
@@ -96,7 +96,7 @@ func TestSetup(t *testing.T) {
 			mode:   tc.mode,
 			logger: lgr,
 		}
-		_, actualErr := server.Setup(*tc.endpoint, &identityServer{}, &controllerServer{}, &nodeServer{})
+		_, actualErr := server.Setup(*tc.endpoint, &identityServer{}, &controllerServer{}, &NodeServer{})
 
 		if tc.expectedErr != nil {
 			assert.Error(t, actualErr)

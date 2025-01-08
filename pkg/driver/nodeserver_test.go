@@ -68,7 +68,7 @@ func TestNodeStageVolume(t *testing.T) {
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		nodeServer := nodeServer{}
+		nodeServer := NodeServer{}
 		actualResp, actualErr := nodeServer.NodeStageVolume(ctx, tc.req)
 
 		if tc.expectedErr != nil {
@@ -119,7 +119,7 @@ func TestNodeUnstageVolume(t *testing.T) {
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		nodeServer := nodeServer{}
+		nodeServer := NodeServer{}
 		actualResp, actualErr := nodeServer.NodeUnstageVolume(ctx, tc.req)
 
 		if tc.expectedErr != nil {
@@ -318,7 +318,7 @@ func TestNodePublishVolume(t *testing.T) {
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		nodeServer := nodeServer{
+		nodeServer := NodeServer{
 			Stats:   tc.driverStatsUtils,
 			Mounter: tc.Mounter,
 		}
@@ -392,7 +392,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		nodeServer := nodeServer{
+		nodeServer := NodeServer{
 			MounterUtils: tc.mounterUtils,
 		}
 		actualResp, actualErr := nodeServer.NodeUnpublishVolume(ctx, tc.req)
@@ -527,7 +527,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		nodeServer := nodeServer{
+		nodeServer := NodeServer{
 			Stats: tc.driverStatsUtils,
 		}
 		actualResp, actualErr := nodeServer.NodeGetVolumeStats(ctx, tc.req)
@@ -547,7 +547,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 
 func TestNodeExpandVolume(t *testing.T) {
 	t.Run("UnImplemented Method", func(t *testing.T) {
-		nodeServer := nodeServer{}
+		nodeServer := NodeServer{}
 		actualResp, actualErr := nodeServer.NodeExpandVolume(ctx, &csi.NodeExpandVolumeRequest{})
 		assert.Equal(t, &csi.NodeExpandVolumeResponse{}, actualResp)
 		assert.Error(t, actualErr)
@@ -597,7 +597,7 @@ func TestNodeGetCapabilities(t *testing.T) {
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		nodeServer := nodeServer{}
+		nodeServer := NodeServer{}
 		actualResp, actualErr := nodeServer.NodeGetCapabilities(ctx, tc.req)
 
 		if tc.expectedErr != nil {
@@ -635,7 +635,7 @@ func TestNodeGetInfo(t *testing.T) {
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		nodeServer := nodeServer{
+		nodeServer := NodeServer{
 			NodeID: testNodeID,
 		}
 		actualResp, actualErr := nodeServer.NodeGetInfo(ctx, tc.req)

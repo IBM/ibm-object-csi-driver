@@ -50,7 +50,7 @@ type S3Driver struct {
 	s3client s3client.ObjectStorageSession
 
 	ids *identityServer
-	ns  *nodeServer
+	ns  *NodeServer
 	cs  *controllerServer
 
 	logger *zap.Logger
@@ -129,8 +129,8 @@ func newControllerServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, s3cosSessio
 	}
 }
 
-func newNodeServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, nodeID string, mountObj mounter.NewMounterFactory, mounterUtil mounterUtils.MounterUtils) *nodeServer {
-	return &nodeServer{
+func newNodeServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, nodeID string, mountObj mounter.NewMounterFactory, mounterUtil mounterUtils.MounterUtils) *NodeServer {
+	return &NodeServer{
 		S3Driver:     d,
 		Stats:        statsUtil,
 		NodeID:       nodeID,
