@@ -16,6 +16,8 @@ import (
 var unmount = syscall.Unmount
 var command = exec.Command
 
+var ErrTimeoutWaitProcess = errors.New("timeout waiting for process to end")
+
 type MounterUtils interface {
 	FuseUnmount(path string) error
 	FuseMount(path string, comm string, args []string) error
@@ -72,28 +74,39 @@ func (su *MounterOptsUtils) FuseUnmount(path string) error {
 		return nil
 	}
 	klog.Infof("Found fuse pid %v of mount %s, checking if it still runs", process.Pid, path)
-	return waitForProcess(process, 1)
+
+	err = waitForProcess(process, 1)
+	if errors.Is(err, ErrTimeoutWaitProcess) {
+		klog.Infof("timeout waiting for pid %d to end, killing process", process.Pid)
+		return process.Kill()
+	}
+
+	return err
 }
 
 func isMountpoint(pathname string) (bool, error) {
 	klog.Infof("Checking if path is mountpoint: Pathname - %s", pathname)
 
-	out, err := exec.Command("mountpoint", pathname).CombinedOutput()
+	// We are omitting error here as the mountpoint command will only return non zero exit code when it's not a mountpoint
+	// This means if it's not a mountpoint we will get an error, but then we need to check the output anyway
+	// So we can directly check the output and ignore the error
+	out, _ := exec.Command("mountpoint", pathname).CombinedOutput()
 	outStr := strings.TrimSpace(string(out))
-	if err != nil {
-		if strings.HasSuffix(outStr, "Transport endpoint is not connected") {
-			return true, err
-		}
-		return false, err
-	}
 
 	if strings.HasSuffix(outStr, "is a mountpoint") {
 		klog.Infof("Path is a mountpoint: pathname - %s", pathname)
 		return true, nil
-	} else if strings.HasSuffix(outStr, "is not a mountpoint") {
+	}
+
+	if strings.HasSuffix(outStr, "is not a mountpoint") {
 		klog.Infof("Path is NOT a mountpoint:Pathname - %s", pathname)
 		return false, nil
 	}
+
+	if strings.HasSuffix(outStr, "Transport endpoint is not connected") {
+		return true, nil
+	}
+
 	klog.Errorf("Cannot parse mountpoint result: %v", outStr)
 	return false, fmt.Errorf("cannot parse mountpoint result: %s", outStr)
 }
@@ -150,7 +163,7 @@ func getCmdLine(pid int) (string, error) {
 
 func waitForProcess(p *os.Process, backoff int) error {
 	if backoff == 20 {
-		return fmt.Errorf("timeout waiting for PID %v to end", p.Pid)
+		return ErrTimeoutWaitProcess
 	}
 	cmdLine, err := getCmdLine(p.Pid)
 	if err != nil {
