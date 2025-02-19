@@ -142,9 +142,12 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 		"-o", "use_path_request_style",
 		"-o", fmt.Sprintf("passwd_file=%s", passwdFile),
 		"-o", fmt.Sprintf("url=%s", s3fs.EndPoint),
-		"-o", fmt.Sprintf("endpoint=%s", s3fs.LocConstraint),
 		"-o", "allow_other",
 		"-o", "mp_umask=002",
+	}
+
+	if s3fs.LocConstraint != "" {
+		args = append(args, "-o", fmt.Sprintf("endpoint=%s", s3fs.LocConstraint))
 	}
 
 	for _, val := range s3fs.MountOptions {
