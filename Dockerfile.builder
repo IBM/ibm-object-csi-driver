@@ -1,4 +1,4 @@
-FROM golang:1.23.2
+FROM golang:1.23.4
 
 WORKDIR /go/src/github.com/IBM/ibm-object-csi-driver
 ADD . /go/src/github.com/IBM/ibm-object-csi-driver

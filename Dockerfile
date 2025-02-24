@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.6-941 as s3fs-builder
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10-1179 as s3fs-builder
 
 ARG   RHSM_PASS=blank
 ARG   RHSM_USER=blank
@@ -22,7 +22,7 @@ RUN   microdnf -y install fuse-devel
 RUN   rm /usr/bin/register-sys.sh && subscription-manager unregister && subscription-manager clean
 
 RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && cd s3fs-fuse && \
-    git checkout v1.93 && \
+    git checkout v1.94 && \
     ./autogen.sh && ./configure --prefix=/usr/local --with-openssl && make && make install && \
     rm -rf /var/lib/apt/lists/*
 
@@ -30,7 +30,7 @@ FROM registry.access.redhat.com/ubi8/ubi as rclone-builder
 RUN yum install wget git gcc -y
 
 ENV ARCH=amd64
-ENV GO_VERSION=1.23.2
+ENV GO_VERSION=1.23.4
 
 RUN echo $ARCH $GO_VERSION
 
@@ -46,7 +46,7 @@ ENV GOARCH $ARCH
 ENV GO111MODULE=on
 
 RUN git clone https://github.com/rclone/rclone.git && \
-      cd rclone && git checkout tags/v1.64.0 && \
+      cd rclone && git checkout tags/v1.68.2 && \
       go build && ./rclone version && \
       cp rclone /usr/local/bin/rclone
 
