@@ -13,8 +13,11 @@ package mounter
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
+	"log"
 	"os"
+	"os/exec"
 	"path"
 	"strings"
 
@@ -22,6 +25,8 @@ import (
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"k8s.io/klog/v2"
 )
+
+var mountWorker bool = true
 
 // Mounter interface defined in mounter.go
 // s3fsMounter Implements Mounter
@@ -158,6 +163,20 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	} else {
 		args = append(args, "-o", "default_acl=private")
 	}
+
+	if mountWorker {
+		klog.Info("Worker Mounting...")
+
+		jsonData, err := json.Marshal(args)
+		if err != nil {
+			log.Fatalf("Error marshalling data: %v", err)
+		}
+		cmd := exec.Command("curl --unix-socket /var/lib/ibmshare.sock -X POST -H \"Content-Type: application/json\" -d '{\"path\": " + target + ", \"command\": " + constants.S3FS + ", \"args\": " + string(jsonData) + "}' http:/unix/api/cos/mount")
+		op, err := cmd.CombinedOutput()
+		klog.Info("Worker Mounting...", op)
+		return err
+	}
+	klog.Info("NodeServer Mounting...")
 	return s3fs.MounterUtils.FuseMount(target, constants.S3FS, args)
 }
 
