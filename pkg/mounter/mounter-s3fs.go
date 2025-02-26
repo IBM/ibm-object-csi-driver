@@ -12,14 +12,18 @@
 package mounter
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net"
+	"net/http"
 	"os"
-	"os/exec"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
@@ -170,14 +174,83 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 		jsonData, err := json.Marshal(args)
 		if err != nil {
 			log.Fatalf("Error marshalling data: %v", err)
+			return err
 		}
-		cmd := exec.Command("curl --unix-socket /var/lib/ibmshare.sock -X POST -H \"Content-Type: application/json\" -d '{\"path\": " + target + ", \"command\": " + constants.S3FS + ", \"args\": " + string(jsonData) + "}' http:/unix/api/cos/mount")
-		op, err := cmd.CombinedOutput()
-		klog.Info("Worker Mounting...", op)
-		return err
+
+		payload := fmt.Sprintf(`{"path":"%s","command":"%s","args":"%s"}`, target, constants.S3FS, string(jsonData))
+
+		errResponse, err := createMountHelperContainerRequest(payload, "http:/unix/api/cos/mount")
+		klog.Info("Worker Mounting...", errResponse)
+		if err != nil {
+			return err
+		}
+		return nil
+
+		// jsonData, err := json.Marshal(args)
+		// if err != nil {
+		// 	log.Fatalf("Error marshalling data: %v", err)
+		// }
+		// cmd := exec.Command("curl --unix-socket /var/lib/ibmshare.sock -X POST -H \"Content-Type: application/json\" -d '{\"path\": " + target + ", \"command\": " + constants.S3FS + ", \"args\": " + string(jsonData) + "}' http:/unix/api/cos/mount")
+		// op, err := cmd.CombinedOutput()
+		//
+		// return err
 	}
 	klog.Info("NodeServer Mounting...")
 	return s3fs.MounterUtils.FuseMount(target, constants.S3FS, args)
+}
+
+func createMountHelperContainerRequest(payload string, url string) (string, error) {
+	timeout := 3 * time.Minute
+	defaultSocketPath := "/tmp/mysocket.sock"
+
+	// Get socket path
+	socketPath := os.Getenv("SOCKET_PATH")
+	if socketPath == "" {
+		socketPath = defaultSocketPath
+	}
+	// Create a custom dialer function for Unix socket connection
+	dialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		return net.Dial("unix", socketPath)
+	}
+
+	// Create an HTTP client with the Unix socket transport
+	client := &http.Client{
+		Transport: &http.Transport{
+			DialContext: dialer,
+		},
+		Timeout: timeout,
+	}
+
+	//Create POST request
+	req, err := http.NewRequest("POST", url, strings.NewReader(payload))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	response, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return "", err
+	}
+
+	// Unmarshell json response
+	var responseBody struct {
+		MountExitCode   string `json:"MountExitCode"`
+		ExitDescription string `json:"Description"`
+	}
+	err = json.Unmarshal(body, &responseBody)
+	if err != nil {
+		return "", err
+	}
+
+	if response.StatusCode != http.StatusOK {
+		return responseBody.ExitDescription, fmt.Errorf("Response from mount-helper-container -> Exit Status Code: %s ,ResponseCode: %v", responseBody.MountExitCode, response.StatusCode)
+	}
+	return "", nil
 }
 
 var writePassFunc = writePass
