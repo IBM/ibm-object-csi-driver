@@ -179,7 +179,7 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 
 		payload := fmt.Sprintf(`{"path":"%s","command":"%s","args":"%s"}`, target, constants.S3FS, string(jsonData))
 
-		errResponse, err := createMountHelperContainerRequest(payload, "http:/unix/api/cos/mount")
+		errResponse, err := createMountHelperContainerRequest(payload, "http://unix/api/cos/mount")
 		klog.Info("Worker Mounting...", errResponse)
 		if err != nil {
 			return err
@@ -190,7 +190,7 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 		// if err != nil {
 		// 	log.Fatalf("Error marshalling data: %v", err)
 		// }
-		// cmd := exec.Command("curl --unix-socket /var/lib/ibmshare.sock -X POST -H \"Content-Type: application/json\" -d '{\"path\": " + target + ", \"command\": " + constants.S3FS + ", \"args\": " + string(jsonData) + "}' http:/unix/api/cos/mount")
+		// cmd := exec.Command("curl --unix-socket /var/lib/ibmshare.sock -X POST -H \"Content-Type: application/json\" -d '{\"path\": " + target + ", \"command\": " + constants.S3FS + ", \"args\": " + string(jsonData) + "}' http://unix/api/cos/mount")
 		// op, err := cmd.CombinedOutput()
 		//
 		// return err
