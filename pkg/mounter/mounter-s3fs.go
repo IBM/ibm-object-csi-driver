@@ -204,7 +204,8 @@ func createMountHelperContainerRequest(payload string, url string) (string, erro
 	defaultSocketPath := "/tmp/mysocket.sock"
 
 	// Get socket path
-	socketPath := os.Getenv("SOCKET_PATH")
+	// socketPath := os.Getenv("SOCKET_PATH")
+	socketPath := "/var/lib/ibmshare.sock"
 	if socketPath == "" {
 		socketPath = defaultSocketPath
 	}
