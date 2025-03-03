@@ -28,9 +28,29 @@ type StatsUtils interface {
 	GetTotalCapacityFromPV(volumeID string) (resource.Quantity, error)
 	GetBucketUsage(volumeID string) (int64, error)
 	GetBucketNameFromPV(volumeID string) (string, error)
+	GetRegionAndZone(nodeName string) (string, string, error)
 }
 
 type DriverStatsUtils struct {
+}
+
+func (su *DriverStatsUtils) GetRegionAndZone(nodeName string) (region, zone string, err error) {
+	clientset, err := CreateK8sClient()
+	if err != nil {
+		return "", "", err
+	}
+
+	node, err := clientset.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
+	if err != nil {
+		return "", "", err
+	}
+
+	nodeLabels := node.ObjectMeta.Labels
+	if len(nodeLabels[constants.NodeRegionLabel]) == 0 || len(nodeLabels[constants.NodeZoneLabel]) == 0 {
+		errorMsg := fmt.Errorf("One or few required node label(s) is/are missing [%s, %s]. Node Labels Found = [#%v]", constants.NodeRegionLabel, constants.NodeZoneLabel, nodeLabels) //nolint:golint
+		return "", "", errorMsg
+	}
+	return nodeLabels[constants.NodeRegionLabel], nodeLabels[constants.NodeZoneLabel], nil
 }
 
 func (su *DriverStatsUtils) BucketToDelete(volumeID string) (string, error) {
