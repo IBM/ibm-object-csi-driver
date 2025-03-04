@@ -247,6 +247,10 @@ func (su *FakeNewDriverStatsUtils) GetBucketNameFromPV(volumeID string) (string,
 	return "", nil
 }
 
+func (su *FakeNewDriverStatsUtils) GetRegionAndZone(nodeName string) (string, string, error) {
+	return "", "", nil
+}
+
 func createTargetDir(targetPath string) error {
 	fileInfo, err := os.Stat(targetPath)
 	if err != nil && os.IsNotExist(err) {

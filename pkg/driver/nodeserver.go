@@ -288,8 +288,8 @@ func (ns *nodeServer) NodeGetInfo(_ context.Context, req *csi.NodeGetInfoRequest
 		return nil, err
 	}
 
-	klog.Infof("Node region %s", region)
-	klog.Infof("Node zone %s", zone)
+	klog.Infof("NodeGetInfo: Node region %s", region)
+	klog.Infof("NodeGetInfo: Node zone %s", zone)
 
 	topology := &csi.Topology{
 		Segments: map[string]string{

@@ -46,11 +46,14 @@ func (su *DriverStatsUtils) GetRegionAndZone(nodeName string) (region, zone stri
 	}
 
 	nodeLabels := node.ObjectMeta.Labels
-	if len(nodeLabels[constants.NodeRegionLabel]) == 0 || len(nodeLabels[constants.NodeZoneLabel]) == 0 {
+	region, regionExists := nodeLabels[constants.NodeRegionLabel]
+	zone, zoneExists := nodeLabels[constants.NodeZoneLabel]
+
+	if !regionExists || !zoneExists {
 		errorMsg := fmt.Errorf("One or few required node label(s) is/are missing [%s, %s]. Node Labels Found = [#%v]", constants.NodeRegionLabel, constants.NodeZoneLabel, nodeLabels) //nolint:golint
 		return "", "", errorMsg
 	}
-	return nodeLabels[constants.NodeRegionLabel], nodeLabels[constants.NodeZoneLabel], nil
+	return region, zone, nil
 }
 
 func (su *DriverStatsUtils) BucketToDelete(volumeID string) (string, error) {

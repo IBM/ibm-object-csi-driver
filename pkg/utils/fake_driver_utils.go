@@ -9,6 +9,7 @@ type FakeStatsUtilsFuncStruct struct {
 	GetTotalCapacityFromPVFn func(volumeID string) (resource.Quantity, error)
 	GetBucketUsageFn         func(volumeID string) (int64, error)
 	GetBucketNameFromPVFn    func(volumeID string) (string, error)
+	GetRegionAndZoneFn       func(nodeName string) (string, string, error)
 }
 
 type FakeStatsUtilsFuncStructImpl struct {
@@ -64,3 +65,13 @@ func (m *FakeStatsUtilsFuncStructImpl) GetBucketNameFromPV(volumeID string) (str
 	}
 	panic("requested method should not be nil")
 }
+
+func (m *FakeStatsUtilsFuncStructImpl) GetRegionAndZone(nodeName string) (string, string, error) {
+	if m.FuncStruct.GetRegionAndZoneFn != nil {
+		return m.FuncStruct.GetRegionAndZoneFn(nodeName)
+	}
+	panic("requested method should not be nil")
+}
+
+
+
