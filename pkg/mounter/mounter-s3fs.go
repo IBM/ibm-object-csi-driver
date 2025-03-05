@@ -180,6 +180,8 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 
 		payload := fmt.Sprintf(`{"path":"%s","command":"%s","args":"%s"}`, target, constants.S3FS, args)
 
+		klog.Info("Worker Mounting...", payload)
+
 		errResponse, err := createMountHelperContainerRequest(payload, "http://unix/api/cos/mount")
 		klog.Info("Worker Mounting...", errResponse)
 		if err != nil {
