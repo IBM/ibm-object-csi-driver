@@ -12,6 +12,7 @@ package driver
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
@@ -276,11 +277,30 @@ func (ns *nodeServer) NodeGetCapabilities(_ context.Context, req *csi.NodeGetCap
 
 func (ns *nodeServer) NodeGetInfo(_ context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	klog.V(3).Infof("NodeGetInfo: called with args %+v", *req)
-	top := &csi.Topology{}
+
+	nodeName := os.Getenv("KUBE_NODE_NAME")
+	if nodeName == "" {
+		return nil, fmt.Errorf("KUBE_NODE_NAME env variable not set")
+	}
+
+	region, zone, err := ns.Stats.GetRegionAndZone(nodeName)
+	if err != nil {
+		return nil, err
+	}
+
+	klog.Infof("NodeGetInfo: Node region %s", region)
+	klog.Infof("NodeGetInfo: Node zone %s", zone)
+
+	topology := &csi.Topology{
+		Segments: map[string]string{
+			constants.NodeRegionLabel: region,
+			constants.NodeZoneLabel:   zone,
+		},
+	}
 	resp := &csi.NodeGetInfoResponse{
 		NodeId:             ns.NodeID,
 		MaxVolumesPerNode:  constants.DefaultVolumesPerNode,
-		AccessibleTopology: top,
+		AccessibleTopology: topology,
 	}
 	klog.V(2).Info("NodeGetInfo: ", resp)
 	return resp, nil

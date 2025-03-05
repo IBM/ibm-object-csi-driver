@@ -8,9 +8,9 @@ spec:
       image: gcr.io/google-samples/node-hello:1.0
       imagePullPolicy: IfNotPresent
       volumeMounts:
-      - mountPath: "/data"
+      - mountPath: "/data/s3fs"
         name: cos-csi-volume
   volumes:
     - name: cos-csi-volume
       persistentVolumeClaim:
-        claimName: cos-s3-csi-s3fs-pvc
+        claimName: cos-s3fs-pvc

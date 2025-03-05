@@ -1,8 +1,11 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: cos-s3-csi-s3fs-pvc
+  name: cos-s3fs-pvc
   namespace: default
+  annotations:
+    cos.csi.driver/secret: "cos-s3fs-secret"
+    cos.csi.driver/secret-namespace: "default"
 spec:
   accessModes:
   - ReadWriteOnce

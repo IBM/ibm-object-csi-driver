@@ -18,6 +18,7 @@ package driver
 
 import (
 	"errors"
+	"os"
 	"reflect"
 	"testing"
 
@@ -615,18 +616,29 @@ func TestNodeGetCapabilities(t *testing.T) {
 
 func TestNodeGetInfo(t *testing.T) {
 	testCases := []struct {
-		testCaseName string
-		req          *csi.NodeGetInfoRequest
-		expectedResp *csi.NodeGetInfoResponse
-		expectedErr  error
+		testCaseName     string
+		driverStatsUtils utils.StatsUtils
+		req              *csi.NodeGetInfoRequest
+		expectedResp     *csi.NodeGetInfoResponse
+		expectedErr      error
 	}{
 		{
 			testCaseName: "Positive: Successful",
 			req:          &csi.NodeGetInfoRequest{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetRegionAndZoneFn: func(nodeName string) (string, string, error) {
+					return "test-region", "test-zone", nil
+				},
+			}),
 			expectedResp: &csi.NodeGetInfoResponse{
-				NodeId:             testNodeID,
-				MaxVolumesPerNode:  constants.DefaultVolumesPerNode,
-				AccessibleTopology: &csi.Topology{},
+				NodeId:            testNodeID,
+				MaxVolumesPerNode: constants.DefaultVolumesPerNode,
+				AccessibleTopology: &csi.Topology{
+					Segments: map[string]string{
+						constants.NodeRegionLabel: "test-region",
+						constants.NodeZoneLabel:   "test-zone",
+					},
+				},
 			},
 			expectedErr: nil,
 		},
@@ -635,8 +647,11 @@ func TestNodeGetInfo(t *testing.T) {
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
+		os.Setenv("KUBE_NODE_NAME", "testNode")
+
 		nodeServer := nodeServer{
 			NodeID: testNodeID,
+			Stats:  tc.driverStatsUtils,
 		}
 		actualResp, actualErr := nodeServer.NodeGetInfo(ctx, tc.req)
 

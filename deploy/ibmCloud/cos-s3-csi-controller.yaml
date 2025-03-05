@@ -105,6 +105,7 @@ spec:
             - "--timeout=180s"
             - "--v=5"
             - "--extra-create-metadata=true"
+            - "--feature-gates=Topology=true"
           env:
             - name: ADDRESS
               value: /csi/csi.sock
