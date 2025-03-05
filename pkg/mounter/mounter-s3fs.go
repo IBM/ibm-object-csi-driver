@@ -317,7 +317,7 @@ func createMountHelperContainerRequest(payload string, url string) (string, erro
 		Timeout: timeout,
 	}
 
-	//Create POST request
+	// Create POST request
 	req, err := http.NewRequest("POST", url, strings.NewReader(payload))
 	if err != nil {
 		return "", err
@@ -333,7 +333,7 @@ func createMountHelperContainerRequest(payload string, url string) (string, erro
 		return "", err
 	}
 
-	// Unmarshell json response
+	// Unmarshal json response
 	var responseBody struct {
 		MountExitCode   string `json:"MountExitCode"`
 		ExitDescription string `json:"Description"`
