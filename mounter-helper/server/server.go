@@ -5,7 +5,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
 	"syscall"
 
@@ -26,21 +25,6 @@ var (
 	socketDir  = "/var/lib/"
 	socketPath = socketDir + "ibmshare.sock"
 )
-
-// SystemOperation is an interface for system operations like mount and unmount.
-type SystemOperation interface {
-	Execute(command string, args ...string) (string, error)
-}
-
-// RealSystemOperation is an implementation of SystemOperation that performs actual system operations.
-type RealSystemOperation struct{}
-
-func (rs *RealSystemOperation) Execute(command string, args ...string) (string, error) {
-	cmd := exec.Command(command, args...)
-
-	output, err := cmd.CombinedOutput()
-	return string(output), err
-}
 
 func setUpLogger() *zap.Logger {
 	// Prepare a new logger
@@ -80,7 +64,7 @@ func main() {
 		os.Exit(0)
 	}()
 
-	logger.Info("Starting mount-helper-container service...")
+	logger.Info("Starting cos-mount-helper service...")
 
 	// Create gin router
 	router := gin.Default()
@@ -93,159 +77,6 @@ func main() {
 	err = http.Serve(listener, router)
 	if err != nil {
 		logger.Fatal("Error while serving HTTP requests:", zap.Error(err))
-	}
-}
-
-func mountHelperContainerStatus(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"Message": "Mount-helper-container server is live!"})
-}
-
-// handleMounting mounts ibmshare based file system mountPath to targetPath
-func handleMounting(sysOp SystemOperation) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var request struct {
-			MountPath  string `json:"mountPath"`
-			TargetPath string `json:"targetPath"`
-			FsType     string `json:"fsType"`
-			RequestID  string `json:"requestID"`
-		}
-
-		if err := c.BindJSON(&request); err != nil {
-			logger.Error("Invalid request: ", zap.Error(err))
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
-			return
-		}
-
-		logger.Info("New mount request with values: ", zap.String("RequestID:", request.RequestID), zap.String("Source mount Path:", request.MountPath), zap.String("Target Path:", request.TargetPath))
-
-		// execute mount command
-		options := "mount -t " + request.FsType + " -o secure=true " + request.MountPath + " " + request.TargetPath + " -v"
-
-		logger.Info("Command to execute is: ", zap.String("Command:", options))
-
-		output, err := sysOp.Execute("mount", "-t", request.FsType, "-o", "secure=true", request.MountPath, request.TargetPath, "-v")
-		if err != nil {
-			logger.Error("Mounting failed with error: ", zap.Error(err))
-			logger.Error("Command output: ", zap.String("output", output))
-			response := gin.H{
-				"MountExitCode": err.Error(),
-				"Description":   output,
-			}
-			c.JSON(http.StatusInternalServerError, response)
-			return
-		}
-
-		logger.Info("Command output: ", zap.String("", output))
-		c.JSON(http.StatusOK, gin.H{"message": "Request processed successfully"})
-	}
-}
-
-// handleUnMount does umount on a targetPath provided
-func handleUnMount(sysOp SystemOperation) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var request struct {
-			TargetPath string `json:"targetPath"`
-		}
-
-		if err := c.BindJSON(&request); err != nil {
-			logger.Error("Invalid request: ", zap.Error(err))
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
-			return
-		}
-
-		logger.Info("New umount request with values: ", zap.String("Target Path:", request.TargetPath))
-
-		output, err := sysOp.Execute("umount", request.TargetPath)
-
-		if err != nil {
-			logger.Error("Umount failed with error: ", zap.Error(err))
-			logger.Error("Command output: ", zap.String("output", output))
-			response := gin.H{
-				"MountExitCode": err.Error(),
-				"Description":   output,
-			}
-			c.JSON(http.StatusInternalServerError, response)
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{"Message": "Request processed successfully"})
-	}
-}
-
-// debugLogs collectes logs necessary in case there are any mount failures.
-func debugLogs(sysOp SystemOperation) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var request struct {
-			RequestID string `json:"requestID"`
-		}
-
-		if err := c.BindJSON(&request); err != nil {
-			logger.Error("Invalid request: ", zap.Error(err))
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
-			return
-		}
-
-		output, err := sysOp.Execute("journalctl", "-u", "mount-helper-container")
-
-		if err != nil {
-			logger.Error("Unable to fetch logs, error: ", zap.Error(err))
-			logger.Error("Command output: ", zap.String("output", output))
-			response := gin.H{
-				"MountExitCode": err.Error(),
-				"Description":   output,
-			}
-			c.JSON(http.StatusInternalServerError, response)
-			return
-		}
-
-		logFile, err := os.Create("/tmp/mount-helper-container.log")
-		if err != nil {
-			logger.Error("Not able to create log file: ", zap.Error(err))
-			return
-		}
-		defer logFile.Close()
-
-		// Write the output to the file
-		_, err = logFile.WriteString(string(output))
-		if err != nil {
-			logger.Error("Error writing to file:", zap.Error(err))
-			return
-		}
-
-		// mount-helper logs are stored at /opt/ibm/mount-ibmshare/mount-ibmshare.log. Available at volume mount path
-
-		c.JSON(http.StatusOK, gin.H{"Message": "Request processed successfully"})
-	}
-}
-
-// mountStatus takes target directory as input and checks if it is a valid mount directory
-func mountStatus(sysOp SystemOperation) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var request struct {
-			TargetPath string `json:"targetPath"`
-		}
-
-		if err := c.BindJSON(&request); err != nil {
-			logger.Error("Invalid request: ", zap.Error(err))
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
-			return
-		}
-
-		logger.Info("New find mount request with values: ", zap.String("Target Path:", request.TargetPath))
-
-		output, err := sysOp.Execute("findmnt", request.TargetPath)
-
-		if err != nil {
-			logger.Error("'findmnt' failed with error: ", zap.Error(err))
-			response := gin.H{
-				"MountExitCode": err.Error(),
-				"Description":   output,
-			}
-			c.JSON(http.StatusInternalServerError, response)
-			return
-		}
-
-		c.JSON(http.StatusOK, "Success!!")
 	}
 }
 
