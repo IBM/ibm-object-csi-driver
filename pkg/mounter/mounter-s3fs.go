@@ -170,15 +170,13 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	if mountWorker {
 		klog.Info("Worker Mounting...")
 
-		// jsonData, err := json.Marshal(args)
-		// if err != nil {
-		// 	log.Fatalf("Error marshalling data: %v", err)
-		// 	return err
-		// }
+		jsonData, err := json.Marshal(args)
+		if err != nil {
+			klog.Fatalf("Error marshalling data: %v", err)
+			return err
+		}
 
-		// payload := fmt.Sprintf(`{"path":"%s","command":"%s","args":"%s"}`, target, constants.S3FS, string(jsonData))
-
-		payload := fmt.Sprintf(`{"path":"%s","command":"%s","args":"%s"}`, target, constants.S3FS, args)
+		payload := fmt.Sprintf(`{"path":"%s","command":"%s","args":%s}`, target, constants.S3FS, jsonData)
 
 		klog.Info("Worker Mounting...", payload)
 
@@ -344,7 +342,7 @@ func createMountHelperContainerRequest(payload string, url string) (string, erro
 	}
 
 	if response.StatusCode != http.StatusOK {
-		return responseBody.ExitDescription, fmt.Errorf("Response from mount-helper-container -> Exit Status Code: %s ,ResponseCode: %v", responseBody.MountExitCode, response.StatusCode)
+		return responseBody.ExitDescription, fmt.Errorf("response from mount-helper-container -> Exit Status Code: %s ,ResponseCode: %v", responseBody.MountExitCode, response.StatusCode)
 	}
 	return "", nil
 }
