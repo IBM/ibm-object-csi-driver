@@ -12,11 +12,17 @@
 package mounter
 
 import (
+	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
@@ -41,6 +47,8 @@ const (
 	metaRoot = "/var/lib/ibmc-s3fs"
 	passFile = ".passwd-s3fs" // #nosec G101: not password
 )
+
+var mountWorker bool = true
 
 func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
 	klog.Info("-newS3fsMounter-")
@@ -158,6 +166,27 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	} else {
 		args = append(args, "-o", "default_acl=private")
 	}
+
+	if mountWorker {
+		klog.Info("Worker Mounting...")
+
+		jsonData, err := json.Marshal(args)
+		if err != nil {
+			klog.Fatalf("Error marshalling data: %v", err)
+			return err
+		}
+
+		payload := fmt.Sprintf(`{"path":"%s","command":"%s","args":%s}`, target, constants.S3FS, jsonData)
+
+		errResponse, err := createMountHelperContainerRequest(payload, "http://unix/api/cos/mount")
+		klog.Info("Worker Mounting...", errResponse)
+		if err != nil {
+			return err
+		}
+		return nil
+
+	}
+	klog.Info("NodeServer Mounting...")
 	return s3fs.MounterUtils.FuseMount(target, constants.S3FS, args)
 }
 
@@ -259,4 +288,59 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 
 	klog.Infof("updated S3fsMounter Options: %v", updatedOptions)
 	return updatedOptions
+}
+
+func createMountHelperContainerRequest(payload string, url string) (string, error) {
+	timeout := 3 * time.Minute
+	defaultSocketPath := "/tmp/mysocket.sock"
+
+	// Get socket path
+	// socketPath := os.Getenv("SOCKET_PATH")
+	socketPath := "/var/lib/ibmshare.sock"
+	if socketPath == "" {
+		socketPath = defaultSocketPath
+	}
+	// Create a custom dialer function for Unix socket connection
+	dialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		return net.Dial("unix", socketPath)
+	}
+
+	// Create an HTTP client with the Unix socket transport
+	client := &http.Client{
+		Transport: &http.Transport{
+			DialContext: dialer,
+		},
+		Timeout: timeout,
+	}
+
+	// Create POST request
+	req, err := http.NewRequest("POST", url, strings.NewReader(payload))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	response, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return "", err
+	}
+
+	// Unmarshal json response
+	var responseBody struct {
+		MountExitCode   string `json:"MountExitCode"`
+		ExitDescription string `json:"Description"`
+	}
+	err = json.Unmarshal(body, &responseBody)
+	if err != nil {
+		return "", err
+	}
+
+	if response.StatusCode != http.StatusOK {
+		return responseBody.ExitDescription, fmt.Errorf("response from mount-helper-container -> Exit Status Code: %s ,ResponseCode: %v", responseBody.MountExitCode, response.StatusCode)
+	}
+	return "", nil
 }
