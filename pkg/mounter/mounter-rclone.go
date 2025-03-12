@@ -14,6 +14,7 @@ package mounter
 import (
 	"bufio"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -216,6 +217,27 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 		uidOpt := "--uid=" + rclone.UID
 		args = append(args, uidOpt)
 	}
+
+	if mountWorker {
+		klog.Info("Worker Mounting...")
+
+		jsonData, err := json.Marshal(args)
+		if err != nil {
+			klog.Fatalf("Error marshalling data: %v", err)
+			return err
+		}
+
+		payload := fmt.Sprintf(`{"path":"%s","command":"%s","args":%s}`, target, constants.S3FS, jsonData)
+
+		errResponse, err := createMountHelperContainerRequest(payload, "http://unix/api/cos/mount")
+		klog.Info("Worker Mounting...", errResponse)
+		if err != nil {
+			return err
+		}
+		return nil
+
+	}
+	klog.Info("NodeServer Mounting...")
 	return rclone.MounterUtils.FuseMount(target, constants.RClone, args)
 }
 
