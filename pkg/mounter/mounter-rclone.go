@@ -235,7 +235,6 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 			return err
 		}
 		return nil
-
 	}
 	klog.Info("NodeServer Mounting...")
 	return rclone.MounterUtils.FuseMount(target, constants.RClone, args)
@@ -248,6 +247,20 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 	if err != nil {
 		return err
 	}
+
+	if mountWorker {
+		klog.Info("Worker Unmounting...")
+
+		payload := fmt.Sprintf(`{"path":"%s"}`, target)
+
+		errResponse, err := createMountHelperContainerRequest(payload, "http://unix/api/cos/unmount")
+		klog.Info("Worker Unmounting...", errResponse)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	klog.Info("NodeServer Unmounting...")
 	return rclone.MounterUtils.FuseUnmount(target)
 }
 

@@ -177,7 +177,6 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 			return err
 		}
 		return nil
-
 	}
 	klog.Info("NodeServer Mounting...")
 	return s3fs.MounterUtils.FuseMount(target, constants.S3FS, args)
@@ -198,6 +197,19 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 		return err
 	}
 
+	if mountWorker {
+		klog.Info("Worker Unmounting...")
+
+		payload := fmt.Sprintf(`{"path":"%s"}`, target)
+
+		errResponse, err := createMountHelperContainerRequest(payload, "http://unix/api/cos/unmount")
+		klog.Info("Worker Unmounting...", errResponse)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	klog.Info("NodeServer Unmounting...")
 	return s3fs.MounterUtils.FuseUnmount(target)
 }
 
