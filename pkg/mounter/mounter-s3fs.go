@@ -186,7 +186,6 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 			return err
 		}
 		return nil
-
 	}
 	klog.Info("NodeServer Mounting...")
 	return s3fs.MounterUtils.FuseMount(target, constants.S3FS, args)

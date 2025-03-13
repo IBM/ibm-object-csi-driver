@@ -1,4 +1,4 @@
-module mounter-helper
+module cos-csi-mounter-helper
 
 go 1.24.1
 
