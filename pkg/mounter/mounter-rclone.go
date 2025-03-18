@@ -227,7 +227,7 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 			return err
 		}
 
-		payload := fmt.Sprintf(`{"path":"%s","command":"%s","args":%s}`, target, constants.S3FS, jsonData)
+		payload := fmt.Sprintf(`{"path":"%s","command":"%s","args":%s}`, target, constants.RClone, jsonData)
 
 		errResponse, err := createMountHelperContainerRequest(payload, "http://unix/api/cos/mount")
 		klog.Info("Worker Mounting...", errResponse)
