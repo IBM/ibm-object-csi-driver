@@ -57,6 +57,8 @@ func TestSanity(t *testing.T) {
 		t.Fatalf("Failed to set skipTests: %v, Error: %v", skipTests, err)
 	}
 
+	os.Setenv("KUBE_NODE_NAME", "testNode")
+
 	// Create a fake CSI driver
 	csiSanityDriver := initCSIDriverForSanity(t)
 
@@ -245,6 +247,10 @@ func (su *FakeNewDriverStatsUtils) GetBucketUsage(volumeID string) (int64, error
 
 func (su *FakeNewDriverStatsUtils) GetBucketNameFromPV(volumeID string) (string, error) {
 	return "", nil
+}
+
+func (su *FakeNewDriverStatsUtils) GetRegionAndZone(nodeName string) (string, string, error) {
+	return "", "", nil
 }
 
 func createTargetDir(targetPath string) error {
