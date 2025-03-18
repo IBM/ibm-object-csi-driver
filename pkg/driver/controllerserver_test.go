@@ -218,27 +218,27 @@ func TestCreateVolume(t *testing.T) {
 			expectedResp: nil,
 			expectedErr:  errors.New("cosEndpoint unknown"),
 		},
-		// {
-		// 	testCaseName: "Negative: locationConstraint is missing",
-		// 	req: &csi.CreateVolumeRequest{
-		// 		Name: testVolumeName,
-		// 		VolumeCapabilities: []*csi.VolumeCapability{
-		// 			{
-		// 				AccessMode: &csi.VolumeCapability_AccessMode{
-		// 					Mode: volumeCapabilities[0],
-		// 				},
-		// 			},
-		// 		},
-		// 		Secrets: map[string]string{
-		// 			"accessKey":   "testAccessKey",
-		// 			"secretKey":   "testSecretKey",
-		// 			"cosEndpoint": "test-endpoint",
-		// 		},
-		// 	},
-		// 	cosSession:   &s3client.FakeCOSSessionFactory{},
-		// 	expectedResp: nil,
-		// 	expectedErr:  errors.New("locationConstraint unknown"),
-		// },
+		{
+		 	testCaseName: "Negative: locationConstraint is missing",
+		 	req: &csi.CreateVolumeRequest{
+		 		Name: testVolumeName,
+		 		VolumeCapabilities: []*csi.VolumeCapability{
+		 			{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+		 					Mode: volumeCapabilities[0],
+		 				},
+		 			},
+		 		},
+		 		Secrets: map[string]string{
+		 			"accessKey":   "testAccessKey",
+		 			"secretKey":   "testSecretKey",
+		 			"cosEndpoint": "test-endpoint",
+		 		},
+		 	},
+		 	cosSession:   &s3client.FakeCOSSessionFactory{},
+		 	expectedResp: nil,
+		 	expectedErr:  errors.New("locationConstraint unknown"),
+	    },
 		{
 			testCaseName: "Negative: Failed to check bucket access",
 			req: &csi.CreateVolumeRequest{

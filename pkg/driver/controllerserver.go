@@ -142,9 +142,9 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	if locationConstraint == "" {
 		locationConstraint = params["locationConstraint"]
 	}
-	// if locationConstraint == "" {
-	// 	return nil, status.Error(codes.InvalidArgument, "locationConstraint unknown")
-	// }
+	if locationConstraint == "" {
+		return nil, status.Error(codes.InvalidArgument, "locationConstraint unknown")
+    }
 
 	kpRootKeyCrn = secretMap["kpRootKeyCRN"]
 	if kpRootKeyCrn == "" {
