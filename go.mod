@@ -1,6 +1,6 @@
 module github.com/IBM/ibm-object-csi-driver
 
-go 1.23.2
+go 1.23.6
 
 require (
 	github.com/IBM/go-sdk-core/v5 v5.18.1

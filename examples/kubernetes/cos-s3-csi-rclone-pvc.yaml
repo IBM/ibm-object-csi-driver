@@ -1,8 +1,11 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: cos-s3-csi-rclone-pvc
+  name: cos-rclone-pvc
   namespace: default
+  annotations:
+    cos.csi.driver/secret: "cos-rclone-secret"
+    cos.csi.driver/secret-namespace: "default"
 spec:
   accessModes:
   - ReadWriteOnce
