@@ -286,9 +286,12 @@ func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
 		"endpoint = " + rclone.EndPoint,
 		"provider = " + cosProvider,
 		"env_auth = " + envAuth,
-		"location_constraint = " + rclone.LocConstraint,
 		"access_key_id = " + accessKey,
 		"secret_access_key = " + secretKey,
+	}
+
+	if rclone.LocConstraint != "" {
+		configParams = append(configParams, "location_constraint = "+rclone.LocConstraint)
 	}
 
 	configParams = append(configParams, rclone.MountOptions...)
