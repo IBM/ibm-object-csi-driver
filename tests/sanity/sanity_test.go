@@ -177,7 +177,7 @@ func (s *FakeS3fsMounterFactory) NewMounter(attrib map[string]string, secretMap 
 	return &Fakes3fsMounter{}
 }
 
-func (s3fs *Fakes3fsMounter) Mount(source string, target string) error {
+func (s3fs *Fakes3fsMounter) Mount(source string, target string, secretMap map[string]string) error {
 	klog.Info("-S3FSMounter Mount-")
 	return nil
 }
