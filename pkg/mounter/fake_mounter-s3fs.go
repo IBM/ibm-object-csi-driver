@@ -27,7 +27,7 @@ func fakenewS3fsMounter(isFailedMount bool) Mounter {
 	}
 }
 
-func (s3fs *fakes3fsMounter) Mount(source string, target string) error {
+func (s3fs *fakes3fsMounter) Mount(source string, target string, secretMap map[string]string) error {
 	if s3fs.isFailedMount {
 		return errors.New("failed to mount s3fs")
 	}

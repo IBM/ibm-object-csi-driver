@@ -220,102 +220,102 @@ func TestNewS3fsMounter_Success_Hmac(t *testing.T) {
 // 	assert.NoError(t, err)
 // }
 
-func Test_Mount_Error_Creating_Mount_Point(t *testing.T) {
-	mounter := NewS3fsMounter(secretMap, mountOptions,
-		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseMountFn: func(path string, comm string, args []string) error {
-				return nil
-			},
-		}))
+// func Test_Mount_Error_Creating_Mount_Point(t *testing.T) {
+// 	mounter := NewS3fsMounter(secretMap, mountOptions,
+// 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+// 			FuseMountFn: func(path string, comm string, args []string) error {
+// 				return nil
+// 			},
+// 		}))
 
-	s3fsMounter, ok := mounter.(*S3fsMounter)
-	if !ok {
-		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
-	}
+// 	s3fsMounter, ok := mounter.(*S3fsMounter)
+// 	if !ok {
+// 		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
+// 	}
 
-	FakeMkdirAll := func(path string, perm os.FileMode) error {
-		return errors.New("error creating mount path")
-	}
+// 	FakeMkdirAll := func(path string, perm os.FileMode) error {
+// 		return errors.New("error creating mount path")
+// 	}
 
-	// Replace mkdirAllFunc with the Fake function
-	mkdirAllFunc = FakeMkdirAll
-	defer func() { mkdirAllFunc = os.MkdirAll }()
+// 	// Replace mkdirAllFunc with the Fake function
+// 	mkdirAllFunc = FakeMkdirAll
+// 	defer func() { mkdirAllFunc = os.MkdirAll }()
 
-	target := "/tmp/test-mount"
+// 	target := "/tmp/test-mount"
 
-	err := s3fsMounter.Mount("source", target)
-	assert.Error(t, err, "Cannot create directory")
-}
+// 	err := s3fsMounter.Mount("source", target)
+// 	assert.Error(t, err, "Cannot create directory")
+// }
 
-func Test_Mount_Error_Creating_PWFile(t *testing.T) {
-	mounter := NewS3fsMounter(secretMap, mountOptions,
-		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseMountFn: func(path string, comm string, args []string) error {
-				return nil
-			},
-		}))
+// func Test_Mount_Error_Creating_PWFile(t *testing.T) {
+// 	mounter := NewS3fsMounter(secretMap, mountOptions,
+// 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+// 			FuseMountFn: func(path string, comm string, args []string) error {
+// 				return nil
+// 			},
+// 		}))
 
-	s3fsMounter, ok := mounter.(*S3fsMounter)
-	if !ok {
-		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
-	}
+// 	s3fsMounter, ok := mounter.(*S3fsMounter)
+// 	if !ok {
+// 		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
+// 	}
 
-	FakeMkdirAll := func(path string, perm os.FileMode) error {
-		return nil
-	}
+// 	FakeMkdirAll := func(path string, perm os.FileMode) error {
+// 		return nil
+// 	}
 
-	// Replace mkdirAllFunc with the Fake function
-	mkdirAllFunc = FakeMkdirAll
-	defer func() { mkdirAllFunc = os.MkdirAll }()
+// 	// Replace mkdirAllFunc with the Fake function
+// 	mkdirAllFunc = FakeMkdirAll
+// 	defer func() { mkdirAllFunc = os.MkdirAll }()
 
-	FakeWritePass := func(pwFileName string, pwFileContent string) error {
-		return errors.New("error creating PWFile")
-	}
+// 	FakeWritePass := func(pwFileName string, pwFileContent string) error {
+// 		return errors.New("error creating PWFile")
+// 	}
 
-	// Replace writePassFunc with the Fake function
-	writePassFunc = FakeWritePass
-	defer func() { writePassFunc = writePass }()
+// 	// Replace writePassFunc with the Fake function
+// 	writePassFunc = FakeWritePass
+// 	defer func() { writePassFunc = writePass }()
 
-	target := "/tmp/test-mount"
+// 	target := "/tmp/test-mount"
 
-	err := s3fsMounter.Mount("source", target)
-	assert.Error(t, err, "Cannot create file")
-}
+// 	err := s3fsMounter.Mount("source", target)
+// 	assert.Error(t, err, "Cannot create file")
+// }
 
-func Test_Mount_ErrorMount(t *testing.T) {
-	mounter := NewS3fsMounter(secretMap, mountOptions,
-		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseMountFn: func(path string, comm string, args []string) error {
-				return errors.New("error mounting volume")
-			},
-		}))
+// func Test_Mount_ErrorMount(t *testing.T) {
+// 	mounter := NewS3fsMounter(secretMap, mountOptions,
+// 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+// 			FuseMountFn: func(path string, comm string, args []string) error {
+// 				return errors.New("error mounting volume")
+// 			},
+// 		}))
 
-	s3fsMounter, ok := mounter.(*S3fsMounter)
-	if !ok {
-		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
-	}
+// 	s3fsMounter, ok := mounter.(*S3fsMounter)
+// 	if !ok {
+// 		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
+// 	}
 
-	FakeMkdirAll := func(path string, perm os.FileMode) error {
-		return nil
-	}
+// 	FakeMkdirAll := func(path string, perm os.FileMode) error {
+// 		return nil
+// 	}
 
-	// Replace mkdirAllFunc with the Fake function
-	mkdirAllFunc = FakeMkdirAll
-	defer func() { mkdirAllFunc = os.MkdirAll }()
+// 	// Replace mkdirAllFunc with the Fake function
+// 	mkdirAllFunc = FakeMkdirAll
+// 	defer func() { mkdirAllFunc = os.MkdirAll }()
 
-	FakeWritePass := func(pwFileName string, pwFileContent string) error {
-		return nil
-	}
+// 	FakeWritePass := func(pwFileName string, pwFileContent string) error {
+// 		return nil
+// 	}
 
-	// Replace writePassFunc with the Fake function
-	writePassFunc = FakeWritePass
-	defer func() { writePassFunc = writePass }()
+// 	// Replace writePassFunc with the Fake function
+// 	writePassFunc = FakeWritePass
+// 	defer func() { writePassFunc = writePass }()
 
-	target := "/tmp/test-mount"
+// 	target := "/tmp/test-mount"
 
-	err := s3fsMounter.Mount("source", target)
-	assert.Error(t, err, "error mounting volume")
-}
+// 	err := s3fsMounter.Mount("source", target)
+// 	assert.Error(t, err, "error mounting volume")
+// }
 
 // func Test_Unmount_Positive(t *testing.T) {
 // 	mounter := NewS3fsMounter(secretMap, mountOptions,

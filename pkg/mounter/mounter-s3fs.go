@@ -101,7 +101,7 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 	return mounter
 }
 
-func (s3fs *S3fsMounter) Mount(source string, target string) error {
+func (s3fs *S3fsMounter) Mount(source string, target string, secretMap map[string]string) error {
 	klog.Info("-S3FSMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
 	var bucketName string
@@ -116,7 +116,6 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	}
 
 	if !pathExist {
-		//if err = os.MkdirAll(metaPath, 0755); // #nosec G301: used for s3fs
 		if err = mkdirAll(metaPath, 0755); // #nosec G301: used for s3fs
 		err != nil {
 			klog.Errorf("S3FSMounter Mount: Cannot create directory %s: %v", metaPath, err)
@@ -169,7 +168,8 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 			return err
 		}
 
-		payload := fmt.Sprintf(`{"path":"%s","command":"%s","args":%s}`, target, constants.S3FS, jsonData)
+		payload := fmt.Sprintf(`{"path":"%s","command":"%s","args":%s,"apiKey":"%s","accessKey":"%s","secretKey":"%s"}`, // pragma: allowlist secret
+			target, constants.S3FS, jsonData, secretMap["apiKey"], secretMap["accessKey"], secretMap["secretKey"])
 
 		errResponse, err := createMountHelperContainerRequest(payload, "http://unix/api/cos/mount")
 		klog.Info("Worker Mounting...", errResponse)

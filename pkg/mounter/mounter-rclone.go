@@ -167,7 +167,7 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 	return updatedOptions
 }
 
-func (rclone *RcloneMounter) Mount(source string, target string) error {
+func (rclone *RcloneMounter) Mount(source string, target string, secretMap map[string]string) error {
 	klog.Info("-RcloneMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
 	var bucketName string
@@ -227,7 +227,8 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 			return err
 		}
 
-		payload := fmt.Sprintf(`{"path":"%s","command":"%s","args":%s}`, target, constants.RClone, jsonData)
+		payload := fmt.Sprintf(`{"path":"%s","command":"%s","args":%s,"apiKey":"%s","accessKey":"%s","secretKey":"%s"}`, // pragma: allowlist secret
+			target, constants.RClone, jsonData, secretMap["apiKey"], secretMap["accessKey"], secretMap["secretKey"])
 
 		errResponse, err := createMountHelperContainerRequest(payload, "http://unix/api/cos/mount")
 		klog.Info("Worker Mounting...", errResponse)
