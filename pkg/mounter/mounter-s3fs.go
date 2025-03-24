@@ -171,8 +171,8 @@ func (s3fs *S3fsMounter) Mount(source string, target string, secretMap map[strin
 			return err
 		}
 
-		payload := fmt.Sprintf(`{"path":"%s","command":"%s","args":%s,"apiKey":"%s","accessKey":"%s","secretKey":"%s"}`, // pragma: allowlist secret
-			target, constants.S3FS, jsonData, secretMap["apiKey"], secretMap["accessKey"], secretMap["secretKey"])
+		payload := fmt.Sprintf(`{"path":"%s","mounter":"%s","args":%s,"apiKey":"%s","accessKey":"%s","secretKey":"%s"}`, // pragma: allowlist secret
+			target, constants.S3FS+"-mounter", jsonData, secretMap["apiKey"], secretMap["accessKey"], secretMap["secretKey"])
 
 		errResponse, err := createMountHelperContainerRequest(payload, "http://unix/api/cos/mount")
 		klog.Info("Worker Mounting...", errResponse)

@@ -227,8 +227,8 @@ func (rclone *RcloneMounter) Mount(source string, target string, secretMap map[s
 			return err
 		}
 
-		payload := fmt.Sprintf(`{"path":"%s","command":"%s","args":%s,"apiKey":"%s","accessKey":"%s","secretKey":"%s"}`, // pragma: allowlist secret
-			target, constants.RClone, jsonData, secretMap["apiKey"], secretMap["accessKey"], secretMap["secretKey"])
+		payload := fmt.Sprintf(`{"path":"%s","mounter":"%s","args":%s,"apiKey":"%s","accessKey":"%s","secretKey":"%s"}`, // pragma: allowlist secret
+			target, constants.RClone+"-mounter", jsonData, secretMap["apiKey"], secretMap["accessKey"], secretMap["secretKey"])
 
 		errResponse, err := createMountHelperContainerRequest(payload, "http://unix/api/cos/mount")
 		klog.Info("Worker Mounting...", errResponse)
