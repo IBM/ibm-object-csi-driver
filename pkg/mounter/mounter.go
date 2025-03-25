@@ -2,7 +2,6 @@ package mounter
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -157,17 +156,21 @@ func createMountHelperContainerRequest(payload string, url string) (string, erro
 	}
 
 	// Unmarshal json response
-	var responseBody struct {
-		MountExitCode   string `json:"MountExitCode"`
-		ExitDescription string `json:"Description"`
-	}
-	err = json.Unmarshal(body, &responseBody)
-	if err != nil {
-		return "", err
-	}
+	// var responseBody struct {
+	// 	MountExitCode   string `json:"MountExitCode"`
+	// 	ExitDescription string `json:"Description"`
+	// }
+
+	// err = json.Unmarshal(body, &responseBody)
+	// if err != nil {
+	// 	return "", err
+	// }
+
+	responseBody := string(body)
 
 	if response.StatusCode != http.StatusOK {
-		return responseBody.ExitDescription, fmt.Errorf("response from mount-helper-container -> Exit Status Code: %s ,ResponseCode: %v", responseBody.MountExitCode, response.StatusCode)
+		// return responseBody.ExitDescription, fmt.Errorf("response from mount-helper-container -> Exit Status Code: %s ,ResponseCode: %v", responseBody.MountExitCode, response.StatusCode)
+		return responseBody, fmt.Errorf("response from mount-helper-container -> Exit Status Code: %s ,ResponseCode: %v", responseBody, response.StatusCode)
 	}
 	return "", nil
 }
