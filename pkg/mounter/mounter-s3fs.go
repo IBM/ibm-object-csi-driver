@@ -13,6 +13,7 @@ package mounter
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -38,7 +39,7 @@ type S3fsMounter struct {
 }
 
 const (
-	metaRoot = "/var/lib/ibmc-s3fs"
+	metaRoot = "/var/lib/s3fs"
 	passFile = ".passwd-s3fs" // #nosec G101: not password
 )
 
@@ -100,7 +101,7 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 	return mounter
 }
 
-func (s3fs *S3fsMounter) Mount(source string, target string) error {
+func (s3fs *S3fsMounter) Mount(source string, target string, secretMap map[string]string) error {
 	klog.Info("-S3FSMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
 	var bucketName string
@@ -115,7 +116,6 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	}
 
 	if !pathExist {
-		//if err = os.MkdirAll(metaPath, 0755); // #nosec G301: used for s3fs
 		if err = mkdirAll(metaPath, 0755); // #nosec G301: used for s3fs
 		err != nil {
 			klog.Errorf("S3FSMounter Mount: Cannot create directory %s: %v", metaPath, err)
@@ -161,6 +161,29 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	} else {
 		args = append(args, "-o", "default_acl=private")
 	}
+
+	if mountWorker {
+		klog.Info("Worker Mounting...")
+
+		jsonData, err := json.Marshal(args)
+		if err != nil {
+			klog.Fatalf("Error marshalling data: %v", err)
+			return err
+		}
+
+		payload := fmt.Sprintf(`{"path":"%s","mounter":"%s","args":%s,"apiKey":"%s","accessKey":"%s","secretKey":"%s"}`, // pragma: allowlist secret
+			target, constants.S3FS+"-mounter", jsonData, secretMap["apiKey"], secretMap["accessKey"], secretMap["secretKey"])
+
+		klog.Info("Worker Mounting Payload...", payload)
+
+		errResponse, err := createMountHelperContainerRequest(payload, "http://unix/api/cos/mount")
+		klog.Info("Worker Mounting...", errResponse)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	klog.Info("NodeServer Mounting...")
 	return s3fs.MounterUtils.FuseMount(target, constants.S3FS, args)
 }
 
@@ -179,6 +202,19 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 		return err
 	}
 
+	if mountWorker {
+		klog.Info("Worker Unmounting...")
+
+		payload := fmt.Sprintf(`{"path":"%s"}`, target)
+
+		errResponse, err := createMountHelperContainerRequest(payload, "http://unix/api/cos/unmount")
+		klog.Info("Worker Unmounting...", errResponse)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	klog.Info("NodeServer Unmounting...")
 	return s3fs.MounterUtils.FuseUnmount(target)
 }
 

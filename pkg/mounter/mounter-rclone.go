@@ -14,6 +14,7 @@ package mounter
 import (
 	"bufio"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -166,7 +167,7 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 	return updatedOptions
 }
 
-func (rclone *RcloneMounter) Mount(source string, target string) error {
+func (rclone *RcloneMounter) Mount(source string, target string, secretMap map[string]string) error {
 	klog.Info("-RcloneMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
 	var bucketName string
@@ -216,6 +217,27 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 		uidOpt := "--uid=" + rclone.UID
 		args = append(args, uidOpt)
 	}
+
+	if mountWorker {
+		klog.Info("Worker Mounting...")
+
+		jsonData, err := json.Marshal(args)
+		if err != nil {
+			klog.Fatalf("Error marshalling data: %v", err)
+			return err
+		}
+
+		payload := fmt.Sprintf(`{"path":"%s","mounter":"%s","args":%s,"apiKey":"%s","accessKey":"%s","secretKey":"%s"}`, // pragma: allowlist secret
+			target, constants.RClone+"-mounter", jsonData, secretMap["apiKey"], secretMap["accessKey"], secretMap["secretKey"])
+
+		errResponse, err := createMountHelperContainerRequest(payload, "http://unix/api/cos/mount")
+		klog.Info("Worker Mounting...", errResponse)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	klog.Info("NodeServer Mounting...")
 	return rclone.MounterUtils.FuseMount(target, constants.RClone, args)
 }
 
@@ -226,6 +248,20 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 	if err != nil {
 		return err
 	}
+
+	if mountWorker {
+		klog.Info("Worker Unmounting...")
+
+		payload := fmt.Sprintf(`{"path":"%s"}`, target)
+
+		errResponse, err := createMountHelperContainerRequest(payload, "http://unix/api/cos/unmount")
+		klog.Info("Worker Unmounting...", errResponse)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	klog.Info("NodeServer Unmounting...")
 	return rclone.MounterUtils.FuseUnmount(target)
 }
 

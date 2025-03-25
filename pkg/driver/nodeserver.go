@@ -154,7 +154,7 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 
 	klog.Info("-NodePublishVolume-: Mount")
 
-	if err = mounterObj.Mount("", targetPath); err != nil {
+	if err = mounterObj.Mount("", targetPath, secretMap); err != nil {
 		klog.Info("-Mount-: Error: ", err)
 		return nil, err
 	}

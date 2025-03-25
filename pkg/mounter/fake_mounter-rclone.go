@@ -31,7 +31,7 @@ func fakenewRcloneMounter(isFailedMount bool) Mounter {
 	}
 }
 
-func (rclone *fakercloneMounter) Mount(source string, target string) error {
+func (rclone *fakercloneMounter) Mount(source string, target string, secretMap map[string]string) error {
 	if rclone.isFailedMount {
 		return errors.New("failed to mount rclone")
 	}
