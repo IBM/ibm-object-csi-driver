@@ -39,7 +39,7 @@ type S3fsMounter struct {
 }
 
 const (
-	metaRoot = "/var/lib/ibmc-s3fs"
+	metaRoot = "/var/lib/s3fs"
 	passFile = ".passwd-s3fs" // #nosec G101: not password
 )
 
