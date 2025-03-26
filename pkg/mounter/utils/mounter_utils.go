@@ -90,7 +90,7 @@ func isMountpoint(pathname string) (bool, error) {
 	// We are omitting error here as the mountpoint command will only return non zero exit code when it's not a mountpoint
 	// This means if it's not a mountpoint we will get an error, but then we need to check the output anyway
 	// So we can directly check the output and ignore the error
-	out, _ := exec.Command("mountpoint", pathname).CombinedOutput()
+	out, err := exec.Command("mountpoint", pathname).CombinedOutput()
 	outStr := strings.TrimSpace(string(out))
 
 	if strings.HasSuffix(outStr, "is a mountpoint") {
@@ -107,7 +107,7 @@ func isMountpoint(pathname string) (bool, error) {
 		return true, nil
 	}
 
-	klog.Errorf("Cannot parse mountpoint result: %v", outStr)
+	klog.Errorf("Cannot parse mountpoint result: %v, output: %s", err, outStr)
 	return false, fmt.Errorf("cannot parse mountpoint result: %s", outStr)
 }
 
@@ -162,7 +162,8 @@ func getCmdLine(pid int) (string, error) {
 }
 
 func waitForProcess(p *os.Process, backoff int) error {
-	if backoff == 20 {
+	//totally it waits 30 seconds before force killing the process
+	if backoff == 60 {
 		return ErrTimeoutWaitProcess
 	}
 	cmdLine, err := getCmdLine(p.Pid)
@@ -182,6 +183,6 @@ func waitForProcess(p *os.Process, backoff int) error {
 		return nil
 	}
 	klog.Infof("Fuse process with PID %v still active, waiting...", p.Pid)
-	time.Sleep(time.Duration(backoff*100) * time.Millisecond)
+	time.Sleep(time.Duration(backoff*500) * time.Millisecond)
 	return waitForProcess(p, backoff+1)
 }
