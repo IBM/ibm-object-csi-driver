@@ -49,6 +49,12 @@ coverage: test
 	# go tool cover -html=cover.out -o=cover.html
 	go tool cover -func=cover.out | fgrep total
 
+ut-coverage: go test -v -timeout 1800s -coverprofile=cover.out ./...
+	go tool cover -html=cover.out -o=cover.html
+	@./scripts/coverage.sh
+	rm cover.html cover.out
+	go mod tidy
+
 clean:
 	-rm -rf bin
 
@@ -84,8 +90,3 @@ build-binary:
 	docker build --build-arg TAG=$(REV) --build-arg OS=linux --build-arg ARCH=$(ARCH) -t csi-driver-builder --pull -f Dockerfile.builder .
 	docker run csi-driver-builder
 	docker cp `docker ps -q -n=1`:/go/bin/${EXE_DRIVER_NAME} ./${EXE_DRIVER_NAME}
-
-ut-coverage: test
-	@./scripts/coverage.sh
-	rm cover.html cover.out
-	go mod tidy
