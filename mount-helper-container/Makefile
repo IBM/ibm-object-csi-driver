@@ -25,6 +25,9 @@ ut-coverage: test
 	rm cover.html cover.out
 	go mod tidy
 
+build-linux:
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod mod -o ${BIN_DIR}/mount-helper-container-server -ldflags "-s -w" -a ./server/server.go
+
 deb-build:
 deb-build: build-linux
 	rm -rf $(BUILD_DIR)
