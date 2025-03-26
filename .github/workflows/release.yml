@@ -20,9 +20,12 @@ jobs:
       uses: actions/checkout@v2
       
     - name: Run Unit Tests for cos csi mount helper container
-      run: sudo make ut-coverage -C mount-helper-container
+      run: sudo make ut-coverage -C ${{ matrix.package_dir }}
 
-    
+    - name: Build Debian/rpm Packages for cos csi mount helper container
+      run: |
+          cd ${{ matrix.package_dir }}
+          make packages
 
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v2
