@@ -18,3 +18,11 @@ jobs:
     steps:
     - name: Checkout Code
       uses: actions/checkout@v2
+      
+    - name: Run Unit Tests for cos csi mount helper container
+      run: sudo make ut-coverage -C mount-helper-container
+
+    
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v2
