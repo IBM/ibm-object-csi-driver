@@ -28,4 +28,4 @@ jobs:
           make packages
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v2
+      uses: github/codeql-action/init@v3
