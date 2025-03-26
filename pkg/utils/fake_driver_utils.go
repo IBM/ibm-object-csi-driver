@@ -72,6 +72,3 @@ func (m *FakeStatsUtilsFuncStructImpl) GetRegionAndZone(nodeName string) (string
 	}
 	panic("requested method should not be nil")
 }
-
-
-
