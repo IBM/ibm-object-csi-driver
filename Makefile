@@ -84,3 +84,8 @@ build-binary:
 	docker build --build-arg TAG=$(REV) --build-arg OS=linux --build-arg ARCH=$(ARCH) -t csi-driver-builder --pull -f Dockerfile.builder .
 	docker run csi-driver-builder
 	docker cp `docker ps -q -n=1`:/go/bin/${EXE_DRIVER_NAME} ./${EXE_DRIVER_NAME}
+
+ut-coverage: test
+	@./scripts/coverage.sh
+	rm cover.html cover.out
+	go mod tidy
