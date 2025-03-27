@@ -32,13 +32,22 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/${{ matrix.package_dir }}/mount.ibmshare-latest.tar.gz
-          /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/${{ matrix.package_dir }}/mount.ibmshare-latest.tar.gz.sha256
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/mount-helper-container/mount-helper-container-latest.tar.gz
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/mount-helper-container/mount-helper-container-latest.tar.gz.sha256
         tag_name: latest
         name: Latest
         body: The latest release tag provides static link for package download. This has the same artificats as in the versioned latest version.
+
+    - name: Latest Version
+      id: release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/mount-helper-container/mount-helper-container-latest.tar.gz
+          /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/mount-helper-container/mount-helper-container-latest.tar.gz.sha256
+        tag_name: 0.0.0
+        name: 0.0.0
+        body: CSR generated with SHA1 is not supported to get certs using Metadata.
 
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
