@@ -87,9 +87,6 @@ func (su *MounterOptsUtils) FuseUnmount(path string) error {
 func isMountpoint(pathname string) (bool, error) {
 	klog.Infof("Checking if path is mountpoint: Pathname - %s", pathname)
 
-	// We are omitting error here as the mountpoint command will only return non zero exit code when it's not a mountpoint
-	// This means if it's not a mountpoint we will get an error, but then we need to check the output anyway
-	// So we can directly check the output and ignore the error
 	out, err := exec.Command("mountpoint", pathname).CombinedOutput()
 	outStr := strings.TrimSpace(string(out))
 
