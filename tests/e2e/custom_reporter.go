@@ -13,7 +13,7 @@ type CustomReporter struct {
 
 func (r *CustomReporter) SpecDidComplete(specSummary *types.SpecSummary) {
 	if specSummary.Failed() {
-		fmt.Fprintf(r.OutputFile, "FAIL: %s\n", specSummary.ComponentTexts[0])
+		_, _ = fmt.Fprintf(r.OutputFile, "FAIL: %s\n", specSummary.ComponentTexts[0])
 	} else {
 		fmt.Fprintf(r.OutputFile, "PASS: %s\n", specSummary.ComponentTexts[0])
 	}
