@@ -45,12 +45,12 @@ func (su *DriverStatsUtils) GetRegionAndZone(nodeName string) (region, zone stri
 		return "", "", err
 	}
 
-	nodeLabels := node.ObjectMeta.Labels
+	nodeLabels := node.Labels
 	region, regionExists := nodeLabels[constants.NodeRegionLabel]
 	zone, zoneExists := nodeLabels[constants.NodeZoneLabel]
 
 	if !regionExists || !zoneExists {
-		errorMsg := fmt.Errorf("One or few required node label(s) is/are missing [%s, %s]. Node Labels Found = [#%v]", constants.NodeRegionLabel, constants.NodeZoneLabel, nodeLabels) //nolint:golint
+		errorMsg := fmt.Errorf("one or few required node label(s) is/are missing [%s, %s]. Node Labels Found = [#%v]", constants.NodeRegionLabel, constants.NodeZoneLabel, nodeLabels) //nolint:golint
 		return "", "", errorMsg
 	}
 	return region, zone, nil
@@ -333,7 +333,7 @@ func fetchSecretUsingPV(volumeID string) (*v1.Secret, error) {
 	secretNamespace := pv.Spec.CSI.NodePublishSecretRef.Namespace
 
 	if secretName == "" {
-		return nil, fmt.Errorf("Secret details not found in the PV, could not fetch the secret")
+		return nil, fmt.Errorf("secret details not found in the PV, could not fetch the secret")
 	}
 
 	if secretNamespace == "" {

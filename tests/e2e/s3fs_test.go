@@ -99,7 +99,11 @@ var _ = Describe("rclone", func() {
 			println("Failed to create file:", err)
 			return
 		}
-		defer customReporter.Close()
+
+		close := func() {
+			_ = customReporter.Close()
+		}
+		defer close()
 
 		err = test.Run(cs, ns)
 		if err != nil {
@@ -174,7 +178,11 @@ var _ = Describe("s3fs", func() {
 			println("Failed to create file:", err)
 			return
 		}
-		defer customReporter.Close()
+
+		close := func() {
+			_ = customReporter.Close()
+		}
+		defer close()
 
 		err = test.Run(cs, ns)
 		if err != nil {
