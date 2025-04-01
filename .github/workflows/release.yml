@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     branches:
-      - enable-github-actions
+      - main
 
 jobs:
   release:
