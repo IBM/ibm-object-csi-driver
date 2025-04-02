@@ -21,6 +21,8 @@ jobs:
 
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
+      with:
+        languages: "go"
       
     - name: Run Unit Tests for cos csi mounter
       run: sudo make ut-coverage -C ${{ matrix.package_dir }}
