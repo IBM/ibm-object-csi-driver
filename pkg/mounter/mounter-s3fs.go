@@ -45,10 +45,7 @@ type S3fsMounter struct {
 	MounterUtils  utils.MounterUtils
 }
 
-const (
-	metaRoot = "/var/lib/ibmc-s3fs"
-	passFile = ".passwd-s3fs" // #nosec G101: not password
-)
+const passFile = ".passwd-s3fs" // #nosec G101: not password
 
 func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
 	klog.Info("-newS3fsMounter-")
@@ -111,6 +108,14 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	klog.Info("-S3FSMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
+
+	var metaRoot string
+	if mountWorker {
+		metaRoot = "/var/lib/cos-csi"
+	} else {
+		metaRoot = "/var/lib/ibmc-s3fs"
+	}
+
 	var bucketName string
 	var pathExist bool
 	var err error
@@ -123,7 +128,6 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	}
 
 	if !pathExist {
-		//if err = os.MkdirAll(metaPath, 0755); // #nosec G301: used for s3fs
 		if err = mkdirAll(metaPath, 0755); // #nosec G301: used for s3fs
 		err != nil {
 			klog.Errorf("S3FSMounter Mount: Cannot create directory %s: %v", metaPath, err)
@@ -203,6 +207,14 @@ var writePassWrap = func(pwFileName string, pwFileContent string) error {
 
 func (s3fs *S3fsMounter) Unmount(target string) error {
 	klog.Info("-S3FSMounter Unmount-")
+
+	var metaRoot string
+	if mountWorker {
+		metaRoot = "/var/lib/cos-csi"
+	} else {
+		metaRoot = "/var/lib/ibmc-s3fs"
+	}
+
 	metaPath := path.Join(metaRoot, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 	err := os.RemoveAll(metaPath)
 	if err != nil {
