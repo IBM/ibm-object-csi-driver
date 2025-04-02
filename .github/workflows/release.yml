@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     branches:
-      - main
+      - enable-github-actions
 
 jobs:
   release:
@@ -18,11 +18,14 @@ jobs:
     steps:
     - name: Checkout Code
       uses: actions/checkout@v2
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
       
-    - name: Run Unit Tests for cos csi mount helper container
+    - name: Run Unit Tests for cos csi mounter
       run: sudo make ut-coverage -C ${{ matrix.package_dir }}
 
-    - name: Build Debian/rpm Packages for cos csi mount helper container
+    - name: Build Debian Package for cos csi mounter container
       run: |
           cd ${{ matrix.package_dir }}
           make packages
@@ -48,6 +51,6 @@ jobs:
         tag_name: 0.0.0
         name: 0.0.0
         body: CSR generated with SHA1 is not supported to get certs using Metadata.
-
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
+    
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3

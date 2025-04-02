@@ -1,5 +1,5 @@
 [Unit]
-Description=COS CSI mount helper container service
+Description=COS CSI mounter service
 DefaultDependencies=no
 Requires=network-online.target
 After=network-online.target
@@ -7,12 +7,12 @@ Before=shutdown.target reboot.target halt.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/mount-helper-container-server
+ExecStart=/usr/local/bin/cos-csi-mounter-server
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=mount-helper-container
+SyslogIdentifier=cos-csi-mounter
 
 [Install]
 WantedBy=multi-user.target
