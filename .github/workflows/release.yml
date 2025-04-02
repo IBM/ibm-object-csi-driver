@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         package_dir:
-          - mount-helper-container
+          - cos-csi-mounter
 
     steps:
     - name: Checkout Code
@@ -29,25 +29,14 @@ jobs:
       run: |
           cd ${{ matrix.package_dir }}
           make packages
-          
-    - name: Latest Tag Release
-      id: latest-tag
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/mount-helper-container/mount-helper-container-latest.tar.gz
-          /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/mount-helper-container/mount-helper-container-latest.tar.gz.sha256
-        tag_name: latest
-        name: Latest
-        body: The latest release tag provides static link for package download. This has the same artificats as in the versioned latest version.
 
-    - name: Latest Version
+    - name: Latest Version (Tag and Release)
       id: release
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/mount-helper-container/mount-helper-container-latest.tar.gz
-          /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/mount-helper-container/mount-helper-container-latest.tar.gz.sha256
+          /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-latest.tar.gz
+          /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-latest.tar.gz.sha256
         tag_name: 0.0.0
         name: 0.0.0
         body: CSR generated with SHA1 is not supported to get certs using Metadata.
