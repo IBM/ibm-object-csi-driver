@@ -22,8 +22,7 @@ func init() {
 
 var (
 	logger     *zap.Logger
-	socketDir  = "/var/lib/"
-	socketPath = socketDir + "ibmshare.sock"
+	socketPath = "/var/lib/coscsi.sock"
 
 	s3fs   = "s3fs"
 	rclone = "rclone"
@@ -40,7 +39,7 @@ func setUpLogger() *zap.Logger {
 		zapcore.NewJSONEncoder(encoderCfg),
 		zapcore.Lock(os.Stdout),
 		atom,
-	), zap.AddCaller()).With(zap.String("ServiceName", "mount-helper-conatiner-service"))
+	), zap.AddCaller()).With(zap.String("ServiceName", "cos-csi-mounter-service"))
 	atom.SetLevel(zap.InfoLevel)
 	return logger
 }
@@ -67,7 +66,7 @@ func main() {
 		os.Exit(0)
 	}()
 
-	logger.Info("Starting cos-mount-helper service...")
+	logger.Info("Starting cos-csi-mounter service...")
 
 	// Create gin router
 	router := gin.Default()
@@ -103,11 +102,7 @@ func handleCosMount() gin.HandlerFunc {
 		var err error
 		var mounterType string
 
-		if request.Mounter == s3fs+"-mounter" {
-			mounterType = s3fs
-		} else if request.Mounter == rclone+"-mounter" {
-			mounterType = rclone
-		} else {
+		if request.Mounter != s3fs && request.Mounter != rclone {
 			logger.Error("Invalid Request!!!!")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
 			return

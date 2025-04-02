@@ -344,7 +344,7 @@ func createMountHelperContainerRequest(payload string, url string) (string, erro
 	}
 
 	if response.StatusCode != http.StatusOK {
-		return responseBody.ExitDescription, fmt.Errorf("response from mount-helper-container -> Exit Status Code: %s ,ResponseCode: %v", responseBody.MountExitCode, response.StatusCode)
+		return responseBody.ExitDescription, fmt.Errorf("response from cos-csi-mounter -> Exit Status Code: %s ,ResponseCode: %v", responseBody.MountExitCode, response.StatusCode)
 	}
 	return "", nil
 }
