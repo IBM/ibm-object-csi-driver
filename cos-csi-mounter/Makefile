@@ -56,7 +56,7 @@ tar-package:
 
 clean:
 	rm -rf ${BIN_DIR}
-	rm *.deb *.rpm
+	rm *.deb
 	rm -rf packages
 
 packages:
