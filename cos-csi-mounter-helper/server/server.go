@@ -100,7 +100,6 @@ func handleCosMount() gin.HandlerFunc {
 
 		logger.Info("New mount request with values: ", zap.String("Path:", request.Path), zap.String("Mounter:", request.Mounter), zap.Any("Args:", request.Args))
 
-		// var pathExist bool
 		var err error
 		var mounterType string
 
