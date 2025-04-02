@@ -307,8 +307,8 @@ func (t *TestPersistentVolumeClaim) ValidateProvisionedPersistentVolume() {
 	framework.Logf("checking PV [%s]", t.persistentVolume.Name)
 	expectedAccessModes := t.requestedPersistentVolumeClaim.Spec.AccessModes
 	gomega.Expect(t.persistentVolume.Spec.AccessModes).To(gomega.Equal(expectedAccessModes))
-	gomega.Expect(t.persistentVolume.Spec.ClaimRef.Name).To(gomega.Equal(t.persistentVolumeClaim.ObjectMeta.Name))
-	gomega.Expect(t.persistentVolume.Spec.ClaimRef.Namespace).To(gomega.Equal(t.persistentVolumeClaim.ObjectMeta.Namespace))
+	gomega.Expect(t.persistentVolume.Spec.ClaimRef.Name).To(gomega.Equal(t.persistentVolumeClaim.Name))
+	gomega.Expect(t.persistentVolume.Spec.ClaimRef.Namespace).To(gomega.Equal(t.persistentVolumeClaim.Namespace))
 }
 
 func generatePVC(name, namespace,

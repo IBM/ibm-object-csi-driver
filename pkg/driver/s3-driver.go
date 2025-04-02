@@ -154,11 +154,12 @@ func (driver *S3Driver) NewS3CosDriver(nodeID string, endpoint string, s3cosSess
 
 	// Create GRPC servers
 	driver.ids = newIdentityServer(driver)
-	if driver.mode == "controller" {
+	switch driver.mode {
+	case "controller":
 		driver.cs = newControllerServer(driver, statsUtil, s3cosSession, driver.logger)
-	} else if driver.mode == "node" {
+	case "node":
 		driver.ns = newNodeServer(driver, statsUtil, nodeID, mountObj, mounterUtil)
-	} else if driver.mode == "controller-node" {
+	case "controller-node":
 		driver.cs = newControllerServer(driver, statsUtil, s3cosSession, driver.logger)
 		driver.ns = newNodeServer(driver, statsUtil, nodeID, mountObj, mounterUtil)
 	}

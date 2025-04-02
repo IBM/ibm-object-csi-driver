@@ -16,6 +16,8 @@ import (
 var unmount = syscall.Unmount
 var command = exec.Command
 
+var ErrTimeoutWaitProcess = errors.New("timeout waiting for process to end")
+
 type MounterUtils interface {
 	FuseUnmount(path string) error
 	FuseMount(path string, comm string, args []string) error
@@ -72,7 +74,14 @@ func (su *MounterOptsUtils) FuseUnmount(path string) error {
 		return nil
 	}
 	klog.Infof("Found fuse pid %v of mount %s, checking if it still runs", process.Pid, path)
-	return waitForProcess(process, 1)
+
+	err = waitForProcess(process, 1)
+	if errors.Is(err, ErrTimeoutWaitProcess) {
+		klog.Infof("timeout waiting for pid %d to end, killing process", process.Pid)
+		return process.Kill()
+	}
+
+	return err
 }
 
 func isMountpoint(pathname string) (bool, error) {
@@ -80,21 +89,22 @@ func isMountpoint(pathname string) (bool, error) {
 
 	out, err := exec.Command("mountpoint", pathname).CombinedOutput()
 	outStr := strings.TrimSpace(string(out))
-	if err != nil {
-		if strings.HasSuffix(outStr, "Transport endpoint is not connected") {
-			return true, err
-		}
-		return false, err
-	}
 
 	if strings.HasSuffix(outStr, "is a mountpoint") {
 		klog.Infof("Path is a mountpoint: pathname - %s", pathname)
 		return true, nil
-	} else if strings.HasSuffix(outStr, "is not a mountpoint") {
+	}
+
+	if strings.HasSuffix(outStr, "is not a mountpoint") {
 		klog.Infof("Path is NOT a mountpoint:Pathname - %s", pathname)
 		return false, nil
 	}
-	klog.Errorf("Cannot parse mountpoint result: %v", outStr)
+
+	if strings.HasSuffix(outStr, "Transport endpoint is not connected") {
+		return true, nil
+	}
+
+	klog.Errorf("Cannot parse mountpoint result: %v, output: %s", err, outStr)
 	return false, fmt.Errorf("cannot parse mountpoint result: %s", outStr)
 }
 
@@ -149,8 +159,9 @@ func getCmdLine(pid int) (string, error) {
 }
 
 func waitForProcess(p *os.Process, backoff int) error {
-	if backoff == 20 {
-		return fmt.Errorf("timeout waiting for PID %v to end", p.Pid)
+	//totally it waits 30 seconds before force killing the process
+	if backoff == 60 {
+		return ErrTimeoutWaitProcess
 	}
 	cmdLine, err := getCmdLine(p.Pid)
 	if err != nil {
@@ -169,6 +180,6 @@ func waitForProcess(p *os.Process, backoff int) error {
 		return nil
 	}
 	klog.Infof("Fuse process with PID %v still active, waiting...", p.Pid)
-	time.Sleep(time.Duration(backoff*100) * time.Millisecond)
+	time.Sleep(time.Duration(backoff*500) * time.Millisecond)
 	return waitForProcess(p, backoff+1)
 }

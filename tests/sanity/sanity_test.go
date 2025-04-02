@@ -57,7 +57,7 @@ func TestSanity(t *testing.T) {
 		t.Fatalf("Failed to set skipTests: %v, Error: %v", skipTests, err)
 	}
 
-	os.Setenv("KUBE_NODE_NAME", "testNode")
+	_ = os.Setenv("KUBE_NODE_NAME", "testNode")
 
 	// Create a fake CSI driver
 	csiSanityDriver := initCSIDriverForSanity(t)
