@@ -32,9 +32,20 @@ jobs:
           cd ${{ matrix.package_dir }}
           make packages
 
+    - name: Get last commit message
+      id: check_commit
+      run:  |
+            message=$(git log -1 --pretty=%B)
+            echo "message=$message" >> "$GITHUB_OUTPUT"
+      shell: bash
+
+    - name: Check Commit Message
+      run: |
+          echo "Commit Message: ${{ steps.check_commit.outputs.message }}"
+
     - name: Latest Version (Tag and Release)
       id: release
-      if: contains(env, 'publish')
+      if: contains(steps.check_commit.outputs.message, 'publish')
       uses: softprops/action-gh-release@v1
       with:
         files: |
