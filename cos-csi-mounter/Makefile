@@ -40,7 +40,7 @@ deb-build: build-linux
 	echo "Maintainer: $(MAINTAINER)" >> $(DEBIAN_CONTROL)
 	echo "Architecture: $(DEB_ARCH)" >> $(DEBIAN_CONTROL)
 	echo "Description: $(DESCRIPTION)" >> $(DEBIAN_CONTROL)
-	echo "Depends: mount.ibmshare-0.0.8" >> $(DEBIAN_CONTROL)
+	# echo "Depends: mount.ibmshare-0.0.8" >> $(DEBIAN_CONTROL)
 
 	dpkg-deb --build $(BUILD_DIR)
 	rm -rf $(BUILD_DIR)
