@@ -36,6 +36,9 @@ jobs:
       id: check_commit
       run:  |
             message=$(git log -1 --pretty=%B)
+            message="${message//'%'/'%25'}"  # Escape '%'
+            message="${message//$'\n'/'%0A'}"  # Escape newlines
+            message="${message//$'\r'/'%0D'}"  # Escape carriage returns
             echo "message=$message" >> "$GITHUB_OUTPUT"
       shell: bash
 
