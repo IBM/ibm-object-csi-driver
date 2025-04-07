@@ -30,8 +30,8 @@ func (csiIdentity *identityServer) GetPluginInfo(_ context.Context, req *csi.Get
 	}
 
 	return &csi.GetPluginInfoResponse{
-		Name:          csiIdentity.S3Driver.name,
-		VendorVersion: csiIdentity.S3Driver.version,
+		Name:          csiIdentity.name,
+		VendorVersion: csiIdentity.version,
 	}, nil
 }
 

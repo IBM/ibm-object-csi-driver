@@ -647,7 +647,7 @@ func TestNodeGetInfo(t *testing.T) {
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		os.Setenv("KUBE_NODE_NAME", "testNode")
+		_ = os.Setenv("KUBE_NODE_NAME", "testNode")
 
 		nodeServer := nodeServer{
 			NodeID: testNodeID,

@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    permissions: write-all 
+    runs-on: ubuntu-20.04
+
+    strategy:
+      matrix:
+        package_dir:
+          - cos-csi-mounter
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v2
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: "go"
+      
+    - name: Run Unit Tests for cos csi mounter
+      run: sudo make ut-coverage -C ${{ matrix.package_dir }}
+
+    - name: Build Debian Package for cos csi mounter container
+      run: |
+          cd ${{ matrix.package_dir }}
+          make packages
+
+    - name: Get last commit message
+      id: check_commit
+      run:  |
+            message=$(git log -1 --pretty=%B)
+            message="${message//'%'/'%25'}"  # Escape '%'
+            message="${message//$'\n'/'%0A'}"  # Escape newlines
+            message="${message//$'\r'/'%0D'}"  # Escape carriage returns
+            echo "message=$message" >> "$GITHUB_OUTPUT"
+      shell: bash
+
+    - name: Check Commit Message
+      run: |
+          echo "Commit Message: ${{ steps.check_commit.outputs.message }}"
+
+    - name: Latest Version (Tag and Release)
+      id: release
+      if: contains(steps.check_commit.outputs.message, 'publish')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-latest.tar.gz
+          /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-latest.tar.gz.sha256
+        tag_name: v0.1.0
+        name: v0.1.0
+        body: CSR generated with SHA1 is not supported to get certs using Metadata.
+    
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
