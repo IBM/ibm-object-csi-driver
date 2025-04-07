@@ -126,226 +126,226 @@ func TestNewRcloneMounter_MountOptsInSecret_Invalid(t *testing.T) {
 	assert.Equal(t, rCloneMounter.GID, secretMap["gid"])
 }
 
-// func Test_RcloneMount_Positive(t *testing.T) {
-// 	mounter := NewRcloneMounter(secretMapRClone, mountOptionsRClone,
-// 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-// 			FuseMountFn: func(path string, comm string, args []string) error {
-// 				return nil
-// 			},
-// 		}))
+func Test_RcloneMount_Positive(t *testing.T) {
+	mounter := NewRcloneMounter(secretMapRClone, mountOptionsRClone,
+		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseMountFn: func(path string, comm string, args []string) error {
+				return nil
+			},
+		}))
 
-// 	rCloneMounter, ok := mounter.(*RcloneMounter)
-// 	if !ok {
-// 		t.Fatal("NewRCloneMounter() did not return a RCloneMounter")
-// 	}
+	rCloneMounter, ok := mounter.(*RcloneMounter)
+	if !ok {
+		t.Fatal("NewRCloneMounter() did not return a RCloneMounter")
+	}
 
-// 	FakeMkdirAll := func(path string, perm os.FileMode) error {
-// 		return nil
-// 	}
+	FakeMkdirAll := func(path string, perm os.FileMode) error {
+		return nil
+	}
 
-// 	// Replace mkdirAllFunc with the Fake function
-// 	mkdirAllFunc = FakeMkdirAll
-// 	defer func() { mkdirAllFunc = os.MkdirAll }()
+	// Replace mkdirAllFunc with the Fake function
+	mkdirAllFunc = FakeMkdirAll
+	defer func() { mkdirAllFunc = os.MkdirAll }()
 
-// 	FakeCreateConfig := func(configPathWithVolID string, rclone *RcloneMounter) error {
-// 		return nil
-// 	}
-// 	// Replace createConfigFunc with the mock function
-// 	createConfigFunc = FakeCreateConfig
-// 	defer func() { createConfigFunc = createConfig }()
+	FakeCreateConfig := func(configPathWithVolID string, rclone *RcloneMounter) error {
+		return nil
+	}
+	// Replace createConfigFunc with the mock function
+	createConfigFunc = FakeCreateConfig
+	defer func() { createConfigFunc = createConfig }()
 
-// 	target := "/tmp/test-mount"
+	target := "/tmp/test-mount"
 
-// 	err := rCloneMounter.Mount("source", target)
-// 	assert.NoError(t, err)
-// }
+	err := rCloneMounter.Mount("source", target)
+	assert.NoError(t, err)
+}
 
-// func Test_RcloneMount_Positive_Empty_ObjPath(t *testing.T) {
-// 	secretMap := map[string]string{
-// 		"cosEndpoint":        "test-endpoint",
-// 		"locationConstraint": "test-loc-constraint",
-// 		"bucketName":         "test-bucket-name",
-// 		"accessKey":          "test-access-key",
-// 		"secretKey":          "test-secret-key",
-// 		"apiKey":             "test-api-key",
-// 		"kpRootKeyCRN":       "test-kp-root-key-crn",
-// 		"gid":                "fake-gid",
-// 		"uid":                "fake-uid",
-// 	}
-// 	mounter := NewRcloneMounter(secretMap, mountOptionsRClone,
-// 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-// 			FuseMountFn: func(path string, comm string, args []string) error {
-// 				return nil
-// 			},
-// 		}))
+func Test_RcloneMount_Positive_Empty_ObjPath(t *testing.T) {
+	secretMap := map[string]string{
+		"cosEndpoint":        "test-endpoint",
+		"locationConstraint": "test-loc-constraint",
+		"bucketName":         "test-bucket-name",
+		"accessKey":          "test-access-key",
+		"secretKey":          "test-secret-key",
+		"apiKey":             "test-api-key",
+		"kpRootKeyCRN":       "test-kp-root-key-crn",
+		"gid":                "fake-gid",
+		"uid":                "fake-uid",
+	}
+	mounter := NewRcloneMounter(secretMap, mountOptionsRClone,
+		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseMountFn: func(path string, comm string, args []string) error {
+				return nil
+			},
+		}))
 
-// 	rCloneMounter, ok := mounter.(*RcloneMounter)
-// 	if !ok {
-// 		t.Fatal("NewRCloneMounter() did not return a RCloneMounter")
-// 	}
+	rCloneMounter, ok := mounter.(*RcloneMounter)
+	if !ok {
+		t.Fatal("NewRCloneMounter() did not return a RCloneMounter")
+	}
 
-// 	FakeMkdirAll := func(path string, perm os.FileMode) error {
-// 		return nil
-// 	}
+	FakeMkdirAll := func(path string, perm os.FileMode) error {
+		return nil
+	}
 
-// 	// Replace mkdirAllFunc with the Fake function
-// 	mkdirAllFunc = FakeMkdirAll
-// 	defer func() { mkdirAllFunc = os.MkdirAll }()
+	// Replace mkdirAllFunc with the Fake function
+	mkdirAllFunc = FakeMkdirAll
+	defer func() { mkdirAllFunc = os.MkdirAll }()
 
-// 	FakeCreateConfig := func(configPathWithVolID string, rclone *RcloneMounter) error {
-// 		return nil
-// 	}
-// 	// Replace createConfigFunc with the mock function
-// 	createConfigFunc = FakeCreateConfig
-// 	defer func() { createConfigFunc = createConfig }()
+	FakeCreateConfig := func(configPathWithVolID string, rclone *RcloneMounter) error {
+		return nil
+	}
+	// Replace createConfigFunc with the mock function
+	createConfigFunc = FakeCreateConfig
+	defer func() { createConfigFunc = createConfig }()
 
-// 	target := "/tmp/test-mount"
+	target := "/tmp/test-mount"
 
-// 	err := rCloneMounter.Mount("source", target)
-// 	assert.NoError(t, err)
-// }
+	err := rCloneMounter.Mount("source", target)
+	assert.NoError(t, err)
+}
 
-// func Test_RcloneMount_Error_Creating_Mount_Point(t *testing.T) {
-// 	mounter := NewRcloneMounter(secretMapRClone, mountOptionsRClone,
-// 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-// 			FuseMountFn: func(path string, comm string, args []string) error {
-// 				return nil
-// 			},
-// 		}))
+func Test_RcloneMount_Error_Creating_Mount_Point(t *testing.T) {
+	mounter := NewRcloneMounter(secretMapRClone, mountOptionsRClone,
+		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseMountFn: func(path string, comm string, args []string) error {
+				return nil
+			},
+		}))
 
-// 	rCloneMounter, ok := mounter.(*RcloneMounter)
-// 	if !ok {
-// 		t.Fatal("NewRCloneMounter() did not return a RCloneMounter")
-// 	}
+	rCloneMounter, ok := mounter.(*RcloneMounter)
+	if !ok {
+		t.Fatal("NewRCloneMounter() did not return a RCloneMounter")
+	}
 
-// 	mockMkdirAll := func(path string, perm os.FileMode) error {
-// 		return errors.New("error creating mount path")
-// 	}
+	mockMkdirAll := func(path string, perm os.FileMode) error {
+		return errors.New("error creating mount path")
+	}
 
-// 	// Replace mkdirAllFunc with the mock function
-// 	mkdirAllFunc = mockMkdirAll
-// 	defer func() { mkdirAllFunc = os.MkdirAll }()
+	// Replace mkdirAllFunc with the mock function
+	mkdirAllFunc = mockMkdirAll
+	defer func() { mkdirAllFunc = os.MkdirAll }()
 
-// 	target := "/tmp/test-mount"
+	target := "/tmp/test-mount"
 
-// 	err := rCloneMounter.Mount("source", target)
-// 	assert.Error(t, err, "Cannot create directory")
-// }
+	err := rCloneMounter.Mount("source", target)
+	assert.Error(t, err, "Cannot create directory")
+}
 
-// func Test_RcloneMount_Error_Creating_ConfigFile(t *testing.T) {
-// 	mounter := NewRcloneMounter(secretMapRClone, mountOptionsRClone,
-// 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-// 			FuseMountFn: func(path string, comm string, args []string) error {
-// 				return nil
-// 			},
-// 		}))
+func Test_RcloneMount_Error_Creating_ConfigFile(t *testing.T) {
+	mounter := NewRcloneMounter(secretMapRClone, mountOptionsRClone,
+		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseMountFn: func(path string, comm string, args []string) error {
+				return nil
+			},
+		}))
 
-// 	rCloneMounter, ok := mounter.(*RcloneMounter)
-// 	if !ok {
-// 		t.Fatal("NewRCloneMounter() did not return a RCloneMounter")
-// 	}
+	rCloneMounter, ok := mounter.(*RcloneMounter)
+	if !ok {
+		t.Fatal("NewRCloneMounter() did not return a RCloneMounter")
+	}
 
-// 	mockMkdirAll := func(path string, perm os.FileMode) error {
-// 		return nil
-// 	}
+	mockMkdirAll := func(path string, perm os.FileMode) error {
+		return nil
+	}
 
-// 	// Replace mkdirAllFunc with the mock function
-// 	mkdirAllFunc = mockMkdirAll
-// 	defer func() { mkdirAllFunc = os.MkdirAll }()
+	// Replace mkdirAllFunc with the mock function
+	mkdirAllFunc = mockMkdirAll
+	defer func() { mkdirAllFunc = os.MkdirAll }()
 
-// 	mockcreateConfig := func(configPathWithVolID string, rclone *RcloneMounter) error {
-// 		return errors.New("error creating ConfigFile")
-// 	}
+	mockcreateConfig := func(configPathWithVolID string, rclone *RcloneMounter) error {
+		return errors.New("error creating ConfigFile")
+	}
 
-// 	// Replace createConfigFunc with the mock function
-// 	createConfigFunc = mockcreateConfig
-// 	defer func() { createConfigFunc = createConfig }()
+	// Replace createConfigFunc with the mock function
+	createConfigFunc = mockcreateConfig
+	defer func() { createConfigFunc = createConfig }()
 
-// 	target := "/tmp/test-mount"
+	target := "/tmp/test-mount"
 
-// 	err := rCloneMounter.Mount("source", target)
-// 	assert.Error(t, err, "Cannot create file")
-// }
+	err := rCloneMounter.Mount("source", target)
+	assert.Error(t, err, "Cannot create file")
+}
 
-// func Test_RcloneMount_ErrorMount(t *testing.T) {
-// 	mounter := NewRcloneMounter(secretMapRClone, mountOptionsRClone,
-// 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-// 			FuseMountFn: func(path string, comm string, args []string) error {
-// 				return errors.New("error mounting volume")
-// 			},
-// 		}))
+func Test_RcloneMount_ErrorMount(t *testing.T) {
+	mounter := NewRcloneMounter(secretMapRClone, mountOptionsRClone,
+		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseMountFn: func(path string, comm string, args []string) error {
+				return errors.New("error mounting volume")
+			},
+		}))
 
-// 	rCloneMounter, ok := mounter.(*RcloneMounter)
-// 	if !ok {
-// 		t.Fatal("NewRCloneMounter() did not return a RCloneMounter")
-// 	}
+	rCloneMounter, ok := mounter.(*RcloneMounter)
+	if !ok {
+		t.Fatal("NewRCloneMounter() did not return a RCloneMounter")
+	}
 
-// 	mockMkdirAll := func(path string, perm os.FileMode) error {
-// 		return nil
-// 	}
+	mockMkdirAll := func(path string, perm os.FileMode) error {
+		return nil
+	}
 
-// 	// Replace mkdirAllFunc with the mock function
-// 	mkdirAllFunc = mockMkdirAll
-// 	defer func() { mkdirAllFunc = os.MkdirAll }()
+	// Replace mkdirAllFunc with the mock function
+	mkdirAllFunc = mockMkdirAll
+	defer func() { mkdirAllFunc = os.MkdirAll }()
 
-// 	mockcreateConfig := func(configPathWithVolID string, rclone *RcloneMounter) error {
-// 		return nil
-// 	}
+	mockcreateConfig := func(configPathWithVolID string, rclone *RcloneMounter) error {
+		return nil
+	}
 
-// 	// Replace createConfigFunc with the mock function
-// 	createConfigFunc = mockcreateConfig
-// 	defer func() { createConfigFunc = createConfig }()
+	// Replace createConfigFunc with the mock function
+	createConfigFunc = mockcreateConfig
+	defer func() { createConfigFunc = createConfig }()
 
-// 	target := "/tmp/test-mount"
+	target := "/tmp/test-mount"
 
-// 	err := rCloneMounter.Mount("source", target)
-// 	assert.Error(t, err, "error mounting volume")
-// }
+	err := rCloneMounter.Mount("source", target)
+	assert.Error(t, err, "error mounting volume")
+}
 
-// func Test_RcloneUnmount_Positive(t *testing.T) {
-// 	secretMap := map[string]string{
-// 		"cosEndpoint":        "test-endpoint",
-// 		"locationConstraint": "test-loc-constraint",
-// 		"bucketName":         "test-bucket-name",
-// 		"objPath":            "test-obj-path",
-// 		"accessKey":          "test-access-key",
-// 		"secretKey":          "test-secret-key",
-// 		"apiKey":             "test-api-key",
-// 		"kpRootKeyCRN":       "test-kp-root-key-crn",
-// 		"gid":                "fake-gid",
-// 		"uid":                "fake-uid",
-// 	}
-// 	mounter := NewRcloneMounter(secretMap, []string{"mountOption1", "mountOption2"},
-// 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-// 			FuseUnmountFn: func(path string) error {
-// 				return nil
-// 			},
-// 		}))
+func Test_RcloneUnmount_Positive(t *testing.T) {
+	secretMap := map[string]string{
+		"cosEndpoint":        "test-endpoint",
+		"locationConstraint": "test-loc-constraint",
+		"bucketName":         "test-bucket-name",
+		"objPath":            "test-obj-path",
+		"accessKey":          "test-access-key",
+		"secretKey":          "test-secret-key",
+		"apiKey":             "test-api-key",
+		"kpRootKeyCRN":       "test-kp-root-key-crn",
+		"gid":                "fake-gid",
+		"uid":                "fake-uid",
+	}
+	mounter := NewRcloneMounter(secretMap, []string{"mountOption1", "mountOption2"},
+		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseUnmountFn: func(path string) error {
+				return nil
+			},
+		}))
 
-// 	rCloneMounter, ok := mounter.(*RcloneMounter)
-// 	if !ok {
-// 		t.Fatal("NewRCloneMounter() did not return a RCloneMounter")
-// 	}
+	rCloneMounter, ok := mounter.(*RcloneMounter)
+	if !ok {
+		t.Fatal("NewRCloneMounter() did not return a RCloneMounter")
+	}
 
-// 	target := "/tmp/test-unmount"
+	target := "/tmp/test-unmount"
 
-// 	// Creating a directory to simulate a mounted path
-// 	err := os.MkdirAll(target, os.ModePerm)
-// 	if err != nil {
-// 		t.Fatalf("TestRCloneMounter_Unmount() failed to create directory: %v", err)
-// 	}
+	// Creating a directory to simulate a mounted path
+	err := os.MkdirAll(target, os.ModePerm)
+	if err != nil {
+		t.Fatalf("TestRCloneMounter_Unmount() failed to create directory: %v", err)
+	}
 
-// 	err = rCloneMounter.Unmount(target)
-// 	assert.NoError(t, err)
-// 	if err != nil {
-// 		t.Errorf("TestRCloneMounter_Unmount() failed to unmount: %v", err)
-// 	}
+	err = rCloneMounter.Unmount(target)
+	assert.NoError(t, err)
+	if err != nil {
+		t.Errorf("TestRCloneMounter_Unmount() failed to unmount: %v", err)
+	}
 
-// 	err = os.RemoveAll(target)
-// 	if err != nil {
-// 		t.Errorf("Failed to remove directory: %v", err)
-// 	}
-// }
+	err = os.RemoveAll(target)
+	if err != nil {
+		t.Errorf("Failed to remove directory: %v", err)
+	}
+}
 
 func Test_RcloneUnmount_Error(t *testing.T) {
 	secretMap := map[string]string{
