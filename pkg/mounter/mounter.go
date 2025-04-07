@@ -20,7 +20,7 @@ import (
 var mountWorker bool = true
 
 type Mounter interface {
-	Mount(source string, target string, secretMap map[string]string) error
+	Mount(source string, target string) error
 	Unmount(target string) error
 }
 

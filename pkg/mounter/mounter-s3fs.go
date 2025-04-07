@@ -101,7 +101,7 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 	return mounter
 }
 
-func (s3fs *S3fsMounter) Mount(source string, target string, secretMap map[string]string) error {
+func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	klog.Info("-S3FSMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
 	var bucketName string

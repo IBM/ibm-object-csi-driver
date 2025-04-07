@@ -167,7 +167,7 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 	return updatedOptions
 }
 
-func (rclone *RcloneMounter) Mount(source string, target string, secretMap map[string]string) error {
+func (rclone *RcloneMounter) Mount(source string, target string) error {
 	klog.Info("-RcloneMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
 	var bucketName string
