@@ -145,7 +145,13 @@ func createCOSCSIMounterRequest(payload string, url string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer response.Body.Close()
+
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			klog.Errorf("failed to close response body: %v", err)
+		}
+	}()
+
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return "", err
