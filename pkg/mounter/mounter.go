@@ -10,7 +10,6 @@ import (
 	"os"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
@@ -116,15 +115,12 @@ var mkdirAll = func(path string, perm os.FileMode) error {
 	return mkdirAllFunc(path, perm)
 }
 
-func createMountHelperContainerRequest(payload string, url string) (string, error) {
-	timeout := 3 * time.Minute
-	defaultSocketPath := "/tmp/mysocket.sock"
-
+func createCOSCSIMounterRequest(payload string, url string) (string, error) {
 	// Get socket path
 	// socketPath := os.Getenv("SOCKET_PATH")
 	socketPath := "/var/lib/ibmshare.sock"
 	if socketPath == "" {
-		socketPath = defaultSocketPath
+		socketPath = constants.DefaultSocketPath
 	}
 	// Create a custom dialer function for Unix socket connection
 	dialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -136,7 +132,7 @@ func createMountHelperContainerRequest(payload string, url string) (string, erro
 		Transport: &http.Transport{
 			DialContext: dialer,
 		},
-		Timeout: timeout,
+		Timeout: constants.Timeout,
 	}
 
 	// Create POST request
@@ -155,22 +151,10 @@ func createMountHelperContainerRequest(payload string, url string) (string, erro
 		return "", err
 	}
 
-	// Unmarshal json response
-	// var responseBody struct {
-	// 	MountExitCode   string `json:"MountExitCode"`
-	// 	ExitDescription string `json:"Description"`
-	// }
-
-	// err = json.Unmarshal(body, &responseBody)
-	// if err != nil {
-	// 	return "", err
-	// }
-
 	responseBody := string(body)
 
 	if response.StatusCode != http.StatusOK {
-		// return responseBody.ExitDescription, fmt.Errorf("response from mount-helper-container -> Exit Status Code: %s ,ResponseCode: %v", responseBody.MountExitCode, response.StatusCode)
-		return responseBody, fmt.Errorf("response from mount-helper-container -> Exit Status Code: %s ,ResponseCode: %v", responseBody, response.StatusCode)
+		return responseBody, fmt.Errorf("response from cos-csi-mounter -> Exit Status Code: %s ,ResponseCode: %v", responseBody, response.StatusCode)
 	}
 	return "", nil
 }

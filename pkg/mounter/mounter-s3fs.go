@@ -38,10 +38,7 @@ type S3fsMounter struct {
 	MounterUtils  utils.MounterUtils
 }
 
-const (
-	metaRoot = "/var/lib/s3fs"
-	passFile = ".passwd-s3fs" // #nosec G101: not password
-)
+const passFile = ".passwd-s3fs" // #nosec G101: not password
 
 func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
 	klog.Info("-newS3fsMounter-")
@@ -104,6 +101,14 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	klog.Info("-S3FSMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
+
+	var metaRoot string
+	if mountWorker {
+		metaRoot = "/var/lib/cos-csi"
+	} else {
+		metaRoot = "/var/lib/ibmc-s3fs"
+	}
+
 	var bucketName string
 	var pathExist bool
 	var err error
@@ -171,12 +176,11 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 			return err
 		}
 
-		payload := fmt.Sprintf(`{"path":"%s","mounter":"%s","args":%s,"apiKey":"%s","accessKey":"%s","secretKey":"%s"}`, // pragma: allowlist secret
-			target, constants.S3FS+"-mounter", jsonData, secretMap["apiKey"], secretMap["accessKey"], secretMap["secretKey"])
+		payload := fmt.Sprintf(`{"path":"%s","mounter":"%s","args":%s}`, target, constants.S3FS, jsonData)
 
 		klog.Info("Worker Mounting Payload...", payload)
 
-		errResponse, err := createMountHelperContainerRequest(payload, "http://unix/api/cos/mount")
+		errResponse, err := createCOSCSIMounterRequest(payload, "http://unix/api/cos/mount")
 		klog.Info("Worker Mounting...", errResponse)
 		if err != nil {
 			return err
@@ -196,6 +200,14 @@ var writePassWrap = func(pwFileName string, pwFileContent string) error {
 
 func (s3fs *S3fsMounter) Unmount(target string) error {
 	klog.Info("-S3FSMounter Unmount-")
+
+	var metaRoot string
+	if mountWorker {
+		metaRoot = "/var/lib/cos-csi"
+	} else {
+		metaRoot = "/var/lib/ibmc-s3fs"
+	}
+
 	metaPath := path.Join(metaRoot, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 	err := os.RemoveAll(metaPath)
 	if err != nil {
@@ -207,7 +219,7 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 
 		payload := fmt.Sprintf(`{"path":"%s"}`, target)
 
-		errResponse, err := createMountHelperContainerRequest(payload, "http://unix/api/cos/unmount")
+		errResponse, err := createCOSCSIMounterRequest(payload, "http://unix/api/cos/unmount")
 		klog.Info("Worker Unmounting...", errResponse)
 		if err != nil {
 			return err
