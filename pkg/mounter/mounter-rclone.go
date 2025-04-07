@@ -172,7 +172,7 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 
 	var metaRoot string
 	if mountWorker {
-		metaRoot = "/var/lib/cos-csi"
+		metaRoot = constants.WorkerNodeMounterPath
 	} else {
 		metaRoot = "/var/lib/ibmc-rclone"
 	}
@@ -252,7 +252,7 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 
 	var metaRoot string
 	if mountWorker {
-		metaRoot = "/var/lib/cos-csi"
+		metaRoot = constants.WorkerNodeMounterPath
 	} else {
 		metaRoot = "/var/lib/ibmc-rclone"
 	}

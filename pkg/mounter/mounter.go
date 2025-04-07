@@ -118,7 +118,7 @@ var mkdirAll = func(path string, perm os.FileMode) error {
 func createCOSCSIMounterRequest(payload string, url string) (string, error) {
 	// Get socket path
 	// socketPath := os.Getenv("SOCKET_PATH")
-	socketPath := "/var/lib/ibmshare.sock"
+	socketPath := "/var/lib/coscsi.sock"
 	if socketPath == "" {
 		socketPath = constants.DefaultSocketPath
 	}

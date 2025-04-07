@@ -104,7 +104,7 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 
 	var metaRoot string
 	if mountWorker {
-		metaRoot = "/var/lib/cos-csi"
+		metaRoot = constants.WorkerNodeMounterPath
 	} else {
 		metaRoot = "/var/lib/ibmc-s3fs"
 	}
@@ -203,7 +203,7 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 
 	var metaRoot string
 	if mountWorker {
-		metaRoot = "/var/lib/cos-csi"
+		metaRoot = constants.WorkerNodeMounterPath
 	} else {
 		metaRoot = "/var/lib/ibmc-s3fs"
 	}
