@@ -6,7 +6,7 @@ BIN_DIR := bin
 DEBIAN_CONTROL := $(BUILD_DIR)/DEBIAN/control
 MAINTAINER := "IKS Storage"
 DEB_ARCH := all
-DESCRIPTION := "IBM COS-CSI-Mounter service"
+DESCRIPTION := "IBM cos-csi-mounter service"
 
 INSTALL_TAR_FILE := "$(NAME)-latest.tar.gz"
 CHECKSUM_FILE := "$(INSTALL_TAR_FILE).sha256"
@@ -40,7 +40,7 @@ deb-build: build-linux
 	echo "Maintainer: $(MAINTAINER)" >> $(DEBIAN_CONTROL)
 	echo "Architecture: $(DEB_ARCH)" >> $(DEBIAN_CONTROL)
 	echo "Description: $(DESCRIPTION)" >> $(DEBIAN_CONTROL)
-	echo "Depends: mount.ibmshare-0.0.8" >> $(DEBIAN_CONTROL)
+	# echo "Depends: mount.ibmshare-0.0.8" >> $(DEBIAN_CONTROL)
 
 	dpkg-deb --build $(BUILD_DIR)
 	rm -rf $(BUILD_DIR)
@@ -55,8 +55,8 @@ tar-package:
 
 clean:
 	rm -rf ${BIN_DIR}
-	rm *.deb *.rpm
+	rm *.deb
 	rm -rf packages
 
 packages:
-packages: deb-build rpm-build tar-package clean
+packages: deb-build tar-package clean
