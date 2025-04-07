@@ -1,0 +1,18 @@
+[Unit]
+Description=COS CSI mounter service
+DefaultDependencies=no
+Requires=network-online.target
+After=network-online.target
+Before=shutdown.target reboot.target halt.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/cos-csi-mounter-server
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cos-csi-mounter
+
+[Install]
+WantedBy=multi-user.target
