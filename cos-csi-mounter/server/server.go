@@ -72,7 +72,7 @@ func main() {
 	router := gin.Default()
 
 	router.POST("/api/cos/mount", handleCosMount())
-	router.POST("/api/cos/unmount", handleCosUnmount())
+	// router.POST("/api/cos/unmount", handleCosUnmount())
 
 	// Serve HTTP requests over Unix socket
 	err = http.Serve(listener, router)
@@ -118,6 +118,9 @@ func handleCosMount() gin.HandlerFunc {
 	}
 }
 
+// Currently by calling FuseUnmount method from NodeServer is able to unmount the volume
+// If required to have specific unmount methods based on mounters then following call can be modified and used
+/*
 func handleCosUnmount() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var request struct {
@@ -146,3 +149,4 @@ func handleCosUnmount() gin.HandlerFunc {
 		c.JSON(http.StatusOK, "Success!!")
 	}
 }
+*/
