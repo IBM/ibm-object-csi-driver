@@ -247,6 +247,7 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 	return rclone.MounterUtils.FuseMount(target, constants.RClone, args)
 }
 
+/*
 func (rclone *RcloneMounter) Unmount(target string) error {
 	klog.Info("-RcloneMounter Unmount-")
 
@@ -278,6 +279,7 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 	klog.Info("NodeServer Unmounting...")
 	return rclone.MounterUtils.FuseUnmount(target)
 }
+*/
 
 var createConfigFunc = createConfig
 
