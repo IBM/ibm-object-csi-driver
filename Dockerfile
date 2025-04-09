@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10-1179 AS s3fs-builder
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10-1179.1741863533 as s3fs-builder
 
 ARG   RHSM_PASS=blank
 ARG   RHSM_USER=blank
@@ -46,7 +46,7 @@ ENV GOARCH=$ARCH
 ENV GO111MODULE=on
 
 RUN git clone https://github.com/rclone/rclone.git && \
-      cd rclone && git checkout tags/v1.68.2 && \
+      cd rclone && git checkout tags/v1.69.0 && \
       go build && ./rclone version && \
       cp rclone /usr/local/bin/rclone
 

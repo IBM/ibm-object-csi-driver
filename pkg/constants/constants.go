@@ -4,7 +4,12 @@ import "time"
 
 const (
 	DefaultIAMEndPoint    = "https://iam.cloud.ibm.com"
-	DefaultVolumesPerNode = 4
+
+	// Maximum number of volumes that controller can publish to the node.
+	// If value is not set or zero CO SHALL decide how many volumes of
+	// this type can be published by the controller to the node. The
+	// plugin MUST NOT set negative values here.
+	DefaultVolumesPerNode = 0 
 
 	KPEncryptionAlgorithm = "AES256" // https://github.com/IBM/ibm-cos-sdk-go/blob/master/service/s3/api.go#L9130-L9136
 
