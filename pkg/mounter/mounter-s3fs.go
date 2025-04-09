@@ -15,7 +15,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path"
 	"strings"
 
@@ -198,6 +197,7 @@ var writePassWrap = func(pwFileName string, pwFileContent string) error {
 	return writePassFunc(pwFileName, pwFileContent)
 }
 
+/*
 func (s3fs *S3fsMounter) Unmount(target string) error {
 	klog.Info("-S3FSMounter Unmount-")
 
@@ -229,6 +229,7 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 	klog.Info("NodeServer Unmounting...")
 	return s3fs.MounterUtils.FuseUnmount(target)
 }
+*/
 
 func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string) []string {
 	mountOptsMap := make(map[string]string)

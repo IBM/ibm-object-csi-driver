@@ -20,7 +20,7 @@ var mountWorker bool = true
 
 type Mounter interface {
 	Mount(source string, target string) error
-	Unmount(target string) error
+	// Unmount(target string) error
 }
 
 type CSIMounterFactory struct{}
