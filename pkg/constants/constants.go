@@ -8,6 +8,7 @@ const (
 
 	S3FS             = "s3fs"
 	RClone           = "rclone"
+  MNTS3            = "mountpoint"
 	DefaultNamespace = "default"
 
 	IAMEP                   = "https://private.iam.cloud.ibm.com/identity/token"
