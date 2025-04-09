@@ -88,15 +88,16 @@ func (s *nonBlockingGRPCServer) Setup(endpoint string, ids csi.IdentityServer, c
 	}
 
 	var addr string
-	if u.Scheme == "unix" {
+	switch u.Scheme {
+	case "unix":
 		addr = u.Path
 		if err := os.Remove(addr); err != nil && !os.IsNotExist(err) {
 			s.logger.Error("failed to remove", zap.Reflect("addr", addr), zap.Error(err))
 			return nil, err
 		}
-	} else if u.Scheme == "tcp" {
+	case "tcp":
 		addr = u.Host
-	} else {
+	default:
 		msg := "endpoint scheme not supported"
 		s.logger.Error(msg, zap.Reflect("Scheme", u.Scheme))
 		return nil, errors.New(msg)
@@ -116,13 +117,14 @@ func (s *nonBlockingGRPCServer) Setup(endpoint string, ids csi.IdentityServer, c
 
 	csi.RegisterIdentityServer(s.server, ids)
 
-	if s.mode == "controller" {
+	switch s.mode {
+	case "controller":
 		klog.V(3).Info("--Starting server in controller mode--")
 		csi.RegisterControllerServer(s.server, cs)
-	} else if s.mode == "node" {
+	case "node":
 		klog.V(3).Info("--Starting server in node server mode--")
 		csi.RegisterNodeServer(s.server, ns)
-	} else if s.mode == "controller-node" {
+	case "controller-node":
 		klog.V(3).Info("--Starting node and controller server mode--")
 		csi.RegisterControllerServer(s.server, cs)
 		csi.RegisterNodeServer(s.server, ns)

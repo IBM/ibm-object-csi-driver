@@ -104,6 +104,8 @@ spec:
             - "--csi-address=$(ADDRESS)"
             - "--timeout=180s"
             - "--v=5"
+            - "--extra-create-metadata=true"
+            - "--feature-gates=Topology=true"
           env:
             - name: ADDRESS
               value: /csi/csi.sock
@@ -113,10 +115,10 @@ spec:
               name: socket-dir
         - name: cos-csi-provisioner
           securityContext:
-            allowPrivilegeEscalation: false
             capabilities:
               drop:
               - ALL
+            allowPrivilegeEscalation: false
           image: cos-driver-image
           imagePullPolicy: "Always"
           args:
@@ -136,6 +138,11 @@ spec:
             - mountPath: /csi
               name: socket-dir
         - name: liveness-probe
+          securityContext:
+            capabilities:
+              drop:
+              - ALL
+            allowPrivilegeEscalation: false
           image: liveness-probe-image
           args:
             - "--csi-address=/csi/csi.sock"

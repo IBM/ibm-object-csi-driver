@@ -6,7 +6,7 @@ CSI base Object Storage driver/plug-in. Currently, the driver supports s3fs and 
 For building the driver `docker` and `GO` should be installed on the system
 
 1. On your local machine, install [`docker`](https://docs.docker.com/install/) and [`Go`](https://golang.org/doc/install).
-2. Install latest Go 
+2. Install latest Go
 3. Set the [`GOPATH` environment variable](https://github.com/golang/go/wiki/SettingGOPATH).
 4. Build the driver image
 
@@ -24,7 +24,7 @@ For building the driver `docker` and `GO` should be installed on the system
    export RHSM_USER=<RHSM_USER>
    export RHSM_PASS=<RHSM_PASS>
 
-   make container
+   make buildimage
    ```
 
 An image named `ibm-object-csi-driver:latest` is created. Please retag and push the image to suitable registries to deploy in cluster.
@@ -33,32 +33,55 @@ An image named `ibm-object-csi-driver:latest` is created. Please retag and push 
 
 Deploy the resources as below based on managed and unmanaged clusters.
 
-## For IBM Managed clusters 
+## For IBM Managed clusters
 
 Review `deploy/ibmCloud/kustomization.yaml` file.
 
-Update images if required
+1. Update images if required
 ```
 - name: cos-driver-image
   newName: icr.io/ibm/ibm-object-csi-driver
-  newTag: v0.1.11
+  newTag: v0.1.16
 ```
 
-Update IBM COS endpoint and locationconstraint as per the region of your cluster
+2. Update IBM COS endpoint and locationconstraint as per the region of your cluster
 ```
 value: "https://s3.direct.au-syd.cloud-object-storage.appdomain.cloud"
 value: "au-syd-standard"
+```
+
+3. If you want to have 1-to-1 mapping between each PVC and secret(using same name for both), uncomment these lines in `deploy/ibmCloud/kustomization.yaml` file. This will automatically handle secret-name and namespace details, so you won’t need to add  annotations for secret-name and namespace in the PVC configuration.
+```
+- target:
+      kind: StorageClass
+  patch: |-
+    - op: replace
+      path: /parameters/csi.storage.k8s.io~1node-publish-secret-name
+      value: "${pvc.name}"
+    - op: add
+      path: /parameters/csi.storage.k8s.io~1provisioner-secret-name
+      value: "${pvc.name}"
+    - op: add
+      path: /parameters/csi.storage.k8s.io~1provisioner-secret-namespace
+      value: "${pvc.namespace}"
+```
+
+**Note**: By default, in the IBM Object CSI Driver, the secret name is not tied to the PVC name. This allows you to use a single secret across multiple PVCs. For this, you’ll need to add two specific annotations in the PVC YAML. These annotations help the driver map the PVC to the correct secret.
+```
+annotations:
+    cos.csi.driver/secret: "custom-secret"
+    cos.csi.driver/secret-namespace: "default"
 ```
 
 Deploy the driver
 `kubectl apply -k deploy/ibmCloud/`
 
 
-To clean up the deployment 
+To clean up the deployment
 
 `kubectl delete -k deploy/ibmCloud/`
 
-After deployment following storage classes will be available in the cluster 
+After deployment following storage classes will be available in the cluster
 ```
 NAME                                          PROVISIONER            RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
 ibm-object-storage-smart-rclone               cos.s3.csi.ibm.io      Delete          Immediate              false
@@ -98,7 +121,7 @@ To clean up the deployment
 
 Provide proper values for parameters in secret under examples/kubernetes/cos-s3-csi-<mounter_type>-secret.yaml
 
-1. Create Secret, PVC and POD 
+1. Create Secret, PVC and POD
    Pick the respective files based on the mounter you want to deploy. Below is for s3fs mounter.
       `kubectl create -f examples/kubernetes/cos-s3-csi-s3fs-secret.yaml`
 
@@ -107,11 +130,11 @@ Provide proper values for parameters in secret under examples/kubernetes/cos-s3-
       `kubectl create -f examples/kubernetes/cos-s3-csi-s3fs-pvc.yaml`
 
       `kubectl create -f examples/kubernetes/cos-csi-app-s3fs.yaml`
-    
+
     For rclone mounter, if any other rclone mount options need to be provided, they can be passed in Secret using StringData field.
     For example -
     ```
-    stringData: 
+    stringData:
         mountOptions: |
             upload_concurrency=30
             low_level_retries=3
@@ -144,7 +167,7 @@ If mounter type is `s3fs`, verify using command
 
    ```
 
-# Debug 
+# Debug
 
 Collect logs using below commands to check failure messages
 

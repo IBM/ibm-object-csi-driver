@@ -69,7 +69,7 @@ apiVersion: apps/v1
 metadata:
   name: ibm-object-csi-driver
   namespace: ibm-object-csi-driver
-  
+
 spec:
   selector:
     matchLabels:
@@ -161,6 +161,12 @@ spec:
             - name: host-log
               mountPath: /host/var/log
         - name: liveness-probe
+          securityContext:
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            allowPrivilegeEscalation: false
           image: liveness-probe-image
           args:
             - "--csi-address=/csi/csi.sock"

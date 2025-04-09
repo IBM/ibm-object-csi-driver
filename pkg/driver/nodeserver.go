@@ -12,6 +12,7 @@ package driver
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
@@ -107,6 +108,7 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		targetPath, deviceID, readOnly, volumeID, attrib, mountFlags)
 
 	secretMap := req.GetSecrets()
+	klog.V(2).Infof("-NodePublishVolume-: length of req.GetSecrets() length: %v", len(req.GetSecrets()))
 	secretMapCopy := make(map[string]string)
 	for k, v := range secretMap {
 		if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
@@ -157,7 +159,7 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		return nil, err
 	}
 
-	klog.Infof("s3: bucket %s successfully mounted to %s", secretMap["bucket-name"], targetPath)
+	klog.Infof("s3: bucket %s successfully mounted to %s", secretMap["bucketName"], targetPath)
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
@@ -275,11 +277,30 @@ func (ns *nodeServer) NodeGetCapabilities(_ context.Context, req *csi.NodeGetCap
 
 func (ns *nodeServer) NodeGetInfo(_ context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	klog.V(3).Infof("NodeGetInfo: called with args %+v", *req)
-	top := &csi.Topology{}
+
+	nodeName := os.Getenv("KUBE_NODE_NAME")
+	if nodeName == "" {
+		return nil, fmt.Errorf("KUBE_NODE_NAME env variable not set")
+	}
+
+	region, zone, err := ns.Stats.GetRegionAndZone(nodeName)
+	if err != nil {
+		return nil, err
+	}
+
+	klog.V(3).Infof("NodeGetInfo: Node region %s", region)
+	klog.V(3).Infof("NodeGetInfo: Node zone %s", zone)
+
+	topology := &csi.Topology{
+		Segments: map[string]string{
+			constants.NodeRegionLabel: region,
+			constants.NodeZoneLabel:   zone,
+		},
+	}
 	resp := &csi.NodeGetInfoResponse{
 		NodeId:             ns.NodeID,
 		MaxVolumesPerNode:  constants.DefaultVolumesPerNode,
-		AccessibleTopology: top,
+		AccessibleTopology: topology,
 	}
 	klog.V(2).Info("NodeGetInfo: ", resp)
 	return resp, nil
