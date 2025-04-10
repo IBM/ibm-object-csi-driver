@@ -14,6 +14,7 @@ package mounter
 import (
 	"bufio"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -41,7 +42,6 @@ type RcloneMounter struct {
 }
 
 const (
-	metaRootRclone = "/var/lib/ibmc-rclone"
 	configPath     = "/root/.config/rclone"
 	configFileName = "rclone.conf"
 	remote         = "ibmcos"
@@ -169,10 +169,18 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 func (rclone *RcloneMounter) Mount(source string, target string) error {
 	klog.Info("-RcloneMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
+
+	var metaRoot string
+	if mountWorker {
+		metaRoot = constants.WorkerNodeMounterPath
+	} else {
+		metaRoot = "/var/lib/ibmc-rclone"
+	}
+
 	var bucketName string
 	var pathExist bool
 	var err error
-	metaPath := path.Join(metaRootRclone, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
+	metaPath := path.Join(metaRoot, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 
 	if pathExist, err = checkPath(metaPath); err != nil {
 		klog.Errorf("RcloneMounter Mount: Cannot stat directory %s: %v", metaPath, err)
@@ -216,18 +224,62 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 		uidOpt := "--uid=" + rclone.UID
 		args = append(args, uidOpt)
 	}
+
+	if mountWorker {
+		klog.Info("Worker Mounting...")
+
+		jsonData, err := json.Marshal(args)
+		if err != nil {
+			klog.Fatalf("Error marshalling data: %v", err)
+			return err
+		}
+
+		payload := fmt.Sprintf(`{"path":"%s","mounter":"%s","args":%s}`, target, constants.RClone, jsonData)
+
+		errResponse, err := createCOSCSIMounterRequest(payload, "http://unix/api/cos/mount")
+		klog.Info("Worker Mounting...", errResponse)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	klog.Info("NodeServer Mounting...")
 	return rclone.MounterUtils.FuseMount(target, constants.RClone, args)
 }
 
+/*
 func (rclone *RcloneMounter) Unmount(target string) error {
 	klog.Info("-RcloneMounter Unmount-")
-	metaPath := path.Join(metaRootRclone, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
+
+	var metaRoot string
+	if mountWorker {
+		metaRoot = constants.WorkerNodeMounterPath
+	} else {
+		metaRoot = "/var/lib/ibmc-rclone"
+	}
+
+	metaPath := path.Join(metaRoot, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 	err := os.RemoveAll(metaPath)
 	if err != nil {
 		return err
 	}
+
+	if mountWorker {
+		klog.Info("Worker Unmounting...")
+
+		payload := fmt.Sprintf(`{"path":"%s"}`, target)
+
+		errResponse, err := createCOSCSIMounterRequest(payload, "http://unix/api/cos/unmount")
+		klog.Info("Worker Unmounting...", errResponse)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	klog.Info("NodeServer Unmounting...")
 	return rclone.MounterUtils.FuseUnmount(target)
 }
+*/
 
 var createConfigFunc = createConfig
 

@@ -13,8 +13,8 @@ package mounter
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
-	"os"
 	"path"
 	"strings"
 
@@ -37,10 +37,7 @@ type S3fsMounter struct {
 	MounterUtils  utils.MounterUtils
 }
 
-const (
-	metaRoot = "/var/lib/ibmc-s3fs"
-	passFile = ".passwd-s3fs" // #nosec G101: not password
-)
+const passFile = ".passwd-s3fs" // #nosec G101: not password
 
 func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
 	klog.Info("-newS3fsMounter-")
@@ -103,6 +100,14 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	klog.Info("-S3FSMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
+
+	var metaRoot string
+	if mountWorker {
+		metaRoot = constants.WorkerNodeMounterPath
+	} else {
+		metaRoot = "/var/lib/ibmc-s3fs"
+	}
+
 	var bucketName string
 	var pathExist bool
 	var err error
@@ -115,7 +120,6 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	}
 
 	if !pathExist {
-		//if err = os.MkdirAll(metaPath, 0755); // #nosec G301: used for s3fs
 		if err = mkdirAll(metaPath, 0755); // #nosec G301: used for s3fs
 		err != nil {
 			klog.Errorf("S3FSMounter Mount: Cannot create directory %s: %v", metaPath, err)
@@ -161,6 +165,28 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	} else {
 		args = append(args, "-o", "default_acl=private")
 	}
+
+	if mountWorker {
+		klog.Info("Worker Mounting...")
+
+		jsonData, err := json.Marshal(args)
+		if err != nil {
+			klog.Fatalf("Error marshalling data: %v", err)
+			return err
+		}
+
+		payload := fmt.Sprintf(`{"path":"%s","mounter":"%s","args":%s}`, target, constants.S3FS, jsonData)
+
+		klog.Info("Worker Mounting Payload...", payload)
+
+		errResponse, err := createCOSCSIMounterRequest(payload, "http://unix/api/cos/mount")
+		klog.Info("Worker Mounting...", errResponse)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	klog.Info("NodeServer Mounting...")
 	return s3fs.MounterUtils.FuseMount(target, constants.S3FS, args)
 }
 
@@ -171,16 +197,39 @@ var writePassWrap = func(pwFileName string, pwFileContent string) error {
 	return writePassFunc(pwFileName, pwFileContent)
 }
 
+/*
 func (s3fs *S3fsMounter) Unmount(target string) error {
 	klog.Info("-S3FSMounter Unmount-")
+
+	var metaRoot string
+	if mountWorker {
+		metaRoot = constants.WorkerNodeMounterPath
+	} else {
+		metaRoot = "/var/lib/ibmc-s3fs"
+	}
+
 	metaPath := path.Join(metaRoot, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 	err := os.RemoveAll(metaPath)
 	if err != nil {
 		return err
 	}
 
+	if mountWorker {
+		klog.Info("Worker Unmounting...")
+
+		payload := fmt.Sprintf(`{"path":"%s"}`, target)
+
+		errResponse, err := createCOSCSIMounterRequest(payload, "http://unix/api/cos/unmount")
+		klog.Info("Worker Unmounting...", errResponse)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	klog.Info("NodeServer Unmounting...")
 	return s3fs.MounterUtils.FuseUnmount(target)
 }
+*/
 
 func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string) []string {
 	mountOptsMap := make(map[string]string)

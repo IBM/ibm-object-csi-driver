@@ -175,7 +175,7 @@ func (ns *nodeServer) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpubl
 	if len(targetPath) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
 	}
-	klog.Infof("Unmounting  target path %s", targetPath)
+	klog.Infof("Unmounting target path %s", targetPath)
 
 	if err := ns.MounterUtils.FuseUnmount(targetPath); err != nil {
 		//TODO: Need to handle the case with non existing mount separately - https://github.com/IBM/ibm-object-csi-driver/issues/46
