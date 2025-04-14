@@ -135,6 +135,10 @@ func findFuseMountProcess(path string) (*os.Process, error) {
 	if err != nil {
 		return nil, err
 	}
+	klog.Info("No of processes found - ", len(processes))
+	for ind, process := range processes {
+		klog.Info("Processes found - ", ind, "  ", process.Pid())
+	}
 	for _, p := range processes {
 		cmdLine, err := getCmdLine(p.Pid())
 		if err != nil {
