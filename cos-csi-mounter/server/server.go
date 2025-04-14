@@ -118,9 +118,6 @@ func handleCosMount() gin.HandlerFunc {
 	}
 }
 
-// Currently by calling FuseUnmount method from NodeServer is able to unmount the volume
-// If required to have specific unmount methods based on mounters then following call can be modified and used
-
 func handleCosUnmount() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var request struct {
