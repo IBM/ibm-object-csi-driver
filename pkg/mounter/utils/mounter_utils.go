@@ -140,15 +140,16 @@ func findFuseMountProcess(path string) (*os.Process, error) {
 		klog.Info("Processes found - ", ind, "  ", process.Pid())
 	}
 	for _, p := range processes {
-		cmdLine, err := getCmdLine(p.Pid())
+		// cmdLine, err := getCmdLine(p.Pid())
+		_, err := getCmdLine(p.Pid())
 		if err != nil {
 			klog.Errorf("Unable to get cmdline of PID %v: %s", p.Pid(), err)
 			continue
 		}
-		if strings.Contains(cmdLine, path) {
-			klog.Infof("Found matching pid %v on path %s", p.Pid(), path)
-			return os.FindProcess(p.Pid())
-		}
+		// if strings.Contains(cmdLine, path) {
+		// klog.Infof("Found matching pid %v on path %s", p.Pid(), path)
+		return os.FindProcess(p.Pid())
+		// }
 	}
 	return nil, nil
 }
