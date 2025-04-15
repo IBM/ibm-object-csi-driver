@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/gin-gonic/gin"
@@ -46,7 +47,11 @@ func setUpLogger() *zap.Logger {
 
 func main() {
 	// Always create fresh socket file
-	os.Remove(socketPath)
+	err := os.Remove(socketPath)
+	if err != nil {
+		// Handle it properly: log it, retry, return, etc.
+		logger.Warn("Failed to remove Socket File")
+	}
 
 	// Create a listener
 	logger.Info("Creating unix socket listener...")
@@ -62,7 +67,11 @@ func main() {
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-signals
-		os.Remove(socketPath)
+		err := os.Remove(socketPath)
+		if err != nil {
+			// Handle it properly: log it, retry, return, etc.
+			logger.Warn("Failed to remove Socket File")
+		}
 		os.Exit(0)
 	}()
 
@@ -75,7 +84,12 @@ func main() {
 	router.POST("/api/cos/unmount", handleCosUnmount())
 
 	// Serve HTTP requests over Unix socket
-	err = http.Serve(listener, router)
+	// err = http.Serve(listener, router)
+	server := &http.Server{
+		Handler:           router,
+		ReadHeaderTimeout: 3 * time.Second,
+	}
+	err = server.Serve(listener)
 	if err != nil {
 		logger.Fatal("Error while serving HTTP requests:", zap.Error(err))
 	}
