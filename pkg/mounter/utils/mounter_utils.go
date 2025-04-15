@@ -52,16 +52,16 @@ func (su *MounterOptsUtils) FuseUnmount(path string) error {
 	isMount, checkMountErr := isMountpoint(path)
 	if isMount || checkMountErr != nil {
 		klog.Infof("isMountpoint  %v", isMount)
-		// err := unmount(path, 0)
-		// if err != nil && checkMountErr == nil {
-		// 	klog.Errorf("Cannot unmount. Trying force unmount %s", err)
-		// 	//Do force unmount
-		// 	err = unmount(path, 0)
-		// 	if err != nil {
-		// 		klog.Errorf("Cannot force unmount %s", err)
-		// 		return fmt.Errorf("cannot force unmount %s: %v", path, err)
-		// 	}
-		// }
+		err := unmount(path, 0)
+		if err != nil && checkMountErr == nil {
+			klog.Errorf("Cannot unmount. Trying force unmount %s", err)
+			//Do force unmount
+			err = unmount(path, 0)
+			if err != nil {
+				klog.Errorf("Cannot force unmount %s", err)
+				return fmt.Errorf("cannot force unmount %s: %v", path, err)
+			}
+		}
 	}
 	// as fuse quits immediately, we will try to wait until the process is done
 	process, err := findFuseMountProcess(path)
@@ -135,21 +135,16 @@ func findFuseMountProcess(path string) (*os.Process, error) {
 	if err != nil {
 		return nil, err
 	}
-	klog.Info("No of processes found - ", len(processes))
-	for ind, process := range processes {
-		klog.Info("Processes found - ", ind, "  ", process.Pid())
-	}
 	for _, p := range processes {
-		// cmdLine, err := getCmdLine(p.Pid())
-		_, err := getCmdLine(p.Pid())
+		cmdLine, err := getCmdLine(p.Pid())
 		if err != nil {
 			klog.Errorf("Unable to get cmdline of PID %v: %s", p.Pid(), err)
 			continue
 		}
-		// if strings.Contains(cmdLine, path) {
-		// klog.Infof("Found matching pid %v on path %s", p.Pid(), path)
-		return os.FindProcess(p.Pid())
-		// }
+		if strings.Contains(cmdLine, path) {
+			klog.Infof("Found matching pid %v on path %s", p.Pid(), path)
+			return os.FindProcess(p.Pid())
+		}
 	}
 	return nil, nil
 }

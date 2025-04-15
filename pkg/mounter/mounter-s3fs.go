@@ -197,22 +197,8 @@ var writePassWrap = func(pwFileName string, pwFileContent string) error {
 	return writePassFunc(pwFileName, pwFileContent)
 }
 
-/*
 func (s3fs *S3fsMounter) Unmount(target string) error {
 	klog.Info("-S3FSMounter Unmount-")
-
-	var metaRoot string
-	if mountWorker {
-		metaRoot = constants.WorkerNodeMounterPath
-	} else {
-		metaRoot = "/var/lib/ibmc-s3fs"
-	}
-
-	metaPath := path.Join(metaRoot, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
-	err := os.RemoveAll(metaPath)
-	if err != nil {
-		return err
-	}
 
 	if mountWorker {
 		klog.Info("Worker Unmounting...")
@@ -229,7 +215,6 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 	klog.Info("NodeServer Unmounting...")
 	return s3fs.MounterUtils.FuseUnmount(target)
 }
-*/
 
 func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string) []string {
 	mountOptsMap := make(map[string]string)

@@ -247,22 +247,8 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 	return rclone.MounterUtils.FuseMount(target, constants.RClone, args)
 }
 
-/*
 func (rclone *RcloneMounter) Unmount(target string) error {
 	klog.Info("-RcloneMounter Unmount-")
-
-	var metaRoot string
-	if mountWorker {
-		metaRoot = constants.WorkerNodeMounterPath
-	} else {
-		metaRoot = "/var/lib/ibmc-rclone"
-	}
-
-	metaPath := path.Join(metaRoot, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
-	err := os.RemoveAll(metaPath)
-	if err != nil {
-		return err
-	}
 
 	if mountWorker {
 		klog.Info("Worker Unmounting...")
@@ -279,7 +265,6 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 	klog.Info("NodeServer Unmounting...")
 	return rclone.MounterUtils.FuseUnmount(target)
 }
-*/
 
 var createConfigFunc = createConfig
 
