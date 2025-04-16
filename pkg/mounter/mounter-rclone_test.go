@@ -126,7 +126,6 @@ func TestNewRcloneMounter_MountOptsInSecret_Invalid(t *testing.T) {
 	assert.Equal(t, rCloneMounter.GID, secretMap["gid"])
 }
 
-/*
 func Test_RcloneMount_Positive(t *testing.T) {
 	mounter := NewRcloneMounter(secretMapRClone, mountOptionsRClone,
 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
@@ -205,7 +204,6 @@ func Test_RcloneMount_Positive_Empty_ObjPath(t *testing.T) {
 	err := rCloneMounter.Mount("source", target)
 	assert.NoError(t, err)
 }
-*/
 
 func Test_RcloneMount_Error_Creating_Mount_Point(t *testing.T) {
 	mounter := NewRcloneMounter(secretMapRClone, mountOptionsRClone,
@@ -304,7 +302,6 @@ func Test_RcloneMount_ErrorMount(t *testing.T) {
 	assert.Error(t, err, "error mounting volume")
 }
 
-/*
 func Test_RcloneUnmount_Positive(t *testing.T) {
 	secretMap := map[string]string{
 		"cosEndpoint":        "test-endpoint",
@@ -388,7 +385,6 @@ func Test_RcloneUnmount_Error(t *testing.T) {
 		t.Errorf("Failed to remove directory: %v", err)
 	}
 }
-*/
 
 func TestUpdateRCloneMountOptions(t *testing.T) {
 	defaultMountOp := []string{"option1=value1", "option2=value2"}

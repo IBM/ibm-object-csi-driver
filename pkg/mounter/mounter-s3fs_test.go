@@ -62,7 +62,6 @@ func TestNewS3fsMounter_Success_Hmac(t *testing.T) {
 	assert.Equal(t, s3fsMounter.LocConstraint, secretMap["locationConstraint"])
 }
 
-/*
 func Test_Mount_Positive(t *testing.T) {
 	mounter := NewS3fsMounter(secretMap, mountOptions,
 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
@@ -220,7 +219,6 @@ func Test_Mount_Positive_SingleMountOptions(t *testing.T) {
 	err := s3fsMounter.Mount("source", target)
 	assert.NoError(t, err)
 }
-*/
 
 func Test_Mount_Error_Creating_Mount_Point(t *testing.T) {
 	mounter := NewS3fsMounter(secretMap, mountOptions,
@@ -319,7 +317,6 @@ func Test_Mount_ErrorMount(t *testing.T) {
 	assert.Error(t, err, "error mounting volume")
 }
 
-/*
 func Test_Unmount_Positive(t *testing.T) {
 	mounter := NewS3fsMounter(secretMap, mountOptions,
 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
@@ -382,7 +379,6 @@ func Test_Unmount_Error(t *testing.T) {
 		t.Errorf("Failed to remove directory: %v", err)
 	}
 }
-*/
 
 func TestUpdateS3FSMountOptions(t *testing.T) {
 	defaultMountOp := []string{"option1=value1", "option2=value2"}
