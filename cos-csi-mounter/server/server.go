@@ -97,12 +97,7 @@ func main() {
 
 func handleCosMount() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var request struct {
-			Path    string   `json:"path"`
-			Mounter string   `json:"mounter"`
-			Args    []string `json:"args"`
-		}
-
+		var request MountRequest
 		logger.Info("New mount request with values: ", zap.Any("Request:", request))
 
 		if err := c.BindJSON(&request); err != nil {
@@ -119,8 +114,16 @@ func handleCosMount() gin.HandlerFunc {
 			return
 		}
 
+		// validate mounter args
+		args, err := request.ParseMounterArgs()
+		if err != nil {
+			logger.Error("Failed to parse mounter args", zap.Any("mounter", request.Mounter), zap.Error(err))
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid args for mounter"})
+			return
+		}
+
 		utils := mounterUtils.MounterOptsUtils{}
-		err := utils.FuseMount(request.Path, request.Mounter, request.Args)
+		err = utils.FuseMount(request.Path, request.Mounter, args)
 		if err != nil {
 			logger.Error("Mount Failed: ", zap.Error(err))
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Mount Failed"})
