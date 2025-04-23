@@ -13,6 +13,7 @@ package mounter
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"path"
 	"strings"
@@ -143,13 +144,13 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	if mountWorker {
 		klog.Info("Worker Mounting...")
 
-		// jsonData, err := json.Marshal(args)
-		// if err != nil {
-		// 	klog.Fatalf("Error marshalling data: %v", err)
-		// 	return err
-		// }
+		jsonData, err := json.Marshal(wnOp)
+		if err != nil {
+			klog.Fatalf("Error marshalling data: %v", err)
+			return err
+		}
 
-		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.S3FS, wnOp)
+		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.S3FS, jsonData)
 
 		klog.Info("Worker Mounting Payload...", payload)
 

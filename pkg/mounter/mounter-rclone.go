@@ -14,6 +14,7 @@ package mounter
 import (
 	"bufio"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -211,14 +212,13 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 	if mountWorker {
 		klog.Info("Worker Mounting...")
 
-		// jsonData, err := json.Marshal(args)
-		// if err != nil {
-		// 	klog.Fatalf("Error marshalling data: %v", err)
-		// 	return err
-		// }
+		jsonData, err := json.Marshal(wnOp)
+		if err != nil {
+			klog.Fatalf("Error marshalling data: %v", err)
+			return err
+		}
 
-		// payload := fmt.Sprintf(`{"path":"%s","mounter":"%s","args":%s}`, target, constants.RClone, jsonData)
-		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.RClone, wnOp)
+		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.RClone, jsonData)
 
 		errResponse, err := createCOSCSIMounterRequest(payload, "http://unix/api/cos/mount")
 		klog.Info("Worker Mounting...", errResponse)
