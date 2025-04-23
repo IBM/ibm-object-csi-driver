@@ -23,6 +23,13 @@ type S3FSArgs struct {
 	URL                 string `json:"url,omitempty"`
 	PasswdFilePath      string `json:"passwd_file,omitempty"`
 	UsePathRequestStyle string `json:"use_path_request_style,omitempty"`
+	SigV2               string `json:"sigv2,omitempty"`
+	AllowOther          string `json:"allow_other,omitempty"`
+	MPUmask             string `json:"mp_umask,omitempty"`
+	EndPoint            string `json:"endpoint,omitempty"`
+	IBMIamAuth          string `json:"ibm_iam_auth,omitempty"`
+	IBMIamEndpoint      string `json:"ibm_iam_endpoint,omitempty"`
+	DefaultACL          string `json:"default_acl,omitempty"`
 }
 
 func (args S3FSArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, error) {
