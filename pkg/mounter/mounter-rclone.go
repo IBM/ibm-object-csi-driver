@@ -207,34 +207,18 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 		bucketName = fmt.Sprintf("%s:%s", remote, rclone.BucketName)
 	}
 
-	args := []string{
-		"mount",
-		bucketName,
-		target,
-		"--allow-other",
-		"--daemon",
-		"--config=" + configPathWithVolID + "/" + configFileName,
-		"--log-file=/var/log/rclone.log",
-	}
-	if rclone.GID != "" {
-		gidOpt := "--gid=" + rclone.GID
-		args = append(args, gidOpt)
-	}
-	if rclone.UID != "" {
-		uidOpt := "--uid=" + rclone.UID
-		args = append(args, uidOpt)
-	}
+	args, wnOp := rclone.formulateMountOptions(bucketName, target, configPathWithVolID)
 
 	if mountWorker {
 		klog.Info("Worker Mounting...")
 
-		jsonData, err := json.Marshal(args)
+		jsonData, err := json.Marshal(wnOp)
 		if err != nil {
 			klog.Fatalf("Error marshalling data: %v", err)
 			return err
 		}
 
-		payload := fmt.Sprintf(`{"path":"%s","mounter":"%s","args":%s}`, target, constants.RClone, jsonData)
+		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.RClone, jsonData)
 
 		errResponse, err := createCOSCSIMounterRequest(payload, "http://unix/api/cos/mount")
 		klog.Info("Worker Mounting...", errResponse)
@@ -336,4 +320,37 @@ func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
 	}
 	klog.Info("-Rclone created rclone config file-")
 	return nil
+}
+
+func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWithVolID string) (nodeServerOp []string, workerNodeOp map[string]string) {
+	nodeServerOp = []string{
+		"mount",
+		bucket,
+		target,
+		"--allow-other",
+		"--daemon",
+		"--config=" + configPathWithVolID + "/" + configFileName,
+		"--log-file=/var/log/rclone.log",
+	}
+
+	workerNodeOp = map[string]string{
+		"allow-other": "true",
+		"daemon":      "true",
+		"config":      configPathWithVolID + "/" + configFileName,
+		"log-file":    "/var/log/rclone.log",
+	}
+
+	if rclone.GID != "" {
+		gidOpt := "--gid=" + rclone.GID
+		nodeServerOp = append(nodeServerOp, gidOpt)
+
+		workerNodeOp["gid"] = rclone.GID
+	}
+	if rclone.UID != "" {
+		uidOpt := "--uid=" + rclone.UID
+		nodeServerOp = append(nodeServerOp, uidOpt)
+
+		workerNodeOp["uid"] = rclone.UID
+	}
+	return
 }

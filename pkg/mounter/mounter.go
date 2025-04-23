@@ -16,7 +16,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var mountWorker bool = true
+var mountWorker = true
 
 type Mounter interface {
 	Mount(source string, target string) error
@@ -123,7 +123,7 @@ func createCOSCSIMounterRequest(payload string, url string) (string, error) {
 		socketPath = constants.DefaultSocketPath
 	}
 	// Create a custom dialer function for Unix socket connection
-	dialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
+	dialer := func(_ context.Context, _, _ string) (net.Conn, error) {
 		return net.Dial("unix", socketPath)
 	}
 
