@@ -117,7 +117,7 @@ func handleCosMount() gin.HandlerFunc {
 		// validate mounter args
 		args, err := request.ParseMounterArgs()
 		if err != nil {
-			logger.Error("Invalid args", zap.Any("mounter", request.Mounter), zap.Error(err))
+			logger.Error("Failed to parse mounter args", zap.Any("mounter", request.Mounter), zap.Error(err))
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid args for mounter"})
 			return
 		}
