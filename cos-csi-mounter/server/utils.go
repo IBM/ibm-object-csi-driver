@@ -49,7 +49,11 @@ func (args S3FSArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, err
 	result := []string{bucket, targetPath}
 	for k, v := range m {
 		result = append(result, "-o")
-		result = append(result, fmt.Sprintf("%s=%v", k, v)) // -o, key=value
+		if strings.ToLower(strings.TrimSpace(v)) == "true" {
+			result = append(result, fmt.Sprintf("%s", k)) // -o, key
+		} else {
+			result = append(result, fmt.Sprintf("%s=%v", k, v)) // -o, key=value
+		}
 	}
 
 	return result, nil // [bucket, path, -o, key1=value1, -o, key2=value2]
