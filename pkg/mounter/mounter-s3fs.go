@@ -13,7 +13,6 @@ package mounter
 
 import (
 	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 	"path"
 	"strings"
@@ -139,43 +138,18 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 		bucketName = s3fs.BucketName
 	}
 
-	args := []string{
-		bucketName,
-		target,
-		"-o", "sigv2",
-		"-o", "use_path_request_style",
-		"-o", fmt.Sprintf("passwd_file=%s", passwdFile),
-		"-o", fmt.Sprintf("url=%s", s3fs.EndPoint),
-		"-o", "allow_other",
-		"-o", "mp_umask=002",
-	}
-
-	if s3fs.LocConstraint != "" {
-		args = append(args, "-o", fmt.Sprintf("endpoint=%s", s3fs.LocConstraint))
-	}
-
-	for _, val := range s3fs.MountOptions {
-		args = append(args, "-o")
-		args = append(args, val)
-	}
-
-	if s3fs.AuthType != "hmac" {
-		args = append(args, "-o", "ibm_iam_auth")
-		args = append(args, "-o", "ibm_iam_endpoint="+constants.DefaultIAMEndPoint)
-	} else {
-		args = append(args, "-o", "default_acl=private")
-	}
+	args, wnOp := s3fs.formulateMountOptions(bucketName, target, passwdFile)
 
 	if mountWorker {
 		klog.Info("Worker Mounting...")
 
-		jsonData, err := json.Marshal(args)
-		if err != nil {
-			klog.Fatalf("Error marshalling data: %v", err)
-			return err
-		}
+		// jsonData, err := json.Marshal(args)
+		// if err != nil {
+		// 	klog.Fatalf("Error marshalling data: %v", err)
+		// 	return err
+		// }
 
-		payload := fmt.Sprintf(`{"path":"%s","mounter":"%s","args":%s}`, target, constants.S3FS, jsonData)
+		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.S3FS, wnOp)
 
 		klog.Info("Worker Mounting Payload...", payload)
 
@@ -296,4 +270,55 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 
 	klog.Infof("updated S3fsMounter Options: %v", updatedOptions)
 	return updatedOptions
+}
+
+func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string) (nodeServerOp []string, workerNodeOp map[string]string) {
+	nodeServerOp = []string{
+		bucket,
+		target,
+		"-o", "sigv2",
+		"-o", "use_path_request_style",
+		"-o", fmt.Sprintf("passwd_file=%s", passwdFile),
+		"-o", fmt.Sprintf("url=%s", s3fs.EndPoint),
+		"-o", "allow_other",
+		"-o", "mp_umask=002",
+	}
+
+	workerNodeOp = map[string]string{
+		"sigv2":                  "true",
+		"use_path_request_style": "true",
+		"passwd_file":            passwdFile,
+		"url":                    s3fs.EndPoint,
+		"allow_other":            "true",
+		"mp_umask":               "002",
+	}
+
+	if s3fs.LocConstraint != "" {
+		nodeServerOp = append(nodeServerOp, "-o", fmt.Sprintf("endpoint=%s", s3fs.LocConstraint))
+		workerNodeOp["endpoint"] = s3fs.LocConstraint
+	}
+
+	for _, val := range s3fs.MountOptions {
+		nodeServerOp = append(nodeServerOp, "-o")
+		nodeServerOp = append(nodeServerOp, val)
+
+		splitVal := strings.Split(val, "=")
+		if len(splitVal) == 1 {
+			workerNodeOp[splitVal[0]] = "true"
+		} else {
+			workerNodeOp[splitVal[0]] = splitVal[1]
+		}
+	}
+
+	if s3fs.AuthType != "hmac" {
+		nodeServerOp = append(nodeServerOp, "-o", "ibm_iam_auth")
+		nodeServerOp = append(nodeServerOp, "-o", "ibm_iam_endpoint="+constants.DefaultIAMEndPoint)
+
+		workerNodeOp["ibm_iam_auth"] = "true"
+		workerNodeOp["ibm_iam_endpoint"] = constants.DefaultIAMEndPoint
+	} else {
+		nodeServerOp = append(nodeServerOp, "-o", "default_acl=private")
+		workerNodeOp["default_acl"] = "private"
+	}
+	return
 }
