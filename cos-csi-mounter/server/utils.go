@@ -39,8 +39,8 @@ func (args S3FSArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, err
 		return nil, err
 	}
 
-	// Unmarshal into map[string]interface{}
-	var m map[string]interface{}
+	// Unmarshal into map[string]string
+	var m map[string]string
 	if err := json.Unmarshal(raw, &m); err != nil {
 		return nil, err
 	}
@@ -73,8 +73,8 @@ func (args RCloneArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, e
 		return nil, err
 	}
 
-	// Unmarshal into map[string]interface{}
-	var m map[string]interface{}
+	// Unmarshal into map[string]string
+	var m map[string]string
 	if err := json.Unmarshal(raw, &m); err != nil {
 		return nil, err
 	}
