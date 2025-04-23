@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // MountRequest ...
@@ -48,6 +49,7 @@ func (args S3FSArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, err
 }
 
 type RCloneArgs struct {
+	Endpoint  string `json:"endpoint,omitempty"`
 	BackupDir string `json:"backup-dir,omitempty"`
 	Bind      string `json:"bind,omitempty"`
 	BWLimit   string `json:"bwlimit,omitempty"`
@@ -81,6 +83,17 @@ func strictDecodeForUnknownFields(data json.RawMessage, v interface{}) error {
 	return dec.Decode(v)
 }
 
+func argsValidator(endpoint, targetPath string) error {
+	if !(strings.HasPrefix(endpoint, "https://") || strings.HasPrefix(endpoint, "http://")) {
+		return fmt.Errorf("Bad value for COS endpoint \"%v\": scheme is missing. "+
+			"Must be of the form http://<hostname> or https://<hostname>", endpoint)
+	}
+	if !(strings.HasPrefix(targetPath, "/var/data/kubelet/pods") || strings.HasPrefix(targetPath, "/var/lib/kubelet/pods")) {
+		return fmt.Errorf("Bad value for target path \"%v\"", targetPath)
+	}
+	return nil
+}
+
 // --- Parser for Mounter Arguments ---
 
 func (req *MountRequest) ParseMounterArgs() ([]string, error) {
@@ -90,12 +103,18 @@ func (req *MountRequest) ParseMounterArgs() ([]string, error) {
 		if err := strictDecodeForUnknownFields(req.Args, &args); err != nil {
 			return nil, fmt.Errorf("invalid s3fs args decode error: %w", err)
 		}
+		if err := argsValidator(args.URL, req.Path); err != nil {
+			return nil, fmt.Errorf("s3fs endpoint or target path validation failed: %w", err)
+		}
 		return args.PopulateArgsSlice(req.Bucket, req.Path)
 
 	case rclone:
 		var args RCloneArgs
 		if err := strictDecodeForUnknownFields(req.Args, &args); err != nil {
 			return nil, fmt.Errorf("invalid rclone args decode error: %w", err)
+		}
+		if err := argsValidator(args.Endpoint, req.Path); err != nil {
+			return nil, fmt.Errorf("rclone endpoint or target path validation failed: %w", err)
 		}
 		return args.PopulateArgsSlice(req.Bucket, req.Path)
 
