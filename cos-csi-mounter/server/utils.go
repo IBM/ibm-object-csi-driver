@@ -19,6 +19,7 @@ type MountRequest struct {
 type MounterArgs interface {
 	PopulateArgsSlice(string, string) ([]string, error)
 }
+
 type S3FSArgs struct {
 	URL                 string `json:"url,omitempty"`
 	PasswdFilePath      string `json:"passwd_file,omitempty"`
