@@ -24,6 +24,7 @@ type S3FSArgs struct {
 	InstanceName            string `json:"instance_name,omitempty"`
 	KernelCache             string `json:"kernel_cache,omitempty"`
 	MaxBackground           string `json:"max_background,omitempty"`
+	MaxDirtyData            string `json:"max_dirty_data,omitempty"`
 	MaxStatCacheSize        string `json:"max_stat_cache_size,omitempty"`
 	MPUmask                 string `json:"mp_umask,omitempty"`
 	MultipartSize           string `json:"multipart_size,omitempty"`
