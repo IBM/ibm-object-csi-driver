@@ -98,7 +98,6 @@ func main() {
 func handleCosMount() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var request MountRequest
-		logger.Info("New mount request with values: ", zap.Any("Request:", request))
 
 		if err := c.BindJSON(&request); err != nil {
 			logger.Error("Invalid request: ", zap.Error(err))
@@ -106,7 +105,7 @@ func handleCosMount() gin.HandlerFunc {
 			return
 		}
 
-		logger.Info("New mount request with values: ", zap.String("Path:", request.Path), zap.String("Mounter:", request.Mounter), zap.Any("Args:", request.Args))
+		logger.Info("New mount request with values:", zap.String("Bucket", request.Bucket), zap.String("Path", request.Path), zap.String("Mounter", request.Mounter), zap.Any("Args", request.Args))
 
 		if request.Mounter != s3fs && request.Mounter != rclone {
 			logger.Error("Invalid Request!!!!")
