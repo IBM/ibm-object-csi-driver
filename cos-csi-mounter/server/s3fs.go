@@ -73,9 +73,6 @@ func (args S3FSArgs) Validate(targetPath string) error {
 	if err := pathValidator(targetPath); err != nil {
 		return err
 	}
-	if !(strings.HasPrefix(targetPath, "/var/data/kubelet/pods") || strings.HasPrefix(targetPath, "/var/lib/kubelet/pods")) {
-		return fmt.Errorf("Bad value for target path \"%v\"", targetPath)
-	}
 
 	retryCount, err := strconv.Atoi(args.RetryCount)
 	if err != nil {
