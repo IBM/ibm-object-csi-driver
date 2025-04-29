@@ -21,6 +21,12 @@ type MounterArgs interface {
 	PopulateArgsSlice(bucket, path string) ([]string, error)
 }
 
+// isBoolString checks if a string is "true" or "false" (case-insensitive)
+func isBoolString(s string) bool {
+	s = strings.TrimSpace(strings.ToLower(s))
+	return s == "true" || s == "false"
+}
+
 func strictDecodeForUnknownFields(data json.RawMessage, v interface{}) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
