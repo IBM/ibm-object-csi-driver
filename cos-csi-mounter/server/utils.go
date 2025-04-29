@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -19,12 +20,6 @@ type MountRequest struct {
 type MounterArgs interface {
 	Validate(path string) error
 	PopulateArgsSlice(bucket, path string) ([]string, error)
-}
-
-// isBoolString checks if a string is "true" or "false" (case-insensitive)
-func isBoolString(s string) bool {
-	s = strings.TrimSpace(strings.ToLower(s))
-	return s == "true" || s == "false"
 }
 
 func strictDecodeForUnknownFields(data json.RawMessage, v interface{}) error {
@@ -67,4 +62,22 @@ func (req *MountRequest) ParseMounterArgs() ([]string, error) {
 	default:
 		return nil, fmt.Errorf("unknown mounter: %s", req.Mounter)
 	}
+}
+
+// isBoolString checks if a string is "true" or "false" (case-insensitive)
+func isBoolString(s string) bool {
+	s = strings.TrimSpace(strings.ToLower(s))
+	return s == "true" || s == "false"
+}
+
+// fileExists checks whether the given file path exists and is not a directory.
+func fileExists(path string) (bool, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return !info.IsDir(), nil
 }
