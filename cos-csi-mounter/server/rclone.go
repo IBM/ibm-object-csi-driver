@@ -11,7 +11,7 @@ type RCloneArgs struct {
 	AllowOther            string `json:"allow-other,omitempty"`
 	AllowRoot             string `json:"allow-root,omitempty"`
 	AsyncRead             string `json:"async-read,omitempty"`
-	AttrTimeout           string `josn:"attr-timeout,omitempty"`
+	AttrTimeout           string `json:"attr-timeout,omitempty"`
 	ConfigPath            string `json:"config,omitempty"`
 	Daemon                string `json:"daemon,omitempty"`
 	DaemonTimeout         string `json:"daemon-timeout,omitempty"`
