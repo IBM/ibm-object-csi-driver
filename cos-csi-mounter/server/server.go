@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -100,36 +101,37 @@ func handleCosMount() gin.HandlerFunc {
 		var request MountRequest
 
 		if err := c.BindJSON(&request); err != nil {
-			logger.Error("Invalid request: ", zap.Error(err))
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+			logger.Error("invalid request: ", zap.Error(err))
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 			return
 		}
 
 		logger.Info("New mount request with values:", zap.String("Bucket", request.Bucket), zap.String("Path", request.Path), zap.String("Mounter", request.Mounter), zap.Any("Args", request.Args))
 
 		if request.Mounter != s3fs && request.Mounter != rclone {
-			logger.Error("Invalid Request!!!!")
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+			logger.Error("invalid mounter", zap.Any("mounter", request.Mounter))
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid mounter"})
 			return
 		}
 
 		// validate mounter args
 		args, err := request.ParseMounterArgs()
 		if err != nil {
-			logger.Error("Failed to parse mounter args", zap.Any("mounter", request.Mounter), zap.Error(err))
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid args for mounter"})
+			logger.Error("failed to parse mounter args", zap.Any("mounter", request.Mounter), zap.Error(err))
+
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid args for mounter: %v", err)})
 			return
 		}
 
 		utils := mounterUtils.MounterOptsUtils{}
 		err = utils.FuseMount(request.Path, request.Mounter, args)
 		if err != nil {
-			logger.Error("Mount Failed: ", zap.Error(err))
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Mount Failed"})
+			logger.Error("mount failed: ", zap.Error(err))
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("mount failed: %v", err)})
 			return
 		}
 
-		logger.Info("New COS Mount is Successfull")
+		logger.Info("bucket mount is successful", zap.Any("bucket", request.Bucket), zap.Any("path", request.Path))
 		c.JSON(http.StatusOK, "Success!!")
 	}
 }
@@ -140,11 +142,9 @@ func handleCosUnmount() gin.HandlerFunc {
 			Path string `json:"path"`
 		}
 
-		logger.Info("New unmount request with values: ", zap.Any("Request:", request))
-
 		if err := c.BindJSON(&request); err != nil {
-			logger.Error("Invalid request: ", zap.Error(err))
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+			logger.Error("invalid request: ", zap.Error(err))
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 			return
 		}
 
@@ -153,12 +153,12 @@ func handleCosUnmount() gin.HandlerFunc {
 		utils := mounterUtils.MounterOptsUtils{}
 		err := utils.FuseUnmount(request.Path)
 		if err != nil {
-			logger.Error("UnMount Failed: ", zap.Error(err))
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Mount Failed"})
+			logger.Error("unmount failed: ", zap.Error(err))
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("unmount failed :%v", err)})
 			return
 		}
 
-		logger.Info("COS UnMount is Successfull")
+		logger.Info("bucket unmount is Successful", zap.Any("path", request.Path))
 		c.JSON(http.StatusOK, "Success!!")
 	}
 }
