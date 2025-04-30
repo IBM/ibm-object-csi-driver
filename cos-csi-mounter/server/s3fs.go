@@ -208,7 +208,7 @@ func (args S3FSArgs) Validate(targetPath string) error {
 		logger.Error("error checking credential file existence", zap.Error(err))
 		return fmt.Errorf("error checking credential file existence: %v", err)
 	} else if !exists {
-		logger.Error("credntial file not found")
+		logger.Error("credential file not found")
 		return fmt.Errorf("credential file not found")
 	}
 
