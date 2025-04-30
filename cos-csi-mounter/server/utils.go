@@ -30,7 +30,7 @@ func strictDecodeForUnknownFields(data json.RawMessage, v interface{}) error {
 
 func pathValidator(targetPath string) error {
 	if !(strings.HasPrefix(targetPath, "/var/data/kubelet/pods") || strings.HasPrefix(targetPath, "/var/lib/kubelet/pods")) {
-		return fmt.Errorf("Bad value for target path \"%v\"", targetPath)
+		return fmt.Errorf("bad value for target path \"%v\"", targetPath)
 	}
 	return nil
 }
