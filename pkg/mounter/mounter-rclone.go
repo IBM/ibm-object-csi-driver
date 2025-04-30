@@ -42,7 +42,6 @@ type RcloneMounter struct {
 }
 
 const (
-	configPath     = "/root/.config/rclone"
 	configFileName = "rclone.conf"
 	remote         = "ibmcos"
 	s3Type         = "s3"
@@ -170,29 +169,14 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 	klog.Info("-RcloneMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
 
-	var metaRoot string
-	if mountWorker {
-		metaRoot = constants.WorkerNodeMounterPath
-	} else {
-		metaRoot = "/var/lib/ibmc-rclone"
-	}
-
 	var bucketName string
-	var pathExist bool
 	var err error
-	metaPath := path.Join(metaRoot, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 
-	if pathExist, err = checkPath(metaPath); err != nil {
-		klog.Errorf("RcloneMounter Mount: Cannot stat directory %s: %v", metaPath, err)
-		return err
-	}
-
-	if !pathExist {
-		if err = mkdirAll(metaPath, 0755); // #nosec G301: used for rclone
-		err != nil {
-			klog.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", metaPath, err)
-			return err
-		}
+	var configPath string
+	if mountWorker {
+		configPath = constants.WorkerNodeMounterPath
+	} else {
+		configPath = "/root/.config/rclone"
 	}
 
 	configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
