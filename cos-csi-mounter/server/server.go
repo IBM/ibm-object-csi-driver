@@ -158,7 +158,7 @@ func handleCosUnmount() gin.HandlerFunc {
 			return
 		}
 
-		logger.Info("bucket unmount is Successful", zap.Any("path", request.Path))
+		logger.Info("bucket unmount is successful", zap.Any("path", request.Path))
 		c.JSON(http.StatusOK, "Success!!")
 	}
 }

@@ -106,14 +106,6 @@ func (args S3FSArgs) Validate(targetPath string) error {
 		return fmt.Errorf("invalid value for 'curldbg' param. Should be either 'body' or 'normal': %v", args.CurlDebug)
 	}
 
-	if !(strings.HasPrefix(args.EndPoint, "https://") || strings.HasPrefix(args.EndPoint, "http://")) {
-		logger.Error("bad value for endpoint: scheme is missing."+
-			" Must be of the form http://<hostname> or https://<hostname>",
-			zap.String("endpoint", args.EndPoint))
-		return fmt.Errorf("bad value for endpoint \"%v\": scheme is missing."+
-			" Must be of the form http://<hostname> or https://<hostname>", args.EndPoint)
-	}
-
 	// Check if value of gid parameter can be converted to integer
 	if args.GID != "" {
 		_, err := strconv.Atoi(args.GID)
@@ -205,11 +197,11 @@ func (args S3FSArgs) Validate(targetPath string) error {
 
 	// Check if .passwd file exists or not
 	if exists, err := fileExists(args.PasswdFilePath); err != nil {
-		logger.Error("error checking file existence", zap.Error(err), zap.Any("path", args.PasswdFilePath))
-		return fmt.Errorf("error checking file existence: %v", err)
+		logger.Error("error checking credential file existence", zap.Error(err))
+		return fmt.Errorf("error checking credential file existence: %v", err)
 	} else if !exists {
-		logger.Error("file not found", zap.Error(err), zap.Any("path", args.PasswdFilePath))
-		return fmt.Errorf("file not found: %v", args.PasswdFilePath)
+		logger.Error("credential file not found")
+		return fmt.Errorf("credential file not found")
 	}
 
 	// Check if value of ro parameter is boolean "true" or "false"
@@ -293,6 +285,14 @@ func (args S3FSArgs) Validate(targetPath string) error {
 			logger.Error("cannot convert value of use_xattr into boolean", zap.Any("use_xattr", args.UseXattr))
 			return fmt.Errorf("cannot convert value of use_xattr into boolean: %v", args.UseXattr)
 		}
+	}
+
+	if !(strings.HasPrefix(args.URL, "https://") || strings.HasPrefix(args.URL, "http://")) {
+		logger.Error("bad value for url: scheme is missing."+
+			" Must be of the form http://<hostname> or https://<hostname>",
+			zap.String("url", args.URL))
+		return fmt.Errorf("bad value for url \"%v\": scheme is missing."+
+			" Must be of the form http://<hostname> or https://<hostname>", args.URL)
 	}
 
 	return nil
