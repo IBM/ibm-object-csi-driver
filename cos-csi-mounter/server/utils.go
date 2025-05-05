@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -15,6 +16,13 @@ type MountRequest struct {
 	Mounter string          `json:"mounter"`
 	Args    json.RawMessage `json:"args"`
 }
+
+var (
+	// Directories where bucket can be mounted
+	safeMountDirs = []string{"/var/data/kubelet/pods", "/var/lib/kubelet/pods"}
+	// Directories where s3fs/rclone configuration files need to be present
+	safeMounterConfigDir = "/var/lib/cos-csi"
+)
 
 // MounterArgs ...
 type MounterArgs interface {
@@ -29,7 +37,11 @@ func strictDecodeForUnknownFields(data json.RawMessage, v interface{}) error {
 }
 
 func pathValidator(targetPath string) error {
-	if !(strings.HasPrefix(targetPath, "/var/data/kubelet/pods") || strings.HasPrefix(targetPath, "/var/lib/kubelet/pods")) {
+	absPath, err := filepath.Abs(targetPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve absolute mount path: %v", err)
+	}
+	if !(strings.HasPrefix(absPath, safeMountDirs[0]) || strings.HasPrefix(absPath, safeMountDirs[1])) {
 		return fmt.Errorf("bad value for target path \"%v\"", targetPath)
 	}
 	return nil
@@ -72,7 +84,14 @@ func isBoolString(s string) bool {
 
 // fileExists checks whether the given file path exists and is not a directory.
 func fileExists(path string) (bool, error) {
-	info, err := os.Stat(path)
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return false, fmt.Errorf("failed to resolve absolute path: %v", err)
+	}
+	if !strings.HasPrefix(absPath, safeMounterConfigDir) {
+		return false, fmt.Errorf("path %v is outside the safe directory", absPath)
+	}
+	info, err := os.Stat(absPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
