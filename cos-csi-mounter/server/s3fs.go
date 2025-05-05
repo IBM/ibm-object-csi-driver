@@ -197,8 +197,8 @@ func (args S3FSArgs) Validate(targetPath string) error {
 
 	// Check if .passwd file exists or not
 	if exists, err := fileExists(args.PasswdFilePath); err != nil {
-		logger.Error("error checking credential file existence", zap.Error(err))
-		return fmt.Errorf("error checking credential file existence: %v", err)
+		logger.Error("error checking credential file existence")
+		return fmt.Errorf("error checking credential file existence")
 	} else if !exists {
 		logger.Error("credential file not found")
 		return fmt.Errorf("credential file not found")
