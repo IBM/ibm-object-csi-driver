@@ -35,6 +35,7 @@ import (
 // Implements Controller csi.ControllerServer
 type controllerServer struct {
 	*S3Driver
+	csi.UnimplementedControllerServer
 	Stats      utils.StatsUtils
 	cosSession s3client.ObjectStorageSessionFactory
 	Logger     *zap.Logger
@@ -294,17 +295,17 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 }
 
 func (cs *controllerServer) ControllerPublishVolume(_ context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	klog.V(3).Infof("CSIControllerServer-ControllerPublishVolume: Request: %v", *req)
+	klog.V(3).Infof("CSIControllerServer-ControllerPublishVolume: Request: %+v", req)
 	return nil, status.Error(codes.Unimplemented, "ControllerPublishVolume")
 }
 
 func (cs *controllerServer) ControllerUnpublishVolume(_ context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
-	klog.V(3).Infof("CSIControllerServer-ControllerUnPublishVolume: Request: %v", *req)
+	klog.V(3).Infof("CSIControllerServer-ControllerUnPublishVolume: Request: %+v", req)
 	return nil, status.Error(codes.Unimplemented, "ControllerUnpublishVolume")
 }
 
 func (cs *controllerServer) ValidateVolumeCapabilities(_ context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
-	klog.V(3).Infof("ValidateVolumeCapabilities: Request: %+v", *req)
+	klog.V(3).Infof("ValidateVolumeCapabilities: Request: %+v", req)
 
 	// Validate Arguments
 	volumeID := req.GetVolumeId()
@@ -328,17 +329,17 @@ func (cs *controllerServer) ValidateVolumeCapabilities(_ context.Context, req *c
 }
 
 func (cs *controllerServer) ListVolumes(_ context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
-	klog.V(3).Infof("ListVolumes: Request: %+v", *req)
+	klog.V(3).Infof("ListVolumes: Request: %+v", req)
 	return nil, status.Error(codes.Unimplemented, "ListVolumes")
 }
 
 func (cs *controllerServer) GetCapacity(_ context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
-	klog.V(3).Infof("GetCapacity: Request: %+v", *req)
+	klog.V(3).Infof("GetCapacity: Request: %+v", req)
 	return nil, status.Error(codes.Unimplemented, "GetCapacity")
 }
 
 func (cs *controllerServer) ControllerGetCapabilities(_ context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
-	klog.V(3).Infof("ControllerGetCapabilities: Request: %+v", *req)
+	klog.V(3).Infof("ControllerGetCapabilities: Request: %+v", req)
 	var caps []*csi.ControllerServiceCapability
 	for _, cap := range controllerCapabilities {
 		c := &csi.ControllerServiceCapability{
@@ -354,32 +355,32 @@ func (cs *controllerServer) ControllerGetCapabilities(_ context.Context, req *cs
 }
 
 func (cs *controllerServer) CreateSnapshot(_ context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
-	klog.V(3).Infof("CreateSnapshot: Request: %+v", *req)
+	klog.V(3).Infof("CreateSnapshot: Request: %+v", req)
 	return nil, status.Error(codes.Unimplemented, "CreateSnapshot")
 }
 
 func (cs *controllerServer) DeleteSnapshot(_ context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
-	klog.V(3).Infof("DeleteSnapshot: called with args %+v", *req)
+	klog.V(3).Infof("DeleteSnapshot: called with args %+v", req)
 	return nil, status.Error(codes.Unimplemented, "DeleteSnapshot")
 }
 
 func (cs *controllerServer) ListSnapshots(_ context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
-	klog.V(3).Infof("ListSnapshots: called with args %+v", *req)
+	klog.V(3).Infof("ListSnapshots: called with args %+v", req)
 	return nil, status.Error(codes.Unimplemented, "ListSnapshots")
 }
 
 func (cs *controllerServer) ControllerExpandVolume(_ context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
-	klog.V(3).Infof("ControllerExpandVolume: called with args %+v", *req)
+	klog.V(3).Infof("ControllerExpandVolume: called with args %+v", req)
 	return nil, status.Error(codes.Unimplemented, "ControllerExpandVolume")
 }
 
 func (cs *controllerServer) ControllerGetVolume(_ context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
-	klog.V(3).Infof("ControllerGetVolume: called with args %+v", *req)
+	klog.V(3).Infof("ControllerGetVolume: called with args %+v", req)
 	return nil, status.Error(codes.Unimplemented, "ControllerGetVolume")
 }
 
 func (cs *controllerServer) ControllerModifyVolume(_ context.Context, req *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
-	klog.V(3).Infof("ControllerModifyVolume: called with args %+v", *req)
+	klog.V(3).Infof("ControllerModifyVolume: called with args %+v", req)
 	return nil, status.Error(codes.Unimplemented, "ControllerModifyVolume")
 }
 
