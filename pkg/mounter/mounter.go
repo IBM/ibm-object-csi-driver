@@ -1,14 +1,22 @@
 package mounter
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
 	"os"
+	"strings"
 	"syscall"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"k8s.io/klog/v2"
 )
+
+var mountWorker = true
 
 type Mounter interface {
 	Mount(source string, target string) error
@@ -105,4 +113,54 @@ var mkdirAllFunc = os.MkdirAll
 // Function that wraps os.MkdirAll
 var mkdirAll = func(path string, perm os.FileMode) error {
 	return mkdirAllFunc(path, perm)
+}
+
+func createCOSCSIMounterRequest(payload string, url string) (string, error) {
+	// Get socket path
+	// socketPath := os.Getenv("SOCKET_PATH")
+	socketPath := "/var/lib/coscsi.sock"
+	if socketPath == "" {
+		socketPath = constants.DefaultSocketPath
+	}
+	// Create a custom dialer function for Unix socket connection
+	dialer := func(_ context.Context, _, _ string) (net.Conn, error) {
+		return net.Dial("unix", socketPath)
+	}
+
+	// Create an HTTP client with the Unix socket transport
+	client := &http.Client{
+		Transport: &http.Transport{
+			DialContext: dialer,
+		},
+		Timeout: constants.Timeout,
+	}
+
+	// Create POST request
+	req, err := http.NewRequest("POST", url, strings.NewReader(payload))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	response, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			klog.Errorf("failed to close response body: %v", err)
+		}
+	}()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return "", err
+	}
+
+	responseBody := string(body)
+
+	if response.StatusCode != http.StatusOK {
+		return responseBody, fmt.Errorf("response from cos-csi-mounter -> Exit Status Code: %s ,ResponseCode: %v", responseBody, response.StatusCode)
+	}
+	return "", nil
 }
