@@ -54,7 +54,7 @@ jobs:
 
     - name: Check IS_LATEST_RELEASE env variable
       run: |
-          echo $IS_LATEST_RELEASE
+          echo ${{ steps.set_is_latest_release.outputs.IS_LATEST_RELEASE }}
 
     - name: Latest Version (Tag and Release)
       id: release
