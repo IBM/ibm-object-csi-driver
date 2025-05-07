@@ -60,12 +60,7 @@ jobs:
         tag_name: v0.0.1
         name: v0.0.1
         body: CSR generated with SHA1 is not supported to get certs using Metadata.
-    
-    - name: Label Release as Latest (if enabled)
-      if: ${{ env.IS_LATEST_RELEASE == 'true' }}
-      run: |
-          # Tag the release as 'latest' if IS_LATEST is true
-          gh release edit ${{ github.ref }} --add-label latest
+        make_latest: ${{ env.IS_LATEST_RELEASE == 'true' && 'true' || 'false' }}
     
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
