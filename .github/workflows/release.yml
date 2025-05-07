@@ -16,7 +16,7 @@ jobs:
           - cos-csi-mounter
 
     env:
-      IS_LATEST_RELEASE: 'false'
+      IS_LATEST_RELEASE: 'true'
 
     steps:
     - name: Checkout Code
@@ -57,8 +57,8 @@ jobs:
         files: |
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-latest.tar.gz
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-latest.tar.gz.sha256
-        tag_name: v0.0.3
-        name: v0.0.3
+        tag_name: v0.0.4
+        name: v0.0.4
         body: CSR generated with SHA1 is not supported to get certs using Metadata.
         prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
     
