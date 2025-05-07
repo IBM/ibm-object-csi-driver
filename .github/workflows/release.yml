@@ -8,12 +8,15 @@ on:
 jobs:
   release:
     permissions: write-all 
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
 
     strategy:
       matrix:
         package_dir:
           - cos-csi-mounter
+
+    env:
+      IS_LATEST_RELEASE: 'true'
 
     steps:
     - name: Checkout Code
@@ -57,6 +60,7 @@ jobs:
         tag_name: v0.1.0
         name: v0.1.0
         body: CSR generated with SHA1 is not supported to get certs using Metadata.
+        prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
     
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
