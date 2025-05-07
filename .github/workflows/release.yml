@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     branches:
-      - main
+      - tagging-github-actions
 
 jobs:
   release:
@@ -46,6 +46,16 @@ jobs:
       run: |
           echo "Commit Message: ${{ steps.check_commit.outputs.message }}"
 
+    - name: Set IS_LATEST_RELEASE Environment Variable
+      id: set_is_latest_release
+      run: |
+          # Here, set IS_LATEST_RELEASE to true or false depending on need
+          echo "IS_LATEST_RELEASE=true" >> $GITHUB_ENV
+
+    - name: Check IS_LATEST_RELEASE env variable
+      run: |
+          echo $IS_LATEST_RELEASE
+
     - name: Latest Version (Tag and Release)
       id: release
       if: contains(steps.check_commit.outputs.message, 'publish')
@@ -57,6 +67,14 @@ jobs:
         tag_name: v0.1.0
         name: v0.1.0
         body: CSR generated with SHA1 is not supported to get certs using Metadata.
+    
+    # - name: Label Release as Latest (if enabled)
+    #   if: $IS_LATEST_RELEASE == 'true'
+    #   run: |
+    #       # Tag the release as 'latest' if IS_LATEST is true
+    #       gh release edit ${{ github.ref }} --add-label latest
+    #   env:
+    #       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
