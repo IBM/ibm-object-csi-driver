@@ -15,6 +15,9 @@ jobs:
         package_dir:
           - cos-csi-mounter
 
+    env:
+      IS_LATEST_RELEASE: true
+
     steps:
     - name: Checkout Code
       uses: actions/checkout@v2
@@ -46,16 +49,6 @@ jobs:
       run: |
           echo "Commit Message: ${{ steps.check_commit.outputs.message }}"
 
-    - name: Set IS_LATEST_RELEASE Environment Variable
-      id: set_is_latest_release
-      run: |
-          # Here, set IS_LATEST_RELEASE to true or false depending on need
-          echo "IS_LATEST_RELEASE=true" >> $GITHUB_ENV
-
-    - name: Check IS_LATEST_RELEASE env variable
-      run: |
-          echo ${{ steps.set_is_latest_release.outputs.IS_LATEST_RELEASE }}
-
     - name: Latest Version (Tag and Release)
       id: release
       if: contains(steps.check_commit.outputs.message, 'publish')
@@ -69,7 +62,7 @@ jobs:
         body: CSR generated with SHA1 is not supported to get certs using Metadata.
     
     - name: Label Release as Latest (if enabled)
-      if: ${{ steps.set_is_latest_release.outputs.IS_LATEST_RELEASE == 'true' }}
+      if: ${{ env.IS_LATEST_RELEASE == true }}
       run: |
           # Tag the release as 'latest' if IS_LATEST is true
           gh release edit ${{ github.ref }} --add-label latest
