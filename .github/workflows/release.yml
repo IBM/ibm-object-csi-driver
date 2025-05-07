@@ -16,7 +16,7 @@ jobs:
           - cos-csi-mounter
 
     env:
-      IS_LATEST_RELEASE: true
+      IS_LATEST_RELEASE: 'true'
 
     steps:
     - name: Checkout Code
@@ -62,7 +62,7 @@ jobs:
         body: CSR generated with SHA1 is not supported to get certs using Metadata.
     
     - name: Label Release as Latest (if enabled)
-      if: ${{ env.IS_LATEST_RELEASE == true }}
+      if: ${{ env.IS_LATEST_RELEASE == 'true' }}
       run: |
           # Tag the release as 'latest' if IS_LATEST is true
           gh release edit ${{ github.ref }} --add-label latest
