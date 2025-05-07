@@ -12,6 +12,7 @@ import (
 	rc "github.com/IBM/ibm-cos-sdk-go-config/v2/resourceconfigurationv1"
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"google.golang.org/protobuf/proto"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -165,8 +166,7 @@ func ReplaceAndReturnCopy(req interface{}) (interface{}, error) {
 		// Create a new CreateVolumeRequest and copy the original values
 		var inReq *csi.CreateVolumeRequest
 
-		newReq := &csi.CreateVolumeRequest{}
-		*newReq = *r
+		newReq := proto.Clone(r).(*csi.CreateVolumeRequest)
 
 		inReq = req.(*csi.CreateVolumeRequest)
 
@@ -186,8 +186,7 @@ func ReplaceAndReturnCopy(req interface{}) (interface{}, error) {
 		// Create a new DeleteVolumeRequest and copy the original values
 		var inReq *csi.DeleteVolumeRequest
 
-		newReq := &csi.DeleteVolumeRequest{}
-		*newReq = *r
+		newReq := proto.Clone(r).(*csi.DeleteVolumeRequest)
 
 		inReq = req.(*csi.DeleteVolumeRequest)
 
@@ -208,8 +207,7 @@ func ReplaceAndReturnCopy(req interface{}) (interface{}, error) {
 		// Create a new NodePublishVolumeRequest and copy the original values
 		var inReq *csi.NodePublishVolumeRequest
 
-		newReq := &csi.NodePublishVolumeRequest{}
-		*newReq = *r
+		newReq := proto.Clone(r).(*csi.NodePublishVolumeRequest)
 
 		inReq = req.(*csi.NodePublishVolumeRequest)
 

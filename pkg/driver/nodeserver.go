@@ -28,6 +28,7 @@ import (
 // Implements Node Server csi.NodeServer
 type nodeServer struct {
 	*S3Driver
+	csi.UnimplementedNodeServer
 	Stats        utils.StatsUtils
 	NodeID       string
 	Mounter      mounter.NewMounterFactory
@@ -35,7 +36,7 @@ type nodeServer struct {
 }
 
 func (ns *nodeServer) NodeStageVolume(_ context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	klog.V(2).Infof("CSINodeServer-NodeStageVolume: Request %v", *req)
+	klog.V(2).Infof("CSINodeServer-NodeStageVolume: Request %+v", req)
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
@@ -51,7 +52,7 @@ func (ns *nodeServer) NodeStageVolume(_ context.Context, req *csi.NodeStageVolum
 }
 
 func (ns *nodeServer) NodeUnstageVolume(_ context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-	klog.V(2).Infof("CSINodeServer-NodeUnstageVolume: Request %v", *req)
+	klog.V(2).Infof("CSINodeServer-NodeUnstageVolume: Request %+v", req)
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
@@ -164,7 +165,7 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 }
 
 func (ns *nodeServer) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
-	klog.V(2).Infof("CSINodeServer-NodeUnpublishVolume: Request: %v", *req)
+	klog.V(2).Infof("CSINodeServer-NodeUnpublishVolume: Request: %+v", req)
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
@@ -188,7 +189,7 @@ func (ns *nodeServer) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpubl
 }
 
 func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-	klog.V(2).Infof("NodeGetVolumeStats: Request: %+v", *req)
+	klog.V(2).Infof("NodeGetVolumeStats: Request: %+v", req)
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
@@ -260,7 +261,7 @@ func (ns *nodeServer) NodeExpandVolume(_ context.Context, _ *csi.NodeExpandVolum
 }
 
 func (ns *nodeServer) NodeGetCapabilities(_ context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-	klog.V(2).Infof("NodeGetCapabilities: Request: %+v", *req)
+	klog.V(2).Infof("NodeGetCapabilities: Request: %+v", req)
 	var caps []*csi.NodeServiceCapability
 	for _, cap := range nodeServerCapabilities {
 		c := &csi.NodeServiceCapability{
@@ -276,7 +277,7 @@ func (ns *nodeServer) NodeGetCapabilities(_ context.Context, req *csi.NodeGetCap
 }
 
 func (ns *nodeServer) NodeGetInfo(_ context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
-	klog.V(3).Infof("NodeGetInfo: called with args %+v", *req)
+	klog.V(3).Infof("NodeGetInfo: called with args %+v", req)
 
 	nodeName := os.Getenv("KUBE_NODE_NAME")
 	if nodeName == "" {

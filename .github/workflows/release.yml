@@ -15,6 +15,9 @@ jobs:
         package_dir:
           - cos-csi-mounter
 
+    env:
+      IS_LATEST_RELEASE: 'true'
+
     steps:
     - name: Checkout Code
       uses: actions/checkout@v2
@@ -57,6 +60,7 @@ jobs:
         tag_name: v0.1.0-dev02
         name: v0.1.0-dev02
         body: CSR generated with SHA1 is not supported to get certs using Metadata.
+        prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
     
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
