@@ -57,10 +57,10 @@ jobs:
         files: |
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-latest.tar.gz
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-latest.tar.gz.sha256
-        tag_name: v0.0.0
-        name: v0.0.0
+        tag_name: v0.0.2
+        name: v0.0.2
         body: CSR generated with SHA1 is not supported to get certs using Metadata.
-        make_latest: ${{ env.IS_LATEST_RELEASE == 'true' }}
+        make_latest: false
     
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
