@@ -11,6 +11,7 @@ type FakeCOSSessionFactory struct {
 	FailCheckBucketAccess bool
 	FailCreateBucket      bool
 	FailDeleteBucket      bool
+	FailEnableVersioning  bool
 }
 
 type fakeCOSSession struct {
@@ -27,6 +28,13 @@ func (f *FakeCOSSessionFactory) NewObjectStorageSession(endpoint, region string,
 func (s *fakeCOSSession) CheckBucketAccess(bucket string) error {
 	if s.factory.FailCheckBucketAccess {
 		return errors.New("failed to check bucket access")
+	}
+	return nil
+}
+
+func (s *fakeCOSSession) EnableBucketVersioning(bucketName string) error {
+	if s.factory.FailEnableVersioning {
+		return errors.New("failed to enable bucket versioning")
 	}
 	return nil
 }

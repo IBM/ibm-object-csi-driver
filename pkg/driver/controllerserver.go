@@ -49,6 +49,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		kpRootKeyCrn       string
 		pvcName            string
 		pvcNamespace       string
+		versioningEnabled  bool
 	)
 	secretMapCustom := make(map[string]string)
 
@@ -165,6 +166,16 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		bucketName = secretMapCustom["bucketName"]
 	}
 
+	// Check for versioningEnabled parameter
+	versioningEnabled = false // Default value
+	if val, ok := secretMap["versioningEnabled"]; ok && strings.ToLower(val) == "true" {
+		versioningEnabled = true
+		klog.Infof("Versioning enabled via secret for volume: %s", volumeID)
+	} else if val, ok := params["versioningEnabled"]; ok && strings.ToLower(val) == "true" {
+		versioningEnabled = true
+		klog.Infof("Versioning enabled via storage class parameters for volume: %s", volumeID)
+	}
+
 	creds, err := getCredentials(secretMap)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
@@ -185,6 +196,13 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			params["userProvidedBucket"] = "false"
 			klog.Infof("Created bucket: %s", bucketName)
 		}
+		// Enable versioning for existing or newly created user-provided bucket
+		if versioningEnabled {
+			if err := sess.EnableBucketVersioning(bucketName); err != nil {
+				klog.Errorf("Failed to enable versioning for bucket: %s, error: %v", bucketName, err)
+				return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to enable versioning for bucket %s: %v", bucketName, err))
+			}
+		}
 		params["bucketName"] = bucketName
 	} else {
 		// Generate random temp bucket name based on volume id
@@ -197,6 +215,13 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		err = createBucket(sess, tempBucketName, kpRootKeyCrn)
 		if err != nil {
 			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", err, tempBucketName))
+		}
+		// Enable versioning for new temp bucket
+		if versioningEnabled {
+			if err := sess.EnableBucketVersioning(tempBucketName); err != nil {
+				klog.Errorf("Failed to enable versioning for temp bucket: %s, error: %v", tempBucketName, err)
+				return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to enable versioning for bucket %s: %v", tempBucketName, err))
+			}
 		}
 		klog.Infof("Created temp bucket: %s", tempBucketName)
 		params["userProvidedBucket"] = "false"
@@ -442,6 +467,7 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 		iamEndpoint        string
 		cosEndpoint        string
 		locationConstraint string
+		versioningEnabled  string
 	)
 
 	if bytesVal, ok := secret.Data["accessKey"]; ok {
@@ -480,6 +506,10 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 		locationConstraint = string(bytesVal)
 	}
 
+	if bytesVal, ok := secret.Data["versioningEnabled"]; ok {
+		versioningEnabled = string(bytesVal)
+	}
+
 	secretMapCustom["accessKey"] = accessKey
 	secretMapCustom["secretKey"] = secretKey
 	secretMapCustom["apiKey"] = apiKey
@@ -489,6 +519,7 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 	secretMapCustom["iamEndpoint"] = iamEndpoint
 	secretMapCustom["cosEndpoint"] = cosEndpoint
 	secretMapCustom["locationConstraint"] = locationConstraint
+	secretMapCustom["versioningEnabled"] = versioningEnabled
 
 	return secretMapCustom
 }

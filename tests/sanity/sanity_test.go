@@ -151,6 +151,10 @@ func (s *fakeObjectStorageSession) CheckBucketAccess(bucket string) error {
 	return nil
 }
 
+func (s *fakeObjectStorageSession) EnableBucketVersioning(bucketName string) error {
+	return nil
+}
+
 func (s *fakeObjectStorageSession) CheckObjectPathExistence(bucket, objectpath string) (bool, error) {
 	return true, nil
 }
