@@ -18,7 +18,7 @@ package driver
 
 import (
 	"errors"
-	"os"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -618,6 +618,7 @@ func TestNodeGetInfo(t *testing.T) {
 	testCases := []struct {
 		testCaseName     string
 		driverStatsUtils utils.StatsUtils
+		envVars          map[string]string
 		req              *csi.NodeGetInfoRequest
 		expectedResp     *csi.NodeGetInfoResponse
 		expectedErr      error
@@ -630,6 +631,9 @@ func TestNodeGetInfo(t *testing.T) {
 					return "test-region", "test-zone", nil
 				},
 			}),
+			envVars: map[string]string{
+				"KUBE_NODE_NAME": "testNode",
+			},
 			expectedResp: &csi.NodeGetInfoResponse{
 				NodeId:            testNodeID,
 				MaxVolumesPerNode: constants.DefaultVolumesPerNode,
@@ -642,12 +646,53 @@ func TestNodeGetInfo(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
+		{
+			testCaseName: "Positive: Custom max volumes per node",
+			req:          &csi.NodeGetInfoRequest{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetRegionAndZoneFn: func(nodeName string) (string, string, error) {
+					return "test-region", "test-zone", nil
+				},
+			}),
+			envVars: map[string]string{
+				"KUBE_NODE_NAME":       "testNode",
+				"MAX_VOLUMES_PER_NODE": "4",
+			},
+			expectedResp: &csi.NodeGetInfoResponse{
+				NodeId:            testNodeID,
+				MaxVolumesPerNode: 4,
+				AccessibleTopology: &csi.Topology{
+					Segments: map[string]string{
+						constants.NodeRegionLabel: "test-region",
+						constants.NodeZoneLabel:   "test-zone",
+					},
+				},
+			},
+			expectedErr: nil,
+		},
+		{
+			testCaseName: "Negative: invalid custom max volumes per node",
+			req:          &csi.NodeGetInfoRequest{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetRegionAndZoneFn: func(nodeName string) (string, string, error) {
+					return "test-region", "test-zone", nil
+				},
+			}),
+			envVars: map[string]string{
+				"KUBE_NODE_NAME":       "testNode",
+				"MAX_VOLUMES_PER_NODE": "foobar",
+			},
+			expectedResp: nil,
+			expectedErr:  fmt.Errorf("MAX_VOLUMES_PER_NODE does not contain valid number"),
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		_ = os.Setenv("KUBE_NODE_NAME", "testNode")
+		for k, v := range tc.envVars {
+			t.Setenv(k, v)
+		}
 
 		nodeServer := nodeServer{
 			NodeID: testNodeID,
