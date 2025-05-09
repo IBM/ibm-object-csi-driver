@@ -1,5 +1,5 @@
 NAME := cos-csi-mounter
-APP_VERSION := 0.0.0
+APP_VERSION := 0.0.1
 BUILD_DIR := $(NAME)-$(APP_VERSION)
 BIN_DIR := bin
 
@@ -8,7 +8,7 @@ MAINTAINER := "IKS Storage"
 DEB_ARCH := all
 DESCRIPTION := "IBM cos-csi-mounter service"
 
-INSTALL_TAR_FILE := "$(NAME)-latest.tar.gz"
+INSTALL_TAR_FILE := "$(NAME)-$(APP_VERSION).tar.gz"
 CHECKSUM_FILE := "$(INSTALL_TAR_FILE).sha256"
 
 test:
@@ -50,8 +50,8 @@ tar-package:
 tar-package:
 	mkdir packages
 	cp ${NAME}-* packages/
-	cd packages && tar -czvf  ../$(INSTALL_TAR_FILE)  *
-	sha256sum ./$(INSTALL_TAR_FILE) > $(CHECKSUM_FILE)
+	cd packages && tar -czvf $(INSTALL_TAR_FILE) *
+	sha256sum $(INSTALL_TAR_FILE) > $(CHECKSUM_FILE)
 	@printf "Production - Install package created ok: $(INSTALL_TAR_FILE)\n"
 
 clean:
