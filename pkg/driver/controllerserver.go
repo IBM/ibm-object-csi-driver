@@ -166,13 +166,13 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	}
 
 	// Check for versioningEnabled parameter
-	if val, ok := params["versioningEnabled"]; ok && strings.ToLower(val) == "true" {
-		versioningEnabled = true
-		klog.Infof("Versioning enabled for volume: %s", volumeID)
-	}
+	versioningEnabled = false // Default value
 	if val, ok := secretMap["versioningEnabled"]; ok && strings.ToLower(val) == "true" {
 		versioningEnabled = true
 		klog.Infof("Versioning enabled via secret for volume: %s", volumeID)
+	} else if val, ok := params["versioningEnabled"]; ok && strings.ToLower(val) == "true" {
+		versioningEnabled = true
+		klog.Infof("Versioning enabled via storage class parameters for volume: %s", volumeID)
 	}
 
 	creds, err := getCredentials(secretMap)
@@ -466,6 +466,7 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 		iamEndpoint        string
 		cosEndpoint        string
 		locationConstraint string
+		versioningEnabled  string
 	)
 
 	if bytesVal, ok := secret.Data["accessKey"]; ok {
@@ -504,6 +505,10 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 		locationConstraint = string(bytesVal)
 	}
 
+	if bytesVal, ok := secret.Data["versioningEnabled"]; ok {
+		versioningEnabled = string(bytesVal)
+	}
+
 	secretMapCustom["accessKey"] = accessKey
 	secretMapCustom["secretKey"] = secretKey
 	secretMapCustom["apiKey"] = apiKey
@@ -513,6 +518,7 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 	secretMapCustom["iamEndpoint"] = iamEndpoint
 	secretMapCustom["cosEndpoint"] = cosEndpoint
 	secretMapCustom["locationConstraint"] = locationConstraint
+	secretMapCustom["versioningEnabled"] = versioningEnabled
 
 	return secretMapCustom
 }
