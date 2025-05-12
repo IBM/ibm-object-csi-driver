@@ -161,17 +161,23 @@ func Test_CreateBucket_Positive(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func Test_EnableBucketVersioning_Positive(t *testing.T) {
+func Test_SetBucketVersioning_True_Positive(t *testing.T) {
 	sess := getSession(&fakeS3API{})
-	err := sess.EnableBucketVersioning(testBucket)
+	err := sess.SetBucketVersioning(testBucket, true)
 	assert.NoError(t, err)
 }
 
-func Test_EnableBucketVersioning_Error(t *testing.T) {
+func Test_SetBucketVersioning_False_Positive(t *testing.T) {
+	sess := getSession(&fakeS3API{})
+	err := sess.SetBucketVersioning(testBucket, false)
+	assert.NoError(t, err)
+}
+
+func Test_SetBucketVersioning_Error(t *testing.T) {
 	sess := getSession(&fakeS3API{ErrPutBucketVersioning: errFoo})
-	err := sess.EnableBucketVersioning(testBucket)
+	err := sess.SetBucketVersioning(testBucket, true)
 	if assert.Error(t, err) {
-		assert.EqualError(t, err, "failed to enable versioning for bucket 'test-bucket': foo")
+		assert.EqualError(t, err, "failed to set versioning to true for bucket 'test-bucket': foo")
 	}
 }
 

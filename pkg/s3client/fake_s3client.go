@@ -32,9 +32,9 @@ func (s *fakeCOSSession) CheckBucketAccess(bucket string) error {
 	return nil
 }
 
-func (s *fakeCOSSession) EnableBucketVersioning(bucketName string) error {
+func (s *fakeCOSSession) SetBucketVersioning(bucket string, enable bool) error {
 	if s.factory.FailEnableVersioning {
-		return errors.New("failed to enable bucket versioning")
+		return errors.New("failed to set bucket versioning")
 	}
 	return nil
 }

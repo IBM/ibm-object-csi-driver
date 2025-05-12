@@ -62,7 +62,7 @@ type ObjectStorageSession interface {
 	// DeleteBucket methods deletes a bucket (with all of its objects)
 	DeleteBucket(bucket string) error
 
-	EnableBucketVersioning(bucket string) error
+	SetBucketVersioning(bucket string, enable bool) error
 }
 
 // COSSessionFactory represents a COS (S3) session factory
@@ -185,19 +185,23 @@ func (s *COSSession) DeleteBucket(bucket string) error {
 	return err
 }
 
-func (s *COSSession) EnableBucketVersioning(bucket string) error {
-	s.logger.Info("Enabling versioning for bucket", zap.String("bucket", bucket))
+func (s *COSSession) SetBucketVersioning(bucket string, enable bool) error {
+	status := "Suspended"
+	if enable {
+		status = "Enabled"
+	}
+	s.logger.Info("Setting versioning for bucket", zap.String("bucket", bucket), zap.Bool("enable", enable))
 	_, err := s.svc.PutBucketVersioning(&s3.PutBucketVersioningInput{
 		Bucket: aws.String(bucket),
 		VersioningConfiguration: &s3.VersioningConfiguration{
-			Status: aws.String("Enabled"),
+			Status: aws.String(status),
 		},
 	})
 	if err != nil {
-		s.logger.Error("Failed to enable versioning", zap.String("bucket", bucket), zap.Error(err))
-		return fmt.Errorf("failed to enable versioning for bucket '%s': %v", bucket, err)
+		s.logger.Error("Failed to set versioning", zap.String("bucket", bucket), zap.Bool("enable", enable), zap.Error(err))
+		return fmt.Errorf("failed to set versioning to %v for bucket '%s': %v", enable, bucket, err)
 	}
-	s.logger.Info("Versioning enabled successfully for bucket", zap.String("bucket", bucket))
+	s.logger.Info("Versioning set successfully for bucket", zap.String("bucket", bucket), zap.Bool("enable", enable))
 	return nil
 }
 
