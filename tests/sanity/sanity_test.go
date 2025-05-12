@@ -151,7 +151,8 @@ func (s *fakeObjectStorageSession) CheckBucketAccess(bucket string) error {
 	return nil
 }
 
-func (s *fakeObjectStorageSession) EnableBucketVersioning(bucketName string) error {
+func (s *fakeObjectStorageSession) SetBucketVersioning(bucketName string, enable bool) error {
+	s.logger.Info(fmt.Sprintf("Fake SetBucketVersioning called for bucket %s with enable=%t", bucketName, enable))
 	return nil
 }
 
