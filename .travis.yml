@@ -2,7 +2,7 @@
 dist: bionic
 language: go
 go:
-  - 1.24.1
+  - 1.24.3
 
 group: bluezone
 
