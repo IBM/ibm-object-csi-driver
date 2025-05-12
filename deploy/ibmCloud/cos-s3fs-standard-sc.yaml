@@ -7,18 +7,17 @@ metadata:
     ibm.cos.storageclass/tier: standard
 provisioner: cos.s3.csi.ibm.io
 mountOptions:
-  - "multipart_size=62"
-  - "max_dirty_data=51200"
-  - "parallel_count=8"
-  - "max_stat_cache_size=100000"
-  - "retries=5"
-  - "kernel_cache"
+    - "multipart_size=62"
+    - "max_dirty_data=51200"
+    - "parallel_count=8"
+    - "max_stat_cache_size=100000"
+    - "retries=5"
+    - "kernel_cache"
 parameters:
   mounter: "s3fs"
   client: "awss3"
   cosEndpoint: "https://s3.direct.us-west.cloud-object-storage.appdomain.cloud"
   locationConstraint: "us-west-standard"
-  versioningEnabled: "true"  
   csi.storage.k8s.io/node-publish-secret-name: ${pvc.annotations['cos.csi.driver/secret']}
   csi.storage.k8s.io/node-publish-secret-namespace: ${pvc.namespace}
 reclaimPolicy: Delete
