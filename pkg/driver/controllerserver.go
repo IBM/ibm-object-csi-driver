@@ -166,14 +166,6 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	}
 
 	// Check for BucketVersioning parameter
-	// BucketVersioning = false // Default value
-	// if val, ok := secretMap["BucketVersioning"]; ok && strings.ToLower(val) == "true" {
-	// 	BucketVersioning = true
-	// 	klog.Infof("Versioning enabled via secret for volume: %s", volumeID)
-	// } else if val, ok := params["BucketVersioning"]; ok && strings.ToLower(val) == "true" {
-	// 	BucketVersioning = true
-	// 	klog.Infof("Versioning enabled via storage class parameters for volume: %s", volumeID)
-	// }
 	if val, ok := secretMap["BucketVersioning"]; ok && val != "" {
 		enable := strings.ToLower(strings.TrimSpace(val))
 		if enable != "true" && enable != "false" {
@@ -211,13 +203,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			params["userProvidedBucket"] = "false"
 			klog.Infof("Created bucket: %s", bucketName)
 		}
-		// Enable versioning for existing or newly created user-provided bucket
-		// if BucketVersioning {
-		// 	if err := sess.SetBucketVersioning(bucketName); err != nil {
-		// 		klog.Errorf("Failed to enable versioning for bucket: %s, error: %v", bucketName, err)
-		// 		return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to enable versioning for bucket %s: %v", bucketName, err))
-		// 	}
-		// }
+
 		if BucketVersioning != "" {
 			enable := BucketVersioning == "true"
 			if err := sess.SetBucketVersioning(bucketName, enable); err != nil {
