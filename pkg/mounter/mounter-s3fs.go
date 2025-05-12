@@ -15,6 +15,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path"
 	"strings"
 
@@ -174,6 +175,33 @@ var writePassWrap = func(pwFileName string, pwFileContent string) error {
 
 func (s3fs *S3fsMounter) Unmount(target string) error {
 	klog.Info("-S3FSMounter Unmount-")
+	klog.Infof("Unmount args:\n\ttarget: <%s>", target)
+
+	var metaRoot string
+	if mountWorker {
+		metaRoot = constants.WorkerNodeMounterPath
+	} else {
+		metaRoot = "/var/lib/ibmc-s3fs"
+	}
+
+	var pathExist bool
+	var err error
+
+	metaPath := path.Join(metaRoot, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
+
+	if pathExist, err = checkPath(metaPath); err != nil {
+		klog.Errorf("S3FSMounter Unmount: Cannot stat directory %s: %v", metaPath, err)
+		return fmt.Errorf("S3FSMounter Unmount: Cannot stat directory %s: %v", metaPath, err)
+	}
+
+	if pathExist {
+		passwdFile := path.Join(metaPath, passFile)
+		err = os.Remove(passwdFile)
+		if err != nil {
+			klog.Errorf("S3FSMounter Unmount: Cannot remove password file %s: %v", metaPath, err)
+			return fmt.Errorf("S3FSMounter Unmount: Cannot remove password file %s: %v", metaPath, err)
+		}
+	}
 
 	if mountWorker {
 		klog.Info("Worker Unmounting...")
