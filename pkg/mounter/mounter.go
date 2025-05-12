@@ -3,7 +3,6 @@ package mounter
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -13,6 +12,8 @@ import (
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
 )
 
@@ -160,7 +161,33 @@ func createCOSCSIMounterRequest(payload string, url string) (string, error) {
 	responseBody := string(body)
 
 	if response.StatusCode != http.StatusOK {
-		return responseBody, fmt.Errorf("response from cos-csi-mounter -> Exit Status Code: %s ,ResponseCode: %v", responseBody, response.StatusCode)
+		klog.Errorf("response from cos-csi-mounter -> Exit Status Code: %s ,ResponseCode: %v", responseBody, response.StatusCode)
+		return responseBody, fetchGRPCReturnCode(response.StatusCode)
 	}
 	return "", nil
+}
+
+func fetchGRPCReturnCode(code int) error {
+	switch code {
+	case http.StatusBadRequest:
+		return status.Error(codes.InvalidArgument, "Invalid Argument")
+	case http.StatusNotFound:
+		return status.Error(codes.NotFound, "Not Found")
+	case http.StatusConflict:
+		return status.Error(codes.AlreadyExists, "Already Exists")
+	case http.StatusForbidden:
+		return status.Error(codes.PermissionDenied, "Permission Denied")
+	case http.StatusTooManyRequests:
+		return status.Error(codes.ResourceExhausted, "Resource Exhausted")
+	case http.StatusNotImplemented:
+		return status.Error(codes.Unimplemented, "Unimplemented")
+	case http.StatusInternalServerError:
+		return status.Error(codes.Internal, "Internal")
+	case http.StatusServiceUnavailable:
+		return status.Error(codes.Unavailable, "Unavailable")
+	case http.StatusUnauthorized:
+		return status.Error(codes.Unauthenticated, "Unauthenticated")
+	default:
+		return status.Error(codes.Unknown, "Unknown")
+	}
 }
