@@ -48,7 +48,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		kpRootKeyCrn       string
 		pvcName            string
 		pvcNamespace       string
-		BucketVersioning   string
+		bucketVersioning   string
 	)
 	secretMapCustom := make(map[string]string)
 
@@ -165,22 +165,22 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		bucketName = secretMapCustom["bucketName"]
 	}
 
-	// Check for BucketVersioning parameter
-	if val, ok := secretMap["BucketVersioning"]; ok && val != "" {
+	// Check for bucketVersioning parameter
+	if val, ok := secretMap["bucketVersioning"]; ok && val != "" {
 		enable := strings.ToLower(strings.TrimSpace(val))
 		if enable != "true" && enable != "false" {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Invalid BucketVersioning value in secret: %s. Must be 'true' or 'false'", val))
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Invalid bucketVersioning value in secret: %s. Must be 'true' or 'false'", val))
 		}
-		BucketVersioning = enable
-		klog.Infof("BucketVersioning set via secret: %s", BucketVersioning)
-	} else if val, ok := params["BucketVersioning"]; ok && val != "" {
+		bucketVersioning = enable
+		klog.Infof("BucketVersioning value that will be set via secret: %s", bucketVersioning)
+	} else if val, ok := params["bucketVersioning"]; ok && val != "" {
 		enable := strings.ToLower(strings.TrimSpace(val))
 		if enable != "true" && enable != "false" {
 			return nil, status.Error(codes.InvalidArgument,
-				fmt.Sprintf("Invalid BucketVersioning value in storage class: %s. Must be 'true' or 'false'", val))
+				fmt.Sprintf("Invalid bucketVersioning value in storage class: %s. Must be 'true' or 'false'", val))
 		}
-		BucketVersioning = enable
-		klog.Infof("BucketVersioning set via storage class: %s", BucketVersioning)
+		bucketVersioning = enable
+		klog.Infof("BucketVersioning value that will be set via storage class params: %s", bucketVersioning)
 	}
 
 	creds, err := getCredentials(secretMap)
@@ -204,8 +204,8 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			klog.Infof("Created bucket: %s", bucketName)
 		}
 
-		if BucketVersioning != "" {
-			enable := BucketVersioning == "true"
+		if bucketVersioning != "" {
+			enable := bucketVersioning == "true"
 			if err := sess.SetBucketVersioning(bucketName, enable); err != nil {
 				klog.Errorf("Failed to set versioning for bucket: %s, error: %v", bucketName, err)
 				return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to set versioning for bucket %s: %v", bucketName, err))
@@ -227,8 +227,8 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", err, tempBucketName))
 		}
 		// Enable versioning for new temp bucket
-		if BucketVersioning != "" {
-			enable := BucketVersioning == "true"
+		if bucketVersioning != "" {
+			enable := bucketVersioning == "true"
 			if err := sess.SetBucketVersioning(tempBucketName, enable); err != nil {
 				klog.Errorf("Failed to set versioning for temp bucket: %s, error: %v", tempBucketName, err)
 				return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to set versioning for bucket %s: %v", tempBucketName, err))
@@ -479,7 +479,7 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 		iamEndpoint        string
 		cosEndpoint        string
 		locationConstraint string
-		BucketVersioning   string
+		bucketVersioning   string
 	)
 
 	if bytesVal, ok := secret.Data["accessKey"]; ok {
@@ -518,8 +518,8 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 		locationConstraint = string(bytesVal)
 	}
 
-	if bytesVal, ok := secret.Data["BucketVersioning"]; ok {
-		BucketVersioning = string(bytesVal)
+	if bytesVal, ok := secret.Data["bucketVersioning"]; ok {
+		bucketVersioning = string(bytesVal)
 	}
 
 	secretMapCustom["accessKey"] = accessKey
@@ -531,7 +531,7 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 	secretMapCustom["iamEndpoint"] = iamEndpoint
 	secretMapCustom["cosEndpoint"] = cosEndpoint
 	secretMapCustom["locationConstraint"] = locationConstraint
-	secretMapCustom["BucketVersioning"] = BucketVersioning
+	secretMapCustom["bucketVersioning"] = bucketVersioning
 
 	return secretMapCustom
 }
