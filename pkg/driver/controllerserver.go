@@ -49,6 +49,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		kpRootKeyCrn       string
 		pvcName            string
 		pvcNamespace       string
+		bucketVersioning   string
 	)
 	secretMapCustom := make(map[string]string)
 
@@ -165,6 +166,24 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		bucketName = secretMapCustom["bucketName"]
 	}
 
+	// Check for bucketVersioning parameter
+	if val, ok := secretMap["bucketVersioning"]; ok && val != "" {
+		enable := strings.ToLower(strings.TrimSpace(val))
+		if enable != "true" && enable != "false" {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Invalid bucketVersioning value in secret: %s. Must be 'true' or 'false'", val))
+		}
+		bucketVersioning = enable
+		klog.Infof("BucketVersioning value that will be set via secret: %s", bucketVersioning)
+	} else if val, ok := params["bucketVersioning"]; ok && val != "" {
+		enable := strings.ToLower(strings.TrimSpace(val))
+		if enable != "true" && enable != "false" {
+			return nil, status.Error(codes.InvalidArgument,
+				fmt.Sprintf("Invalid bucketVersioning value in storage class: %s. Must be 'true' or 'false'", val))
+		}
+		bucketVersioning = enable
+		klog.Infof("BucketVersioning value that will be set via storage class params: %s", bucketVersioning)
+	}
+
 	creds, err := getCredentials(secretMap)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
@@ -185,6 +204,16 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			params["userProvidedBucket"] = "false"
 			klog.Infof("Created bucket: %s", bucketName)
 		}
+
+		if bucketVersioning != "" {
+			enable := bucketVersioning == "true"
+			if err := sess.SetBucketVersioning(bucketName, enable); err != nil {
+				klog.Errorf("Failed to set versioning for bucket: %s, error: %v", bucketName, err)
+				return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to set versioning for bucket %s: %v", bucketName, err))
+			}
+			klog.Infof("Bucket versioning set to %t for bucket %s", enable, bucketName)
+		}
+
 		params["bucketName"] = bucketName
 	} else {
 		// Generate random temp bucket name based on volume id
@@ -197,6 +226,15 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		err = createBucket(sess, tempBucketName, kpRootKeyCrn)
 		if err != nil {
 			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", err, tempBucketName))
+		}
+		// Enable versioning for new temp bucket
+		if bucketVersioning != "" {
+			enable := bucketVersioning == "true"
+			if err := sess.SetBucketVersioning(tempBucketName, enable); err != nil {
+				klog.Errorf("Failed to set versioning for temp bucket: %s, error: %v", tempBucketName, err)
+				return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to set versioning for bucket %s: %v", tempBucketName, err))
+			}
+			klog.Infof("Bucket versioning set to %t for temp bucket %s", enable, tempBucketName)
 		}
 		klog.Infof("Created temp bucket: %s", tempBucketName)
 		params["userProvidedBucket"] = "false"
@@ -442,6 +480,7 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 		iamEndpoint        string
 		cosEndpoint        string
 		locationConstraint string
+		bucketVersioning   string
 	)
 
 	if bytesVal, ok := secret.Data["accessKey"]; ok {
@@ -480,6 +519,10 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 		locationConstraint = string(bytesVal)
 	}
 
+	if bytesVal, ok := secret.Data["bucketVersioning"]; ok {
+		bucketVersioning = string(bytesVal)
+	}
+
 	secretMapCustom["accessKey"] = accessKey
 	secretMapCustom["secretKey"] = secretKey
 	secretMapCustom["apiKey"] = apiKey
@@ -489,6 +532,7 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 	secretMapCustom["iamEndpoint"] = iamEndpoint
 	secretMapCustom["cosEndpoint"] = cosEndpoint
 	secretMapCustom["locationConstraint"] = locationConstraint
+	secretMapCustom["bucketVersioning"] = bucketVersioning
 
 	return secretMapCustom
 }

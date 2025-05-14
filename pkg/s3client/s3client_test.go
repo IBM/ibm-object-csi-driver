@@ -12,13 +12,14 @@ import (
 )
 
 type fakeS3API struct {
-	ErrHeadBucket    error
-	ErrCreateBucket  error
-	ErrListObjects   error
-	ErrListObjectsV2 error
-	ErrDeleteObject  error
-	ErrDeleteBucket  error
-	ObjectPath       string
+	ErrHeadBucket          error
+	ErrCreateBucket        error
+	ErrListObjects         error
+	ErrListObjectsV2       error
+	ErrDeleteObject        error
+	ErrDeleteBucket        error
+	ObjectPath             string
+	ErrPutBucketVersioning error
 }
 
 const (
@@ -47,6 +48,10 @@ func (a *fakeS3API) HeadBucket(input *s3.HeadBucketInput) (*s3.HeadBucketOutput,
 
 func (a *fakeS3API) CreateBucket(input *s3.CreateBucketInput) (*s3.CreateBucketOutput, error) {
 	return nil, a.ErrCreateBucket
+}
+
+func (a *fakeS3API) PutBucketVersioning(input *s3.PutBucketVersioningInput) (*s3.PutBucketVersioningOutput, error) {
+	return &s3.PutBucketVersioningOutput{}, a.ErrPutBucketVersioning
 }
 
 func (a *fakeS3API) ListObjects(input *s3.ListObjectsInput) (*s3.ListObjectsOutput, error) {
@@ -154,6 +159,26 @@ func Test_CreateBucket_Positive(t *testing.T) {
 	sess := getSession(&fakeS3API{})
 	_, err := sess.CreateBucket(testBucket, testKpRootKeyCrn)
 	assert.NoError(t, err)
+}
+
+func Test_SetBucketVersioning_True_Positive(t *testing.T) {
+	sess := getSession(&fakeS3API{})
+	err := sess.SetBucketVersioning(testBucket, true)
+	assert.NoError(t, err)
+}
+
+func Test_SetBucketVersioning_False_Positive(t *testing.T) {
+	sess := getSession(&fakeS3API{})
+	err := sess.SetBucketVersioning(testBucket, false)
+	assert.NoError(t, err)
+}
+
+func Test_SetBucketVersioning_Error(t *testing.T) {
+	sess := getSession(&fakeS3API{ErrPutBucketVersioning: errFoo})
+	err := sess.SetBucketVersioning(testBucket, true)
+	if assert.Error(t, err) {
+		assert.EqualError(t, err, "failed to set versioning to true for bucket 'test-bucket': foo")
+	}
 }
 
 func Test_DeleteBucket_BucketAlreadyDeleted_Positive(t *testing.T) {
