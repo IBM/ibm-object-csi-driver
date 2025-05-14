@@ -174,7 +174,7 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 
 	var configPath string
 	if mountWorker {
-		configPath = constants.WorkerNodeMounterPath
+		configPath = constants.MounterConfigPathOnHost
 	} else {
 		configPath = "/root/.config/rclone"
 	}

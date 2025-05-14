@@ -27,7 +27,8 @@ const (
 	// NodeRegionLabel Region Label attached to node
 	NodeRegionLabel = "topology.kubernetes.io/region"
 
-	Timeout               = 3 * time.Minute
-	DefaultSocketPath     = "/tmp/mysocket.sock"
-	WorkerNodeMounterPath = "/var/lib/cos-csi"
+	Timeout                 = 3 * time.Minute
+	DefaultSocketPath       = "/tmp/mysocket.sock"
+	MounterConfigPathOnHost = "/var/lib/cos-csi"
+	MounterConfigPathOnPod  = "/var/lib/ibmc-s3fs"
 )

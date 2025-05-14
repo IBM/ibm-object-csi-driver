@@ -18,6 +18,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
@@ -104,9 +105,9 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 
 	var metaRoot string
 	if mountWorker {
-		metaRoot = constants.WorkerNodeMounterPath
+		metaRoot = constants.MounterConfigPathOnHost
 	} else {
-		metaRoot = "/var/lib/ibmc-s3fs"
+		metaRoot = constants.MounterConfigPathOnPod
 	}
 
 	var bucketName string
@@ -177,23 +178,6 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 	klog.Info("-S3FSMounter Unmount-")
 	klog.Infof("Unmount args:\n\ttarget: <%s>", target)
 
-	var metaRoot string
-	if mountWorker {
-		metaRoot = constants.WorkerNodeMounterPath
-	} else {
-		metaRoot = "/var/lib/ibmc-s3fs"
-	}
-
-	var pathExist bool
-	var err error
-
-	metaPath := path.Join(metaRoot, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
-
-	if pathExist, err = checkPath(metaPath); err != nil {
-		klog.Errorf("S3FSMounter Unmount: Cannot stat directory %s: %v", metaPath, err)
-		return fmt.Errorf("S3FSMounter Unmount: Cannot stat directory %s: %v", metaPath, err)
-	}
-
 	if mountWorker {
 		klog.Info("Worker Unmounting...")
 
@@ -205,31 +189,16 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 			return err
 		}
 
-		if pathExist {
-			passwdFile := path.Join(metaPath, passFile)
-			err = os.Remove(passwdFile)
-			if err != nil {
-				klog.Errorf("S3FSMounter Unmount: Cannot remove password file %s: %v", metaPath, err)
-				return fmt.Errorf("S3FSMounter Unmount: Cannot remove password file %s: %v", metaPath, err)
-			}
-		}
-
+		cleanupOfs3fsPasswordFile(target)
 		return nil
 	}
 	klog.Info("NodeServer Unmounting...")
-	err = s3fs.MounterUtils.FuseUnmount(target)
+	err := s3fs.MounterUtils.FuseUnmount(target)
 	if err != nil {
 		return err
 	}
 
-	if pathExist {
-		passwdFile := path.Join(metaPath, passFile)
-		err = os.Remove(passwdFile)
-		if err != nil {
-			klog.Errorf("S3FSMounter Unmount: Cannot remove password file %s: %v", metaPath, err)
-			return fmt.Errorf("S3FSMounter Unmount: Cannot remove password file %s: %v", metaPath, err)
-		}
-	}
+	cleanupOfs3fsPasswordFile(target)
 	return nil
 }
 
@@ -362,6 +331,40 @@ func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string
 	} else {
 		nodeServerOp = append(nodeServerOp, "-o", "default_acl=private")
 		workerNodeOp["default_acl"] = "private"
+	}
+	return
+}
+
+func cleanupOfs3fsPasswordFile(target string) {
+	var metaRoot string
+	if mountWorker {
+		metaRoot = constants.MounterConfigPathOnHost
+	} else {
+		metaRoot = constants.MounterConfigPathOnPod
+	}
+
+	metaPath := path.Join(metaRoot, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
+
+	for retry := 1; retry <= 3; retry++ {
+		_, err := os.Stat(metaPath)
+		if err == nil {
+			passwdFile := path.Join(metaPath, passFile)
+			err = os.Remove(passwdFile)
+			if err != nil {
+				klog.Errorf("S3FSMounter Unmount: Cannot remove password file %s: %v", metaPath, err)
+				time.Sleep(500 * time.Millisecond)
+				continue
+			}
+			return
+		} else {
+			if os.IsNotExist(err) {
+				klog.Infof("S3FSMounter Unmount: Password file does not exists%s", metaPath)
+				return
+			}
+			klog.Errorf("S3FSMounter Unmount: Error occurred while fetching path stats for password file")
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
 	}
 	return
 }
