@@ -107,7 +107,7 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	if mountWorker {
 		metaRoot = constants.MounterConfigPathOnHost
 	} else {
-		metaRoot = constants.MounterConfigPathOnPod
+		metaRoot = constants.MounterConfigPathOnPodS3fs
 	}
 
 	var bucketName string
@@ -340,7 +340,7 @@ func cleanupOfs3fsPasswordFile(target string) {
 	if mountWorker {
 		metaRoot = constants.MounterConfigPathOnHost
 	} else {
-		metaRoot = constants.MounterConfigPathOnPod
+		metaRoot = constants.MounterConfigPathOnPodS3fs
 	}
 
 	metaPath := path.Join(metaRoot, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
