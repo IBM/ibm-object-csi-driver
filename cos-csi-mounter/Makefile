@@ -21,7 +21,7 @@ ut-coverage: test
 	go mod tidy
 
 build-linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod mod -o ${BIN_DIR}/cos-csi-mounter-server -ldflags "-s -w" -a ./server/server.go
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod mod -o ${BIN_DIR}/cos-csi-mounter-server -ldflags "-s -w" -a ./server
 
 deb-build:
 deb-build: build-linux
