@@ -39,7 +39,11 @@ type S3fsMounter struct {
 	MounterUtils  utils.MounterUtils
 }
 
-const passFile = ".passwd-s3fs" // #nosec G101: not password
+const (
+	passFile   = ".passwd-s3fs" // #nosec G101: not password
+	maxRetries = 3
+	delay      = 500 * time.Millisecond
+)
 
 func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
 	klog.Info("-newS3fsMounter-")
@@ -189,7 +193,7 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 			return err
 		}
 
-		cleanupOfs3fsPasswordFile(target)
+		removeS3FSCredFile(target)
 		return nil
 	}
 	klog.Info("NodeServer Unmounting...")
@@ -198,7 +202,7 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 		return err
 	}
 
-	cleanupOfs3fsPasswordFile(target)
+	removeS3FSCredFile(target)
 	return nil
 }
 
@@ -335,7 +339,7 @@ func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string
 	return
 }
 
-func cleanupOfs3fsPasswordFile(target string) {
+func removeS3FSCredFile(target string) {
 	var metaRoot string
 	if mountWorker {
 		metaRoot = constants.MounterConfigPathOnHost
@@ -345,26 +349,28 @@ func cleanupOfs3fsPasswordFile(target string) {
 
 	metaPath := path.Join(metaRoot, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 
-	for retry := 1; retry <= 3; retry++ {
+	for retry := 1; retry <= maxRetries; retry++ {
 		_, err := os.Stat(metaPath)
-		if err == nil {
-			passwdFile := path.Join(metaPath, passFile)
-			err = os.Remove(passwdFile)
-			if err != nil {
-				klog.Errorf("S3FSMounter Unmount: Cannot remove password file %s: %v", metaPath, err)
-				time.Sleep(500 * time.Millisecond)
-				continue
-			}
-			return
-		} else {
+		if err != nil {
 			if os.IsNotExist(err) {
-				klog.Infof("S3FSMounter Unmount: Password file does not exists%s", metaPath)
+				klog.Infof("removeS3FSCredFile: Password file directory does not exist: %s", metaPath)
 				return
 			}
-			klog.Errorf("S3FSMounter Unmount: Error occurred while fetching path stats for password file")
-			time.Sleep(500 * time.Millisecond)
+			klog.Errorf("removeS3FSCredFile: Attempt %d - Failed to stat path %s: %v", retry, metaPath, err)
+			time.Sleep(delay)
 			continue
 		}
+		passwdFile := path.Join(metaPath, passFile)
+		err = os.Remove(passwdFile)
+		if err != nil {
+			klog.Errorf("removeS3FSCredFile: Attempt %d - Failed to remove password file %s: %v", retry, passwdFile, err)
+			time.Sleep(delay)
+			continue
+		}
+		klog.Infof("removeS3FSCredFile: Successfully removed password file: %s", passwdFile)
+		return
 	}
+
+	klog.Errorf("removeS3FSCredFile: Failed to remove password file after %d attempts", maxRetries)
 	return
 }
