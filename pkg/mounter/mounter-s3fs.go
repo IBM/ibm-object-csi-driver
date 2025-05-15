@@ -370,7 +370,5 @@ func removeS3FSCredFile(target string) {
 		klog.Infof("removeS3FSCredFile: Successfully removed password file: %s", passwdFile)
 		return
 	}
-
 	klog.Errorf("removeS3FSCredFile: Failed to remove password file after %d attempts", maxRetries)
-	return
 }
