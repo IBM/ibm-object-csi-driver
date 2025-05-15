@@ -1,5 +1,7 @@
 package constants
 
+import "time"
+
 const (
 	DefaultIAMEndPoint = "https://iam.cloud.ibm.com"
 
@@ -24,4 +26,10 @@ const (
 
 	// NodeRegionLabel Region Label attached to node
 	NodeRegionLabel = "topology.kubernetes.io/region"
+
+	Timeout                      = 3 * time.Minute
+	DefaultSocketPath            = "/tmp/mysocket.sock"
+	MounterConfigPathOnHost      = "/var/lib/cos-csi"
+	MounterConfigPathOnPodS3fs   = "/var/lib/ibmc-s3fs"
+	MounterConfigPathOnPodRclone = "/root/.config/rclone"
 )
