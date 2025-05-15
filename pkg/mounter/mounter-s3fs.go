@@ -15,8 +15,10 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
@@ -37,7 +39,11 @@ type S3fsMounter struct {
 	MounterUtils  utils.MounterUtils
 }
 
-const passFile = ".passwd-s3fs" // #nosec G101: not password
+const (
+	passFile   = ".passwd-s3fs" // #nosec G101: not password
+	maxRetries = 3
+	delay      = 500 * time.Millisecond
+)
 
 func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
 	klog.Info("-newS3fsMounter-")
@@ -103,9 +109,9 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 
 	var metaRoot string
 	if mountWorker {
-		metaRoot = constants.WorkerNodeMounterPath
+		metaRoot = constants.MounterConfigPathOnHost
 	} else {
-		metaRoot = "/var/lib/ibmc-s3fs"
+		metaRoot = constants.MounterConfigPathOnPodS3fs
 	}
 
 	var bucketName string
@@ -174,9 +180,13 @@ var writePassWrap = func(pwFileName string, pwFileContent string) error {
 
 func (s3fs *S3fsMounter) Unmount(target string) error {
 	klog.Info("-S3FSMounter Unmount-")
+	klog.Infof("Unmount args:\n\ttarget: <%s>", target)
+
+	var metaRoot string
 
 	if mountWorker {
 		klog.Info("Worker Unmounting...")
+		metaRoot = constants.MounterConfigPathOnHost
 
 		payload := fmt.Sprintf(`{"path":"%s"}`, target)
 
@@ -185,10 +195,20 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 		if err != nil {
 			return err
 		}
+
+		removeS3FSCredFile(metaRoot, target)
 		return nil
 	}
 	klog.Info("NodeServer Unmounting...")
-	return s3fs.MounterUtils.FuseUnmount(target)
+	metaRoot = constants.MounterConfigPathOnPodS3fs
+
+	err := s3fs.MounterUtils.FuseUnmount(target)
+	if err != nil {
+		return err
+	}
+
+	removeS3FSCredFile(metaRoot, target)
+	return nil
 }
 
 func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string) []string {
@@ -322,4 +342,32 @@ func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string
 		workerNodeOp["default_acl"] = "private"
 	}
 	return
+}
+
+func removeS3FSCredFile(credDir, target string) {
+
+	metaPath := path.Join(credDir, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
+
+	for retry := 1; retry <= maxRetries; retry++ {
+		_, err := os.Stat(metaPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				klog.Infof("removeS3FSCredFile: Password file directory does not exist: %s", metaPath)
+				return
+			}
+			klog.Errorf("removeS3FSCredFile: Attempt %d - Failed to stat path %s: %v", retry, metaPath, err)
+			time.Sleep(delay)
+			continue
+		}
+		passwdFile := path.Join(metaPath, passFile)
+		err = os.Remove(passwdFile)
+		if err != nil {
+			klog.Errorf("removeS3FSCredFile: Attempt %d - Failed to remove password file %s: %v", retry, passwdFile, err)
+			time.Sleep(delay)
+			continue
+		}
+		klog.Infof("removeS3FSCredFile: Successfully removed password file: %s", passwdFile)
+		return
+	}
+	klog.Errorf("removeS3FSCredFile: Failed to remove password file after %d attempts", maxRetries)
 }
