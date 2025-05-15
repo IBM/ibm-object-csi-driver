@@ -182,8 +182,11 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 	klog.Info("-S3FSMounter Unmount-")
 	klog.Infof("Unmount args:\n\ttarget: <%s>", target)
 
+	var metaRoot string
+
 	if mountWorker {
 		klog.Info("Worker Unmounting...")
+		metaRoot = constants.MounterConfigPathOnHost
 
 		payload := fmt.Sprintf(`{"path":"%s"}`, target)
 
@@ -193,16 +196,18 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 			return err
 		}
 
-		removeS3FSCredFile(target)
+		removeS3FSCredFile(metaRoot, target)
 		return nil
 	}
 	klog.Info("NodeServer Unmounting...")
+	metaRoot = constants.MounterConfigPathOnPodS3fs
+
 	err := s3fs.MounterUtils.FuseUnmount(target)
 	if err != nil {
 		return err
 	}
 
-	removeS3FSCredFile(target)
+	removeS3FSCredFile(metaRoot, target)
 	return nil
 }
 
@@ -339,15 +344,9 @@ func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string
 	return
 }
 
-func removeS3FSCredFile(target string) {
-	var metaRoot string
-	if mountWorker {
-		metaRoot = constants.MounterConfigPathOnHost
-	} else {
-		metaRoot = constants.MounterConfigPathOnPodS3fs
-	}
+func removeS3FSCredFile(credDir, target string) {
 
-	metaPath := path.Join(metaRoot, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
+	metaPath := path.Join(credDir, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 
 	for retry := 1; retry <= maxRetries; retry++ {
 		_, err := os.Stat(metaPath)
