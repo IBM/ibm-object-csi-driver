@@ -345,7 +345,6 @@ func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string
 }
 
 func removeS3FSCredFile(credDir, target string) {
-
 	metaPath := path.Join(credDir, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 
 	for retry := 1; retry <= maxRetries; retry++ {
