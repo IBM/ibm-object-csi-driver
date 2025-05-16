@@ -17,7 +17,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var mountWorker = true
+var mountWorker = false
 
 type Mounter interface {
 	Mount(source string, target string) error
