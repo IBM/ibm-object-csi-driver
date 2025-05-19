@@ -31,7 +31,7 @@ func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) e
 	klog.Infof("FuseMount params:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%s>", path, comm, args)
 	out, err := command(comm, args...).CombinedOutput()
 	if err != nil {
-		if err1 := waitForMount(path, 10*time.Second); err1 == nil { // check if bucket already got mounted
+		if mounted, err1 := isMountpoint(path); err1 == nil && mounted { // check if bucket already got mounted
 			klog.Infof("bucket is already mounted using '%s' mounter", comm)
 			return nil
 		}
@@ -84,24 +84,26 @@ func isMountpoint(pathname string) (bool, error) {
 	klog.Infof("Checking if path is mountpoint: Pathname - %s", pathname)
 
 	out, err := exec.Command("mountpoint", pathname).CombinedOutput()
-	outStr := strings.TrimSpace(string(out))
-
+	outStr := strings.ToLower(strings.TrimSpace(string(out)))
+	if err != nil {
+		klog.Errorf("Failed to check mountpoint for path '%s', error: %v, output: %s", pathname, err, string(out))
+		return false, fmt.Errorf("Failed to check mountpoint for path '%s', error: %v, output: %s", pathname, err, string(out))
+	}
 	if strings.HasSuffix(outStr, "is a mountpoint") {
 		klog.Infof("Path is a mountpoint: pathname - %s", pathname)
 		return true, nil
 	}
 
 	if strings.HasSuffix(outStr, "is not a mountpoint") {
-		klog.Infof("Path is NOT a mountpoint:Pathname - %s", pathname)
+		klog.Infof("Path is NOT a mountpoint: pathname - %s", pathname)
 		return false, nil
 	}
 
-	if strings.HasSuffix(outStr, "Transport endpoint is not connected") {
+	if strings.HasSuffix(outStr, "transport endpoint is not connected") {
 		return true, nil
 	}
 
-	klog.Errorf("Cannot parse mountpoint result: %v, output: %s", err, outStr)
-	return false, fmt.Errorf("cannot parse mountpoint result: %s", outStr)
+	return false, nil
 }
 
 func waitForMount(path string, timeout time.Duration) error {
