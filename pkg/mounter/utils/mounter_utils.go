@@ -27,20 +27,15 @@ type MounterOptsUtils struct {
 }
 
 func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) error {
-	klog.Info("-fuseMount-")
-	klog.Infof("fuseMount args:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%s>", path, comm, args)
-	cmd := command(comm, args...)
-	err := cmd.Start()
-
+	klog.Info("-FuseMount-")
+	klog.Infof("FuseMount params:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%s>", path, comm, args)
+	out, err := command(comm, args...).CombinedOutput()
 	if err != nil {
-		klog.Errorf("fuseMount: cmd start failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
-		return fmt.Errorf("fuseMount: cmd start failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
-	}
-	err = cmd.Wait()
-	if err != nil {
-		// Handle error
-		klog.Errorf("fuseMount: cmd wait failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
-		return fmt.Errorf("fuseMount: cmd wait failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+		if err1 := waitForMount(path, 10*time.Second); err1 == nil { // check if bucket already got mounted
+			return nil
+		}
+		klog.Errorf("FuseMount: command execution failed: <%s>\nargs: <%s>\nerror: <%v>\noutput: <%v>", comm, args, err, string(out))
+		return fmt.Errorf("'%s' mount failed: <%v>", comm, string(out))
 	}
 
 	return waitForMount(path, 10*time.Second)
@@ -110,11 +105,12 @@ func isMountpoint(pathname string) (bool, error) {
 
 func waitForMount(path string, timeout time.Duration) error {
 	var elapsed time.Duration
-	var interval = 10 * time.Millisecond
+	var interval = 500 * time.Millisecond
 	for {
 		out, err := exec.Command("mountpoint", path).CombinedOutput()
 		outStr := strings.TrimSpace(string(out))
 		if err != nil {
+			klog.Errorf("Failed to check mountpoint for path '%s', error: %v", path, outStr)
 			return err
 		}
 		if strings.HasSuffix(outStr, "is a mountpoint") {
