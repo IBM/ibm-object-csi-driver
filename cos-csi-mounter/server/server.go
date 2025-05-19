@@ -127,7 +127,7 @@ func handleCosMount() gin.HandlerFunc {
 		err = utils.FuseMount(request.Path, request.Mounter, args)
 		if err != nil {
 			logger.Error("mount failed: ", zap.Error(err))
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("mount failed: %v", err)})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("mount failed: %v", err)})
 			return
 		}
 
@@ -154,7 +154,7 @@ func handleCosUnmount() gin.HandlerFunc {
 		err := utils.FuseUnmount(request.Path)
 		if err != nil {
 			logger.Error("unmount failed: ", zap.Error(err))
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("unmount failed :%v", err)})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("unmount failed :%v", err)})
 			return
 		}
 
