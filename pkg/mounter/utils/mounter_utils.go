@@ -87,7 +87,7 @@ func isMountpoint(pathname string) (bool, error) {
 	outStr := strings.ToLower(strings.TrimSpace(string(out)))
 	if err != nil {
 		klog.Errorf("Failed to check mountpoint for path '%s', error: %v, output: %s", pathname, err, string(out))
-		return false, fmt.Errorf("Failed to check mountpoint for path '%s', error: %v, output: %s", pathname, err, string(out))
+		return false, fmt.Errorf("failed to check mountpoint for path '%s', error: %v, output: %s", pathname, err, string(out))
 	}
 	if strings.HasSuffix(outStr, "is a mountpoint") {
 		klog.Infof("Path is a mountpoint: pathname - %s", pathname)
