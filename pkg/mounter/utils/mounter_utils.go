@@ -158,8 +158,8 @@ func getCmdLine(pid int) (string, error) {
 }
 
 func waitForProcess(p *os.Process, backoff int) error {
-	//totally it waits 30 seconds before force killing the process
-	if backoff == 60 {
+	// totally it waits 60 seconds before force killing the process
+	if backoff == 120 {
 		return ErrTimeoutWaitProcess
 	}
 	cmdLine, err := getCmdLine(p.Pid)
@@ -178,7 +178,7 @@ func waitForProcess(p *os.Process, backoff int) error {
 		klog.Warningf("Fuse process does not seem active or we are unprivileged: %s", err)
 		return nil
 	}
-	klog.Infof("Fuse process with PID %v still active, waiting...", p.Pid)
-	time.Sleep(time.Duration(backoff*500) * time.Millisecond)
+	klog.Infof("Fuse process with PID %v still active, waiting... %v", p.Pid, backoff)
+	time.Sleep(time.Duration(500) * time.Millisecond)
 	return waitForProcess(p, backoff+1)
 }
