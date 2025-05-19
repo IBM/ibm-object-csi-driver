@@ -62,7 +62,7 @@ test-sanity:
 .PHONY: lint
 lint:
 	hack/verify-golint.sh
-	run-gosec
+	make run-gosec
 
 .PHONY: driver
 driver: deps buildimage
