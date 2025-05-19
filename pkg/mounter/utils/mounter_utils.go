@@ -113,7 +113,7 @@ func waitForMount(path string, timeout time.Duration) error {
 		out, err := exec.Command("mountpoint", path).CombinedOutput()
 		outStr := strings.TrimSpace(string(out))
 		if err != nil {
-			klog.Errorf("Failed to check mountpoint for path '%s', error: %v", path, outStr)
+			klog.Errorf("Failed to check mountpoint for path '%s', error: %v, output: %s", path, err, outStr)
 			return err
 		}
 		if strings.HasSuffix(outStr, "is a mountpoint") {
