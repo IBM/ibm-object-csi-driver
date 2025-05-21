@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
@@ -120,9 +121,15 @@ func createCOSCSIMounterRequest(payload string, url string) (string, error) {
 	// Get socket path
 	// socketPath := os.Getenv("SOCKET_PATH")
 	socketPath := "/var/lib/coscsi.sock"
-	if socketPath == "" {
-		socketPath = constants.DefaultSocketPath
+	// if socketPath == "" {
+	// 	socketPath = constants.DefaultSocketPath
+	// }
+
+	err := isGRPCServerAvailable(socketPath)
+	if err != nil {
+		return "", err
 	}
+
 	// Create a custom dialer function for Unix socket connection
 	dialer := func(_ context.Context, _, _ string) (net.Conn, error) {
 		return net.Dial("unix", socketPath)
@@ -190,4 +197,14 @@ func fetchGRPCReturnCode(code int) error {
 	default:
 		return status.Error(codes.Unknown, "Unknown")
 	}
+}
+
+// isGRPCServerAvailable tries to connect to the UNIX socket to see if it's up
+func isGRPCServerAvailable(socketPath string) error {
+	conn, err := net.DialTimeout("unix", socketPath, 500*time.Millisecond)
+	if err != nil {
+		return err
+	}
+	conn.Close()
+	return nil
 }

@@ -4,7 +4,7 @@ go 1.24.3
 
 require (
 	github.com/IBM/ibm-object-csi-driver v0.1.0
-	github.com/gin-gonic/gin v1.10.0
+	github.com/gin-gonic/gin v1.10.1
 	go.uber.org/zap v1.27.0
 )
 
