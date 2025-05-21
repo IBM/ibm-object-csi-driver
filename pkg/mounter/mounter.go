@@ -1,14 +1,24 @@
 package mounter
 
 import (
+	"context"
 	"errors"
+	"io"
+	"net"
+	"net/http"
 	"os"
+	"strings"
 	"syscall"
+	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
 )
+
+var mountWorker = true
 
 type Mounter interface {
 	Mount(source string, target string) error
@@ -105,4 +115,99 @@ var mkdirAllFunc = os.MkdirAll
 // Function that wraps os.MkdirAll
 var mkdirAll = func(path string, perm os.FileMode) error {
 	return mkdirAllFunc(path, perm)
+}
+
+func createCOSCSIMounterRequest(payload string, url string) (string, error) {
+	// Get socket path
+	// socketPath := os.Getenv("SOCKET_PATH")
+	socketPath := "/var/lib/coscsi.sock"
+	// if socketPath == "" {
+	// 	socketPath = constants.DefaultSocketPath
+	// }
+
+	err := isGRPCServerAvailable(socketPath)
+	if err != nil {
+		return "", err
+	}
+
+	// Create a custom dialer function for Unix socket connection
+	dialer := func(_ context.Context, _, _ string) (net.Conn, error) {
+		return net.Dial("unix", socketPath)
+	}
+
+	// Create an HTTP client with the Unix socket transport
+	client := &http.Client{
+		Transport: &http.Transport{
+			DialContext: dialer,
+		},
+		Timeout: constants.Timeout,
+	}
+
+	// Create POST request
+	req, err := http.NewRequest("POST", url, strings.NewReader(payload))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	response, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			klog.Errorf("failed to close response body: %v", err)
+		}
+	}()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return "", err
+	}
+
+	responseBody := string(body)
+
+	if response.StatusCode != http.StatusOK {
+		klog.Errorf("response from cos-csi-mounter -> Exit Status Code: %s ,ResponseCode: %v", responseBody, response.StatusCode)
+		return responseBody, fetchGRPCReturnCode(response.StatusCode)
+	}
+	return "", nil
+}
+
+func fetchGRPCReturnCode(code int) error {
+	switch code {
+	case http.StatusBadRequest:
+		return status.Error(codes.InvalidArgument, "Invalid Argument")
+	case http.StatusNotFound:
+		return status.Error(codes.NotFound, "Not Found")
+	case http.StatusConflict:
+		return status.Error(codes.AlreadyExists, "Already Exists")
+	case http.StatusForbidden:
+		return status.Error(codes.PermissionDenied, "Permission Denied")
+	case http.StatusTooManyRequests:
+		return status.Error(codes.ResourceExhausted, "Resource Exhausted")
+	case http.StatusNotImplemented:
+		return status.Error(codes.Unimplemented, "Unimplemented")
+	case http.StatusInternalServerError:
+		return status.Error(codes.Internal, "Internal")
+	case http.StatusServiceUnavailable:
+		return status.Error(codes.Unavailable, "Unavailable")
+	case http.StatusUnauthorized:
+		return status.Error(codes.Unauthenticated, "Unauthenticated")
+	default:
+		return status.Error(codes.Unknown, "Unknown")
+	}
+}
+
+// isGRPCServerAvailable tries to connect to the UNIX socket to see if it's up
+func isGRPCServerAvailable(socketPath string) error {
+	conn, err := net.DialTimeout("unix", socketPath, 500*time.Millisecond)
+	if err != nil {
+		return err
+	}
+	err = conn.Close()
+	if err != nil {
+		return err
+	}
+	return nil
 }
