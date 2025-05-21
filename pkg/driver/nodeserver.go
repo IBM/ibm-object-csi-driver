@@ -187,7 +187,7 @@ func (ns *nodeServer) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpubl
 
 	mounterObj := ns.Mounter.NewMounter(attrib, secretMap, mountFlags)
 
-	klog.Info("-NodePublishVolume-: Unmount")
+	klog.Info("-NodeUnpublishVolume-: Unmount")
 	if err = mounterObj.Unmount(targetPath); err != nil {
 		//TODO: Need to handle the case with non existing mount separately - https://github.com/IBM/ibm-object-csi-driver/issues/46
 		klog.Infof("UNMOUNT ERROR: %v", err)
