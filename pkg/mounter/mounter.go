@@ -205,6 +205,9 @@ func isGRPCServerAvailable(socketPath string) error {
 	if err != nil {
 		return err
 	}
-	conn.Close()
+	err = conn.Close()
+	if err != nil {
+		return err
+	}
 	return nil
 }
