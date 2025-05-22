@@ -46,52 +46,69 @@ func setUpLogger() *zap.Logger {
 	return logger
 }
 
-func main() {
-	// Always create fresh socket file
-	err := os.Remove(socketPath)
-	if err != nil {
-		// Handle it properly: log it, retry, return, etc.
-		logger.Warn("Failed to remove Socket File")
+func setupSocket(path string) (net.Listener, error) {
+	// Check for socket file
+	if _, err := os.Stat(path); err == nil {
+		// Always create fresh socket file
+		if err := os.Remove(path); err != nil {
+			// Handle it properly: log it, retry, return, etc.
+			logger.Warn("Failed to remove existing socket file")
+		}
 	}
 
 	// Create a listener
 	logger.Info("Creating unix socket listener...")
-	listener, err := net.Listen("unix", socketPath)
+	listener, err := net.Listen("unix", path)
 	if err != nil {
 		logger.Fatal("Failed to create unix socket listener:", zap.Error(err))
+		return nil, err
+	}
+	return listener, nil
+}
+
+func handleSignals(path string) {
+	// Handle SIGINT and SIGTERM signals to gracefully shut down the server
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-signals
+		if err := os.Remove(path); err != nil {
+			// Handle it properly: log it, retry, return, etc.
+			logger.Warn("Failed to remove socket on exit")
+		}
+		os.Exit(0)
+	}()
+}
+
+func newRouter() *gin.Engine {
+	// Create gin router
+	router := gin.Default()
+	router.POST("/api/cos/mount", handleCosMount())
+	router.POST("/api/cos/unmount", handleCosUnmount())
+	return router
+}
+
+func main() {
+	listener, err := setupSocket(socketPath)
+	if err != nil {
+		logger.Fatal("Failed to create socket")
 	}
 	// Close the listener at the end
 	defer listener.Close()
 
-	// Handle SIGINT and SIGTERM signals to gracefully shut down the server
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-signals
-		err := os.Remove(socketPath)
-		if err != nil {
-			// Handle it properly: log it, retry, return, etc.
-			logger.Warn("Failed to remove Socket File")
-		}
-		os.Exit(0)
-	}()
+	handleSignals(socketPath)
 
 	logger.Info("Starting cos-csi-mounter service...")
 
-	// Create gin router
-	router := gin.Default()
-
-	router.POST("/api/cos/mount", handleCosMount())
-	router.POST("/api/cos/unmount", handleCosUnmount())
+	router := newRouter()
 
 	// Serve HTTP requests over Unix socket
-	// err = http.Serve(listener, router)
 	server := &http.Server{
 		Handler:           router,
 		ReadHeaderTimeout: 3 * time.Second,
 	}
-	err = server.Serve(listener)
-	if err != nil {
+	if err := server.Serve(listener); err != nil {
 		logger.Fatal("Error while serving HTTP requests:", zap.Error(err))
 	}
 }
