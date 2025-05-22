@@ -206,10 +206,18 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		}
 
 		if bucketVersioning != "" {
-			enable := bucketVersioning == "true"
-			if err := sess.SetBucketVersioning(bucketName, enable); err != nil {
-				klog.Errorf("Failed to set versioning for bucket: %s, error: %v", bucketName, err)
-				return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to set versioning for bucket %s: %v", bucketName, err))
+			enable := strings.ToLower(strings.TrimSpace(bucketVersioning)) == "true"
+			klog.Infof("Bucket versioning value evaluated to: %t", enable)
+
+			err := sess.SetBucketVersioning(bucketName, enable)
+			if err != nil {
+				if params["userProvidedBucket"] == "false" {
+					err1 := sess.DeleteBucket(bucketName)
+					if err1 != nil {
+						return nil, status.Error(codes.Internal, fmt.Sprintf("cannot set versioning: %v and cannot delete bucket %s: %v", err, bucketName, err1))
+					}
+				}
+				return nil, status.Error(codes.Internal, fmt.Sprintf("failed to set versioning %t for bucket %s: %v", enable, bucketName, err))
 			}
 			klog.Infof("Bucket versioning set to %t for bucket %s", enable, bucketName)
 		}

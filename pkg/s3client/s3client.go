@@ -186,9 +186,9 @@ func (s *COSSession) DeleteBucket(bucket string) error {
 }
 
 func (s *COSSession) SetBucketVersioning(bucket string, enable bool) error {
-	status := "Suspended"
+	status := s3.BucketVersioningStatusSuspended
 	if enable {
-		status = "Enabled"
+		status = s3.BucketVersioningStatusEnabled
 	}
 	s.logger.Info("Setting versioning for bucket", zap.String("bucket", bucket), zap.Bool("enable", enable))
 	_, err := s.svc.PutBucketVersioning(&s3.PutBucketVersioningInput{
