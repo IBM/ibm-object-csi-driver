@@ -235,14 +235,13 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		if err != nil {
 			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", err, tempBucketName))
 		}
-		// Enable versioning for new temp bucket
+
 		if bucketVersioning != "" {
 			enable := strings.ToLower(strings.TrimSpace(bucketVersioning)) == "true"
 			klog.Infof("Temp bucket versioning value evaluated to: %t", enable)
 
 			err := sess.SetBucketVersioning(tempBucketName, enable)
 			if err != nil {
-				// Always delete temp bucket on failure
 				err1 := sess.DeleteBucket(tempBucketName)
 				if err1 != nil {
 					return nil, status.Error(codes.Internal, fmt.Sprintf("cannot set versioning: %v and cannot delete temp bucket %s: %v", err, tempBucketName, err1))
