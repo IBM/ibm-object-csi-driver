@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     branches:
-      - main
+      - ashima-server
 
 jobs:
   release:
@@ -57,8 +57,8 @@ jobs:
         files: |
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-latest.tar.gz
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-latest.tar.gz.sha256
-        tag_name: v0.1.0
-        name: v0.1.0
+        tag_name: v0.1.0-dev05
+        name: v0.1.0-dev05
         body: CSR generated with SHA1 is not supported to get certs using Metadata.
         prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
     
