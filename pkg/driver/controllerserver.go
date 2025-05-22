@@ -237,10 +237,17 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		}
 		// Enable versioning for new temp bucket
 		if bucketVersioning != "" {
-			enable := bucketVersioning == "true"
-			if err := sess.SetBucketVersioning(tempBucketName, enable); err != nil {
-				klog.Errorf("Failed to set versioning for temp bucket: %s, error: %v", tempBucketName, err)
-				return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to set versioning for bucket %s: %v", tempBucketName, err))
+			enable := strings.ToLower(strings.TrimSpace(bucketVersioning)) == "true"
+			klog.Infof("Temp bucket versioning value evaluated to: %t", enable)
+
+			err := sess.SetBucketVersioning(tempBucketName, enable)
+			if err != nil {
+				// Always delete temp bucket on failure
+				err1 := sess.DeleteBucket(tempBucketName)
+				if err1 != nil {
+					return nil, status.Error(codes.Internal, fmt.Sprintf("cannot set versioning: %v and cannot delete temp bucket %s: %v", err, tempBucketName, err1))
+				}
+				return nil, status.Error(codes.Internal, fmt.Sprintf("failed to set versioning %t for temp bucket %s: %v", enable, tempBucketName, err))
 			}
 			klog.Infof("Bucket versioning set to %t for temp bucket %s", enable, tempBucketName)
 		}
