@@ -32,6 +32,7 @@ deb-build: build-linux
 	cp install/cos-csi-mounter.service $(BUILD_DIR)/etc/systemd/system/
 	cp install/share.conf $(BUILD_DIR)/etc/ibmcloud/
 	cp ${BIN_DIR}/cos-csi-mounter-server $(BUILD_DIR)/usr/local/bin/
+	cp install/postinst.sh $(BUILD_DIR)/DEBIAN/postinst
 	cp install/prerm.sh $(BUILD_DIR)/DEBIAN/prerm
 
 	echo "Package: $(BUILD_DIR)" > $(DEBIAN_CONTROL)
@@ -39,7 +40,6 @@ deb-build: build-linux
 	echo "Maintainer: $(MAINTAINER)" >> $(DEBIAN_CONTROL)
 	echo "Architecture: $(DEB_ARCH)" >> $(DEBIAN_CONTROL)
 	echo "Description: $(DESCRIPTION)" >> $(DEBIAN_CONTROL)
-	# echo "Depends: mount.ibmshare-0.0.8" >> $(DEBIAN_CONTROL)
 
 	dpkg-deb --build $(BUILD_DIR)
 	rm -rf $(BUILD_DIR)
