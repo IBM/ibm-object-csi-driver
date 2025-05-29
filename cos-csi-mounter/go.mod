@@ -3,7 +3,7 @@ module github.com/IBM/ibm-object-csi-driver/cos-csi-mounter
 go 1.24.3
 
 require (
-	github.com/IBM/ibm-object-csi-driver v0.1.1
+	github.com/IBM/ibm-object-csi-driver v0.1.2
 	github.com/gin-gonic/gin v1.10.0
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.27.0
