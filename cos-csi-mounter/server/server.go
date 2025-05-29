@@ -138,7 +138,7 @@ func handleCosMount() gin.HandlerFunc {
 		}
 
 		logger.Info("bucket mount is successful", zap.Any("bucket", request.Bucket), zap.Any("path", request.Path))
-		c.JSON(http.StatusOK, "Success!!")
+		c.JSON(http.StatusOK, gin.H{"status": "success"})
 	}
 }
 
@@ -154,7 +154,7 @@ func handleCosUnmount() gin.HandlerFunc {
 			return
 		}
 
-		logger.Info("New unmount request with values: ", zap.String("Path:", request.Path))
+		logger.Info("New unmount request with values: ", zap.String("Path", request.Path))
 
 		utils := mounterUtils.MounterOptsUtils{}
 		err := utils.FuseUnmount(request.Path)
@@ -165,6 +165,6 @@ func handleCosUnmount() gin.HandlerFunc {
 		}
 
 		logger.Info("bucket unmount is successful", zap.Any("path", request.Path))
-		c.JSON(http.StatusOK, "Success!!")
+		c.JSON(http.StatusOK, gin.H{"status": "success"})
 	}
 }
