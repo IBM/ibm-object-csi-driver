@@ -13,6 +13,7 @@ package driver
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
@@ -289,8 +290,17 @@ func (ns *nodeServer) NodeGetInfo(_ context.Context, req *csi.NodeGetInfoRequest
 		return nil, err
 	}
 
+	maxVolumesPerNode := constants.DefaultVolumesPerNode
+	if val := os.Getenv("MAX_VOLUMES_PER_NODE"); val != "" {
+		maxVolumesPerNode, err = strconv.Atoi(val)
+		if err != nil {
+			return nil, fmt.Errorf("MAX_VOLUMES_PER_NODE does not contain valid number")
+		}
+	}
+
 	klog.V(3).Infof("NodeGetInfo: Node region %s", region)
 	klog.V(3).Infof("NodeGetInfo: Node zone %s", zone)
+	klog.V(3).Infof("NodeGetInfo: Max volumes per node %s", zone)
 
 	topology := &csi.Topology{
 		Segments: map[string]string{
@@ -300,7 +310,7 @@ func (ns *nodeServer) NodeGetInfo(_ context.Context, req *csi.NodeGetInfoRequest
 	}
 	resp := &csi.NodeGetInfoResponse{
 		NodeId:             ns.NodeID,
-		MaxVolumesPerNode:  constants.DefaultVolumesPerNode,
+		MaxVolumesPerNode:  int64(maxVolumesPerNode),
 		AccessibleTopology: topology,
 	}
 	klog.V(2).Info("NodeGetInfo: ", resp)
