@@ -151,6 +151,11 @@ func (s *fakeObjectStorageSession) CheckBucketAccess(bucket string) error {
 	return nil
 }
 
+func (s *fakeObjectStorageSession) SetBucketVersioning(bucketName string, enable bool) error {
+	s.logger.Info(fmt.Sprintf("Fake SetBucketVersioning called for bucket %s with enable=%t", bucketName, enable))
+	return nil
+}
+
 func (s *fakeObjectStorageSession) CheckObjectPathExistence(bucket, objectpath string) (bool, error) {
 	return true, nil
 }

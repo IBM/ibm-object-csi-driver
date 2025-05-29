@@ -49,6 +49,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		kpRootKeyCrn       string
 		pvcName            string
 		pvcNamespace       string
+		bucketVersioning   string
 	)
 	secretMapCustom := make(map[string]string)
 
@@ -85,6 +86,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	secretMap := req.GetSecrets()
 	klog.Info("req.GetSecrets() length:\t", len(secretMap))
 
+	var customSecretName string
 	if len(secretMap) == 0 {
 		klog.Info("Did not find the secret that matches pvc name. Fetching custom secret from PVC annotations")
 
@@ -108,10 +110,10 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 
 		pvcAnnotations := pvcRes.Annotations
 
-		secretName := pvcAnnotations["cos.csi.driver/secret"]
+		customSecretName = pvcAnnotations["cos.csi.driver/secret"]
 		secretNamespace := pvcAnnotations["cos.csi.driver/secret-namespace"]
 
-		if secretName == "" {
+		if customSecretName == "" {
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("secretName annotation 'cos.csi.driver/secret' not specified in the PVC annotations, could not fetch the secret %v", err))
 		}
 
@@ -120,7 +122,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			secretNamespace = constants.DefaultNamespace
 		}
 
-		secret, err := utils.GetSecret(secretName, secretNamespace)
+		secret, err := utils.GetSecret(customSecretName, secretNamespace)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret resource not found %v", err))
 		}
@@ -165,6 +167,24 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		bucketName = secretMapCustom["bucketName"]
 	}
 
+	// Check for bucketVersioning parameter
+	if val, ok := secretMap["bucketVersioning"]; ok && val != "" {
+		enable := strings.ToLower(strings.TrimSpace(val))
+		if enable != "true" && enable != "false" {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Invalid BucketVersioning value in secret: %s. Value set %s. Must be 'true' or 'false'", customSecretName, val))
+		}
+		bucketVersioning = enable
+		klog.Infof("BucketVersioning value that will be set via secret: %s", bucketVersioning)
+	} else if val, ok := params["bucketVersioning"]; ok && val != "" {
+		enable := strings.ToLower(strings.TrimSpace(val))
+		if enable != "true" && enable != "false" {
+			return nil, status.Error(codes.InvalidArgument,
+				fmt.Sprintf("Invalid bucketVersioning value in storage class: %s. Must be 'true' or 'false'", val))
+		}
+		bucketVersioning = enable
+		klog.Infof("BucketVersioning value that will be set via storage class params: %s", bucketVersioning)
+	}
+
 	creds, err := getCredentials(secretMap)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
@@ -185,6 +205,24 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			params["userProvidedBucket"] = "false"
 			klog.Infof("Created bucket: %s", bucketName)
 		}
+
+		if bucketVersioning != "" {
+			enable := strings.ToLower(strings.TrimSpace(bucketVersioning)) == "true"
+			klog.Infof("Bucket versioning value evaluated to: %t", enable)
+
+			err := sess.SetBucketVersioning(bucketName, enable)
+			if err != nil {
+				if params["userProvidedBucket"] == "false" {
+					err1 := sess.DeleteBucket(bucketName)
+					if err1 != nil {
+						return nil, status.Error(codes.Internal, fmt.Sprintf("cannot set versioning: %v and cannot delete bucket %s: %v", err, bucketName, err1))
+					}
+				}
+				return nil, status.Error(codes.Internal, fmt.Sprintf("failed to set versioning %t for bucket %s: %v", enable, bucketName, err))
+			}
+			klog.Infof("Bucket versioning set to %t for bucket %s", enable, bucketName)
+		}
+
 		params["bucketName"] = bucketName
 	} else {
 		// Generate random temp bucket name based on volume id
@@ -197,6 +235,21 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		err = createBucket(sess, tempBucketName, kpRootKeyCrn)
 		if err != nil {
 			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", err, tempBucketName))
+		}
+
+		if bucketVersioning != "" {
+			enable := strings.ToLower(strings.TrimSpace(bucketVersioning)) == "true"
+			klog.Infof("Temp bucket versioning value evaluated to: %t", enable)
+
+			err := sess.SetBucketVersioning(tempBucketName, enable)
+			if err != nil {
+				err1 := sess.DeleteBucket(tempBucketName)
+				if err1 != nil {
+					return nil, status.Error(codes.Internal, fmt.Sprintf("cannot set versioning: %v and cannot delete temp bucket %s: %v", err, tempBucketName, err1))
+				}
+				return nil, status.Error(codes.Internal, fmt.Sprintf("failed to set versioning %t for temp bucket %s: %v", enable, tempBucketName, err))
+			}
+			klog.Infof("Bucket versioning set to %t for temp bucket %s", enable, tempBucketName)
 		}
 		klog.Infof("Created temp bucket: %s", tempBucketName)
 		params["userProvidedBucket"] = "false"
@@ -442,6 +495,7 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 		iamEndpoint        string
 		cosEndpoint        string
 		locationConstraint string
+		bucketVersioning   string
 	)
 
 	if bytesVal, ok := secret.Data["accessKey"]; ok {
@@ -480,6 +534,10 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 		locationConstraint = string(bytesVal)
 	}
 
+	if bytesVal, ok := secret.Data["bucketVersioning"]; ok {
+		bucketVersioning = string(bytesVal)
+	}
+
 	secretMapCustom["accessKey"] = accessKey
 	secretMapCustom["secretKey"] = secretKey
 	secretMapCustom["apiKey"] = apiKey
@@ -489,6 +547,7 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 	secretMapCustom["iamEndpoint"] = iamEndpoint
 	secretMapCustom["cosEndpoint"] = cosEndpoint
 	secretMapCustom["locationConstraint"] = locationConstraint
+	secretMapCustom["bucketVersioning"] = bucketVersioning
 
 	return secretMapCustom
 }
