@@ -114,6 +114,12 @@ func handleCosMount() gin.HandlerFunc {
 			return
 		}
 
+		if request.Bucket == "" {
+			logger.Error("missing bucket in request")
+			c.JSON(http.StatusBadRequest, gin.H{"error": "missing bucket"})
+			return
+		}
+
 		// validate mounter args
 		args, err := request.ParseMounterArgs()
 		if err != nil {
