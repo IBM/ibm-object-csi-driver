@@ -21,7 +21,7 @@ var (
 	// Directories where bucket can be mounted
 	safeMountDirs = []string{"/var/data/kubelet/pods", "/var/lib/kubelet/pods"}
 	// Directories where s3fs/rclone configuration files need to be present
-	safeMounterConfigDir = "/var/lib/cos-csi"
+	safeMounterConfigDir = "/var/lib/coscsi-config"
 )
 
 // MounterArgs ...
