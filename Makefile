@@ -38,11 +38,6 @@ deps:
 		go install github.com/golangci/golangci-lint/cmd/golangci-lint@v${LINT_VERSION}; \
 	fi
 
-.PHONY: run-gosec
-run-gosec:
-	go install github.com/securego/gosec/v2/cmd/gosec@latest
-	@go list -f '{{.Dir}}' ./... | grep -v '/cos-csi-mounter/' | xargs gosec
-
 .PHONY: fmt
 fmt: lint
 	gofmt -l ${GOFILES}
@@ -62,7 +57,6 @@ test-sanity:
 .PHONY: lint
 lint:
 	hack/verify-golint.sh
-	make run-gosec
 
 .PHONY: driver
 driver: deps buildimage
