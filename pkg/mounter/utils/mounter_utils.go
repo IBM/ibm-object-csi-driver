@@ -38,8 +38,11 @@ func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) e
 		klog.Errorf("FuseMount: command execution failed: <%s>\nargs: <%s>\nerror: <%v>\noutput: <%v>", comm, args, err, string(out))
 		return fmt.Errorf("'%s' mount failed: <%v>", comm, string(out))
 	}
+	if err := waitForMount(path, 10*time.Second); err != nil {
+		return err
+	}
 	klog.Infof("bucket mounted successfully using '%s' mounter", comm)
-	return waitForMount(path, 10*time.Second)
+	return nil
 }
 
 func (su *MounterOptsUtils) FuseUnmount(path string) error {
@@ -112,19 +115,17 @@ func waitForMount(path string, timeout time.Duration) error {
 	for {
 		out, err := exec.Command("mountpoint", path).CombinedOutput()
 		outStr := strings.TrimSpace(string(out))
-		if err != nil {
-			klog.Errorf("Failed to check mountpoint for path '%s', error: %v, output: %s", path, err, outStr)
-			return err
-		}
-		if strings.HasSuffix(outStr, "is a mountpoint") {
+		if err == nil && strings.HasSuffix(outStr, "is a mountpoint") {
 			klog.Infof("Path is a mountpoint: pathname - %s", path)
 			return nil
 		}
 
+		klog.Infof("Mountpoint check in progress: path=%s, output=%s, err=%v", path, outStr, err)
+
 		time.Sleep(interval)
 		elapsed = elapsed + interval
 		if elapsed >= timeout {
-			return errors.New("timeout waiting for mount")
+			return fmt.Errorf("timeout waiting for mount: last check output: %s", outStr)
 		}
 	}
 }

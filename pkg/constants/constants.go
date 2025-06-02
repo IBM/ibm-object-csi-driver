@@ -28,8 +28,9 @@ const (
 	NodeRegionLabel = "topology.kubernetes.io/region"
 
 	Timeout                      = 3 * time.Minute
-	DefaultSocketPath            = "/tmp/mysocket.sock"
-	MounterConfigPathOnHost      = "/var/lib/cos-csi"
+	COSCSIMounterSocketPath      = "/var/lib/coscsi-sock/coscsi.sock"
+	COSCSIMounterSocketPathEnv   = "COS_CSI_MOUNTER_SOCKET"
+	MounterConfigPathOnHost      = "/var/lib/coscsi-config"
 	MounterConfigPathOnPodS3fs   = "/var/lib/ibmc-s3fs"
 	MounterConfigPathOnPodRclone = "/root/.config/rclone"
 )
