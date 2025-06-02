@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -18,7 +19,8 @@ import (
 
 var (
 	logger     *zap.Logger
-	socketPath = "/var/lib/coscsi.sock"
+	socketDir  = "/var/lib/coscsi-sock"
+	socketFile = "coscsi.sock"
 
 	s3fs   = "s3fs"
 	rclone = "rclone"
@@ -41,41 +43,49 @@ func setUpLogger() *zap.Logger {
 		zapcore.NewJSONEncoder(encoderCfg),
 		zapcore.Lock(os.Stdout),
 		atom,
-	), zap.AddCaller()).With(zap.String("ServiceName", "cos-csi-mounter-service"))
+	), zap.AddCaller()).With(zap.String("ServiceName", "cos-csi-mounter"))
 	atom.SetLevel(zap.InfoLevel)
 	return logger
 }
 
-func setupSocket(path string) (net.Listener, error) {
-	// Check for socket file
-	if _, err := os.Stat(path); err == nil {
-		// Always create fresh socket file
-		if err := os.Remove(path); err != nil {
-			// Handle it properly: log it, retry, return, etc.
-			logger.Warn("Failed to remove existing socket file")
-		}
+func setupSocket() (net.Listener, error) {
+	socketPath := filepath.Join(socketDir, socketFile)
+
+	// Ensure the socket directory exists
+	if err := os.MkdirAll(socketDir, 0755); err != nil {
+		logger.Fatal("Failed to create socket directory", zap.String("dir", socketDir), zap.Error(err))
+		return nil, err
 	}
 
-	// Create a listener
-	logger.Info("Creating unix socket listener...")
-	listener, err := net.Listen("unix", path)
+	// Check for socket file
+	if _, err := os.Stat(socketPath); err == nil {
+		if err := os.Remove(socketPath); err != nil {
+			logger.Warn("Failed to remove existing socket file", zap.String("path", socketPath), zap.Error(err))
+		}
+	} else if !os.IsNotExist(err) {
+		logger.Warn("Could not stat socket file", zap.String("path", socketPath), zap.Error(err))
+	}
+
+	logger.Info("Creating unix socket listener...", zap.String("path", socketPath))
+	listener, err := net.Listen("unix", socketPath)
 	if err != nil {
-		logger.Fatal("Failed to create unix socket listener:", zap.Error(err))
+		logger.Fatal("Failed to create unix socket listener", zap.String("path", socketPath), zap.Error(err))
 		return nil, err
 	}
 	return listener, nil
 }
 
-func handleSignals(path string) {
+func handleSignals() {
 	// Handle SIGINT and SIGTERM signals to gracefully shut down the server
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
 		<-signals
-		if err := os.Remove(path); err != nil {
+		socketPath := filepath.Join(socketDir, socketFile)
+		if err := os.Remove(socketPath); err != nil {
 			// Handle it properly: log it, retry, return, etc.
-			logger.Warn("Failed to remove socket on exit")
+			logger.Warn("Failed to remove socket on exit", zap.String("path", socketPath), zap.Error(err))
 		}
 		os.Exit(0)
 	}()
@@ -90,14 +100,14 @@ func newRouter() *gin.Engine {
 }
 
 func main() {
-	listener, err := setupSocket(socketPath)
+	listener, err := setupSocket()
 	if err != nil {
 		logger.Fatal("Failed to create socket")
 	}
 	// Close the listener at the end
 	defer listener.Close()
 
-	handleSignals(socketPath)
+	handleSignals()
 
 	logger.Info("Starting cos-csi-mounter service...")
 
