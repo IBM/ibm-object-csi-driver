@@ -38,8 +38,11 @@ func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) e
 		klog.Errorf("FuseMount: command execution failed: <%s>\nargs: <%s>\nerror: <%v>\noutput: <%v>", comm, args, err, string(out))
 		return fmt.Errorf("'%s' mount failed: <%v>", comm, string(out))
 	}
+	if err := waitForMount(path, 10*time.Second); err != nil {
+		return err
+	}
 	klog.Infof("bucket mounted successfully using '%s' mounter", comm)
-	return waitForMount(path, 10*time.Second)
+	return nil
 }
 
 func (su *MounterOptsUtils) FuseUnmount(path string) error {
