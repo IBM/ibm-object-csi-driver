@@ -29,7 +29,11 @@ var (
 func init() {
 	_ = flag.Set("logtostderr", "true") // #nosec G104: Attempt to set flags for logging to stderr only on best-effort basis.Error cannot be usefully handled.
 	logger = setUpLogger()
-	defer logger.Sync()
+	defer func() {
+		if err := logger.Sync(); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to sync logger: %v\n", err)
+		}
+	}()
 }
 
 func setUpLogger() *zap.Logger {
@@ -105,7 +109,11 @@ func main() {
 		logger.Fatal("Failed to create socket")
 	}
 	// Close the listener at the end
-	defer listener.Close()
+	defer func() {
+		if err := listener.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to close listener: %v\n", err)
+		}
+	}()
 
 	handleSignals()
 

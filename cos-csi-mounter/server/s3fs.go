@@ -61,7 +61,7 @@ func (args S3FSArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, err
 	for k, v := range m {
 		result = append(result, "-o")
 		if strings.ToLower(strings.TrimSpace(v)) == "true" {
-			result = append(result, fmt.Sprintf("%s", k)) // -o, key
+			result = append(result, k) // -o, key
 		} else {
 			result = append(result, fmt.Sprintf("%s=%v", k, v)) // -o, key=value
 		}
@@ -101,7 +101,7 @@ func (args S3FSArgs) Validate(targetPath string) error {
 	}
 
 	// Check if value of curldbg parameter is either "body" or "normal"
-	if args.CurlDebug != "" && !(args.CurlDebug == "body" || args.CurlDebug == "normal") {
+	if args.CurlDebug != "" && args.CurlDebug != "body" && args.CurlDebug != "normal" {
 		logger.Error("invalid value for 'curldbg' param. Should be either 'body' or 'normal'", zap.Any("curldbg", args.CurlDebug))
 		return fmt.Errorf("invalid value for 'curldbg' param. Should be either 'body' or 'normal': %v", args.CurlDebug)
 	}
@@ -124,7 +124,7 @@ func (args S3FSArgs) Validate(targetPath string) error {
 	}
 
 	if args.IBMIamEndpoint != "" {
-		if !(strings.HasPrefix(args.IBMIamEndpoint, "https://") || strings.HasPrefix(args.IBMIamEndpoint, "http://")) {
+		if !strings.HasPrefix(args.IBMIamEndpoint, "https://") && !strings.HasPrefix(args.IBMIamEndpoint, "http://") {
 			logger.Error("bad value for ibm_iam_endpoint."+
 				" Must be of the form https://<hostname> or http://<hostname>",
 				zap.String("ibm_iam_endpoint", args.IBMIamEndpoint))
@@ -287,7 +287,7 @@ func (args S3FSArgs) Validate(targetPath string) error {
 		}
 	}
 
-	if !(strings.HasPrefix(args.URL, "https://") || strings.HasPrefix(args.URL, "http://")) {
+	if !strings.HasPrefix(args.URL, "https://") && !strings.HasPrefix(args.URL, "http://") {
 		logger.Error("bad value for url: scheme is missing."+
 			" Must be of the form http://<hostname> or https://<hostname>",
 			zap.String("url", args.URL))
