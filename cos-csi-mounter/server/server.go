@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -18,7 +19,8 @@ import (
 
 var (
 	logger     *zap.Logger
-	socketPath = "/var/lib/coscsi.sock"
+	socketDir  = "/var/lib/coscsi-sock"
+	socketFile = "coscsi.sock"
 
 	s3fs   = "s3fs"
 	rclone = "rclone"
@@ -27,7 +29,11 @@ var (
 func init() {
 	_ = flag.Set("logtostderr", "true") // #nosec G104: Attempt to set flags for logging to stderr only on best-effort basis.Error cannot be usefully handled.
 	logger = setUpLogger()
-	defer logger.Sync()
+	defer func() {
+		if err := logger.Sync(); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to sync logger: %v\n", err)
+		}
+	}()
 }
 
 func setUpLogger() *zap.Logger {
@@ -41,57 +47,86 @@ func setUpLogger() *zap.Logger {
 		zapcore.NewJSONEncoder(encoderCfg),
 		zapcore.Lock(os.Stdout),
 		atom,
-	), zap.AddCaller()).With(zap.String("ServiceName", "cos-csi-mounter-service"))
+	), zap.AddCaller()).With(zap.String("ServiceName", "cos-csi-mounter"))
 	atom.SetLevel(zap.InfoLevel)
 	return logger
 }
 
-func main() {
-	// Always create fresh socket file
-	err := os.Remove(socketPath)
-	if err != nil {
-		// Handle it properly: log it, retry, return, etc.
-		logger.Warn("Failed to remove Socket File")
+func setupSocket() (net.Listener, error) {
+	socketPath := filepath.Join(socketDir, socketFile)
+
+	// Ensure the socket directory exists
+	if err := os.MkdirAll(socketDir, 0755); err != nil {
+		logger.Fatal("Failed to create socket directory", zap.String("dir", socketDir), zap.Error(err))
+		return nil, err
 	}
 
-	// Create a listener
-	logger.Info("Creating unix socket listener...")
+	// Check for socket file
+	if _, err := os.Stat(socketPath); err == nil {
+		if err := os.Remove(socketPath); err != nil {
+			logger.Warn("Failed to remove existing socket file", zap.String("path", socketPath), zap.Error(err))
+		}
+	} else if !os.IsNotExist(err) {
+		logger.Warn("Could not stat socket file", zap.String("path", socketPath), zap.Error(err))
+	}
+
+	logger.Info("Creating unix socket listener...", zap.String("path", socketPath))
 	listener, err := net.Listen("unix", socketPath)
 	if err != nil {
-		logger.Fatal("Failed to create unix socket listener:", zap.Error(err))
+		logger.Fatal("Failed to create unix socket listener", zap.String("path", socketPath), zap.Error(err))
+		return nil, err
 	}
-	// Close the listener at the end
-	defer listener.Close()
+	return listener, nil
+}
 
+func handleSignals() {
 	// Handle SIGINT and SIGTERM signals to gracefully shut down the server
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+
 	go func() {
 		<-signals
-		err := os.Remove(socketPath)
-		if err != nil {
+		socketPath := filepath.Join(socketDir, socketFile)
+		if err := os.Remove(socketPath); err != nil {
 			// Handle it properly: log it, retry, return, etc.
-			logger.Warn("Failed to remove Socket File")
+			logger.Warn("Failed to remove socket on exit", zap.String("path", socketPath), zap.Error(err))
 		}
 		os.Exit(0)
 	}()
+}
+
+func newRouter() *gin.Engine {
+	// Create gin router
+	router := gin.Default()
+	router.POST("/api/cos/mount", handleCosMount())
+	router.POST("/api/cos/unmount", handleCosUnmount())
+	return router
+}
+
+func main() {
+	listener, err := setupSocket()
+	if err != nil {
+		logger.Fatal("Failed to create socket")
+	}
+	// Close the listener at the end
+	defer func() {
+		if err := listener.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to close listener: %v\n", err)
+		}
+	}()
+
+	handleSignals()
 
 	logger.Info("Starting cos-csi-mounter service...")
 
-	// Create gin router
-	router := gin.Default()
-
-	router.POST("/api/cos/mount", handleCosMount())
-	router.POST("/api/cos/unmount", handleCosUnmount())
+	router := newRouter()
 
 	// Serve HTTP requests over Unix socket
-	// err = http.Serve(listener, router)
 	server := &http.Server{
 		Handler:           router,
 		ReadHeaderTimeout: 3 * time.Second,
 	}
-	err = server.Serve(listener)
-	if err != nil {
+	if err := server.Serve(listener); err != nil {
 		logger.Fatal("Error while serving HTTP requests:", zap.Error(err))
 	}
 }

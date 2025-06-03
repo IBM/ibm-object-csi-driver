@@ -21,7 +21,7 @@ var (
 	// Directories where bucket can be mounted
 	safeMountDirs = []string{"/var/data/kubelet/pods", "/var/lib/kubelet/pods"}
 	// Directories where s3fs/rclone configuration files need to be present
-	safeMounterConfigDir = "/var/lib/cos-csi"
+	safeMounterConfigDir = "/var/lib/coscsi-config"
 )
 
 // MounterArgs ...
@@ -41,7 +41,7 @@ func pathValidator(targetPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to resolve absolute mount path: %v", err)
 	}
-	if !(strings.HasPrefix(absPath, safeMountDirs[0]) || strings.HasPrefix(absPath, safeMountDirs[1])) {
+	if !strings.HasPrefix(absPath, safeMountDirs[0]) && !strings.HasPrefix(absPath, safeMountDirs[1]) {
 		return fmt.Errorf("bad value for target path \"%v\"", targetPath)
 	}
 	return nil
