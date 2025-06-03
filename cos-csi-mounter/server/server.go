@@ -56,7 +56,7 @@ func setupSocket() (net.Listener, error) {
 	socketPath := filepath.Join(socketDir, socketFile)
 
 	// Ensure the socket directory exists
-	if err := os.MkdirAll(socketDir, 0755); err != nil {
+	if err := os.MkdirAll(socketDir, 0750); err != nil {
 		logger.Fatal("Failed to create socket directory", zap.String("dir", socketDir), zap.Error(err))
 		return nil, err
 	}

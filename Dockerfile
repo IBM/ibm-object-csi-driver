@@ -1,10 +1,10 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10-1179.1741863533 as s3fs-builder
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10-1179.1741863533 AS s3fs-builder
 
 ARG   RHSM_PASS=blank
 ARG   RHSM_USER=blank
 
-ENV   RHSM_PASS "${RHSM_PASS}"
-ENV   RHSM_USER "${RHSM_USER}"
+ENV   RHSM_PASS="${RHSM_PASS}"
+ENV   RHSM_USER="${RHSM_USER}"
 
 ADD   register-sys.sh /usr/bin/
 RUN   microdnf update --setopt=tsflags=nodocs && \
@@ -26,7 +26,7 @@ RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && cd s3fs-fuse && \
     ./autogen.sh && ./configure --prefix=/usr/local --with-openssl && make && make install && \
     rm -rf /var/lib/apt/lists/*
 
-FROM registry.access.redhat.com/ubi8/ubi as rclone-builder
+FROM registry.access.redhat.com/ubi8/ubi AS rclone-builder
 RUN yum install wget git gcc -y
 
 ENV ARCH=amd64
@@ -39,10 +39,10 @@ RUN wget -q https://dl.google.com/go/go$GO_VERSION.linux-$ARCH.tar.gz && \
   rm go$GO_VERSION.linux-$ARCH.tar.gz && \
   mv go /usr/local
 
-ENV GOROOT /usr/local/go
-ENV GOPATH /go
+ENV GOROOT=/usr/local/go
+ENV GOPATH=/go
 ENV PATH=$GOPATH/bin:$GOROOT/bin:$PATH
-ENV GOARCH $ARCH
+ENV GOARCH=$ARCH
 ENV GO111MODULE=on
 
 RUN git clone https://github.com/rclone/rclone.git && \
