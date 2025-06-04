@@ -11,20 +11,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-var (
-	logger     *zap.Logger
-	socketDir  = "/var/lib/coscsi-sock"
-	socketFile = "coscsi.sock"
-
-	s3fs   = "s3fs"
-	rclone = "rclone"
-)
+var logger *zap.Logger
 
 func init() {
 	_ = flag.Set("logtostderr", "true") // #nosec G104: Attempt to set flags for logging to stderr only on best-effort basis.Error cannot be usefully handled.
@@ -53,11 +47,11 @@ func setUpLogger() *zap.Logger {
 }
 
 func setupSocket() (net.Listener, error) {
-	socketPath := filepath.Join(socketDir, socketFile)
+	socketPath := filepath.Join(constants.SocketDir, constants.SocketFile)
 
 	// Ensure the socket directory exists
-	if err := os.MkdirAll(socketDir, 0755); err != nil {
-		logger.Fatal("Failed to create socket directory", zap.String("dir", socketDir), zap.Error(err))
+	if err := os.MkdirAll(constants.SocketDir, 0750); err != nil {
+		logger.Fatal("Failed to create socket directory", zap.String("dir", constants.SocketDir), zap.Error(err))
 		return nil, err
 	}
 
@@ -86,7 +80,7 @@ func handleSignals() {
 
 	go func() {
 		<-signals
-		socketPath := filepath.Join(socketDir, socketFile)
+		socketPath := filepath.Join(constants.SocketDir, constants.SocketFile)
 		if err := os.Remove(socketPath); err != nil {
 			// Handle it properly: log it, retry, return, etc.
 			logger.Warn("Failed to remove socket on exit", zap.String("path", socketPath), zap.Error(err))
@@ -143,7 +137,7 @@ func handleCosMount() gin.HandlerFunc {
 
 		logger.Info("New mount request with values:", zap.String("Bucket", request.Bucket), zap.String("Path", request.Path), zap.String("Mounter", request.Mounter), zap.Any("Args", request.Args))
 
-		if request.Mounter != s3fs && request.Mounter != rclone {
+		if request.Mounter != constants.S3FS && request.Mounter != constants.RClone {
 			logger.Error("invalid mounter", zap.Any("mounter", request.Mounter))
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid mounter"})
 			return

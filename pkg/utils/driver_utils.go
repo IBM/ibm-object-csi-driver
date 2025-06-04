@@ -304,7 +304,6 @@ func getEPBasedOnCluserInfra() (string, error) {
 	}
 
 	clusterConfigStr := configMap.Data["cluster-config.json"]
-	klog.Info("Successfully fetched Cluster Config ", clusterConfigStr)
 
 	var clusterConfig map[string]string
 	if err = json.Unmarshal([]byte(clusterConfigStr), &clusterConfig); err != nil {

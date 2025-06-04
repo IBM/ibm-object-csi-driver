@@ -8,6 +8,7 @@ Before=shutdown.target reboot.target halt.target
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/cos-csi-mounter-server
+KillMode=process
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal

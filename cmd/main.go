@@ -18,7 +18,7 @@ import (
 	"strconv"
 	"strings"
 
-	csiConfig "github.com/IBM/ibm-object-csi-driver/config"
+	"github.com/IBM/ibm-object-csi-driver/config"
 	"github.com/IBM/ibm-object-csi-driver/pkg/driver"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
@@ -67,7 +67,7 @@ func getZapLogger() *zap.Logger {
 		zapcore.NewJSONEncoder(encoderCfg),
 		zapcore.Lock(os.Stdout),
 		atom,
-	), zap.AddCaller()).With(zap.String("name", "ibm-object-csi-driver")).With(zap.String("CSIDriverName", "IBM CSI Object Driver"))
+	), zap.AddCaller()).With(zap.String("name", config.CSIPluginGithubName)).With(zap.String("CSIDriverName", "IBM CSI Object Driver"))
 
 	atom.SetLevel(zap.InfoLevel)
 	return logger
@@ -107,7 +107,7 @@ func main() {
 }
 
 func serverSetup(options *Options, logger *zap.Logger) {
-	csiDriver, err := driver.Setups3Driver(options.ServerMode, csiConfig.CSIDriverName, csiConfig.VendorVersion, logger)
+	csiDriver, err := driver.Setups3Driver(options.ServerMode, config.CSIDriverName, config.VendorVersion, logger)
 	if err != nil {
 		logger.Fatal("Failed to setup s3 driver", zap.Error(err))
 		os.Exit(1)

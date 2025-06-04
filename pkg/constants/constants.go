@@ -27,6 +27,9 @@ const (
 	// NodeRegionLabel Region Label attached to node
 	NodeRegionLabel = "topology.kubernetes.io/region"
 
+	SocketDir  = "/var/lib/coscsi-sock"
+	SocketFile = "coscsi.sock"
+
 	Timeout                      = 3 * time.Minute
 	COSCSIMounterSocketPath      = "/var/lib/coscsi-sock/coscsi.sock"
 	COSCSIMounterSocketPathEnv   = "COS_CSI_MOUNTER_SOCKET"
