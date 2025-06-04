@@ -18,8 +18,6 @@
 package config
 
 const (
-
-	// CSIPluginGithubName ...
 	CSIPluginGithubName = "ibm-object-csi-driver"
 	CSIDriverName       = "cos.s3.csi.ibm.io"
 	VendorVersion       = "1.1.2"
