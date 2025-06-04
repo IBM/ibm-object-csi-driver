@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 )
 
 // MountRequest ...
@@ -51,7 +53,7 @@ func pathValidator(targetPath string) error {
 
 func (req *MountRequest) ParseMounterArgs() ([]string, error) {
 	switch req.Mounter {
-	case s3fs:
+	case constants.S3FS:
 		var args S3FSArgs
 		if err := strictDecodeForUnknownFields(req.Args, &args); err != nil {
 			return nil, fmt.Errorf("invalid s3fs args decode error: %w", err)
@@ -61,7 +63,7 @@ func (req *MountRequest) ParseMounterArgs() ([]string, error) {
 		}
 		return args.PopulateArgsSlice(req.Bucket, req.Path)
 
-	case rclone:
+	case constants.RClone:
 		var args RCloneArgs
 		if err := strictDecodeForUnknownFields(req.Args, &args); err != nil {
 			return nil, fmt.Errorf("invalid rclone args decode error: %w", err)

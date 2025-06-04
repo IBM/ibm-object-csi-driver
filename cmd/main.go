@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/IBM/ibm-object-csi-driver/config"
 	csiConfig "github.com/IBM/ibm-object-csi-driver/config"
 	"github.com/IBM/ibm-object-csi-driver/pkg/driver"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
@@ -67,7 +68,7 @@ func getZapLogger() *zap.Logger {
 		zapcore.NewJSONEncoder(encoderCfg),
 		zapcore.Lock(os.Stdout),
 		atom,
-	), zap.AddCaller()).With(zap.String("name", "ibm-object-csi-driver")).With(zap.String("CSIDriverName", "IBM CSI Object Driver"))
+	), zap.AddCaller()).With(zap.String("name", config.CSIPluginGithubName)).With(zap.String("CSIDriverName", "IBM CSI Object Driver"))
 
 	atom.SetLevel(zap.InfoLevel)
 	return logger
