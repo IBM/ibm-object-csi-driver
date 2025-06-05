@@ -48,9 +48,9 @@ func TestSetupSocket_CreatesSocket(t *testing.T) {
 	listener, err := setupSocket()
 	defer func() {
 		if listener != nil {
-			listener.Close()
+			_ = listener.Close()
 		}
-		os.Remove(socketPath)
+		_ = os.Remove(socketPath)
 	}()
 
 	assert.NoError(t, err, "expected no error from setupSocket")
