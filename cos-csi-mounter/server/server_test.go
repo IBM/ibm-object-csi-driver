@@ -48,6 +48,7 @@ func (m *MockMounterArgsParser) Parse(request MountRequest) ([]string, error) {
 	return args.Get(0).([]string), args.Error(1)
 }
 
+// Unit Tests
 func TestSetupSocket_CreatesSocket(t *testing.T) {
 	// Use temp dir for socket dir
 	tmpDir := t.TempDir()
