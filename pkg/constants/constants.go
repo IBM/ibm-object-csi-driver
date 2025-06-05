@@ -24,7 +24,9 @@ const (
 
 	// NodeRegionLabel Region Label attached to node
 	NodeRegionLabel = "topology.kubernetes.io/region"
+)
 
+var (
 	SocketDir  = "/var/lib/coscsi-sock"
 	SocketFile = "coscsi.sock"
 )

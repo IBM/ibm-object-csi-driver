@@ -51,7 +51,7 @@ func setupSocket() (net.Listener, error) {
 
 	// Ensure the socket directory exists
 	if err := os.MkdirAll(constants.SocketDir, 0750); err != nil {
-		logger.Fatal("Failed to create socket directory", zap.String("dir", constants.SocketDir), zap.Error(err))
+		logger.Error("Failed to create socket directory", zap.String("dir", constants.SocketDir), zap.Error(err))
 		return nil, err
 	}
 
@@ -67,7 +67,7 @@ func setupSocket() (net.Listener, error) {
 	logger.Info("Creating unix socket listener...", zap.String("path", socketPath))
 	listener, err := net.Listen("unix", socketPath)
 	if err != nil {
-		logger.Fatal("Failed to create unix socket listener", zap.String("path", socketPath), zap.Error(err))
+		logger.Error("Failed to create unix socket listener", zap.String("path", socketPath), zap.Error(err))
 		return nil, err
 	}
 	return listener, nil
@@ -90,10 +90,12 @@ func handleSignals() {
 }
 
 func newRouter() *gin.Engine {
+	utils := &mounterUtils.MounterOptsUtils{}
+
 	// Create gin router
 	router := gin.Default()
-	router.POST("/api/cos/mount", handleCosMount())
-	router.POST("/api/cos/unmount", handleCosUnmount())
+	router.POST("/api/cos/mount", handleCosMount(utils))
+	router.POST("/api/cos/unmount", handleCosUnmount(utils))
 	return router
 }
 
@@ -125,7 +127,7 @@ func main() {
 	}
 }
 
-func handleCosMount() gin.HandlerFunc {
+func handleCosMount(mounter mounterUtils.MounterUtils) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var request MountRequest
 
@@ -158,8 +160,7 @@ func handleCosMount() gin.HandlerFunc {
 			return
 		}
 
-		utils := mounterUtils.MounterOptsUtils{}
-		err = utils.FuseMount(request.Path, request.Mounter, args)
+		err = mounter.FuseMount(request.Path, request.Mounter, args)
 		if err != nil {
 			logger.Error("mount failed: ", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("mount failed: %v", err)})
@@ -171,7 +172,7 @@ func handleCosMount() gin.HandlerFunc {
 	}
 }
 
-func handleCosUnmount() gin.HandlerFunc {
+func handleCosUnmount(mounter mounterUtils.MounterUtils) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var request struct {
 			Path string `json:"path"`
@@ -185,8 +186,7 @@ func handleCosUnmount() gin.HandlerFunc {
 
 		logger.Info("New unmount request with values: ", zap.String("Path", request.Path))
 
-		utils := mounterUtils.MounterOptsUtils{}
-		err := utils.FuseUnmount(request.Path)
+		err := mounter.FuseUnmount(request.Path)
 		if err != nil {
 			logger.Error("unmount failed: ", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("unmount failed :%v", err)})
