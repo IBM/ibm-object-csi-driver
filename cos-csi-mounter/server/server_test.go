@@ -16,6 +16,21 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+// Mock implementation of MounterUtils
+type mockMounter struct {
+	mock.Mock
+}
+
+func (m *mockMounter) FuseMount(path string, mounter string, args []string) error {
+	argsCalled := m.Called(path, mounter, args)
+	return argsCalled.Error(0)
+}
+
+func (m *mockMounter) FuseUnmount(path string) error {
+	argsCalled := m.Called(path)
+	return argsCalled.Error(0)
+}
+
 func TestSetupSocket_CreatesSocket(t *testing.T) {
 	// Use temp dir for socket dir
 	tmpDir := t.TempDir()
@@ -112,21 +127,6 @@ func TestSetupSocket_StatSocketFileFails(t *testing.T) {
 func TestNewRouter_HasExpectedRoutes(t *testing.T) {
 	router := newRouter()
 	assert.NotNil(t, router)
-}
-
-// Mock implementation of MounterUtils
-type mockMounter struct {
-	mock.Mock
-}
-
-func (m *mockMounter) FuseMount(path string, mounter string, args []string) error {
-	argsCalled := m.Called(path, mounter, args)
-	return argsCalled.Error(0)
-}
-
-func (m *mockMounter) FuseUnmount(path string) error {
-	argsCalled := m.Called(path)
-	return argsCalled.Error(0)
 }
 
 func TestHandleCosMount_InvalidJSON(t *testing.T) {
