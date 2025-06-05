@@ -17,7 +17,7 @@ jobs:
 
     env:
       IS_LATEST_RELEASE: 'true'
-      APP_VERSION: 0.2.3
+      APP_VERSION: 0.2.4
 
     steps:
     - name: Checkout Code
@@ -58,8 +58,8 @@ jobs:
         files: |
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.tar.gz
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.tar.gz.sha256
-        tag_name: v0.2.3-dev
-        name: v0.2.3-dev
+        tag_name: v0.2.4-dev
+        name: v0.2.4-dev
         body: Generate debian package with KillMode=process
         prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
     

@@ -102,8 +102,6 @@ func TestSetupSocket_FailsToCreateSocket(t *testing.T) {
 
 func TestSetupSocket_StatSocketFileFails(t *testing.T) {
 	tmpDir := t.TempDir()
-
-	// Override constants
 	originalSocketDir := constants.SocketDir
 	originalSocketFile := constants.SocketFile
 	constants.SocketDir = tmpDir
