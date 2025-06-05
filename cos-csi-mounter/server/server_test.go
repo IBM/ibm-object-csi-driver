@@ -19,16 +19,16 @@ import (
 )
 
 // Mock implementations
-type mockMounter struct {
+type MockMounterUtils struct {
 	mock.Mock
 }
 
-func (m *mockMounter) FuseMount(path string, mounter string, args []string) error {
+func (m *MockMounterUtils) FuseMount(path string, mounter string, args []string) error {
 	argsCalled := m.Called(path, mounter, args)
 	return argsCalled.Error(0)
 }
 
-func (m *mockMounter) FuseUnmount(path string) error {
+func (m *MockMounterUtils) FuseUnmount(path string) error {
 	argsCalled := m.Called(path)
 	return argsCalled.Error(0)
 }
@@ -133,7 +133,7 @@ func TestNewRouter_HasExpectedRoutes(t *testing.T) {
 }
 
 func TestHandleCosMount_InvalidJSON(t *testing.T) {
-	mockMounter := new(mockMounter)
+	mockMounter := new(MockMounterUtils)
 	router := gin.Default()
 	router.POST("/mount", handleCosMount(mockMounter, &MockMounterArgsParser{}))
 
@@ -147,7 +147,7 @@ func TestHandleCosMount_InvalidJSON(t *testing.T) {
 }
 
 func TestHandleCosMount_InvalidMounter(t *testing.T) {
-	mockMounter := new(mockMounter)
+	mockMounter := new(MockMounterUtils)
 	router := gin.Default()
 	router.POST("/mount", handleCosMount(mockMounter, &MockMounterArgsParser{}))
 
@@ -170,7 +170,7 @@ func TestHandleCosMount_InvalidMounter(t *testing.T) {
 }
 
 func TestHandleCosMount_MissingBucket(t *testing.T) {
-	mockMounter := new(mockMounter)
+	mockMounter := new(MockMounterUtils)
 	router := gin.Default()
 	router.POST("/mount", handleCosMount(mockMounter, &MockMounterArgsParser{}))
 
@@ -194,7 +194,7 @@ func TestHandleCosMount_MissingBucket(t *testing.T) {
 func TestHandleCosMount_InvalidMounterArgs(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	mockMounter := new(mockMounter)
+	mockMounter := new(MockMounterUtils)
 	mockParser := new(MockMounterArgsParser)
 
 	reqBody := []byte(`{
@@ -204,7 +204,6 @@ func TestHandleCosMount_InvalidMounterArgs(t *testing.T) {
 		"args": {"flag": "--invalid"}
 	}`)
 
-	// Unmarshal into MountRequest to match the call made to Parse()
 	var request MountRequest
 	err := json.Unmarshal(reqBody, &request)
 	assert.NoError(t, err)
@@ -224,8 +223,74 @@ func TestHandleCosMount_InvalidMounterArgs(t *testing.T) {
 	mockParser.AssertExpectations(t)
 }
 
+func TestHandleCosMount_FuseMountFails(t *testing.T) {
+	mockMounter := new(MockMounterUtils)
+	mockParser := new(MockMounterArgsParser)
+
+	request := MountRequest{
+		Bucket:  "my-bucket",
+		Path:    "/mnt/test",
+		Mounter: constants.S3FS,
+		Args:    json.RawMessage(`["--endpoint=https://s3.example.com"]`),
+	}
+
+	expectedArgs := []string{"--endpoint=https://s3.example.com"}
+
+	mockParser.On("Parse", request).Return(expectedArgs, nil)
+	mockMounter.On("FuseMount", request.Path, request.Mounter, expectedArgs).Return(fmt.Errorf("mount error"))
+
+	router := gin.Default()
+	router.POST("/mount", handleCosMount(mockMounter, mockParser))
+
+	body, _ := json.Marshal(request)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/mount", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Contains(t, w.Body.String(), "mount failed: mount error")
+
+	mockMounter.AssertExpectations(t)
+	mockParser.AssertExpectations(t)
+}
+
+func TestHandleCosMount_Success(t *testing.T) {
+	mockMounter := new(MockMounterUtils)
+	mockParser := new(MockMounterArgsParser)
+
+	request := MountRequest{
+		Bucket:  "my-bucket",
+		Path:    "/mnt/test",
+		Mounter: constants.S3FS,
+		Args:    json.RawMessage(`["--endpoint=https://s3.example.com"]`),
+	}
+
+	expectedArgs := []string{"--endpoint=https://s3.example.com"}
+
+	mockParser.On("Parse", request).Return(expectedArgs, nil)
+	mockMounter.On("FuseMount", request.Path, request.Mounter, expectedArgs).Return(nil)
+
+	router := gin.Default()
+	router.POST("/mount", handleCosMount(mockMounter, mockParser))
+
+	body, _ := json.Marshal(request)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/mount", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "success")
+
+	mockMounter.AssertExpectations(t)
+	mockParser.AssertExpectations(t)
+}
+
 func TestHandleCosUnmount_InvalidJSON(t *testing.T) {
-	mock := new(mockMounter)
+	mock := new(MockMounterUtils)
 	router := gin.Default()
 	router.POST("/unmount", handleCosUnmount(mock))
 
@@ -240,7 +305,7 @@ func TestHandleCosUnmount_InvalidJSON(t *testing.T) {
 }
 
 func TestHandleCosUnmount_UnmountFailure(t *testing.T) {
-	mock := new(mockMounter)
+	mock := new(MockMounterUtils)
 	mock.On("FuseUnmount", "/mnt/fail").Return(errors.New("mock failure"))
 
 	router := gin.Default()
@@ -261,7 +326,7 @@ func TestHandleCosUnmount_UnmountFailure(t *testing.T) {
 }
 
 func TestHandleCosUnmount_Success(t *testing.T) {
-	mock := new(mockMounter)
+	mock := new(MockMounterUtils)
 	mock.On("FuseUnmount", "/mnt/success").Return(nil)
 
 	router := gin.Default()
