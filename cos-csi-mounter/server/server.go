@@ -98,10 +98,11 @@ func handleSignals() {
 
 func newRouter() *gin.Engine {
 	utils := &mounterUtils.MounterOptsUtils{}
+	parser := &DefaultMounterArgsParser{}
 
 	// Create gin router
 	router := gin.Default()
-	router.POST("/api/cos/mount", handleCosMount(utils))
+	router.POST("/api/cos/mount", handleCosMount(utils, parser))
 	router.POST("/api/cos/unmount", handleCosUnmount(utils))
 	return router
 }
@@ -134,7 +135,7 @@ func main() {
 	}
 }
 
-func handleCosMount(mounter mounterUtils.MounterUtils) gin.HandlerFunc {
+func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var request MountRequest
 
@@ -159,7 +160,7 @@ func handleCosMount(mounter mounterUtils.MounterUtils) gin.HandlerFunc {
 		}
 
 		// validate mounter args
-		args, err := request.ParseMounterArgs()
+		args, err := parser.Parse(request)
 		if err != nil {
 			logger.Error("failed to parse mounter args", zap.Any("mounter", request.Mounter), zap.Error(err))
 

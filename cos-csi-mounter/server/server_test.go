@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -17,7 +18,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// Mock implementation of MounterUtils
+// Mock implementations
 type mockMounter struct {
 	mock.Mock
 }
@@ -37,6 +38,15 @@ type dummyListener struct{}
 func (d *dummyListener) Accept() (net.Conn, error) { return nil, nil }
 func (d *dummyListener) Close() error              { return nil }
 func (d *dummyListener) Addr() net.Addr            { return &net.UnixAddr{Name: "dummy", Net: "unix"} }
+
+type MockMounterArgsParser struct {
+	mock.Mock
+}
+
+func (m *MockMounterArgsParser) Parse(request MountRequest) ([]string, error) {
+	args := m.Called(request)
+	return args.Get(0).([]string), args.Error(1)
+}
 
 func TestSetupSocket_CreatesSocket(t *testing.T) {
 	// Use temp dir for socket dir
@@ -125,7 +135,7 @@ func TestNewRouter_HasExpectedRoutes(t *testing.T) {
 func TestHandleCosMount_InvalidJSON(t *testing.T) {
 	mockMounter := new(mockMounter)
 	router := gin.Default()
-	router.POST("/mount", handleCosMount(mockMounter))
+	router.POST("/mount", handleCosMount(mockMounter, &MockMounterArgsParser{}))
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", "/mount", bytes.NewBufferString(`invalid-json`))
@@ -139,7 +149,7 @@ func TestHandleCosMount_InvalidJSON(t *testing.T) {
 func TestHandleCosMount_InvalidMounter(t *testing.T) {
 	mockMounter := new(mockMounter)
 	router := gin.Default()
-	router.POST("/mount", handleCosMount(mockMounter))
+	router.POST("/mount", handleCosMount(mockMounter, &MockMounterArgsParser{}))
 
 	reqBody := map[string]interface{}{
 		"mounter": "invalid",
@@ -162,7 +172,7 @@ func TestHandleCosMount_InvalidMounter(t *testing.T) {
 func TestHandleCosMount_MissingBucket(t *testing.T) {
 	mockMounter := new(mockMounter)
 	router := gin.Default()
-	router.POST("/mount", handleCosMount(mockMounter))
+	router.POST("/mount", handleCosMount(mockMounter, &MockMounterArgsParser{}))
 
 	reqBody := map[string]interface{}{
 		"mounter": constants.S3FS,
@@ -179,6 +189,39 @@ func TestHandleCosMount_MissingBucket(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, w.Body.String(), "missing bucket")
+}
+
+func TestHandleCosMount_InvalidMounterArgs(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockMounter := new(mockMounter)
+	mockParser := new(MockMounterArgsParser)
+
+	reqBody := []byte(`{
+		"bucket": "my-bucket",
+		"path": "/mnt/test",
+		"mounter": "s3fs",
+		"args": {"flag": "--invalid"}
+	}`)
+
+	// Unmarshal into MountRequest to match the call made to Parse()
+	var request MountRequest
+	err := json.Unmarshal(reqBody, &request)
+	assert.NoError(t, err)
+
+	mockParser.On("Parse", request).Return([]string(nil), fmt.Errorf("invalid arg format"))
+
+	req, _ := http.NewRequest("POST", "/mount", bytes.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router := gin.Default()
+	router.POST("/mount", handleCosMount(mockMounter, mockParser))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "invalid args for mounter")
+	mockParser.AssertExpectations(t)
 }
 
 func TestHandleCosUnmount_InvalidJSON(t *testing.T) {
