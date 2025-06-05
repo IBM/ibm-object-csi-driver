@@ -51,31 +51,16 @@ func TestSetupSocket_CreatesSocket(t *testing.T) {
 }
 
 func TestSetupSocket_MkdirAllFails(t *testing.T) {
-	// Create a temporary parent directory
-	parentDir := t.TempDir()
+	original := MakeDir
+	defer func() { MakeDir = original }()
 
-	// Create a read-only subdirectory to simulate mkdir failure
-	readOnlyDir := filepath.Join(parentDir, "readonly")
-	err := os.Mkdir(readOnlyDir, 0400) // read-only permissions
-	assert.NoError(t, err)
-
-	// Override constants to force mkdir to fail
-	originalSocketDir := constants.SocketDir
-	originalSocketFile := constants.SocketFile
-	constants.SocketDir = filepath.Join(readOnlyDir, "subdir")
-	constants.SocketFile = "test.sock"
-
-	defer func() {
-		// Restore constants after test
-		constants.SocketDir = originalSocketDir
-		constants.SocketFile = originalSocketFile
-		_ = os.Chmod(readOnlyDir, 0700) // allow cleanup
-	}()
+	MakeDir = func(path string, perm os.FileMode) error {
+		return errors.New("mock mkdir failure")
+	}
 
 	listener, err := setupSocket()
 	assert.Nil(t, listener)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "permission denied")
 }
 
 func TestSetupSocket_FailsToCreateSocket(t *testing.T) {

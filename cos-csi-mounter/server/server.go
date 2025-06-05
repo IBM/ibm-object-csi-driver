@@ -19,6 +19,7 @@ import (
 )
 
 var logger *zap.Logger
+var MakeDir = os.MkdirAll
 
 func init() {
 	_ = flag.Set("logtostderr", "true") // #nosec G104: Attempt to set flags for logging to stderr only on best-effort basis.Error cannot be usefully handled.
@@ -50,7 +51,7 @@ func setupSocket() (net.Listener, error) {
 	socketPath := filepath.Join(constants.SocketDir, constants.SocketFile)
 
 	// Ensure the socket directory exists
-	if err := os.MkdirAll(constants.SocketDir, 0750); err != nil {
+	if err := MakeDir(constants.SocketDir, 0750); err != nil {
 		logger.Error("Failed to create socket directory", zap.String("dir", constants.SocketDir), zap.Error(err))
 		return nil, err
 	}
