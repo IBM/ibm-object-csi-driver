@@ -18,8 +18,14 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-var logger *zap.Logger
-var MakeDir = os.MkdirAll
+var (
+	logger             *zap.Logger
+	MakeDir            = os.MkdirAll
+	RemoveFile         = os.Remove
+	UnixSocketListener = func(network, address string) (net.Listener, error) {
+		return net.Listen(network, address)
+	}
+)
 
 func init() {
 	_ = flag.Set("logtostderr", "true") // #nosec G104: Attempt to set flags for logging to stderr only on best-effort basis.Error cannot be usefully handled.
@@ -58,7 +64,7 @@ func setupSocket() (net.Listener, error) {
 
 	// Check for socket file
 	if _, err := os.Stat(socketPath); err == nil {
-		if err := os.Remove(socketPath); err != nil {
+		if err := RemoveFile(socketPath); err != nil {
 			logger.Warn("Failed to remove existing socket file", zap.String("path", socketPath), zap.Error(err))
 		}
 	} else if !os.IsNotExist(err) {
@@ -66,7 +72,7 @@ func setupSocket() (net.Listener, error) {
 	}
 
 	logger.Info("Creating unix socket listener...", zap.String("path", socketPath))
-	listener, err := net.Listen("unix", socketPath)
+	listener, err := UnixSocketListener("unix", socketPath)
 	if err != nil {
 		logger.Error("Failed to create unix socket listener", zap.String("path", socketPath), zap.Error(err))
 		return nil, err
