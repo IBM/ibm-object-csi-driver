@@ -1,5 +1,5 @@
-//go:build !test
-// +build !test
+//go:build !unit_test
+// +build !unit_test
 
 package main
 
