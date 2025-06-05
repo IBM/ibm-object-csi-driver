@@ -107,10 +107,11 @@ func newRouter() *gin.Engine {
 	return router
 }
 
-func main() {
-	listener, err := setupSocket()
+func startService(setupSocketFunc func() (net.Listener, error), router http.Handler, handleSignalsFunc func()) error {
+	listener, err := setupSocketFunc()
 	if err != nil {
-		logger.Fatal("Failed to create socket")
+		logger.Error("Failed to create socket", zap.Error(err))
+		return err
 	}
 	// Close the listener at the end
 	defer func() {
@@ -119,11 +120,9 @@ func main() {
 		}
 	}()
 
-	handleSignals()
+	handleSignalsFunc()
 
 	logger.Info("Starting cos-csi-mounter service...")
-
-	router := newRouter()
 
 	// Serve HTTP requests over Unix socket
 	server := &http.Server{
@@ -131,7 +130,16 @@ func main() {
 		ReadHeaderTimeout: 3 * time.Second,
 	}
 	if err := server.Serve(listener); err != nil {
-		logger.Fatal("Error while serving HTTP requests:", zap.Error(err))
+		logger.Error("Error while serving HTTP requests:", zap.Error(err))
+		return err
+	}
+	return nil
+}
+
+func main() {
+	err := startService(setupSocket, newRouter(), handleSignals)
+	if err != nil {
+		logger.Fatal("cos-csi-mounter exited with error", zap.Error(err))
 	}
 }
 

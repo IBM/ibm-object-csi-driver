@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/gin-gonic/gin"
@@ -33,11 +34,28 @@ func (m *MockMounterUtils) FuseUnmount(path string) error {
 	return argsCalled.Error(0)
 }
 
-type dummyListener struct{}
+type fakeListener struct{}
 
-func (d *dummyListener) Accept() (net.Conn, error) { return nil, nil }
-func (d *dummyListener) Close() error              { return nil }
-func (d *dummyListener) Addr() net.Addr            { return &net.UnixAddr{Name: "dummy", Net: "unix"} }
+func (d *fakeListener) Accept() (net.Conn, error) {
+	time.Sleep(100 * time.Millisecond)
+	return nil, errors.New("simulated shutdown")
+}
+func (d *fakeListener) Close() error   { return nil }
+func (d *fakeListener) Addr() net.Addr { return &net.UnixAddr{Name: "fake", Net: "unix"} }
+
+func fakeSetupSocketSuccess() (net.Listener, error) {
+	return &fakeListener{}, nil
+}
+
+func fakeRouter() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+}
+
+func fakeHandleSignals() {}
+
+func fakeSetupSocketFail() (net.Listener, error) {
+	return nil, errors.New("socket creation error")
+}
 
 type MockMounterArgsParser struct {
 	mock.Mock
@@ -87,8 +105,8 @@ func TestSetupSocket_FailsToCreateSocket(t *testing.T) {
 	constants.SocketFile = "existing.sock"
 	socketPath := filepath.Join(tmpDir, constants.SocketFile)
 
-	// Create a dummy socket file
-	err := os.WriteFile(socketPath, []byte("dummy"), 0644)
+	// Create a fake socket file
+	err := os.WriteFile(socketPath, []byte("fake"), 0644)
 	assert.NoError(t, err)
 
 	// Mock removeFile to simulate failure
@@ -101,7 +119,7 @@ func TestSetupSocket_FailsToCreateSocket(t *testing.T) {
 	// Also inject working listenUnix to avoid interfering errors
 	originalListen := UnixSocketListener
 	UnixSocketListener = func(network, address string) (net.Listener, error) {
-		return &dummyListener{}, nil
+		return &fakeListener{}, nil
 	}
 	defer func() { UnixSocketListener = originalListen }()
 
@@ -131,6 +149,31 @@ func TestSetupSocket_StatSocketFileFails(t *testing.T) {
 func TestNewRouter_HasExpectedRoutes(t *testing.T) {
 	router := newRouter()
 	assert.NotNil(t, router)
+}
+
+func TestStartService(t *testing.T) {
+	// Create a channel to receive the error from the goroutine
+	errCh := make(chan error, 1)
+
+	go func() {
+		err := startService(fakeSetupSocketSuccess, fakeRouter(), fakeHandleSignals)
+		errCh <- err
+	}()
+
+	select {
+	case err := <-errCh:
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "simulated shutdown")
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("startService did not return in time")
+	}
+}
+
+func TestStartService_SocketError(t *testing.T) {
+	err := startService(fakeSetupSocketFail, fakeRouter(), fakeHandleSignals)
+	if err == nil {
+		t.Error("Expected socket creation error, got nil")
+	}
 }
 
 func TestHandleCosMount_InvalidJSON(t *testing.T) {
