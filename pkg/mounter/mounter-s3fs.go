@@ -13,10 +13,12 @@ package mounter
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
@@ -38,8 +40,9 @@ type S3fsMounter struct {
 }
 
 const (
-	metaRoot = "/var/lib/ibmc-s3fs"
-	passFile = ".passwd-s3fs" // #nosec G101: not password
+	passFile   = ".passwd-s3fs" // #nosec G101: not password
+	maxRetries = 3
+	delay      = 500 * time.Millisecond
 )
 
 func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
@@ -103,6 +106,14 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	klog.Info("-S3FSMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
+
+	var metaRoot string
+	if mountWorker {
+		metaRoot = constants.MounterConfigPathOnHost
+	} else {
+		metaRoot = constants.MounterConfigPathOnPodS3fs
+	}
+
 	var bucketName string
 	var pathExist bool
 	var err error
@@ -115,7 +126,6 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	}
 
 	if !pathExist {
-		//if err = os.MkdirAll(metaPath, 0755); // #nosec G301: used for s3fs
 		if err = mkdirAll(metaPath, 0755); // #nosec G301: used for s3fs
 		err != nil {
 			klog.Errorf("S3FSMounter Mount: Cannot create directory %s: %v", metaPath, err)
@@ -135,32 +145,29 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 		bucketName = s3fs.BucketName
 	}
 
-	args := []string{
-		bucketName,
-		target,
-		"-o", "sigv2",
-		"-o", "use_path_request_style",
-		"-o", fmt.Sprintf("passwd_file=%s", passwdFile),
-		"-o", fmt.Sprintf("url=%s", s3fs.EndPoint),
-		"-o", "allow_other",
-		"-o", "mp_umask=002",
-	}
+	args, wnOp := s3fs.formulateMountOptions(bucketName, target, passwdFile)
 
-	if s3fs.LocConstraint != "" {
-		args = append(args, "-o", fmt.Sprintf("endpoint=%s", s3fs.LocConstraint))
-	}
+	if mountWorker {
+		klog.Info("Worker Mounting...")
 
-	for _, val := range s3fs.MountOptions {
-		args = append(args, "-o")
-		args = append(args, val)
-	}
+		jsonData, err := json.Marshal(wnOp)
+		if err != nil {
+			klog.Fatalf("Error marshalling data: %v", err)
+			return err
+		}
 
-	if s3fs.AuthType != "hmac" {
-		args = append(args, "-o", "ibm_iam_auth")
-		args = append(args, "-o", "ibm_iam_endpoint="+constants.DefaultIAMEndPoint)
-	} else {
-		args = append(args, "-o", "default_acl=private")
+		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.S3FS, jsonData)
+
+		klog.Info("Worker Mounting Payload...", payload)
+
+		response, err := createCOSCSIMounterRequest(payload, "http://unix/api/cos/mount")
+		klog.Info("Worker Mounting...", response)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
+	klog.Info("NodeServer Mounting...")
 	return s3fs.MounterUtils.FuseMount(target, constants.S3FS, args)
 }
 
@@ -173,13 +180,31 @@ var writePassWrap = func(pwFileName string, pwFileContent string) error {
 
 func (s3fs *S3fsMounter) Unmount(target string) error {
 	klog.Info("-S3FSMounter Unmount-")
-	metaPath := path.Join(metaRoot, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
-	err := os.RemoveAll(metaPath)
+	klog.Infof("Unmount args:\n\ttarget: <%s>", target)
+
+	if mountWorker {
+		klog.Info("Worker Unmounting...")
+
+		payload := fmt.Sprintf(`{"path":"%s"}`, target)
+
+		response, err := createCOSCSIMounterRequest(payload, "http://unix/api/cos/unmount")
+		klog.Info("Worker Unmounting...", response)
+		if err != nil {
+			return err
+		}
+
+		removeS3FSCredFile(constants.MounterConfigPathOnHost, target)
+		return nil
+	}
+	klog.Info("NodeServer Unmounting...")
+
+	err := s3fs.MounterUtils.FuseUnmount(target)
 	if err != nil {
 		return err
 	}
 
-	return s3fs.MounterUtils.FuseUnmount(target)
+	removeS3FSCredFile(constants.MounterConfigPathOnPodS3fs, target)
+	return nil
 }
 
 func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string) []string {
@@ -262,4 +287,82 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 
 	klog.Infof("updated S3fsMounter Options: %v", updatedOptions)
 	return updatedOptions
+}
+
+func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string) (nodeServerOp []string, workerNodeOp map[string]string) {
+	nodeServerOp = []string{
+		bucket,
+		target,
+		"-o", "sigv2",
+		"-o", "use_path_request_style",
+		"-o", fmt.Sprintf("passwd_file=%s", passwdFile),
+		"-o", fmt.Sprintf("url=%s", s3fs.EndPoint),
+		"-o", "allow_other",
+		"-o", "mp_umask=002",
+	}
+
+	workerNodeOp = map[string]string{
+		"sigv2":                  "true",
+		"use_path_request_style": "true",
+		"passwd_file":            passwdFile,
+		"url":                    s3fs.EndPoint,
+		"allow_other":            "true",
+		"mp_umask":               "002",
+	}
+
+	if s3fs.LocConstraint != "" {
+		nodeServerOp = append(nodeServerOp, "-o", fmt.Sprintf("endpoint=%s", s3fs.LocConstraint))
+		workerNodeOp["endpoint"] = s3fs.LocConstraint
+	}
+
+	for _, val := range s3fs.MountOptions {
+		nodeServerOp = append(nodeServerOp, "-o")
+		nodeServerOp = append(nodeServerOp, val)
+
+		splitVal := strings.Split(val, "=")
+		if len(splitVal) == 1 {
+			workerNodeOp[splitVal[0]] = "true"
+		} else {
+			workerNodeOp[splitVal[0]] = splitVal[1]
+		}
+	}
+
+	if s3fs.AuthType != "hmac" {
+		nodeServerOp = append(nodeServerOp, "-o", "ibm_iam_auth")
+		nodeServerOp = append(nodeServerOp, "-o", "ibm_iam_endpoint="+constants.DefaultIAMEndPoint)
+
+		workerNodeOp["ibm_iam_auth"] = "true"
+		workerNodeOp["ibm_iam_endpoint"] = constants.DefaultIAMEndPoint
+	} else {
+		nodeServerOp = append(nodeServerOp, "-o", "default_acl=private")
+		workerNodeOp["default_acl"] = "private"
+	}
+	return
+}
+
+func removeS3FSCredFile(credDir, target string) {
+	metaPath := path.Join(credDir, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
+
+	for retry := 1; retry <= maxRetries; retry++ {
+		_, err := os.Stat(metaPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				klog.Infof("removeS3FSCredFile: Password file directory does not exist: %s", metaPath)
+				return
+			}
+			klog.Errorf("removeS3FSCredFile: Attempt %d - Failed to stat path %s: %v", retry, metaPath, err)
+			time.Sleep(delay)
+			continue
+		}
+		passwdFile := path.Join(metaPath, passFile)
+		err = os.Remove(passwdFile)
+		if err != nil {
+			klog.Errorf("removeS3FSCredFile: Attempt %d - Failed to remove password file %s: %v", retry, passwdFile, err)
+			time.Sleep(delay)
+			continue
+		}
+		klog.Infof("removeS3FSCredFile: Successfully removed password file: %s", passwdFile)
+		return
+	}
+	klog.Errorf("removeS3FSCredFile: Failed to remove password file after %d attempts", maxRetries)
 }

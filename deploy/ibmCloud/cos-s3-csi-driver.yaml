@@ -99,6 +99,7 @@ spec:
             allowPrivilegeEscalation: false
             runAsNonRoot: false
             runAsUser: 0
+            runAsGroup: 0
           image: driver-registrar-image
           args:
             - --v=5
@@ -129,6 +130,7 @@ spec:
             privileged: true
             runAsNonRoot: false
             runAsUser: 0
+            runAsGroup: 0
           image: cos-driver-image
           imagePullPolicy: Always
           args:
@@ -145,6 +147,10 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
+            - name: IS_NODE_SERVER
+              value: "true"
+            - name: SIDECAR_GROUP_ID
+              value: "2121"
           volumeMounts:
             - name: plugin-dir
               mountPath: /csi
@@ -162,10 +168,16 @@ spec:
               mountPath: /host/var/log
         - name: liveness-probe
           securityContext:
+            runAsNonRoot: true
+            runAsUser: 2121
+            runAsGroup: 2121
+            privileged: false
+            seLinuxOptions: # seLinux label is set as a precaution for accessing csi socket
+              type: spc_t
+              level: s0
             capabilities:
               drop:
               - ALL
-            privileged: false
             allowPrivilegeEscalation: false
           image: liveness-probe-image
           args:
