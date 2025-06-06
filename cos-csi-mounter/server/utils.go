@@ -32,6 +32,10 @@ type MounterArgs interface {
 	PopulateArgsSlice(bucket, path string) ([]string, error)
 }
 
+type MounterArgsParser interface {
+	Parse(request MountRequest) ([]string, error)
+}
+
 func strictDecodeForUnknownFields(data json.RawMessage, v interface{}) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
@@ -50,6 +54,12 @@ func pathValidator(targetPath string) error {
 }
 
 // --- Parser for Mounter Arguments ---
+
+type DefaultMounterArgsParser struct{}
+
+func (p *DefaultMounterArgsParser) Parse(request MountRequest) ([]string, error) {
+	return request.ParseMounterArgs()
+}
 
 func (req *MountRequest) ParseMounterArgs() ([]string, error) {
 	switch req.Mounter {

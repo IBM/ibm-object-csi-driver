@@ -18,7 +18,14 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-var logger *zap.Logger
+var (
+	logger             *zap.Logger
+	MakeDir            = os.MkdirAll
+	RemoveFile         = os.Remove
+	UnixSocketListener = func(network, address string) (net.Listener, error) {
+		return net.Listen(network, address)
+	}
+)
 
 func init() {
 	_ = flag.Set("logtostderr", "true") // #nosec G104: Attempt to set flags for logging to stderr only on best-effort basis.Error cannot be usefully handled.
@@ -50,14 +57,14 @@ func setupSocket() (net.Listener, error) {
 	socketPath := filepath.Join(constants.SocketDir, constants.SocketFile)
 
 	// Ensure the socket directory exists
-	if err := os.MkdirAll(constants.SocketDir, 0750); err != nil {
-		logger.Fatal("Failed to create socket directory", zap.String("dir", constants.SocketDir), zap.Error(err))
+	if err := MakeDir(constants.SocketDir, 0750); err != nil {
+		logger.Error("Failed to create socket directory", zap.String("dir", constants.SocketDir), zap.Error(err))
 		return nil, err
 	}
 
 	// Check for socket file
 	if _, err := os.Stat(socketPath); err == nil {
-		if err := os.Remove(socketPath); err != nil {
+		if err := RemoveFile(socketPath); err != nil {
 			logger.Warn("Failed to remove existing socket file", zap.String("path", socketPath), zap.Error(err))
 		}
 	} else if !os.IsNotExist(err) {
@@ -65,9 +72,9 @@ func setupSocket() (net.Listener, error) {
 	}
 
 	logger.Info("Creating unix socket listener...", zap.String("path", socketPath))
-	listener, err := net.Listen("unix", socketPath)
+	listener, err := UnixSocketListener("unix", socketPath)
 	if err != nil {
-		logger.Fatal("Failed to create unix socket listener", zap.String("path", socketPath), zap.Error(err))
+		logger.Error("Failed to create unix socket listener", zap.String("path", socketPath), zap.Error(err))
 		return nil, err
 	}
 	return listener, nil
@@ -90,17 +97,21 @@ func handleSignals() {
 }
 
 func newRouter() *gin.Engine {
+	utils := &mounterUtils.MounterOptsUtils{}
+	parser := &DefaultMounterArgsParser{}
+
 	// Create gin router
 	router := gin.Default()
-	router.POST("/api/cos/mount", handleCosMount())
-	router.POST("/api/cos/unmount", handleCosUnmount())
+	router.POST("/api/cos/mount", handleCosMount(utils, parser))
+	router.POST("/api/cos/unmount", handleCosUnmount(utils))
 	return router
 }
 
-func main() {
-	listener, err := setupSocket()
+func startService(setupSocketFunc func() (net.Listener, error), router http.Handler, handleSignalsFunc func()) error {
+	listener, err := setupSocketFunc()
 	if err != nil {
-		logger.Fatal("Failed to create socket")
+		logger.Error("Failed to create socket", zap.Error(err))
+		return err
 	}
 	// Close the listener at the end
 	defer func() {
@@ -109,11 +120,9 @@ func main() {
 		}
 	}()
 
-	handleSignals()
+	handleSignalsFunc()
 
 	logger.Info("Starting cos-csi-mounter service...")
-
-	router := newRouter()
 
 	// Serve HTTP requests over Unix socket
 	server := &http.Server{
@@ -121,11 +130,21 @@ func main() {
 		ReadHeaderTimeout: 3 * time.Second,
 	}
 	if err := server.Serve(listener); err != nil {
-		logger.Fatal("Error while serving HTTP requests:", zap.Error(err))
+		logger.Error("Error while serving HTTP requests:", zap.Error(err))
+		return err
+	}
+	return nil
+}
+
+func main() {
+	err := startService(setupSocket, newRouter(), handleSignals)
+	if err != nil {
+		logger.Error("cos-csi-mounter exited with error", zap.Error(err))
+		os.Exit(1)
 	}
 }
 
-func handleCosMount() gin.HandlerFunc {
+func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var request MountRequest
 
@@ -150,7 +169,7 @@ func handleCosMount() gin.HandlerFunc {
 		}
 
 		// validate mounter args
-		args, err := request.ParseMounterArgs()
+		args, err := parser.Parse(request)
 		if err != nil {
 			logger.Error("failed to parse mounter args", zap.Any("mounter", request.Mounter), zap.Error(err))
 
@@ -158,8 +177,7 @@ func handleCosMount() gin.HandlerFunc {
 			return
 		}
 
-		utils := mounterUtils.MounterOptsUtils{}
-		err = utils.FuseMount(request.Path, request.Mounter, args)
+		err = mounter.FuseMount(request.Path, request.Mounter, args)
 		if err != nil {
 			logger.Error("mount failed: ", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("mount failed: %v", err)})
@@ -171,7 +189,7 @@ func handleCosMount() gin.HandlerFunc {
 	}
 }
 
-func handleCosUnmount() gin.HandlerFunc {
+func handleCosUnmount(mounter mounterUtils.MounterUtils) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var request struct {
 			Path string `json:"path"`
@@ -185,8 +203,7 @@ func handleCosUnmount() gin.HandlerFunc {
 
 		logger.Info("New unmount request with values: ", zap.String("Path", request.Path))
 
-		utils := mounterUtils.MounterOptsUtils{}
-		err := utils.FuseUnmount(request.Path)
+		err := mounter.FuseUnmount(request.Path)
 		if err != nil {
 			logger.Error("unmount failed: ", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("unmount failed :%v", err)})
