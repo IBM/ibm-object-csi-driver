@@ -139,7 +139,8 @@ func startService(setupSocketFunc func() (net.Listener, error), router http.Hand
 func main() {
 	err := startService(setupSocket, newRouter(), handleSignals)
 	if err != nil {
-		logger.Fatal("cos-csi-mounter exited with error", zap.Error(err))
+		logger.Error("cos-csi-mounter exited with error", zap.Error(err))
+		os.Exit(1)
 	}
 }
 
