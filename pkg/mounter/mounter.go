@@ -40,6 +40,13 @@ func (s *CSIMounterFactory) NewMounter(attrib map[string]string, secretMap map[s
 	var mounter, val string
 	var check bool
 
+	if secretMap == nil {
+		secretMap = map[string]string{}
+	}
+	if mountFlags == nil {
+		mountFlags = []string{}
+	}
+
 	// Select mounter as per storage class
 	if val, check = attrib["mounter"]; check {
 		mounter = val

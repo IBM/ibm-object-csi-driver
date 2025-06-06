@@ -182,10 +182,7 @@ func (ns *nodeServer) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpubl
 		return nil, status.Error(codes.NotFound, "Failed to get PV details")
 	}
 
-	secretMap := map[string]string{}
-	mountFlags := []string{}
-
-	mounterObj := ns.Mounter.NewMounter(attrib, secretMap, mountFlags)
+	mounterObj := ns.Mounter.NewMounter(attrib, nil, nil)
 
 	klog.Info("-NodeUnpublishVolume-: Unmount")
 	if err = mounterObj.Unmount(targetPath); err != nil {
