@@ -26,11 +26,6 @@ const (
 
 	// NodeRegionLabel Region Label attached to node
 	NodeRegionLabel = "topology.kubernetes.io/region"
-)
-
-var (
-	SocketDir  = "/var/lib/coscsi-sock"
-	SocketFile = "coscsi.sock"
 
 	// Timeout specifies a time limit for requests made by HTTP Client
 	Timeout                      = 3 * time.Minute
@@ -41,4 +36,9 @@ var (
 	MounterConfigPathOnPodRclone = "/root/.config/rclone"
 
 	IsNodeServer = "IS_NODE_SERVER"
+)
+
+var (
+	SocketDir  = "/var/lib/coscsi-sock"
+	SocketFile = "coscsi.sock"
 )

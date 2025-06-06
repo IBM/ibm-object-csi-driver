@@ -173,9 +173,9 @@ func createCOSCSIMounterRequest(payload string, url string) (string, error) {
 	}
 
 	responseBody := string(body)
+	klog.Infof("response from cos-csi-mounter -> Exit Status Code: %s ,ResponseCode: %v", responseBody, response.StatusCode)
 
 	if response.StatusCode != http.StatusOK {
-		klog.Errorf("response from cos-csi-mounter -> Exit Status Code: %s ,ResponseCode: %v", responseBody, response.StatusCode)
 		return responseBody, fetchGRPCReturnCode(response.StatusCode)
 	}
 	return "", nil

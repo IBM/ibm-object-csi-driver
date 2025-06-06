@@ -160,8 +160,8 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 
 		klog.Info("Worker Mounting Payload...", payload)
 
-		errResponse, err := createCOSCSIMounterRequest(payload, "http://unix/api/cos/mount")
-		klog.Info("Worker Mounting...", errResponse)
+		response, err := createCOSCSIMounterRequest(payload, "http://unix/api/cos/mount")
+		klog.Info("Worker Mounting...", response)
 		if err != nil {
 			return err
 		}
@@ -182,32 +182,28 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 	klog.Info("-S3FSMounter Unmount-")
 	klog.Infof("Unmount args:\n\ttarget: <%s>", target)
 
-	var metaRoot string
-
 	if mountWorker {
 		klog.Info("Worker Unmounting...")
-		metaRoot = constants.MounterConfigPathOnHost
 
 		payload := fmt.Sprintf(`{"path":"%s"}`, target)
 
-		errResponse, err := createCOSCSIMounterRequest(payload, "http://unix/api/cos/unmount")
-		klog.Info("Worker Unmounting...", errResponse)
+		response, err := createCOSCSIMounterRequest(payload, "http://unix/api/cos/unmount")
+		klog.Info("Worker Unmounting...", response)
 		if err != nil {
 			return err
 		}
 
-		removeS3FSCredFile(metaRoot, target)
+		removeS3FSCredFile(constants.MounterConfigPathOnHost, target)
 		return nil
 	}
 	klog.Info("NodeServer Unmounting...")
-	metaRoot = constants.MounterConfigPathOnPodS3fs
 
 	err := s3fs.MounterUtils.FuseUnmount(target)
 	if err != nil {
 		return err
 	}
 
-	removeS3FSCredFile(metaRoot, target)
+	removeS3FSCredFile(constants.MounterConfigPathOnPodS3fs, target)
 	return nil
 }
 

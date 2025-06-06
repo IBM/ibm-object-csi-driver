@@ -179,7 +179,7 @@ func (ns *nodeServer) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpubl
 
 	attrib, err := utils.GetPVAttributes(volumeID)
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "Failed to get PV details")
+		return nil, status.Error(codes.Internal, "Failed to get PV details")
 	}
 
 	mounterObj := ns.Mounter.NewMounter(attrib, nil, nil)
