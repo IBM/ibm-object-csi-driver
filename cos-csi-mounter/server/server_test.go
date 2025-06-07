@@ -57,7 +57,7 @@ func TestSetupSocket_FailsToCreateSocket(t *testing.T) {
 	socketPath := filepath.Join(tmpDir, constants.SocketFile)
 
 	// Create a fake socket file
-	err := os.WriteFile(socketPath, []byte("fake"), 0644)
+	err := os.WriteFile(socketPath, []byte("fake"), 0600)
 	assert.NoError(t, err)
 
 	// Mock removeFile to simulate failure

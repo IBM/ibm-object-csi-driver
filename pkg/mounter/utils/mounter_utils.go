@@ -67,9 +67,8 @@ func (su *MounterOptsUtils) FuseUnmount(path string) error {
 				if err != nil {
 					klog.Errorf("Force unmount failed for %s: %v", path, err)
 					return fmt.Errorf("all unmount attempts failed for %s: %v", path, err)
-				} else {
-					klog.Infof("Force unmounted %s successfully", path)
 				}
+				klog.Infof("Force unmounted %s successfully", path)
 			} else {
 				klog.Infof("Lazy unmounted %s successfully", path)
 			}
