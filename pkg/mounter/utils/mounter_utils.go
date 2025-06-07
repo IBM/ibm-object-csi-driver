@@ -51,7 +51,7 @@ func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) e
 
 func (su *MounterOptsUtils) FuseUnmount(path string) error {
 	klog.Info("-fuseUnmount-")
-	// directory exists
+	// check if mountpoint exists
 	isMount, checkMountErr := isMountpoint(path)
 	if isMount || checkMountErr != nil {
 		klog.Infof("isMountpoint  %v", isMount)
