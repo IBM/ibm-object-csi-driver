@@ -27,7 +27,8 @@ RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && cd s3fs-fuse && \
     rm -rf /var/lib/apt/lists/*
 
 FROM registry.access.redhat.com/ubi8/ubi AS rclone-builder
-RUN yum install wget git gcc -y
+RUN yum install -y --nobest --setopt=install_weak_deps=False \
+    wget git gcc glibc-devel libxcrypt-devel
 
 ENV ARCH=amd64
 ENV GO_VERSION=1.24.4
