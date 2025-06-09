@@ -60,7 +60,7 @@ ARG build_date=unknown
 LABEL description="IBM CSI Object Storage Plugin"
 LABEL build-date=${build_date}
 LABEL git-commit-id=${git_commit_id}
-RUN yum update -y && yum install fuse fuse-libs fuse3 fuse3-libs -y
+RUN yum update -y --allowerasing && yum install --allowerasing fuse fuse-libs fuse3 fuse3-libs -y
 COPY --from=s3fs-builder /usr/local/bin/s3fs /usr/bin/s3fs
 COPY --from=rclone-builder /usr/local/bin/rclone /usr/bin/rclone
 COPY ibm-object-csi-driver ibm-object-csi-driver
