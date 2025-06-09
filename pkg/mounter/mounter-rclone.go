@@ -14,6 +14,7 @@ package mounter
 import (
 	"bufio"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -41,8 +42,6 @@ type RcloneMounter struct {
 }
 
 const (
-	metaRootRclone = "/var/lib/ibmc-rclone"
-	configPath     = "/root/.config/rclone"
 	configFileName = "rclone.conf"
 	remote         = "ibmcos"
 	s3Type         = "s3"
@@ -169,22 +168,15 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 func (rclone *RcloneMounter) Mount(source string, target string) error {
 	klog.Info("-RcloneMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
+
 	var bucketName string
-	var pathExist bool
 	var err error
-	metaPath := path.Join(metaRootRclone, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 
-	if pathExist, err = checkPath(metaPath); err != nil {
-		klog.Errorf("RcloneMounter Mount: Cannot stat directory %s: %v", metaPath, err)
-		return err
-	}
-
-	if !pathExist {
-		if err = mkdirAll(metaPath, 0755); // #nosec G301: used for rclone
-		err != nil {
-			klog.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", metaPath, err)
-			return err
-		}
+	var configPath string
+	if mountWorker {
+		configPath = constants.MounterConfigPathOnHost
+	} else {
+		configPath = constants.MounterConfigPathOnPodRclone
 	}
 
 	configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
@@ -199,33 +191,46 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 		bucketName = fmt.Sprintf("%s:%s", remote, rclone.BucketName)
 	}
 
-	args := []string{
-		"mount",
-		bucketName,
-		target,
-		"--allow-other",
-		"--daemon",
-		"--config=" + configPathWithVolID + "/" + configFileName,
-		"--log-file=/var/log/rclone.log",
+	args, wnOp := rclone.formulateMountOptions(bucketName, target, configPathWithVolID)
+
+	if mountWorker {
+		klog.Info("Worker Mounting...")
+
+		jsonData, err := json.Marshal(wnOp)
+		if err != nil {
+			klog.Fatalf("Error marshalling data: %v", err)
+			return err
+		}
+
+		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.RClone, jsonData)
+
+		response, err := createCOSCSIMounterRequest(payload, "http://unix/api/cos/mount")
+		klog.Info("Worker Mounting...", response)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
-	if rclone.GID != "" {
-		gidOpt := "--gid=" + rclone.GID
-		args = append(args, gidOpt)
-	}
-	if rclone.UID != "" {
-		uidOpt := "--uid=" + rclone.UID
-		args = append(args, uidOpt)
-	}
+	klog.Info("NodeServer Mounting...")
 	return rclone.MounterUtils.FuseMount(target, constants.RClone, args)
 }
 
 func (rclone *RcloneMounter) Unmount(target string) error {
 	klog.Info("-RcloneMounter Unmount-")
-	metaPath := path.Join(metaRootRclone, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
-	err := os.RemoveAll(metaPath)
-	if err != nil {
-		return err
+
+	if mountWorker {
+		klog.Info("Worker Unmounting...")
+
+		payload := fmt.Sprintf(`{"path":"%s"}`, target)
+
+		response, err := createCOSCSIMounterRequest(payload, "http://unix/api/cos/unmount")
+		klog.Info("Worker Unmounting...", response)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
+	klog.Info("NodeServer Unmounting...")
 	return rclone.MounterUtils.FuseUnmount(target)
 }
 
@@ -299,4 +304,49 @@ func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
 	}
 	klog.Info("-Rclone created rclone config file-")
 	return nil
+}
+
+func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWithVolID string) (nodeServerOp []string, workerNodeOp map[string]string) {
+	nodeServerOp = []string{
+		"mount",
+		bucket,
+		target,
+		"--allow-other",
+		"--daemon",
+		"--config=" + configPathWithVolID + "/" + configFileName,
+		"--log-file=/var/log/rclone.log",
+	}
+
+	workerNodeOp = map[string]string{
+		"allow-other": "true",
+		"daemon":      "true",
+		"config":      configPathWithVolID + "/" + configFileName,
+		"log-file":    "/var/log/rclone.log",
+	}
+
+	if rclone.GID != "" {
+		gidOpt := "--gid=" + rclone.GID
+		nodeServerOp = append(nodeServerOp, gidOpt)
+
+		workerNodeOp["gid"] = rclone.GID
+	}
+	if rclone.UID != "" {
+		uidOpt := "--uid=" + rclone.UID
+		nodeServerOp = append(nodeServerOp, uidOpt)
+
+		workerNodeOp["uid"] = rclone.UID
+	}
+
+	for _, val := range rclone.MountOptions {
+		nodeServerOp = append(nodeServerOp, val)
+
+		flag := strings.TrimPrefix(val, "--")
+		splitVal := strings.Split(flag, "=")
+		if len(splitVal) == 1 {
+			workerNodeOp[splitVal[0]] = "true"
+		} else {
+			workerNodeOp[splitVal[0]] = splitVal[1]
+		}
+	}
+	return
 }
