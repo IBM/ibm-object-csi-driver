@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 package utils
 
 import (
@@ -48,21 +51,32 @@ func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) e
 
 func (su *MounterOptsUtils) FuseUnmount(path string) error {
 	klog.Info("-fuseUnmount-")
-	// directory exists
+	// check if mountpoint exists
 	isMount, checkMountErr := isMountpoint(path)
 	if isMount || checkMountErr != nil {
 		klog.Infof("isMountpoint  %v", isMount)
 		err := unmount(path, 0)
-		if err != nil && checkMountErr == nil {
-			klog.Errorf("Cannot unmount. Trying force unmount %s", err)
-			//Do force unmount
-			err = unmount(path, 0)
+		if err != nil {
+			klog.Warningf("Standard unmount failed for %s: %v. Trying lazy unmount...", path, err)
+			// Try lazy (MNT_DETACH) unmount
+			err = unmount(path, syscall.MNT_DETACH)
 			if err != nil {
-				klog.Errorf("Cannot force unmount %s", err)
-				return fmt.Errorf("cannot force unmount %s: %v", path, err)
+				klog.Warningf("Lazy unmount failed for %s: %v. Trying force unmount...", path, err)
+				// Try force unmount as last resort
+				err = unmount(path, syscall.MNT_FORCE)
+				if err != nil {
+					klog.Errorf("Force unmount failed for %s: %v", path, err)
+					return fmt.Errorf("all unmount attempts failed for %s: %v", path, err)
+				}
+				klog.Infof("Force unmounted %s successfully", path)
+			} else {
+				klog.Infof("Lazy unmounted %s successfully", path)
 			}
+		} else {
+			klog.Infof("Unmounted %s with standard unmount successfully", path)
 		}
 	}
+
 	// as fuse quits immediately, we will try to wait until the process is done
 	process, err := findFuseMountProcess(path)
 	if err != nil {
