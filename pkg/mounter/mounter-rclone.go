@@ -336,17 +336,5 @@ func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWit
 
 		workerNodeOp["uid"] = rclone.UID
 	}
-
-	for _, val := range rclone.MountOptions {
-		nodeServerOp = append(nodeServerOp, val)
-
-		flag := strings.TrimPrefix(val, "--")
-		splitVal := strings.Split(flag, "=")
-		if len(splitVal) == 1 {
-			workerNodeOp[splitVal[0]] = "true"
-		} else {
-			workerNodeOp[splitVal[0]] = splitVal[1]
-		}
-	}
 	return
 }
