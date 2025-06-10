@@ -281,7 +281,6 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 		}
 
 		updatedOptions = append(updatedOptions, option)
-		//klog.Infof("newS3fsMounter mountOption: [%s]", option)
 	}
 
 	klog.Infof("updated S3fsMounter Options: %v", updatedOptions)
