@@ -115,7 +115,7 @@ func TestStartService(t *testing.T) {
 	case err := <-errCh:
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "simulated shutdown")
-	case <-time.After(500 * time.Millisecond):
+	case <-time.After(constants.Interval):
 		t.Fatal("startService did not return in time")
 	}
 }

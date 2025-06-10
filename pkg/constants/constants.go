@@ -34,6 +34,8 @@ const (
 	MounterConfigPathOnHost      = "/var/lib/coscsi-config"
 	MounterConfigPathOnPodS3fs   = "/var/lib/ibmc-s3fs"
 	MounterConfigPathOnPodRclone = "/root/.config/rclone"
+	// Interval to wait till next loop
+	Interval = 500 * time.Millisecond
 
 	IsNodeServer = "IS_NODE_SERVER"
 )
