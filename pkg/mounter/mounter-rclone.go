@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
@@ -229,10 +230,19 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 		if err != nil {
 			return err
 		}
+
+		removeRcloneConfigFile(constants.MounterConfigPathOnHost, target)
 		return nil
 	}
 	klog.Info("NodeServer Unmounting...")
-	return rclone.MounterUtils.FuseUnmount(target)
+
+	err := rclone.MounterUtils.FuseUnmount(target)
+	if err != nil {
+		return err
+	}
+
+	removeRcloneConfigFile(constants.MounterConfigPathOnPodRclone, target)
+	return nil
 }
 
 func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
@@ -330,4 +340,31 @@ func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWit
 		workerNodeOp["uid"] = rclone.UID
 	}
 	return
+}
+
+func removeRcloneConfigFile(configPath, target string) {
+	configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
+
+	for retry := 1; retry <= maxRetries; retry++ {
+		_, err := os.Stat(configPathWithVolID)
+		if err != nil {
+			if os.IsNotExist(err) {
+				klog.Infof("removeRcloneConfigFile: Password file directory does not exist: %s", configPathWithVolID)
+				return
+			}
+			klog.Errorf("removeRcloneConfigFile: Attempt %d - Failed to stat path %s: %v", retry, configPathWithVolID, err)
+			time.Sleep(constants.Interval)
+			continue
+		}
+		configFile := path.Join(configPathWithVolID, configFileName)
+		err = os.Remove(configFile)
+		if err != nil {
+			klog.Errorf("removeRcloneConfigFile: Attempt %d - Failed to remove password file %s: %v", retry, configFile, err)
+			time.Sleep(constants.Interval)
+			continue
+		}
+		klog.Infof("removeRcloneConfigFile: Successfully removed config file: %s", configFile)
+		return
+	}
+	klog.Errorf("removeRcloneConfigFile: Failed to remove config file after %d attempts", maxRetries)
 }
