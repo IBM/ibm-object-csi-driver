@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/mitchellh/go-ps"
 	"k8s.io/klog/v2"
 )
@@ -125,7 +126,6 @@ func isMountpoint(pathname string) (bool, error) {
 
 func waitForMount(path string, timeout time.Duration) error {
 	var elapsed time.Duration
-	var interval = 500 * time.Millisecond
 	for {
 		out, err := exec.Command("mountpoint", path).CombinedOutput()
 		outStr := strings.TrimSpace(string(out))
@@ -135,9 +135,8 @@ func waitForMount(path string, timeout time.Duration) error {
 		}
 
 		klog.Infof("Mountpoint check in progress: path=%s, output=%s, err=%v", path, outStr, err)
-
-		time.Sleep(interval)
-		elapsed = elapsed + interval
+		time.Sleep(constants.Interval)
+		elapsed = elapsed + constants.Interval
 		if elapsed >= timeout {
 			return fmt.Errorf("timeout waiting for mount: last check output: %s", outStr)
 		}
