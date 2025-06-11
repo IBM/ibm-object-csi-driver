@@ -32,6 +32,10 @@ func TestGetConfigBool(t *testing.T) {
 	os.Setenv("DEBUG_TRACE", "true")
 	val := getConfigBool("DEBUG_TRACE", false, *logger)
 	assert.True(t, val)
+
+	os.Setenv("DEBUG_TRACE", "notbool")
+	val = getConfigBool("DEBUG_TRACE", false, *logger)
+	assert.False(t, val)
 	os.Unsetenv("DEBUG_TRACE")
 
 	val = getConfigBool("DEBUG_TRACE", true, *logger)
