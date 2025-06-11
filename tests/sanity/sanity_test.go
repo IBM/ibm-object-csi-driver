@@ -258,6 +258,10 @@ func (su *FakeNewDriverStatsUtils) GetRegionAndZone(nodeName string) (string, st
 	return "", "", nil
 }
 
+func (su *FakeNewDriverStatsUtils) GetPVAttributes(volumeID string) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+
 func createTargetDir(targetPath string) error {
 	fileInfo, err := os.Stat(targetPath)
 	if err != nil && os.IsNotExist(err) {

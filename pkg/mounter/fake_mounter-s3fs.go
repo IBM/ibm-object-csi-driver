@@ -11,19 +11,21 @@ type fakes3fsMounter struct {
 	accessKeys    string
 	kpRootKeyCrn  string
 
-	isFailedMount bool
+	isFailedMount   bool
+	isFailedUnmount bool
 }
 
-func fakenewS3fsMounter(isFailedMount bool) Mounter {
+func fakenewS3fsMounter(isFailedMount, isFailedUnmount bool) Mounter {
 	return &fakes3fsMounter{
-		bucketName:    bucketName,
-		objPath:       objPath,
-		endPoint:      endPoint,
-		locConstraint: region,
-		accessKeys:    keys,
-		authType:      authType,
-		kpRootKeyCrn:  "",
-		isFailedMount: isFailedMount,
+		bucketName:      bucketName,
+		objPath:         objPath,
+		endPoint:        endPoint,
+		locConstraint:   region,
+		accessKeys:      keys,
+		authType:        authType,
+		kpRootKeyCrn:    "",
+		isFailedMount:   isFailedMount,
+		isFailedUnmount: isFailedUnmount,
 	}
 }
 
@@ -35,5 +37,8 @@ func (s3fs *fakes3fsMounter) Mount(source string, target string) error {
 }
 
 func (s3fs *fakes3fsMounter) Unmount(target string) error {
+	if s3fs.isFailedUnmount {
+		return errors.New("failed to unmount s3fs")
+	}
 	return nil
 }
