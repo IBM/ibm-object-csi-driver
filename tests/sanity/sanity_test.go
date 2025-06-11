@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	cloudProvider "github.com/IBM/ibm-csi-common/pkg/ibmcloudprovider"
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	csiDriver "github.com/IBM/ibm-object-csi-driver/pkg/driver"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
@@ -57,7 +58,7 @@ func TestSanity(t *testing.T) {
 		t.Fatalf("Failed to set skipTests: %v, Error: %v", skipTests, err)
 	}
 
-	_ = os.Setenv("KUBE_NODE_NAME", "testNode")
+	_ = os.Setenv(constants.KubeNodeName, "testNode")
 
 	// Create a fake CSI driver
 	csiSanityDriver := initCSIDriverForSanity(t)
