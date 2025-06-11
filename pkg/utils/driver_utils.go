@@ -30,6 +30,7 @@ type StatsUtils interface {
 	GetBucketUsage(volumeID string) (int64, error)
 	GetBucketNameFromPV(volumeID string) (string, error)
 	GetRegionAndZone(nodeName string) (string, string, error)
+	GetPVAttributes(volumeID string) (map[string]string, error)
 }
 
 type DriverStatsUtils struct {
@@ -158,6 +159,15 @@ func (su *DriverStatsUtils) GetBucketNameFromPV(volumeID string) (string, error)
 
 	tempBucketName := pv.Spec.CSI.VolumeAttributes["bucketName"]
 	return tempBucketName, nil
+}
+
+func (su *DriverStatsUtils) GetPVAttributes(volumeID string) (map[string]string, error) {
+	pv, err := GetPV(volumeID)
+	if err != nil {
+		return nil, err
+	}
+
+	return pv.Spec.CSI.VolumeAttributes, nil
 }
 
 func ReplaceAndReturnCopy(req interface{}) (interface{}, error) {
@@ -349,13 +359,4 @@ func fetchSecretUsingPV(volumeID string) (*v1.Secret, error) {
 
 	klog.Info("secret details found. secretName: ", secret.Name)
 	return secret, nil
-}
-
-func GetPVAttributes(volumeID string) (map[string]string, error) {
-	pv, err := GetPV(volumeID)
-	if err != nil {
-		return nil, err
-	}
-
-	return pv.Spec.CSI.VolumeAttributes, nil
 }
