@@ -20,8 +20,10 @@ func TestGetOptions_Defaults(t *testing.T) {
 }
 
 func TestGetEnv(t *testing.T) {
-	os.Setenv("TEST_KEY", "test-value")
-	defer os.Unsetenv("TEST_KEY")
+	_ = os.Setenv("TEST_KEY", "test-value")
+	defer func() {
+		_ = os.Unsetenv("TEST_KEY")
+	}()
 
 	val := getEnv("test_key")
 	assert.Equal(t, "test-value", val)
@@ -36,7 +38,7 @@ func TestGetConfigBool(t *testing.T) {
 	os.Setenv("DEBUG_TRACE", "notbool")
 	val = getConfigBool("DEBUG_TRACE", false, *logger)
 	assert.False(t, val)
-	os.Unsetenv("DEBUG_TRACE")
+	_ = os.Unsetenv("DEBUG_TRACE")
 
 	val = getConfigBool("DEBUG_TRACE", true, *logger)
 	assert.True(t, val)

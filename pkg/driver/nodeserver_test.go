@@ -653,7 +653,7 @@ func TestNodeGetInfo(t *testing.T) {
 	}{
 		{
 			testCaseName:    "Positive: Successful",
-			envKubeNodeName: "testNode",
+			envKubeNodeName: testNodeID,
 			req:             &csi.NodeGetInfoRequest{},
 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
 				GetRegionAndZoneFn: func(nodeName string) (string, string, error) {
@@ -682,7 +682,7 @@ func TestNodeGetInfo(t *testing.T) {
 		},
 		{
 			testCaseName:     "Negative: Failed to get region and zone",
-			envKubeNodeName:  "testNode",
+			envKubeNodeName:  testNodeID,
 			driverStatsUtils: &utils.DriverStatsUtils{},
 			req:              &csi.NodeGetInfoRequest{},
 			expectedResp:     nil,
