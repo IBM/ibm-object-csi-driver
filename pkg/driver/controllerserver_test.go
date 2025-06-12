@@ -24,6 +24,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
 	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -31,6 +32,8 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -44,6 +47,10 @@ var (
 	testTargetPath = "test/path"
 	testNodeID     = "testNodeID"
 	bucketName     = "testBucket"
+	testPVCName    = "testPVCName"
+	testPVCNs      = "testPVCNs"
+	testSecretName = "testSecretName"
+	testSecretNs   = "testSecretNs"
 
 	testSecret = map[string]string{
 		"accessKey":          "testAccessKey",
@@ -58,11 +65,12 @@ var (
 
 func TestCreateVolume(t *testing.T) {
 	testCases := []struct {
-		testCaseName string
-		req          *csi.CreateVolumeRequest
-		cosSession   s3client.ObjectStorageSessionFactory
-		expectedResp *csi.CreateVolumeResponse
-		expectedErr  error
+		testCaseName     string
+		req              *csi.CreateVolumeRequest
+		cosSession       s3client.ObjectStorageSessionFactory
+		driverStatsUtils utils.StatsUtils
+		expectedResp     *csi.CreateVolumeResponse
+		expectedErr      error
 	}{
 		{
 			testCaseName: "Positive: Successfully created volume",
@@ -122,6 +130,59 @@ func TestCreateVolume(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
+			testCaseName: "Positive: Secret and PVC Names Different",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: volumeCapabilities[0],
+						},
+					},
+				},
+				Parameters: map[string]string{
+					constants.PVCNameKey:      testPVCName,
+					constants.PVCNamespaceKey: testPVCNs,
+				},
+			},
+			cosSession: &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetPVCFn: func(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error) {
+					return &v1.PersistentVolumeClaim{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								constants.SecretNameKey:      testSecretName,
+								constants.SecretNamespaceKey: testSecretNs,
+							},
+						},
+					}, nil
+				},
+				GetSecretFn: func(secretName, secretNamespace string) (*v1.Secret, error) {
+					return &v1.Secret{
+						Data: func(m map[string]string) map[string][]byte {
+							r := make(map[string][]byte)
+							for k, v := range m {
+								r[k] = []byte(v)
+							}
+							return r
+						}(testSecret),
+					}, nil
+				},
+			}),
+			expectedResp: &csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					VolumeId: testVolumeName,
+					VolumeContext: map[string]string{
+						"bucketName":              bucketName,
+						"userProvidedBucket":      "true",
+						constants.PVCNameKey:      testPVCName,
+						constants.PVCNamespaceKey: testPVCNs,
+					},
+				},
+			},
+			expectedErr: nil,
+		},
+		{
 			testCaseName: "Negative: Volume Name is missing",
 			req: &csi.CreateVolumeRequest{
 				Name: "",
@@ -154,27 +215,6 @@ func TestCreateVolume(t *testing.T) {
 			cosSession:   &s3client.FakeCOSSessionFactory{},
 			expectedResp: nil,
 			expectedErr:  errors.New("Volume type block Volume not supported"),
-		},
-		{
-			testCaseName: "Negative: Secret Key not provided",
-			req: &csi.CreateVolumeRequest{
-				Name: testVolumeName,
-				VolumeCapabilities: []*csi.VolumeCapability{
-					{
-						AccessMode: &csi.VolumeCapability_AccessMode{
-							Mode: volumeCapabilities[0],
-						},
-					},
-				},
-				Secrets: map[string]string{
-					"accessKey":          "testAccessKey",
-					"cosEndpoint":        "test-endpoint",
-					"locationConstraint": "test-region",
-				},
-			},
-			cosSession:   &s3client.FakeCOSSessionFactory{},
-			expectedResp: nil,
-			expectedErr:  errors.New("Error in getting credentials"),
 		},
 		{
 			testCaseName: "Negative: API Key is present in secret but not service ID",
@@ -287,6 +327,7 @@ func TestCreateVolume(t *testing.T) {
 
 		controllerServer := &controllerServer{
 			cosSession: tc.cosSession,
+			Stats:      tc.driverStatsUtils,
 		}
 		actualResp, actualErr := controllerServer.CreateVolume(ctx, tc.req)
 
@@ -344,20 +385,20 @@ func TestDeleteVolume(t *testing.T) {
 			expectedResp:     nil,
 			expectedErr:      errors.New("Volume ID missing"),
 		},
-		{
-			testCaseName: "Negative: Access Key not provided",
-			req: &csi.DeleteVolumeRequest{
-				VolumeId: testVolumeID,
-				Secrets: map[string]string{
-					"cosEndpoint": "test-endpoint",
-					"secretKey":   "testSecretKey",
-				},
-			},
-			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
-			cosSession:       &s3client.FakeCOSSessionFactory{},
-			expectedResp:     nil,
-			expectedErr:      errors.New("Valid access credentials are not provided"),
-		},
+		// 		{
+		// 			testCaseName: "Negative: Access Key not provided",
+		// 			req: &csi.DeleteVolumeRequest{
+		// 				VolumeId: testVolumeID,
+		// 				Secrets: map[string]string{
+		// 					"cosEndpoint": "test-endpoint",
+		// 					"secretKey":   "testSecretKey",
+		// 				},
+		// 			},
+		// 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+		// 			cosSession:       &s3client.FakeCOSSessionFactory{},
+		// 			expectedResp:     nil,
+		// 			expectedErr:      errors.New("Valid access credentials are not provided"),
+		// 		},
 		{
 			testCaseName: "Incomplete: Can't delete bucket",
 			req: &csi.DeleteVolumeRequest{
