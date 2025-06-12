@@ -320,6 +320,109 @@ func TestCreateVolume(t *testing.T) {
 			expectedResp: nil,
 			expectedErr:  errors.New("unable to create the bucket"),
 		},
+		{
+			testCaseName: "Negative: Secret and PVC Names Different, PVC Name not found",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: volumeCapabilities[0],
+						},
+					},
+				},
+				Parameters: map[string]string{},
+			},
+			cosSession:       &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			expectedResp:     nil,
+			expectedErr:      errors.New("pvcName not specified"),
+		},
+		{
+			testCaseName: "Negative: Secret and PVC Names Different, Failed to get PVC",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: volumeCapabilities[0],
+						},
+					},
+				},
+				Parameters: map[string]string{
+					constants.PVCNameKey: testPVCName,
+				},
+			},
+			cosSession: &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetPVCFn: func(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error) {
+					return nil, errors.New("failed to get pvc")
+				},
+			}),
+			expectedResp: nil,
+			expectedErr:  errors.New("PVC resource not found"),
+		},
+		{
+			testCaseName: "Negative: Secret and PVC Names Different, Secret Name not found",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: volumeCapabilities[0],
+						},
+					},
+				},
+				Parameters: map[string]string{
+					constants.PVCNameKey: testPVCName,
+				},
+			},
+			cosSession: &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetPVCFn: func(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error) {
+					return &v1.PersistentVolumeClaim{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{},
+						},
+					}, nil
+				},
+			}),
+			expectedResp: nil,
+			expectedErr:  errors.New("could not fetch the secret"),
+		},
+		{
+			testCaseName: "Negative: Secret and PVC Names Different, Failed to get Secret",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: volumeCapabilities[0],
+						},
+					},
+				},
+				Parameters: map[string]string{
+					constants.PVCNameKey: testPVCName,
+				},
+			},
+			cosSession: &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetPVCFn: func(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error) {
+					return &v1.PersistentVolumeClaim{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								constants.SecretNameKey: testSecretName,
+							},
+						},
+					}, nil
+				},
+				GetSecretFn: func(secretName, secretNamespace string) (*v1.Secret, error) {
+					return nil, errors.New("failed to get secret")
+				},
+			}),
+			expectedResp: nil,
+			expectedErr:  errors.New("Secret resource not found"),
+		},
 	}
 
 	for _, tc := range testCases {

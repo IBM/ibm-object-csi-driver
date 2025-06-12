@@ -31,11 +31,11 @@ func TestGetEnv(t *testing.T) {
 
 func TestGetConfigBool(t *testing.T) {
 	logger := getZapLogger()
-	os.Setenv("DEBUG_TRACE", "true")
+	_ = os.Setenv("DEBUG_TRACE", "true")
 	val := getConfigBool("DEBUG_TRACE", false, *logger)
 	assert.True(t, val)
 
-	os.Setenv("DEBUG_TRACE", "notbool")
+	_ = os.Setenv("DEBUG_TRACE", "notbool")
 	val = getConfigBool("DEBUG_TRACE", false, *logger)
 	assert.False(t, val)
 	_ = os.Unsetenv("DEBUG_TRACE")
@@ -54,7 +54,9 @@ func TestServeMetrics(t *testing.T) {
 
 	resp, err := http.Get("http://" + addr + "/metrics")
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
