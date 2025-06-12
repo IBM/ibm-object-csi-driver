@@ -1,6 +1,9 @@
 package utils
 
-import "k8s.io/apimachinery/pkg/api/resource"
+import (
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+)
 
 type FakeStatsUtilsFuncStruct struct {
 	FSInfoFn                 func(path string) (int64, int64, int64, int64, int64, int64, error)
@@ -11,6 +14,8 @@ type FakeStatsUtilsFuncStruct struct {
 	GetBucketNameFromPVFn    func(volumeID string) (string, error)
 	GetRegionAndZoneFn       func(nodeName string) (string, string, error)
 	GetPVAttributesFn        func(volumeID string) (map[string]string, error)
+	GetPVCFn                 func(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error)
+	GetSecretFn              func(secretName, secretNamespace string) (*v1.Secret, error)
 }
 
 type FakeStatsUtilsFuncStructImpl struct {
@@ -77,6 +82,20 @@ func (m *FakeStatsUtilsFuncStructImpl) GetRegionAndZone(nodeName string) (string
 func (m *FakeStatsUtilsFuncStructImpl) GetPVAttributes(volumeID string) (map[string]string, error) {
 	if m.FuncStruct.GetPVAttributesFn != nil {
 		return m.FuncStruct.GetPVAttributesFn(volumeID)
+	}
+	panic("requested method should not be nil")
+}
+
+func (m *FakeStatsUtilsFuncStructImpl) GetPVC(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error) {
+	if m.FuncStruct.GetPVCFn != nil {
+		return m.FuncStruct.GetPVCFn(pvcName, pvcNamespace)
+	}
+	panic("requested method should not be nil")
+}
+
+func (m *FakeStatsUtilsFuncStructImpl) GetSecret(secretName, secretNamespace string) (*v1.Secret, error) {
+	if m.FuncStruct.GetSecretFn != nil {
+		return m.FuncStruct.GetSecretFn(secretName, secretNamespace)
 	}
 	panic("requested method should not be nil")
 }

@@ -90,8 +90,8 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	if len(secretMap) == 0 {
 		klog.Info("Did not find the secret that matches pvc name. Fetching custom secret from PVC annotations")
 
-		pvcName = params["csi.storage.k8s.io/pvc/name"]
-		pvcNamespace = params["csi.storage.k8s.io/pvc/namespace"]
+		pvcName = params[constants.PVCNameKey]
+		pvcNamespace = params[constants.PVCNamespaceKey]
 
 		if pvcName == "" {
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("pvcName not specified, could not fetch the secret %v", err))
@@ -101,7 +101,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			pvcNamespace = constants.DefaultNamespace
 		}
 
-		pvcRes, err := utils.GetPVC(pvcName, pvcNamespace)
+		pvcRes, err := cs.Stats.GetPVC(pvcName, pvcNamespace)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("PVC resource not found %v", err))
 		}
@@ -110,8 +110,8 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 
 		pvcAnnotations := pvcRes.Annotations
 
-		customSecretName = pvcAnnotations["cos.csi.driver/secret"]
-		secretNamespace := pvcAnnotations["cos.csi.driver/secret-namespace"]
+		customSecretName = pvcAnnotations[constants.SecretNameKey]
+		secretNamespace := pvcAnnotations[constants.SecretNamespaceKey]
 
 		if customSecretName == "" {
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("secretName annotation 'cos.csi.driver/secret' not specified in the PVC annotations, could not fetch the secret %v", err))
@@ -122,7 +122,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			secretNamespace = constants.DefaultNamespace
 		}
 
-		secret, err := utils.GetSecret(customSecretName, secretNamespace)
+		secret, err := cs.Stats.GetSecret(customSecretName, secretNamespace)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret resource not found %v", err))
 		}
@@ -314,7 +314,7 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 
 		klog.Info("secret details found. secret-name: ", secretName, "\tsecret-namespace: ", secretNamespace)
 
-		secret, err := utils.GetSecret(secretName, secretNamespace)
+		secret, err := cs.Stats.GetSecret(secretName, secretNamespace)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret resource not found %v", err))
 		}
