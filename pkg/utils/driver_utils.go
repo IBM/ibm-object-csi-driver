@@ -304,7 +304,6 @@ func getEPBasedOnCluserInfra() (string, error) {
 	}
 
 	clusterConfigStr := configMap.Data["cluster-config.json"]
-	klog.Info("Successfully fetched Cluster Config ", clusterConfigStr)
 
 	var clusterConfig map[string]string
 	if err = json.Unmarshal([]byte(clusterConfigStr), &clusterConfig); err != nil {
@@ -350,4 +349,13 @@ func fetchSecretUsingPV(volumeID string) (*v1.Secret, error) {
 
 	klog.Info("secret details found. secretName: ", secret.Name)
 	return secret, nil
+}
+
+func GetPVAttributes(volumeID string) (map[string]string, error) {
+	pv, err := GetPV(volumeID)
+	if err != nil {
+		return nil, err
+	}
+
+	return pv.Spec.CSI.VolumeAttributes, nil
 }

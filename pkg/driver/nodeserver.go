@@ -154,7 +154,6 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 	mounterObj := ns.Mounter.NewMounter(attrib, secretMap, mountFlags)
 
 	klog.Info("-NodePublishVolume-: Mount")
-
 	if err = mounterObj.Mount("", targetPath); err != nil {
 		klog.Info("-Mount-: Error: ", err)
 		return nil, err
@@ -176,15 +175,23 @@ func (ns *nodeServer) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpubl
 	if len(targetPath) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
 	}
-	klog.Infof("Unmounting  target path %s", targetPath)
+	klog.Infof("Unmounting target path %s", targetPath)
 
-	if err := ns.MounterUtils.FuseUnmount(targetPath); err != nil {
+	attrib, err := utils.GetPVAttributes(volumeID)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "Failed to get PV details")
+	}
+
+	mounterObj := ns.Mounter.NewMounter(attrib, nil, nil)
+
+	klog.Info("-NodeUnpublishVolume-: Unmount")
+	if err = mounterObj.Unmount(targetPath); err != nil {
 		//TODO: Need to handle the case with non existing mount separately - https://github.com/IBM/ibm-object-csi-driver/issues/46
 		klog.Infof("UNMOUNT ERROR: %v", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	klog.Infof("Successfully unmounted  target path %s", targetPath)
 
+	klog.Infof("Successfully unmounted  target path %s", targetPath)
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 

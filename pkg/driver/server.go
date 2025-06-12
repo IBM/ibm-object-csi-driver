@@ -17,6 +17,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
@@ -110,6 +111,16 @@ func (s *nonBlockingGRPCServer) Setup(endpoint string, ids csi.IdentityServer, c
 		msg := "failed to listen GRPC server"
 		s.logger.Error(msg, zap.Reflect("Error", err))
 		return nil, errors.New(msg)
+	}
+
+	// In case of nodeSerer container, setup desired csi socket permissions and user/group.
+	// This is required for running `livenessprobe` container as non-root user/group
+	if os.Getenv(constants.IsNodeServer) == "true" {
+		fileops := &opsSocketPermission{}
+		if err := setupSidecar(addr, fileops, s.logger); err != nil {
+			s.logger.Error("setupSidecar failed.", zap.Error(err))
+			return nil, err
+		}
 	}
 
 	server := grpc.NewServer(opts...)

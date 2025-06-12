@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 package utils
 
 import (
@@ -27,42 +30,52 @@ type MounterOptsUtils struct {
 }
 
 func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) error {
-	klog.Info("-fuseMount-")
-	klog.Infof("fuseMount args:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%s>", path, comm, args)
-	cmd := command(comm, args...)
-	err := cmd.Start()
-
+	klog.Info("-FuseMount-")
+	klog.Infof("FuseMount params:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%s>", path, comm, args)
+	out, err := command(comm, args...).CombinedOutput()
 	if err != nil {
-		klog.Errorf("fuseMount: cmd start failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
-		return fmt.Errorf("fuseMount: cmd start failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+		if mounted, err1 := isMountpoint(path); err1 == nil && mounted { // check if bucket already got mounted
+			klog.Infof("bucket is already mounted using '%s' mounter", comm)
+			return nil
+		}
+		klog.Errorf("FuseMount: command execution failed: <%s>\nargs: <%s>\nerror: <%v>\noutput: <%v>", comm, args, err, string(out))
+		return fmt.Errorf("'%s' mount failed: <%v>", comm, string(out))
 	}
-	err = cmd.Wait()
-	if err != nil {
-		// Handle error
-		klog.Errorf("fuseMount: cmd wait failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
-		return fmt.Errorf("fuseMount: cmd wait failed: <%s>\nargs: <%s>\nerror: <%v>", comm, args, err)
+	if err := waitForMount(path, 10*time.Second); err != nil {
+		return err
 	}
-
-	return waitForMount(path, 10*time.Second)
+	klog.Infof("bucket mounted successfully using '%s' mounter", comm)
+	return nil
 }
 
 func (su *MounterOptsUtils) FuseUnmount(path string) error {
 	klog.Info("-fuseUnmount-")
-	// directory exists
+	// check if mountpoint exists
 	isMount, checkMountErr := isMountpoint(path)
 	if isMount || checkMountErr != nil {
 		klog.Infof("isMountpoint  %v", isMount)
 		err := unmount(path, 0)
-		if err != nil && checkMountErr == nil {
-			klog.Errorf("Cannot unmount. Trying force unmount %s", err)
-			//Do force unmount
-			err = unmount(path, 0)
+		if err != nil {
+			klog.Warningf("Standard unmount failed for %s: %v. Trying lazy unmount...", path, err)
+			// Try lazy (MNT_DETACH) unmount
+			err = unmount(path, syscall.MNT_DETACH)
 			if err != nil {
-				klog.Errorf("Cannot force unmount %s", err)
-				return fmt.Errorf("cannot force unmount %s: %v", path, err)
+				klog.Warningf("Lazy unmount failed for %s: %v. Trying force unmount...", path, err)
+				// Try force unmount as last resort
+				err = unmount(path, syscall.MNT_FORCE)
+				if err != nil {
+					klog.Errorf("Force unmount failed for %s: %v", path, err)
+					return fmt.Errorf("all unmount attempts failed for %s: %v", path, err)
+				}
+				klog.Infof("Force unmounted %s successfully", path)
+			} else {
+				klog.Infof("Lazy unmounted %s successfully", path)
 			}
+		} else {
+			klog.Infof("Unmounted %s with standard unmount successfully", path)
 		}
 	}
+
 	// as fuse quits immediately, we will try to wait until the process is done
 	process, err := findFuseMountProcess(path)
 	if err != nil {
@@ -88,44 +101,45 @@ func isMountpoint(pathname string) (bool, error) {
 	klog.Infof("Checking if path is mountpoint: Pathname - %s", pathname)
 
 	out, err := exec.Command("mountpoint", pathname).CombinedOutput()
-	outStr := strings.TrimSpace(string(out))
-
+	outStr := strings.ToLower(strings.TrimSpace(string(out)))
+	klog.Infof("mountpoint status for path '%s', error: %v, output: %s", pathname, err, string(out))
+	if err != nil {
+		if strings.HasSuffix(outStr, "transport endpoint is not connected") {
+			return true, nil
+		}
+		klog.Errorf("Failed to check mountpoint for path '%s', error: %v, output: %s", pathname, err, string(out))
+		return false, fmt.Errorf("failed to check mountpoint for path '%s', error: %v, output: %s", pathname, err, string(out))
+	}
 	if strings.HasSuffix(outStr, "is a mountpoint") {
 		klog.Infof("Path is a mountpoint: pathname - %s", pathname)
 		return true, nil
 	}
 
 	if strings.HasSuffix(outStr, "is not a mountpoint") {
-		klog.Infof("Path is NOT a mountpoint:Pathname - %s", pathname)
+		klog.Infof("Path is NOT a mountpoint: pathname - %s", pathname)
 		return false, nil
 	}
 
-	if strings.HasSuffix(outStr, "Transport endpoint is not connected") {
-		return true, nil
-	}
-
-	klog.Errorf("Cannot parse mountpoint result: %v, output: %s", err, outStr)
-	return false, fmt.Errorf("cannot parse mountpoint result: %s", outStr)
+	return false, nil
 }
 
 func waitForMount(path string, timeout time.Duration) error {
 	var elapsed time.Duration
-	var interval = 10 * time.Millisecond
+	var interval = 500 * time.Millisecond
 	for {
 		out, err := exec.Command("mountpoint", path).CombinedOutput()
 		outStr := strings.TrimSpace(string(out))
-		if err != nil {
-			return err
-		}
-		if strings.HasSuffix(outStr, "is a mountpoint") {
+		if err == nil && strings.HasSuffix(outStr, "is a mountpoint") {
 			klog.Infof("Path is a mountpoint: pathname - %s", path)
 			return nil
 		}
 
+		klog.Infof("Mountpoint check in progress: path=%s, output=%s, err=%v", path, outStr, err)
+
 		time.Sleep(interval)
 		elapsed = elapsed + interval
 		if elapsed >= timeout {
-			return errors.New("timeout waiting for mount")
+			return fmt.Errorf("timeout waiting for mount: last check output: %s", outStr)
 		}
 	}
 }
@@ -159,8 +173,8 @@ func getCmdLine(pid int) (string, error) {
 }
 
 func waitForProcess(p *os.Process, backoff int) error {
-	//totally it waits 30 seconds before force killing the process
-	if backoff == 60 {
+	// totally it waits 60 seconds before force killing the process
+	if backoff == 120 {
 		return ErrTimeoutWaitProcess
 	}
 	cmdLine, err := getCmdLine(p.Pid)
@@ -179,7 +193,7 @@ func waitForProcess(p *os.Process, backoff int) error {
 		klog.Warningf("Fuse process does not seem active or we are unprivileged: %s", err)
 		return nil
 	}
-	klog.Infof("Fuse process with PID %v still active, waiting...", p.Pid)
-	time.Sleep(time.Duration(backoff*500) * time.Millisecond)
+	klog.Infof("Fuse process with PID %v still active, waiting... %v", p.Pid, backoff)
+	time.Sleep(time.Duration(500) * time.Millisecond)
 	return waitForProcess(p, backoff+1)
 }

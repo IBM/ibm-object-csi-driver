@@ -38,7 +38,6 @@ deps:
 		go install github.com/golangci/golangci-lint/cmd/golangci-lint@v${LINT_VERSION}; \
 	fi
 
-
 .PHONY: fmt
 fmt: lint
 	gofmt -l ${GOFILES}

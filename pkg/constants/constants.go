@@ -1,5 +1,7 @@
 package constants
 
+import "time"
+
 const (
 	DefaultIAMEndPoint = "https://iam.cloud.ibm.com"
 
@@ -24,4 +26,19 @@ const (
 
 	// NodeRegionLabel Region Label attached to node
 	NodeRegionLabel = "topology.kubernetes.io/region"
+
+	// Timeout specifies a time limit for requests made by HTTP Client
+	Timeout                      = 3 * time.Minute
+	COSCSIMounterSocketPath      = "/var/lib/coscsi-sock/coscsi.sock"
+	COSCSIMounterSocketPathEnv   = "COS_CSI_MOUNTER_SOCKET"
+	MounterConfigPathOnHost      = "/var/lib/coscsi-config"
+	MounterConfigPathOnPodS3fs   = "/var/lib/ibmc-s3fs"
+	MounterConfigPathOnPodRclone = "/root/.config/rclone"
+
+	IsNodeServer = "IS_NODE_SERVER"
+)
+
+var (
+	SocketDir  = "/var/lib/coscsi-sock"
+	SocketFile = "coscsi.sock"
 )

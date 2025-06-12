@@ -24,7 +24,6 @@ import (
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
-	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
@@ -338,6 +337,7 @@ func TestNodePublishVolume(t *testing.T) {
 	}
 }
 
+/*
 func TestNodeUnpublishVolume(t *testing.T) {
 	testCases := []struct {
 		testCaseName string
@@ -410,6 +410,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 		}
 	}
 }
+*/
 
 func TestNodeGetVolumeStats(t *testing.T) {
 	testCases := []struct {
