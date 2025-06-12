@@ -55,8 +55,12 @@ var (
 	testSecret = map[string]string{
 		"accessKey":          "testAccessKey",
 		"secretKey":          "testSecretKey",
+		"apiKey":             "testApiKey",
+		"serviceId":          "testServiceId",
+		"kpRootKeyCRN":       "testKpRootKeyCRN",
 		"locationConstraint": "test-region",
 		"cosEndpoint":        "test-endpoint",
+		"iamEndpoint":        "testIamEndpoint",
 		"bucketName":         bucketName,
 	}
 
@@ -111,11 +115,12 @@ func TestCreateVolume(t *testing.T) {
 				},
 				Parameters: map[string]string{},
 				Secrets: map[string]string{
-					"accessKey":          "testAccessKey",
-					"secretKey":          "testSecretKey",
-					"locationConstraint": "test-region",
-					"cosEndpoint":        "test-endpoint",
-					"kpRootKeyCRN":       "test-kpRootKeyCRN",
+					"accessKey":                "testAccessKey",
+					"secretKey":                "testSecretKey",
+					"locationConstraint":       "test-region",
+					"cosEndpoint":              "test-endpoint",
+					"kpRootKeyCRN":             "test-kpRootKeyCRN",
+					constants.BucketVersioning: "true",
 				},
 			},
 			cosSession: &s3client.FakeCOSSessionFactory{},
@@ -141,8 +146,9 @@ func TestCreateVolume(t *testing.T) {
 					},
 				},
 				Parameters: map[string]string{
-					constants.PVCNameKey:      testPVCName,
-					constants.PVCNamespaceKey: testPVCNs,
+					constants.PVCNameKey:       testPVCName,
+					constants.PVCNamespaceKey:  testPVCNs,
+					constants.BucketVersioning: "true",
 				},
 			},
 			cosSession: &s3client.FakeCOSSessionFactory{},
@@ -173,10 +179,11 @@ func TestCreateVolume(t *testing.T) {
 				Volume: &csi.Volume{
 					VolumeId: testVolumeName,
 					VolumeContext: map[string]string{
-						"bucketName":              bucketName,
-						"userProvidedBucket":      "true",
-						constants.PVCNameKey:      testPVCName,
-						constants.PVCNamespaceKey: testPVCNs,
+						"bucketName":               bucketName,
+						"userProvidedBucket":       "true",
+						constants.PVCNameKey:       testPVCName,
+						constants.PVCNamespaceKey:  testPVCNs,
+						constants.BucketVersioning: "true",
 					},
 				},
 			},

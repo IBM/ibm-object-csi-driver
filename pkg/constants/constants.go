@@ -40,6 +40,8 @@ const (
 	SecretNameKey      = "cos.csi.driver/secret"
 	SecretNamespaceKey = "cos.csi.driver/secret-namespace"
 
+	BucketVersioning = "bucketVersioning"
+
 	IsNodeServer = "IS_NODE_SERVER"
 	KubeNodeName = "KUBE_NODE_NAME"
 )
