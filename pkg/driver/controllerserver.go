@@ -290,7 +290,7 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 	if len(secretMap) == 0 {
 		klog.Info("Did not find the secret that matches pvc name. Fetching custom secret from PVC annotations")
 
-		pv, err := utils.GetPV(volumeID)
+		pv, err := cs.Stats.GetPV(volumeID)
 		if err != nil {
 			return nil, err
 		}

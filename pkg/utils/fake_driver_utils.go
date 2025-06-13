@@ -16,6 +16,7 @@ type FakeStatsUtilsFuncStruct struct {
 	GetPVAttributesFn        func(volumeID string) (map[string]string, error)
 	GetPVCFn                 func(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error)
 	GetSecretFn              func(secretName, secretNamespace string) (*v1.Secret, error)
+	GetPVFn                  func(volumeID string) (*v1.PersistentVolume, error)
 }
 
 type FakeStatsUtilsFuncStructImpl struct {
@@ -96,6 +97,13 @@ func (m *FakeStatsUtilsFuncStructImpl) GetPVC(pvcName, pvcNamespace string) (*v1
 func (m *FakeStatsUtilsFuncStructImpl) GetSecret(secretName, secretNamespace string) (*v1.Secret, error) {
 	if m.FuncStruct.GetSecretFn != nil {
 		return m.FuncStruct.GetSecretFn(secretName, secretNamespace)
+	}
+	panic("requested method should not be nil")
+}
+
+func (m *FakeStatsUtilsFuncStructImpl) GetPV(volumeID string) (*v1.PersistentVolume, error) {
+	if m.FuncStruct.GetPVFn != nil {
+		return m.FuncStruct.GetPVFn(volumeID)
 	}
 	panic("requested method should not be nil")
 }

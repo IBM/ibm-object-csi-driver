@@ -272,6 +272,10 @@ func (su *FakeNewDriverStatsUtils) GetSecret(secretName, secretNamespace string)
 	return &v1.Secret{}, nil
 }
 
+func (su *FakeNewDriverStatsUtils) GetPV(volumeID string) (*v1.PersistentVolume, error) {
+	return &v1.PersistentVolume{}, nil
+}
+
 func createTargetDir(targetPath string) error {
 	fileInfo, err := os.Stat(targetPath)
 	if err != nil && os.IsNotExist(err) {
