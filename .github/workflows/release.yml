@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     branches:
-      - main
+      - uts
 
 jobs:
   release:
@@ -17,7 +17,7 @@ jobs:
 
     env:
       IS_LATEST_RELEASE: 'true'
-      APP_VERSION: 0.0.0
+      APP_VERSION: 0.5.1
 
     steps:
     - name: Checkout Code
@@ -58,9 +58,9 @@ jobs:
         files: |
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.tar.gz
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.tar.gz.sha256
-        tag_name: v0.1.0
-        name: v0.1.0
-        body: Generate debian package
+        tag_name: v0.5.1
+        name: v0.5.1
+        body: Add 'umask' s3fs mount option
         prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
     
     - name: Perform CodeQL Analysis
