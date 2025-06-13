@@ -430,6 +430,76 @@ func TestCreateVolume(t *testing.T) {
 			expectedResp: nil,
 			expectedErr:  errors.New("Secret resource not found"),
 		},
+		{
+			testCaseName: "Negative: Invalid bucket versioning name in secret",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: volumeCapabilities[0],
+						},
+					},
+				},
+				Parameters: map[string]string{},
+				Secrets: map[string]string{
+					"accessKey":                "testAccessKey",
+					"secretKey":                "testSecretKey",
+					"locationConstraint":       "test-region",
+					"cosEndpoint":              "test-endpoint",
+					"kpRootKeyCRN":             "test-kpRootKeyCRN",
+					constants.BucketVersioning: "invalid-value",
+				},
+			},
+			cosSession:       &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			expectedResp:     nil,
+			expectedErr:      errors.New("Invalid BucketVersioning value in secret"),
+		},
+		{
+			testCaseName: "Negative: Secret and PVC Names Different, Invalid bucket versioning name in secret",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: volumeCapabilities[0],
+						},
+					},
+				},
+				Parameters: map[string]string{
+					constants.PVCNameKey:       testPVCName,
+					constants.PVCNamespaceKey:  testPVCNs,
+					constants.BucketVersioning: "invalid-value",
+				},
+			},
+			cosSession: &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetPVCFn: func(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error) {
+					return &v1.PersistentVolumeClaim{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								constants.SecretNameKey:      testSecretName,
+								constants.SecretNamespaceKey: testSecretNs,
+							},
+						},
+					}, nil
+				},
+				GetSecretFn: func(secretName, secretNamespace string) (*v1.Secret, error) {
+					return &v1.Secret{
+						Data: func(m map[string]string) map[string][]byte {
+							r := make(map[string][]byte)
+							for k, v := range m {
+								r[k] = []byte(v)
+							}
+							return r
+						}(testSecret),
+					}, nil
+				},
+			}),
+			expectedResp: nil,
+			expectedErr:  errors.New("Invalid bucketVersioning value in storage class"),
+		},
 	}
 
 	for _, tc := range testCases {
