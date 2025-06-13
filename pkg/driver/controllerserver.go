@@ -541,7 +541,7 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 	secretMapCustom["accessKey"] = accessKey
 	secretMapCustom["secretKey"] = secretKey
 	secretMapCustom["apiKey"] = apiKey
-	secretMapCustom["kpRootKeyCrn"] = kpRootKeyCrn
+	secretMapCustom["kpRootKeyCRN"] = kpRootKeyCrn
 	secretMapCustom["serviceId"] = serviceInstanceID
 	secretMapCustom["bucketName"] = bucketName
 	secretMapCustom["iamEndpoint"] = iamEndpoint
