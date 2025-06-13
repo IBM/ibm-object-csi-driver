@@ -604,20 +604,20 @@ func TestDeleteVolume(t *testing.T) {
 			expectedResp:     nil,
 			expectedErr:      errors.New("Volume ID missing"),
 		},
-		// 		{
-		// 			testCaseName: "Negative: Access Key not provided",
-		// 			req: &csi.DeleteVolumeRequest{
-		// 				VolumeId: testVolumeID,
-		// 				Secrets: map[string]string{
-		// 					"cosEndpoint": "test-endpoint",
-		// 					"secretKey":   "testSecretKey",
-		// 				},
-		// 			},
-		// 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
-		// 			cosSession:       &s3client.FakeCOSSessionFactory{},
-		// 			expectedResp:     nil,
-		// 			expectedErr:      errors.New("Valid access credentials are not provided"),
-		// 		},
+		{
+			testCaseName: "Negative: Access Key not provided",
+			req: &csi.DeleteVolumeRequest{
+				VolumeId: testVolumeID,
+				Secrets: map[string]string{
+					"cosEndpoint": "test-endpoint",
+					"secretKey":   "testSecretKey",
+				},
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			cosSession:       &s3client.FakeCOSSessionFactory{},
+			expectedResp:     nil,
+			expectedErr:      errors.New("Valid access credentials are not provided"),
+		},
 		{
 			testCaseName: "Incomplete: Can't delete bucket",
 			req: &csi.DeleteVolumeRequest{
