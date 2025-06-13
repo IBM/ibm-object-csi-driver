@@ -605,6 +605,67 @@ func TestDeleteVolume(t *testing.T) {
 			expectedErr:      errors.New("Volume ID missing"),
 		},
 		{
+			testCaseName: "Negative: Secret and PVC Names Different: PV not found",
+			req: &csi.DeleteVolumeRequest{
+				VolumeId: testVolumeID,
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetPVFn: func(volumeID string) (*v1.PersistentVolume, error) {
+					return nil, errors.New("pv not found")
+				},
+			}),
+			cosSession:   &s3client.FakeCOSSessionFactory{},
+			expectedResp: nil,
+			expectedErr:  errors.New("pv not found"),
+		},
+		{
+			testCaseName: "Negative: Secret and PVC Names Different, Secret Name not found",
+			req: &csi.DeleteVolumeRequest{
+				VolumeId: testVolumeID,
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetPVFn: func(volumeID string) (*v1.PersistentVolume, error) {
+					return &v1.PersistentVolume{
+						Spec: v1.PersistentVolumeSpec{
+							PersistentVolumeSource: v1.PersistentVolumeSource{
+								CSI: &v1.CSIPersistentVolumeSource{
+									NodePublishSecretRef: &v1.SecretReference{},
+								},
+							},
+						},
+					}, nil
+				},
+			}),
+			expectedResp: nil,
+			expectedErr:  errors.New("Secret details not found"),
+		},
+		{
+			testCaseName: "Negative: Secret and PVC Names Different, Secret not found",
+			req: &csi.DeleteVolumeRequest{
+				VolumeId: testVolumeID,
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetPVFn: func(volumeID string) (*v1.PersistentVolume, error) {
+					return &v1.PersistentVolume{
+						Spec: v1.PersistentVolumeSpec{
+							PersistentVolumeSource: v1.PersistentVolumeSource{
+								CSI: &v1.CSIPersistentVolumeSource{
+									NodePublishSecretRef: &v1.SecretReference{
+										Name: testSecretName,
+									},
+								},
+							},
+						},
+					}, nil
+				},
+				GetSecretFn: func(secretName, secretNamespace string) (*v1.Secret, error) {
+					return nil, errors.New("secret not found")
+				},
+			}),
+			expectedResp: nil,
+			expectedErr:  errors.New("Secret resource not found"),
+		},
+		{
 			testCaseName: "Negative: Access Key not provided",
 			req: &csi.DeleteVolumeRequest{
 				VolumeId: testVolumeID,
