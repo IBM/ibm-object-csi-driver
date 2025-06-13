@@ -31,6 +31,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
 )
@@ -261,6 +262,14 @@ func (su *FakeNewDriverStatsUtils) GetRegionAndZone(nodeName string) (string, st
 
 func (su *FakeNewDriverStatsUtils) GetPVAttributes(volumeID string) (map[string]string, error) {
 	return map[string]string{}, nil
+}
+
+func (su *FakeNewDriverStatsUtils) GetPVC(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error) {
+	return &v1.PersistentVolumeClaim{}, nil
+}
+
+func (su *FakeNewDriverStatsUtils) GetSecret(secretName, secretNamespace string) (*v1.Secret, error) {
+	return &v1.Secret{}, nil
 }
 
 func createTargetDir(targetPath string) error {

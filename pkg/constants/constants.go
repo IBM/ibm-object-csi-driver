@@ -35,6 +35,13 @@ const (
 	MounterConfigPathOnPodS3fs   = "/var/lib/ibmc-s3fs"
 	MounterConfigPathOnPodRclone = "/root/.config/rclone"
 
+	PVCNameKey         = "csi.storage.k8s.io/pvc/name"
+	PVCNamespaceKey    = "csi.storage.k8s.io/pvc/namespace"
+	SecretNameKey      = "cos.csi.driver/secret"
+	SecretNamespaceKey = "cos.csi.driver/secret-namespace"
+
+	BucketVersioning = "bucketVersioning"
+
 	IsNodeServer = "IS_NODE_SERVER"
 	KubeNodeName = "KUBE_NODE_NAME"
 )
