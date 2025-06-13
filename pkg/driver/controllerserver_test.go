@@ -556,6 +556,45 @@ func TestDeleteVolume(t *testing.T) {
 			expectedErr:  nil,
 		},
 		{
+			testCaseName: "Positive: Successfully deleted volume: Secret and PVC Names Different",
+			req: &csi.DeleteVolumeRequest{
+				VolumeId: testVolumeID,
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetPVFn: func(volumeID string) (*v1.PersistentVolume, error) {
+					return &v1.PersistentVolume{
+						Spec: v1.PersistentVolumeSpec{
+							PersistentVolumeSource: v1.PersistentVolumeSource{
+								CSI: &v1.CSIPersistentVolumeSource{
+									NodePublishSecretRef: &v1.SecretReference{
+										Name:      testSecretName,
+										Namespace: testSecretNs,
+									},
+								},
+							},
+						},
+					}, nil
+				},
+				GetSecretFn: func(secretName, secretNamespace string) (*v1.Secret, error) {
+					return &v1.Secret{
+						Data: func(m map[string]string) map[string][]byte {
+							r := make(map[string][]byte)
+							for k, v := range m {
+								r[k] = []byte(v)
+							}
+							return r
+						}(testSecret),
+					}, nil
+				},
+				BucketToDeleteFn: func(volumeID string) (string, error) {
+					return bucketName, nil
+				},
+			}),
+			cosSession:   &s3client.FakeCOSSessionFactory{},
+			expectedResp: &csi.DeleteVolumeResponse{},
+			expectedErr:  nil,
+		},
+		{
 			testCaseName: "Negative: Volume ID is missing",
 			req: &csi.DeleteVolumeRequest{
 				VolumeId: "",
