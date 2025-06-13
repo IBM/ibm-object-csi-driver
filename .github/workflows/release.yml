@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     branches:
-      - uts
+      - main
 
 jobs:
   release:
