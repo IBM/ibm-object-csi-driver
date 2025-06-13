@@ -36,6 +36,7 @@ const (
 	MounterConfigPathOnPodRclone = "/root/.config/rclone"
 
 	IsNodeServer = "IS_NODE_SERVER"
+	KubeNodeName = "KUBE_NODE_NAME"
 )
 
 var (

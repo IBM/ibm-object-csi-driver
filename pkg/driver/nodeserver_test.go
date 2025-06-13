@@ -18,6 +18,7 @@ package driver
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"reflect"
 	"testing"
@@ -337,14 +338,14 @@ func TestNodePublishVolume(t *testing.T) {
 	}
 }
 
-/*
 func TestNodeUnpublishVolume(t *testing.T) {
 	testCases := []struct {
-		testCaseName string
-		req          *csi.NodeUnpublishVolumeRequest
-		mounterUtils mounterUtils.MounterUtils
-		expectedResp *csi.NodeUnpublishVolumeResponse
-		expectedErr  error
+		testCaseName     string
+		req              *csi.NodeUnpublishVolumeRequest
+		driverStatsUtils utils.StatsUtils
+		Mounter          mounter.NewMounterFactory
+		expectedResp     *csi.NodeUnpublishVolumeResponse
+		expectedErr      error
 	}{
 		{
 			testCaseName: "Positive: Successful",
@@ -352,11 +353,17 @@ func TestNodeUnpublishVolume(t *testing.T) {
 				VolumeId:   testVolumeID,
 				TargetPath: testTargetPath,
 			},
-			mounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-				FuseUnmountFn: func(path string) error {
-					return nil
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetPVAttributesFn: func(volumeID string) (map[string]string, error) {
+					return map[string]string{
+						"mounter": "s3fs",
+					}, nil
 				},
 			}),
+			Mounter: &mounter.FakeMounterFactory{
+				Mounter:         constants.S3FS,
+				IsFailedUnmount: false,
+			},
 			expectedResp: &csi.NodeUnpublishVolumeResponse{},
 			expectedErr:  nil,
 		},
@@ -375,18 +382,38 @@ func TestNodeUnpublishVolume(t *testing.T) {
 			expectedErr:  errors.New("Target path missing in request"),
 		},
 		{
+			testCaseName: "Negative: Failed to get PV details",
+			req: &csi.NodeUnpublishVolumeRequest{
+				VolumeId:   testVolumeID,
+				TargetPath: testTargetPath,
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetPVAttributesFn: func(volumeID string) (map[string]string, error) {
+					return nil, errors.New("pv not found")
+				},
+			}),
+			expectedResp: nil,
+			expectedErr:  errors.New("Failed to get PV details"),
+		},
+		{
 			testCaseName: "Negative: Unmount failed",
 			req: &csi.NodeUnpublishVolumeRequest{
 				VolumeId:   testVolumeID,
 				TargetPath: testTargetPath,
 			},
-			mounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-				FuseUnmountFn: func(path string) error {
-					return errors.New("cannot force unmount")
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetPVAttributesFn: func(volumeID string) (map[string]string, error) {
+					return map[string]string{
+						"mounter": "s3fs",
+					}, nil
 				},
 			}),
+			Mounter: &mounter.FakeMounterFactory{
+				Mounter:         constants.S3FS,
+				IsFailedUnmount: true,
+			},
 			expectedResp: nil,
-			expectedErr:  errors.New("cannot force unmount"),
+			expectedErr:  errors.New("failed to unmount s3fs"),
 		},
 	}
 
@@ -394,7 +421,8 @@ func TestNodeUnpublishVolume(t *testing.T) {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
 		nodeServer := nodeServer{
-			MounterUtils: tc.mounterUtils,
+			Stats:   tc.driverStatsUtils,
+			Mounter: tc.Mounter,
 		}
 		actualResp, actualErr := nodeServer.NodeUnpublishVolume(ctx, tc.req)
 
@@ -410,7 +438,6 @@ func TestNodeUnpublishVolume(t *testing.T) {
 		}
 	}
 }
-*/
 
 func TestNodeGetVolumeStats(t *testing.T) {
 	testCases := []struct {
@@ -618,14 +645,16 @@ func TestNodeGetCapabilities(t *testing.T) {
 func TestNodeGetInfo(t *testing.T) {
 	testCases := []struct {
 		testCaseName     string
+		envKubeNodeName  string
 		driverStatsUtils utils.StatsUtils
 		req              *csi.NodeGetInfoRequest
 		expectedResp     *csi.NodeGetInfoResponse
 		expectedErr      error
 	}{
 		{
-			testCaseName: "Positive: Successful",
-			req:          &csi.NodeGetInfoRequest{},
+			testCaseName:    "Positive: Successful",
+			envKubeNodeName: "testNode",
+			req:             &csi.NodeGetInfoRequest{},
 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
 				GetRegionAndZoneFn: func(nodeName string) (string, string, error) {
 					return "test-region", "test-zone", nil
@@ -643,18 +672,35 @@ func TestNodeGetInfo(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
+		{
+			testCaseName:     "Negative: Failed to get KUBE_NODE_NAME env variable",
+			envKubeNodeName:  "",
+			driverStatsUtils: &utils.DriverStatsUtils{},
+			req:              &csi.NodeGetInfoRequest{},
+			expectedResp:     nil,
+			expectedErr:      errors.New("KUBE_NODE_NAME env variable not set"),
+		},
+		{
+			testCaseName:     "Negative: Failed to get region and zone",
+			envKubeNodeName:  "testNode",
+			driverStatsUtils: &utils.DriverStatsUtils{},
+			req:              &csi.NodeGetInfoRequest{},
+			expectedResp:     nil,
+			expectedErr:      errors.New("unable to load in-cluster configuration"),
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		_ = os.Setenv("KUBE_NODE_NAME", "testNode")
+		_ = os.Setenv(constants.KubeNodeName, tc.envKubeNodeName)
 
 		nodeServer := nodeServer{
 			NodeID: testNodeID,
 			Stats:  tc.driverStatsUtils,
 		}
 		actualResp, actualErr := nodeServer.NodeGetInfo(ctx, tc.req)
+		fmt.Println(actualErr)
 
 		if tc.expectedErr != nil {
 			assert.Error(t, actualErr)
