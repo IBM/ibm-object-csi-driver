@@ -38,6 +38,7 @@ type S3FSArgs struct {
 	SigV4                   string `json:"sigv4,omitempty"`
 	StatCacheExpireSeconds  string `json:"stat_cache_expire,omitempty"`
 	UID                     string `json:"uid,omitempty"`
+	Umask                   string `json:"umask,omitempty"`
 	URL                     string `json:"url,omitempty"`
 	UsePathRequestStyle     string `json:"use_path_request_style,omitempty"`
 	UseXattr                string `json:"use_xattr,string,omitempty"`
