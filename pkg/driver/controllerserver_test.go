@@ -430,6 +430,76 @@ func TestCreateVolume(t *testing.T) {
 			expectedResp: nil,
 			expectedErr:  errors.New("Secret resource not found"),
 		},
+		{
+			testCaseName: "Negative: Invalid bucket versioning name in secret",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: volumeCapabilities[0],
+						},
+					},
+				},
+				Parameters: map[string]string{},
+				Secrets: map[string]string{
+					"accessKey":                "testAccessKey",
+					"secretKey":                "testSecretKey",
+					"locationConstraint":       "test-region",
+					"cosEndpoint":              "test-endpoint",
+					"kpRootKeyCRN":             "test-kpRootKeyCRN",
+					constants.BucketVersioning: "invalid-value",
+				},
+			},
+			cosSession:       &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			expectedResp:     nil,
+			expectedErr:      errors.New("Invalid BucketVersioning value in secret"),
+		},
+		{
+			testCaseName: "Negative: Secret and PVC Names Different, Invalid bucket versioning name in secret",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: volumeCapabilities[0],
+						},
+					},
+				},
+				Parameters: map[string]string{
+					constants.PVCNameKey:       testPVCName,
+					constants.PVCNamespaceKey:  testPVCNs,
+					constants.BucketVersioning: "invalid-value",
+				},
+			},
+			cosSession: &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetPVCFn: func(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error) {
+					return &v1.PersistentVolumeClaim{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								constants.SecretNameKey:      testSecretName,
+								constants.SecretNamespaceKey: testSecretNs,
+							},
+						},
+					}, nil
+				},
+				GetSecretFn: func(secretName, secretNamespace string) (*v1.Secret, error) {
+					return &v1.Secret{
+						Data: func(m map[string]string) map[string][]byte {
+							r := make(map[string][]byte)
+							for k, v := range m {
+								r[k] = []byte(v)
+							}
+							return r
+						}(testSecret),
+					}, nil
+				},
+			}),
+			expectedResp: nil,
+			expectedErr:  errors.New("Invalid bucketVersioning value in storage class"),
+		},
 	}
 
 	for _, tc := range testCases {
@@ -486,6 +556,45 @@ func TestDeleteVolume(t *testing.T) {
 			expectedErr:  nil,
 		},
 		{
+			testCaseName: "Positive: Successfully deleted volume: Secret and PVC Names Different",
+			req: &csi.DeleteVolumeRequest{
+				VolumeId: testVolumeID,
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetPVFn: func(volumeID string) (*v1.PersistentVolume, error) {
+					return &v1.PersistentVolume{
+						Spec: v1.PersistentVolumeSpec{
+							PersistentVolumeSource: v1.PersistentVolumeSource{
+								CSI: &v1.CSIPersistentVolumeSource{
+									NodePublishSecretRef: &v1.SecretReference{
+										Name:      testSecretName,
+										Namespace: testSecretNs,
+									},
+								},
+							},
+						},
+					}, nil
+				},
+				GetSecretFn: func(secretName, secretNamespace string) (*v1.Secret, error) {
+					return &v1.Secret{
+						Data: func(m map[string]string) map[string][]byte {
+							r := make(map[string][]byte)
+							for k, v := range m {
+								r[k] = []byte(v)
+							}
+							return r
+						}(testSecret),
+					}, nil
+				},
+				BucketToDeleteFn: func(volumeID string) (string, error) {
+					return bucketName, nil
+				},
+			}),
+			cosSession:   &s3client.FakeCOSSessionFactory{},
+			expectedResp: &csi.DeleteVolumeResponse{},
+			expectedErr:  nil,
+		},
+		{
 			testCaseName: "Negative: Volume ID is missing",
 			req: &csi.DeleteVolumeRequest{
 				VolumeId: "",
@@ -495,20 +604,81 @@ func TestDeleteVolume(t *testing.T) {
 			expectedResp:     nil,
 			expectedErr:      errors.New("Volume ID missing"),
 		},
-		// 		{
-		// 			testCaseName: "Negative: Access Key not provided",
-		// 			req: &csi.DeleteVolumeRequest{
-		// 				VolumeId: testVolumeID,
-		// 				Secrets: map[string]string{
-		// 					"cosEndpoint": "test-endpoint",
-		// 					"secretKey":   "testSecretKey",
-		// 				},
-		// 			},
-		// 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
-		// 			cosSession:       &s3client.FakeCOSSessionFactory{},
-		// 			expectedResp:     nil,
-		// 			expectedErr:      errors.New("Valid access credentials are not provided"),
-		// 		},
+		{
+			testCaseName: "Negative: Secret and PVC Names Different: PV not found",
+			req: &csi.DeleteVolumeRequest{
+				VolumeId: testVolumeID,
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetPVFn: func(volumeID string) (*v1.PersistentVolume, error) {
+					return nil, errors.New("pv not found")
+				},
+			}),
+			cosSession:   &s3client.FakeCOSSessionFactory{},
+			expectedResp: nil,
+			expectedErr:  errors.New("pv not found"),
+		},
+		{
+			testCaseName: "Negative: Secret and PVC Names Different, Secret Name not found",
+			req: &csi.DeleteVolumeRequest{
+				VolumeId: testVolumeID,
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetPVFn: func(volumeID string) (*v1.PersistentVolume, error) {
+					return &v1.PersistentVolume{
+						Spec: v1.PersistentVolumeSpec{
+							PersistentVolumeSource: v1.PersistentVolumeSource{
+								CSI: &v1.CSIPersistentVolumeSource{
+									NodePublishSecretRef: &v1.SecretReference{},
+								},
+							},
+						},
+					}, nil
+				},
+			}),
+			expectedResp: nil,
+			expectedErr:  errors.New("Secret details not found"),
+		},
+		{
+			testCaseName: "Negative: Secret and PVC Names Different, Secret not found",
+			req: &csi.DeleteVolumeRequest{
+				VolumeId: testVolumeID,
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetPVFn: func(volumeID string) (*v1.PersistentVolume, error) {
+					return &v1.PersistentVolume{
+						Spec: v1.PersistentVolumeSpec{
+							PersistentVolumeSource: v1.PersistentVolumeSource{
+								CSI: &v1.CSIPersistentVolumeSource{
+									NodePublishSecretRef: &v1.SecretReference{
+										Name: testSecretName,
+									},
+								},
+							},
+						},
+					}, nil
+				},
+				GetSecretFn: func(secretName, secretNamespace string) (*v1.Secret, error) {
+					return nil, errors.New("secret not found")
+				},
+			}),
+			expectedResp: nil,
+			expectedErr:  errors.New("Secret resource not found"),
+		},
+		{
+			testCaseName: "Negative: Access Key not provided",
+			req: &csi.DeleteVolumeRequest{
+				VolumeId: testVolumeID,
+				Secrets: map[string]string{
+					"cosEndpoint": "test-endpoint",
+					"secretKey":   "testSecretKey",
+				},
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			cosSession:       &s3client.FakeCOSSessionFactory{},
+			expectedResp:     nil,
+			expectedErr:      errors.New("Valid access credentials are not provided"),
+		},
 		{
 			testCaseName: "Incomplete: Can't delete bucket",
 			req: &csi.DeleteVolumeRequest{

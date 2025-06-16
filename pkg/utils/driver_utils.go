@@ -33,6 +33,7 @@ type StatsUtils interface {
 	GetPVAttributes(volumeID string) (map[string]string, error)
 	GetPVC(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error)
 	GetSecret(secretName, secretNamespace string) (*v1.Secret, error)
+	GetPV(volumeID string) (*v1.PersistentVolume, error)
 }
 
 type DriverStatsUtils struct {
@@ -104,7 +105,7 @@ func (su *DriverStatsUtils) CheckMount(targetPath string) error {
 }
 
 func (su *DriverStatsUtils) GetTotalCapacityFromPV(volumeID string) (resource.Quantity, error) {
-	pv, err := GetPV(volumeID)
+	pv, err := su.GetPV(volumeID)
 	if err != nil {
 		return resource.Quantity{}, err
 	}
@@ -154,7 +155,7 @@ func (su *DriverStatsUtils) GetBucketUsage(volumeID string) (int64, error) {
 }
 
 func (su *DriverStatsUtils) GetBucketNameFromPV(volumeID string) (string, error) {
-	pv, err := GetPV(volumeID)
+	pv, err := su.GetPV(volumeID)
 	if err != nil {
 		return "", err
 	}
@@ -164,7 +165,7 @@ func (su *DriverStatsUtils) GetBucketNameFromPV(volumeID string) (string, error)
 }
 
 func (su *DriverStatsUtils) GetPVAttributes(volumeID string) (map[string]string, error) {
-	pv, err := GetPV(volumeID)
+	pv, err := su.GetPV(volumeID)
 	if err != nil {
 		return nil, err
 	}
@@ -199,6 +200,21 @@ func (su *DriverStatsUtils) GetSecret(secretName, secretNamespace string) (*v1.S
 	}
 
 	return secret, nil
+}
+
+func (su *DriverStatsUtils) GetPV(volumeID string) (*v1.PersistentVolume, error) {
+	k8sClient, err := CreateK8sClient()
+	if err != nil {
+		return nil, err
+	}
+
+	pv, err := k8sClient.CoreV1().PersistentVolumes().Get(context.Background(), volumeID, metav1.GetOptions{})
+	if err != nil {
+		klog.Errorf("Unable to fetch pv %v", err)
+		return nil, fmt.Errorf("error getting PV: %v", err)
+	}
+
+	return pv, nil
 }
 
 func ReplaceAndReturnCopy(req interface{}) (interface{}, error) {
@@ -289,21 +305,6 @@ func CreateK8sClient() (*kubernetes.Clientset, error) {
 	return clientset, nil
 }
 
-func GetPV(volumeID string) (*v1.PersistentVolume, error) {
-	k8sClient, err := CreateK8sClient()
-	if err != nil {
-		return nil, err
-	}
-
-	pv, err := k8sClient.CoreV1().PersistentVolumes().Get(context.Background(), volumeID, metav1.GetOptions{})
-	if err != nil {
-		klog.Errorf("Unable to fetch pv %v", err)
-		return nil, fmt.Errorf("error getting PV: %v", err)
-	}
-
-	return pv, nil
-}
-
 func getEPBasedOnCluserInfra() (string, error) {
 	k8sClient, err := CreateK8sClient()
 	if err != nil {
@@ -332,7 +333,7 @@ func getEPBasedOnCluserInfra() (string, error) {
 }
 
 func fetchSecretUsingPV(volumeID string, su *DriverStatsUtils) (*v1.Secret, error) {
-	pv, err := GetPV(volumeID)
+	pv, err := su.GetPV(volumeID)
 	if err != nil {
 		return nil, err
 	}
