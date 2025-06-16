@@ -12,17 +12,18 @@ const (
 )
 
 type FakeMounterFactory struct {
-	Mounter       string
-	IsFailedMount bool
+	Mounter         string
+	IsFailedMount   bool
+	IsFailedUnmount bool
 }
 
 func (f *FakeMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) Mounter {
 	switch f.Mounter {
 	case constants.S3FS:
-		return fakenewS3fsMounter(f.IsFailedMount)
+		return fakenewS3fsMounter(f.IsFailedMount, f.IsFailedUnmount)
 	case constants.RClone:
-		return fakenewRcloneMounter(f.IsFailedMount)
+		return fakenewRcloneMounter(f.IsFailedMount, f.IsFailedUnmount)
 	default:
-		return fakenewS3fsMounter(f.IsFailedMount)
+		return fakenewS3fsMounter(f.IsFailedMount, f.IsFailedUnmount)
 	}
 }

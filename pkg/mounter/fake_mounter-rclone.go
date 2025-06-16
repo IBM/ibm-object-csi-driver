@@ -13,21 +13,23 @@ type fakercloneMounter struct {
 	uid           string
 	gid           string
 
-	isFailedMount bool
+	isFailedMount   bool
+	isFailedUnmount bool
 }
 
-func fakenewRcloneMounter(isFailedMount bool) Mounter {
+func fakenewRcloneMounter(isFailedMount, isFailedUnmount bool) Mounter {
 	return &fakercloneMounter{
-		bucketName:    bucketName,
-		objPath:       objPath,
-		endPoint:      endPoint,
-		locConstraint: region,
-		accessKeys:    keys,
-		authType:      authType,
-		kpRootKeyCrn:  "",
-		uid:           "",
-		gid:           "",
-		isFailedMount: isFailedMount,
+		bucketName:      bucketName,
+		objPath:         objPath,
+		endPoint:        endPoint,
+		locConstraint:   region,
+		accessKeys:      keys,
+		authType:        authType,
+		kpRootKeyCrn:    "",
+		uid:             "",
+		gid:             "",
+		isFailedMount:   isFailedMount,
+		isFailedUnmount: isFailedUnmount,
 	}
 }
 
@@ -39,5 +41,8 @@ func (rclone *fakercloneMounter) Mount(source string, target string) error {
 }
 
 func (rclone *fakercloneMounter) Unmount(target string) error {
+	if rclone.isFailedUnmount {
+		return errors.New("failed to unmount rclone")
+	}
 	return nil
 }

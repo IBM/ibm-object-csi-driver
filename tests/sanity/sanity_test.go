@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	cloudProvider "github.com/IBM/ibm-csi-common/pkg/ibmcloudprovider"
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	csiDriver "github.com/IBM/ibm-object-csi-driver/pkg/driver"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
@@ -30,6 +31,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
 )
@@ -57,7 +59,7 @@ func TestSanity(t *testing.T) {
 		t.Fatalf("Failed to set skipTests: %v, Error: %v", skipTests, err)
 	}
 
-	_ = os.Setenv("KUBE_NODE_NAME", "testNode")
+	_ = os.Setenv(constants.KubeNodeName, "testNode")
 
 	// Create a fake CSI driver
 	csiSanityDriver := initCSIDriverForSanity(t)
@@ -256,6 +258,22 @@ func (su *FakeNewDriverStatsUtils) GetBucketNameFromPV(volumeID string) (string,
 
 func (su *FakeNewDriverStatsUtils) GetRegionAndZone(nodeName string) (string, string, error) {
 	return "", "", nil
+}
+
+func (su *FakeNewDriverStatsUtils) GetPVAttributes(volumeID string) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+
+func (su *FakeNewDriverStatsUtils) GetPVC(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error) {
+	return &v1.PersistentVolumeClaim{}, nil
+}
+
+func (su *FakeNewDriverStatsUtils) GetSecret(secretName, secretNamespace string) (*v1.Secret, error) {
+	return &v1.Secret{}, nil
+}
+
+func (su *FakeNewDriverStatsUtils) GetPV(volumeID string) (*v1.PersistentVolume, error) {
+	return &v1.PersistentVolume{}, nil
 }
 
 func createTargetDir(targetPath string) error {

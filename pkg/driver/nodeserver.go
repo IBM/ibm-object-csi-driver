@@ -109,7 +109,7 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		targetPath, deviceID, readOnly, volumeID, attrib, mountFlags)
 
 	secretMap := req.GetSecrets()
-	klog.V(2).Infof("-NodePublishVolume-: length of req.GetSecrets() length: %v", len(req.GetSecrets()))
+	klog.V(2).Infof("-NodePublishVolume-: length of req.GetSecrets() length: %v", len(secretMap))
 	secretMapCopy := make(map[string]string)
 	for k, v := range secretMap {
 		if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
@@ -177,7 +177,7 @@ func (ns *nodeServer) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpubl
 	}
 	klog.Infof("Unmounting target path %s", targetPath)
 
-	attrib, err := utils.GetPVAttributes(volumeID)
+	attrib, err := ns.Stats.GetPVAttributes(volumeID)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "Failed to get PV details")
 	}
@@ -286,7 +286,7 @@ func (ns *nodeServer) NodeGetCapabilities(_ context.Context, req *csi.NodeGetCap
 func (ns *nodeServer) NodeGetInfo(_ context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	klog.V(3).Infof("NodeGetInfo: called with args %+v", req)
 
-	nodeName := os.Getenv("KUBE_NODE_NAME")
+	nodeName := os.Getenv(constants.KubeNodeName)
 	if nodeName == "" {
 		return nil, fmt.Errorf("KUBE_NODE_NAME env variable not set")
 	}
