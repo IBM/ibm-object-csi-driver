@@ -94,6 +94,8 @@ func isBoolString(s string) bool {
 	return s == "true" || s == "false"
 }
 
+var FileExists = fileExists
+
 // fileExists checks whether the given file path exists and is not a directory.
 func fileExists(path string) (bool, error) {
 	absPath, err := filepath.Abs(path)
