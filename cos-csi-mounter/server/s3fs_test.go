@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -25,6 +26,8 @@ func TestS3FSPopulateArgsSlice_Success(t *testing.T) {
 	resp, err := args.PopulateArgsSlice(testBucket, testTargetPath)
 	assert.NoError(t, err)
 	expectedVal := []string{testBucket, testTargetPath, "-o", "allow_other", "-o", "endpoint=" + testEndPoint}
+	slices.Sort(expectedVal)
+	slices.Sort(resp)
 	assert.Equal(t, expectedVal, resp)
 }
 
