@@ -24,6 +24,9 @@ var (
 	safeMountDirs = []string{"/var/data/kubelet/pods", "/var/lib/kubelet/pods"}
 	// Directories where s3fs/rclone configuration files need to be present
 	safeMounterConfigDir = "/var/lib/coscsi-config"
+
+	FileExists      = fileExists
+	absPathResolver = filepath.Abs
 )
 
 // MounterArgs ...
@@ -43,7 +46,7 @@ func strictDecodeForUnknownFields(data json.RawMessage, v interface{}) error {
 }
 
 func pathValidator(targetPath string) error {
-	absPath, err := filepath.Abs(targetPath)
+	absPath, err := absPathResolver(targetPath)
 	if err != nil {
 		return fmt.Errorf("failed to resolve absolute mount path: %v", err)
 	}
@@ -94,11 +97,9 @@ func isBoolString(s string) bool {
 	return s == "true" || s == "false"
 }
 
-var FileExists = fileExists
-
 // fileExists checks whether the given file path exists and is not a directory.
 func fileExists(path string) (bool, error) {
-	absPath, err := filepath.Abs(path)
+	absPath, err := absPathResolver(path)
 	if err != nil {
 		return false, fmt.Errorf("failed to resolve absolute path: %v", err)
 	}

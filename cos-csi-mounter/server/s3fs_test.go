@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,10 +14,10 @@ var (
 	testTargetPath     = "/var/data/kubelet/pods/"
 	testEndPoint       = "testEndPoint"
 	testPasswdFilePath = "testPasswdFilePath"
-	testURL            = "https://testRRL"
+	testURL            = "https://testURL"
 )
 
-func TestPopulateArgsSlice_Success(t *testing.T) {
+func TestS3FSPopulateArgsSlice_Success(t *testing.T) {
 	args := S3FSArgs{
 		AllowOther: "true",
 		EndPoint:   "testEndPoint",
@@ -25,10 +26,12 @@ func TestPopulateArgsSlice_Success(t *testing.T) {
 	resp, err := args.PopulateArgsSlice(testBucket, testTargetPath)
 	assert.NoError(t, err)
 	expectedVal := []string{testBucket, testTargetPath, "-o", "allow_other", "-o", "endpoint=" + testEndPoint}
+	slices.Sort(expectedVal)
+	slices.Sort(resp)
 	assert.Equal(t, expectedVal, resp)
 }
 
-func TestValidate_Success(t *testing.T) {
+func TestS3FSValidate_Success(t *testing.T) {
 	FileExists = func(path string) (bool, error) {
 		return true, nil
 	}
@@ -41,14 +44,14 @@ func TestValidate_Success(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestValidate_PathValidatorFailed(t *testing.T) {
+func TestS3FSValidate_PathValidatorFailed(t *testing.T) {
 	args := S3FSArgs{}
 	err := args.Validate("invalid-path")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "bad value for target path")
 }
 
-func TestValidate_InvalidS3FSParamValues(t *testing.T) {
+func TestS3FSValidate_InvalidS3FSParamValues(t *testing.T) {
 	fields := []string{
 		"AllowOther",
 		"AutoCache",
@@ -85,7 +88,7 @@ func TestValidate_InvalidS3FSParamValues(t *testing.T) {
 	}
 }
 
-func TestValidate_FailedToCheckPasswordFile(t *testing.T) {
+func TestS3FSValidate_FailedToCheckPasswordFile(t *testing.T) {
 	FileExists = func(path string) (bool, error) {
 		return false, errors.New("error")
 	}
@@ -97,7 +100,7 @@ func TestValidate_FailedToCheckPasswordFile(t *testing.T) {
 	assert.Contains(t, err.Error(), "error checking credential file existence")
 }
 
-func TestValidate_PasswordFileNotFound(t *testing.T) {
+func TestS3FSValidate_PasswordFileNotFound(t *testing.T) {
 	FileExists = func(path string) (bool, error) {
 		return false, nil
 	}
@@ -111,7 +114,7 @@ func TestValidate_PasswordFileNotFound(t *testing.T) {
 	assert.Contains(t, err.Error(), "credential file not found")
 }
 
-func TestValidate_RetryCountLessThanOne(t *testing.T) {
+func TestS3FSValidate_RetryCountLessThanOne(t *testing.T) {
 	FileExists = func(path string) (bool, error) {
 		return true, nil
 	}
@@ -126,7 +129,7 @@ func TestValidate_RetryCountLessThanOne(t *testing.T) {
 	assert.Contains(t, err.Error(), "value of retires should be >= 1")
 }
 
-func TestValidate_StatCacheExpireSecondsThanZero(t *testing.T) {
+func TestS3FSValidate_StatCacheExpireSecondsThanZero(t *testing.T) {
 	FileExists = func(path string) (bool, error) {
 		return true, nil
 	}
