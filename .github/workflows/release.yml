@@ -53,7 +53,7 @@ jobs:
     - name: Latest Version (Tag and Release)
       id: release
       if: contains(steps.check_commit.outputs.message, 'publish')
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: |
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.tar.gz
