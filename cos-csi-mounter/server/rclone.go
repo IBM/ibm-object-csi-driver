@@ -94,7 +94,7 @@ func (args RCloneArgs) Validate(targetPath string) error {
 	}
 
 	// Check if rclone config file exists or not
-	if exists, err := fileExists(args.ConfigPath); err != nil {
+	if exists, err := FileExists(args.ConfigPath); err != nil {
 		logger.Error("error checking rclone config file existence")
 		return fmt.Errorf("error checking rclone config file existence")
 	} else if !exists {

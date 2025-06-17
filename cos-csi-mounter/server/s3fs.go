@@ -197,7 +197,7 @@ func (args S3FSArgs) Validate(targetPath string) error {
 	}
 
 	// Check if .passwd file exists or not
-	if exists, err := fileExists(args.PasswdFilePath); err != nil {
+	if exists, err := FileExists(args.PasswdFilePath); err != nil {
 		logger.Error("error checking credential file existence")
 		return fmt.Errorf("error checking credential file existence")
 	} else if !exists {
@@ -259,7 +259,7 @@ func (args S3FSArgs) Validate(targetPath string) error {
 			return fmt.Errorf("cannot convert value of stat_cache_expire into integer: %v", err)
 		} else if cacheExpireSeconds < 0 {
 			logger.Error("value of stat_cache_expire should be >= 0")
-			return fmt.Errorf("value ofstat_cache_expire should be >= 0")
+			return fmt.Errorf("value of stat_cache_expire should be >= 0")
 		}
 	}
 
