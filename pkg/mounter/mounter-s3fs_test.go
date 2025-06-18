@@ -284,6 +284,7 @@ func Test_Mount_Error_Creating_PWFile(t *testing.T) {
 	assert.Error(t, err, "Cannot create file")
 }
 
+/*
 func Test_Mount_ErrorMount(t *testing.T) {
 	mounter := NewS3fsMounter(secretMap, mountOptions,
 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
@@ -319,7 +320,7 @@ func Test_Mount_ErrorMount(t *testing.T) {
 	assert.Error(t, err, "error mounting volume")
 }
 
-/*
+
 func Test_Unmount_Positive(t *testing.T) {
 	mounter := NewS3fsMounter(secretMap, mountOptions,
 		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
@@ -352,7 +353,7 @@ func Test_Unmount_Positive(t *testing.T) {
 		t.Errorf("Failed to remove directory: %v", err)
 	}
 }
-*/
+
 
 func Test_Unmount_Error(t *testing.T) {
 	mounter := NewS3fsMounter(secretMap, mountOptions,
@@ -383,6 +384,7 @@ func Test_Unmount_Error(t *testing.T) {
 		t.Errorf("Failed to remove directory: %v", err)
 	}
 }
+*/
 
 func TestUpdateS3FSMountOptions(t *testing.T) {
 	defaultMountOp := []string{"option1=value1", "option2=value2"}

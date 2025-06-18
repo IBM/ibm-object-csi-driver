@@ -124,6 +124,8 @@ var mkdirAll = func(path string, perm os.FileMode) error {
 	return mkdirAllFunc(path, perm)
 }
 
+var mounterRequest = createCOSCSIMounterRequest
+
 func createCOSCSIMounterRequest(payload string, url string) (string, error) {
 	// Get socket path
 	socketPath := os.Getenv(constants.COSCSIMounterSocketPathEnv)
