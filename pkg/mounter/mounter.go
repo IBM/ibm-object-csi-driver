@@ -18,7 +18,10 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var mountWorker = true
+var (
+	mountWorker    = true
+	mounterRequest = createCOSCSIMounterRequest
+)
 
 type Mounter interface {
 	Mount(source string, target string) error
@@ -116,15 +119,6 @@ func writePass(pwFileName string, pwFileContent string) error {
 	}
 	return nil
 }
-
-var mkdirAllFunc = os.MkdirAll
-
-// Function that wraps os.MkdirAll
-var mkdirAll = func(path string, perm os.FileMode) error {
-	return mkdirAllFunc(path, perm)
-}
-
-var mounterRequest = createCOSCSIMounterRequest
 
 func createCOSCSIMounterRequest(payload string, url string) (string, error) {
 	// Get socket path

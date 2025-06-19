@@ -126,7 +126,7 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	}
 
 	if !pathExist {
-		if err = mkdirAll(metaPath, 0755); // #nosec G301: used for s3fs
+		if err = MakeDir(metaPath, 0755); // #nosec G301: used for s3fs
 		err != nil {
 			klog.Errorf("S3FSMounter Mount: Cannot create directory %s: %v", metaPath, err)
 			return fmt.Errorf("S3FSMounter Mount: Cannot create directory %s: %v", metaPath, err)

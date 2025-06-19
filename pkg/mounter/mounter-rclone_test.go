@@ -2,6 +2,8 @@ package mounter
 
 import (
 	"errors"
+	"fmt"
+	"os"
 	"testing"
 
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
@@ -231,4 +233,43 @@ func TestRcloneUnmount_WorkerNode_Negative(t *testing.T) {
 	err := rclone.Unmount(target)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create http request")
+}
+
+func TestCreateConfig_Success(t *testing.T) {
+	rclone := &RcloneMounter{
+		AccessKeys:    "accessKey:secretKey",
+		LocConstraint: "us-south",
+	}
+
+	err := createConfig("/tmp/testconfig", rclone)
+	assert.Nil(t, err)
+}
+
+func TestCreateConfig_MakeDirFails(t *testing.T) {
+	MakeDir = func(string, os.FileMode) error {
+		return fmt.Errorf("mkdir failed")
+	}
+	err := createConfig("/tmp/testconfig", &RcloneMounter{})
+	assert.ErrorContains(t, err, "mkdir failed")
+}
+
+func TestCreateConfig_FileCreateFails(t *testing.T) {
+	MakeDir = func(string, os.FileMode) error { return nil }
+	CreateFile = func(string) (*os.File, error) {
+		return nil, fmt.Errorf("file create failed")
+	}
+	err := createConfig("/tmp/testconfig", &RcloneMounter{})
+	assert.ErrorContains(t, err, "file create failed")
+}
+
+func TestCreateConfig_ChmodFails(t *testing.T) {
+	MakeDir = func(string, os.FileMode) error { return nil }
+	CreateFile = func(string) (*os.File, error) {
+		return os.CreateTemp("", "test")
+	}
+	Chmod = func(string, os.FileMode) error {
+		return fmt.Errorf("chmod failed")
+	}
+	err := createConfig("/tmp/testconfig", &RcloneMounter{})
+	assert.ErrorContains(t, err, "chmod failed")
 }

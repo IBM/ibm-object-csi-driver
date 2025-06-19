@@ -240,8 +240,8 @@ func Test_Mount_Error_Creating_Mount_Point(t *testing.T) {
 	}
 
 	// Replace mkdirAllFunc with the Fake function
-	mkdirAllFunc = FakeMkdirAll
-	defer func() { mkdirAllFunc = os.MkdirAll }()
+	MakeDir = FakeMkdirAll
+	defer func() { MakeDir = os.MkdirAll }()
 
 	target := "/tmp/test-mount"
 
@@ -267,8 +267,8 @@ func Test_Mount_Error_Creating_PWFile(t *testing.T) {
 	}
 
 	// Replace mkdirAllFunc with the Fake function
-	mkdirAllFunc = FakeMkdirAll
-	defer func() { mkdirAllFunc = os.MkdirAll }()
+	MakeDir = FakeMkdirAll
+	defer func() { MakeDir = os.MkdirAll }()
 
 	FakeWritePass := func(pwFileName string, pwFileContent string) error {
 		return errors.New("error creating PWFile")
