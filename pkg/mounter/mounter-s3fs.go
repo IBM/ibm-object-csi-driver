@@ -45,6 +45,11 @@ const (
 	delay      = 500 * time.Millisecond
 )
 
+var (
+	writePassWrap = writePass
+	removeFile    = removeS3FSCredFile
+)
+
 func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
 	klog.Info("-newS3fsMounter-")
 
@@ -171,13 +176,6 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	return s3fs.MounterUtils.FuseMount(target, constants.S3FS, args)
 }
 
-var writePassFunc = writePass
-
-// Function that wraps writePass
-var writePassWrap = func(pwFileName string, pwFileContent string) error {
-	return writePassFunc(pwFileName, pwFileContent)
-}
-
 func (s3fs *S3fsMounter) Unmount(target string) error {
 	klog.Info("-S3FSMounter Unmount-")
 	klog.Infof("Unmount args:\n\ttarget: <%s>", target)
@@ -193,7 +191,7 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 			return err
 		}
 
-		removeS3FSCredFile(constants.MounterConfigPathOnHost, target)
+		removeFile(constants.MounterConfigPathOnHost, target)
 		return nil
 	}
 	klog.Info("NodeServer Unmounting...")
@@ -203,7 +201,7 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 		return err
 	}
 
-	removeS3FSCredFile(constants.MounterConfigPathOnPodS3fs, target)
+	removeFile(constants.MounterConfigPathOnPodS3fs, target)
 	return nil
 }
 
@@ -282,7 +280,6 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 		}
 
 		updatedOptions = append(updatedOptions, option)
-		//klog.Infof("newS3fsMounter mountOption: [%s]", option)
 	}
 
 	klog.Infof("updated S3fsMounter Options: %v", updatedOptions)
@@ -344,7 +341,7 @@ func removeS3FSCredFile(credDir, target string) {
 	metaPath := path.Join(credDir, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 
 	for retry := 1; retry <= maxRetries; retry++ {
-		_, err := os.Stat(metaPath)
+		_, err := Stat(metaPath)
 		if err != nil {
 			if os.IsNotExist(err) {
 				klog.Infof("removeS3FSCredFile: Password file directory does not exist: %s", metaPath)
@@ -355,7 +352,7 @@ func removeS3FSCredFile(credDir, target string) {
 			continue
 		}
 		passwdFile := path.Join(metaPath, passFile)
-		err = os.Remove(passwdFile)
+		err = Remove(passwdFile)
 		if err != nil {
 			klog.Errorf("removeS3FSCredFile: Attempt %d - Failed to remove password file %s: %v", retry, passwdFile, err)
 			time.Sleep(delay)
