@@ -49,6 +49,14 @@ const (
 	envAuth        = "true"
 )
 
+var (
+	MakeDir    = os.MkdirAll
+	CreateFile = os.Create
+	Chmod      = os.Chmod
+
+	createConfigWrap = createConfig
+)
+
 func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
 	klog.Info("-newRcloneMounter-")
 
@@ -204,7 +212,7 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 
 		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.RClone, jsonData)
 
-		response, err := createCOSCSIMounterRequest(payload, "http://unix/api/cos/mount")
+		response, err := mounterRequest(payload, "http://unix/api/cos/mount")
 		klog.Info("Worker Mounting...", response)
 		if err != nil {
 			return err
@@ -223,7 +231,7 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 
 		payload := fmt.Sprintf(`{"path":"%s"}`, target)
 
-		response, err := createCOSCSIMounterRequest(payload, "http://unix/api/cos/unmount")
+		response, err := mounterRequest(payload, "http://unix/api/cos/unmount")
 		klog.Info("Worker Unmounting...", response)
 		if err != nil {
 			return err
@@ -234,16 +242,8 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 	return rclone.MounterUtils.FuseUnmount(target)
 }
 
-var createConfigFunc = createConfig
-
-// Function that wraps writePass
-var createConfigWrap = func(configPathWithVolID string, rclone *RcloneMounter) error {
-	return createConfigFunc(configPathWithVolID, rclone)
-}
-
 func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
-	var accessKey string
-	var secretKey string
+	var accessKey, secretKey string
 	keys := strings.Split(rclone.AccessKeys, ":")
 	if len(keys) == 2 {
 		accessKey = keys[0]
@@ -265,14 +265,14 @@ func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
 
 	configParams = append(configParams, rclone.MountOptions...)
 
-	if err := os.MkdirAll(configPathWithVolID, 0755); // #nosec G301: used for rclone
+	if err := MakeDir(configPathWithVolID, 0755); // #nosec G301: used for rclone
 	err != nil {
 		klog.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", configPathWithVolID, err)
 		return err
 	}
 
 	configFile := path.Join(configPathWithVolID, configFileName)
-	file, err := os.Create(configFile) // #nosec G304 used for rclone
+	file, err := CreateFile(configFile) // #nosec G304 used for rclone
 	if err != nil {
 		klog.Errorf("RcloneMounter Mount: Cannot create file %s: %v", configFileName, err)
 		return err
@@ -283,7 +283,7 @@ func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
 		}
 	}()
 
-	err = os.Chmod(configFile, 0644) // #nosec G302: used for rclone
+	err = Chmod(configFile, 0644) // #nosec G302: used for rclone
 	if err != nil {
 		klog.Errorf("RcloneMounter Mount: Cannot change permissions on file  %s: %v", configFileName, err)
 		return err
