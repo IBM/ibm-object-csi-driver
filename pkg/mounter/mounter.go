@@ -77,7 +77,7 @@ func checkPath(path string) (bool, error) {
 	if path == "" {
 		return false, errors.New("undefined path")
 	}
-	_, err := os.Stat(path)
+	_, err := Stat(path)
 	if err == nil {
 		return true, nil
 	} else if os.IsNotExist(err) {
