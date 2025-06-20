@@ -166,9 +166,7 @@ func TestS3FSMount_WorkerNode_Negative(t *testing.T) {
 func TestUnmount_NodeServer(t *testing.T) {
 	mountWorker = false
 
-	removeFile = func(_, _ string) {
-		return
-	}
+	removeFile = func(_, _ string) {}
 
 	s3fs := &S3fsMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 		FuseUnmountFn: func(path string) error {
@@ -183,9 +181,7 @@ func TestUnmount_NodeServer(t *testing.T) {
 func TestUnmount_WorkerNode(t *testing.T) {
 	mountWorker = true
 
-	removeFile = func(_, _ string) {
-		return
-	}
+	removeFile = func(_, _ string) {}
 
 	s3fs := &S3fsMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 		FuseUnmountFn: func(path string) error {
@@ -222,9 +218,7 @@ func TestUnmount_WorkerNode_Negative(t *testing.T) {
 func TestUnmount_NodeServer_Negative(t *testing.T) {
 	mountWorker = false
 
-	removeFile = func(_, _ string) {
-		return
-	}
+	removeFile = func(_, _ string) {}
 
 	s3fs := &S3fsMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 		FuseUnmountFn: func(path string) error {
