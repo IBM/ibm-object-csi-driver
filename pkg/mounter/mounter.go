@@ -21,6 +21,12 @@ import (
 var (
 	mountWorker    = true
 	mounterRequest = createCOSCSIMounterRequest
+
+	MakeDir    = os.MkdirAll
+	CreateFile = os.Create
+	Chmod      = os.Chmod
+	Stat       = os.Stat
+	Remove     = os.Remove
 )
 
 type Mounter interface {
@@ -77,7 +83,7 @@ func checkPath(path string) (bool, error) {
 	if path == "" {
 		return false, errors.New("undefined path")
 	}
-	_, err := os.Stat(path)
+	_, err := Stat(path)
 	if err == nil {
 		return true, nil
 	} else if os.IsNotExist(err) {
