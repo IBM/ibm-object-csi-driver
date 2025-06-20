@@ -16,7 +16,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path"
 	"strings"
 
@@ -49,15 +48,7 @@ const (
 	envAuth        = "true"
 )
 
-var (
-	MakeDir    = os.MkdirAll
-	CreateFile = os.Create
-	Chmod      = os.Chmod
-	Stat       = os.Stat
-	Remove     = os.Remove
-
-	createConfigWrap = createConfig
-)
+var createConfigWrap = createConfig
 
 func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
 	klog.Info("-newRcloneMounter-")

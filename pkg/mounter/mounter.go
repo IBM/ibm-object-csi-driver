@@ -21,6 +21,12 @@ import (
 var (
 	mountWorker    = true
 	mounterRequest = createCOSCSIMounterRequest
+
+	MakeDir    = os.MkdirAll
+	CreateFile = os.Create
+	Chmod      = os.Chmod
+	Stat       = os.Stat
+	Remove     = os.Remove
 )
 
 type Mounter interface {
