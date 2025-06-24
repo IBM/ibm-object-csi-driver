@@ -148,7 +148,7 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	args, wnOp := s3fs.formulateMountOptions(bucketName, target, passwdFile)
 
 	if mountWorker {
-		klog.Info("Worker Mounting...")
+		klog.Info(" Mount on Worker started...")
 
 		jsonData, err := json.Marshal(wnOp)
 		if err != nil {
@@ -183,7 +183,7 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 	klog.Infof("Unmount args:\n\ttarget: <%s>", target)
 
 	if mountWorker {
-		klog.Info("Worker Unmounting...")
+		klog.Info("Unmount on Worker started...")
 
 		payload := fmt.Sprintf(`{"path":"%s"}`, target)
 
