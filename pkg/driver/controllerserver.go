@@ -196,8 +196,9 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	if bucketName != "" {
 		// User Provided bucket. Check its existence and create if not present
 		klog.Infof("Bucket name provided: %v", bucketName)
+		klog.Infof("Check if the provided bucket already exists: %v", bucketName)
 		if err := sess.CheckBucketAccess(bucketName); err != nil {
-			klog.Infof("CreateVolume: Unable to access the bucket: %v, Creating with given name", err)
+			klog.Infof("CreateVolume: bucket not accessible: %v, Creating new bucket with given name", err)
 			err = createBucket(sess, bucketName, kpRootKeyCrn)
 			if err != nil {
 				return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", err, bucketName))
