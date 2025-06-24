@@ -91,7 +91,7 @@ func (su *DriverStatsUtils) CheckMount(targetPath string) error {
 	out, err := exec.Command("mountpoint", targetPath).CombinedOutput()
 	outStr := strings.TrimSpace(string(out))
 	if err != nil {
-		klog.V(3).Infof("Output: Output string error %+v", outStr)
+		klog.V(3).Infof("Check if mountPath exists: Output string %+v", outStr)
 		if strings.HasSuffix(outStr, "No such file or directory") {
 			if err = os.MkdirAll(targetPath, 0750); err != nil {
 				klog.V(2).Infof("checkMount: Error: %+v", err)
