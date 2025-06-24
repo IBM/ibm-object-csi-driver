@@ -8,7 +8,7 @@ MAINTAINER := "IKS Storage"
 DEB_ARCH := all
 DESCRIPTION := "IBM cos-csi-mounter service"
 
-INSTALL_TAR_FILE := "$(NAME)-$(APP_VERSION).tar.gz"
+INSTALL_TAR_FILE := "$(NAME)-$(APP_VERSION).dev.tar.gz"
 CHECKSUM_FILE := "$(INSTALL_TAR_FILE).sha256"
 
 test:
