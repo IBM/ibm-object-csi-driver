@@ -202,7 +202,7 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 	args, wnOp := rclone.formulateMountOptions(bucketName, target, configPathWithVolID)
 
 	if mountWorker {
-		klog.Info("Worker Mounting...")
+		klog.Info("Mount on Worker started...")
 
 		jsonData, err := json.Marshal(wnOp)
 		if err != nil {
@@ -227,7 +227,7 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 	klog.Info("-RcloneMounter Unmount-")
 
 	if mountWorker {
-		klog.Info("Worker Unmounting...")
+		klog.Info("Unmount on Worker started...")
 
 		payload := fmt.Sprintf(`{"path":"%s"}`, target)
 
