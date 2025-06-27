@@ -6,7 +6,7 @@ require (
 	github.com/IBM/go-sdk-core/v5 v5.20.1
 	github.com/IBM/ibm-cos-sdk-go v1.12.2
 	github.com/IBM/ibm-cos-sdk-go-config/v2 v2.3.0
-	github.com/IBM/ibm-csi-common v1.1.20
+	github.com/IBM/ibm-csi-common v1.1.21
 	github.com/IBM/ibmcloud-volume-interface v1.2.20
 	github.com/aws/aws-sdk-go v1.55.7
 	github.com/container-storage-interface/spec v1.11.0
@@ -33,7 +33,7 @@ require (
 require (
 	cel.dev/expr v0.23.0 // indirect
 	github.com/BurntSushi/toml v1.0.0 // indirect
-	github.com/IBM/secret-utils-lib v1.1.13 // indirect
+	github.com/IBM/secret-utils-lib v1.1.14 // indirect
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
