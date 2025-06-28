@@ -12,8 +12,11 @@ package driver
 
 import (
 	"fmt"
+	"os"
+	"strconv"
 
 	"github.com/IBM/ibm-csi-common/pkg/utils"
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
@@ -129,14 +132,36 @@ func newControllerServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, s3cosSessio
 	}
 }
 
-func newNodeServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, nodeID string, mountObj mounter.NewMounterFactory, mounterUtil mounterUtils.MounterUtils) *nodeServer {
+func newNodeServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, nodeID string, mountObj mounter.NewMounterFactory, mounterUtil mounterUtils.MounterUtils) (*nodeServer, error) {
+	nodeName := os.Getenv(constants.KubeNodeName)
+	if nodeName == "" {
+		return nil, fmt.Errorf("KUBE_NODE_NAME env variable not set")
+	}
+
+	region, zone, err := statsUtil.GetRegionAndZone(nodeName)
+	if err != nil {
+		return nil, err
+	}
+
+	var maxVolumesPerNode int64
+	maxVolumesPerNodeStr := os.Getenv(constants.MaxVolumesPerNodeEnv)
+	if maxVolumesPerNodeStr != "" {
+		maxVolumesPerNode, err = strconv.ParseInt(maxVolumesPerNodeStr, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		d.Logger("MAX_VOLUMES_PER_NODE env variable not set. Using default value")
+		maxVolumesPerNode = constants.DefaultVolumesPerNode
+	}
+
 	return &nodeServer{
 		S3Driver:     d,
 		Stats:        statsUtil,
-		NodeID:       nodeID,
+		Config:       NodeServerConfig{MaxVolumesPerNode: maxVolumesPerNode, Region: region, Zone: zone, NodeID: nodeID},
 		Mounter:      mountObj,
 		MounterUtils: mounterUtil,
-	}
+	}, nil
 }
 
 func (driver *S3Driver) NewS3CosDriver(nodeID string, endpoint string, s3cosSession s3client.ObjectStorageSessionFactory, mountObj mounter.NewMounterFactory, statsUtil pkgUtils.StatsUtils, mounterUtil mounterUtils.MounterUtils) (*S3Driver, error) {
@@ -158,13 +183,13 @@ func (driver *S3Driver) NewS3CosDriver(nodeID string, endpoint string, s3cosSess
 	case "controller":
 		driver.cs = newControllerServer(driver, statsUtil, s3cosSession, driver.logger)
 	case "node":
-		driver.ns = newNodeServer(driver, statsUtil, nodeID, mountObj, mounterUtil)
+		driver.ns, err = newNodeServer(driver, statsUtil, nodeID, mountObj, mounterUtil)
 	case "controller-node":
 		driver.cs = newControllerServer(driver, statsUtil, s3cosSession, driver.logger)
-		driver.ns = newNodeServer(driver, statsUtil, nodeID, mountObj, mounterUtil)
+		driver.ns, err = newNodeServer(driver, statsUtil, nodeID, mountObj, mounterUtil)
 	}
 
-	return driver, nil
+	return driver, err
 }
 
 func (driver *S3Driver) Run() {
