@@ -200,8 +200,6 @@ func TestNewNodeServer(t *testing.T) {
 
 		_ = os.Setenv(constants.KubeNodeName, tc.kubeNodeName)
 		_ = os.Setenv(constants.MaxVolumesPerNodeEnv, tc.maxVolumesPerNode)
-		defer os.Unsetenv(constants.KubeNodeName)
-		defer os.Unsetenv(constants.MaxVolumesPerNodeEnv)
 
 		actualResp, actualErr := newNodeServer(driver, tc.statsUtils, nodeID, fakeMountObj, mounterUtil)
 
@@ -215,6 +213,14 @@ func TestNewNodeServer(t *testing.T) {
 		if tc.verifyResult != nil {
 			tc.verifyResult(t, actualResp, actualErr)
 		}
+	}
+
+	// unset environment variables
+	if err := os.Unsetenv(constants.KubeNodeName); err != nil {
+		t.Logf("failed to unset env KUBE_NODE_NAME: %v", err)
+	}
+	if err := os.Unsetenv(constants.MaxVolumesPerNodeEnv); err != nil {
+		t.Logf("failed to unset env MAX_VOLUMES_PER_NODE: %v", err)
 	}
 }
 
@@ -283,8 +289,16 @@ func TestNewS3CosDriver(t *testing.T) {
 
 	_ = os.Setenv(constants.KubeNodeName, testNodeID)
 	_ = os.Setenv(constants.MaxVolumesPerNodeEnv, strconv.Itoa(constants.DefaultVolumesPerNode))
-	defer os.Unsetenv(constants.KubeNodeName)
-	defer os.Unsetenv(constants.MaxVolumesPerNodeEnv)
+	defer func() {
+		if err := os.Unsetenv(constants.KubeNodeName); err != nil {
+			t.Logf("failed to unset env KUBE_NODE_NAME: %v", err)
+		}
+	}()
+	defer func() {
+		if err := os.Unsetenv(constants.MaxVolumesPerNodeEnv); err != nil {
+			t.Logf("failed to unset env MAX_VOLUMES_PER_NODE: %v", err)
+		}
+	}()
 
 	mounterUtil := mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{})
 
