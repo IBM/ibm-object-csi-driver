@@ -152,7 +152,7 @@ func newNodeServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, nodeID string, mo
 		}
 	} else {
 		d.logger.Warn("MAX_VOLUMES_PER_NODE env variable not set. Using default value")
-		maxVolumesPerNode = constants.DefaultVolumesPerNode
+		maxVolumesPerNode = int64(constants.DefaultVolumesPerNode)
 	}
 
 	return &nodeServer{
