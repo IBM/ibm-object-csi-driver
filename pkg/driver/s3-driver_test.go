@@ -19,7 +19,6 @@ package driver
 import (
 	"bytes"
 	"errors"
-	"os"
 	"strconv"
 	"testing"
 
@@ -107,17 +106,18 @@ func TestNewNodeServer(t *testing.T) {
 	testZone := "test-zone"
 
 	testCases := []struct {
-		testCaseName      string
-		kubeNodeName      string
-		maxVolumesPerNode string
-		statsUtils        utils.StatsUtils
-		verifyResult      func(*testing.T, *nodeServer, error)
-		expectedErr       error
+		testCaseName string
+		envVars      map[string]string
+		statsUtils   utils.StatsUtils
+		verifyResult func(*testing.T, *nodeServer, error)
+		expectedErr  error
 	}{
 		{
-			testCaseName:      "Positive: success",
-			kubeNodeName:      nodeID,
-			maxVolumesPerNode: "10",
+			testCaseName: "Positive: success",
+			envVars: map[string]string{
+				constants.KubeNodeName:         nodeID,
+				constants.MaxVolumesPerNodeEnv: "10",
+			},
 			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
 				GetRegionAndZoneFn: func(nodeName string) (string, string, error) { return testRegion, testZone, nil },
 			}),
@@ -133,7 +133,10 @@ func TestNewNodeServer(t *testing.T) {
 		},
 		{
 			testCaseName: "Negative: Failed to get KUBE_NODE_NAME env variable",
-			kubeNodeName: "",
+			envVars: map[string]string{
+				constants.KubeNodeName:         "",
+				constants.MaxVolumesPerNodeEnv: "",
+			},
 			verifyResult: func(t *testing.T, ns *nodeServer, err error) {
 				assert.Nil(t, ns)
 			},
@@ -141,7 +144,10 @@ func TestNewNodeServer(t *testing.T) {
 		},
 		{
 			testCaseName: "Negative: Failed to get region and zone",
-			kubeNodeName: nodeID,
+			envVars: map[string]string{
+				constants.KubeNodeName:         nodeID,
+				constants.MaxVolumesPerNodeEnv: "",
+			},
 			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
 				GetRegionAndZoneFn: func(nodeName string) (string, string, error) {
 					return "", "", errors.New("unable to load in-cluster configuration")
@@ -153,9 +159,11 @@ func TestNewNodeServer(t *testing.T) {
 			expectedErr: errors.New("unable to load in-cluster configuration"),
 		},
 		{
-			testCaseName:      "Negative: invalid value of maxVolumesPerNode",
-			kubeNodeName:      nodeID,
-			maxVolumesPerNode: "invalid",
+			testCaseName: "Negative: invalid value of maxVolumesPerNode",
+			envVars: map[string]string{
+				constants.KubeNodeName:         nodeID,
+				constants.MaxVolumesPerNodeEnv: "invalid",
+			},
 			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
 				GetRegionAndZoneFn: func(nodeName string) (string, string, error) {
 					return testRegion, testZone, nil
@@ -168,7 +176,10 @@ func TestNewNodeServer(t *testing.T) {
 		},
 		{
 			testCaseName: "Positive: maxVolumesPerNode not set",
-			kubeNodeName: nodeID,
+			envVars: map[string]string{
+				constants.KubeNodeName:         nodeID,
+				constants.MaxVolumesPerNodeEnv: "",
+			},
 			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
 				GetRegionAndZoneFn: func(nodeName string) (string, string, error) { return testRegion, testZone, nil },
 			}),
@@ -198,8 +209,9 @@ func TestNewNodeServer(t *testing.T) {
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		_ = os.Setenv(constants.KubeNodeName, tc.kubeNodeName)
-		_ = os.Setenv(constants.MaxVolumesPerNodeEnv, tc.maxVolumesPerNode)
+		for k, v := range tc.envVars {
+			t.Setenv(k, v)
+		}
 
 		actualResp, actualErr := newNodeServer(driver, tc.statsUtils, nodeID, fakeMountObj, mounterUtil)
 
@@ -214,14 +226,6 @@ func TestNewNodeServer(t *testing.T) {
 			tc.verifyResult(t, actualResp, actualErr)
 		}
 	}
-
-	// unset environment variables
-	if err := os.Unsetenv(constants.KubeNodeName); err != nil {
-		t.Logf("failed to unset env KUBE_NODE_NAME: %v", err)
-	}
-	if err := os.Unsetenv(constants.MaxVolumesPerNodeEnv); err != nil {
-		t.Logf("failed to unset env MAX_VOLUMES_PER_NODE: %v", err)
-	}
 }
 
 func TestNewS3CosDriver(t *testing.T) {
@@ -232,6 +236,11 @@ func TestNewS3CosDriver(t *testing.T) {
 	nodeID := "test-nodeID"
 	testRegion := "test-region"
 	testZone := "test-zone"
+
+	envVars := map[string]string{
+		constants.KubeNodeName:         testNodeID,
+		constants.MaxVolumesPerNodeEnv: strconv.Itoa(constants.DefaultVolumesPerNode),
+	}
 
 	testCases := []struct {
 		testCaseName string
@@ -287,18 +296,9 @@ func TestNewS3CosDriver(t *testing.T) {
 	logger, teardown := GetTestLogger(t)
 	defer teardown()
 
-	_ = os.Setenv(constants.KubeNodeName, testNodeID)
-	_ = os.Setenv(constants.MaxVolumesPerNodeEnv, strconv.Itoa(constants.DefaultVolumesPerNode))
-	defer func() {
-		if err := os.Unsetenv(constants.KubeNodeName); err != nil {
-			t.Logf("failed to unset env KUBE_NODE_NAME: %v", err)
-		}
-	}()
-	defer func() {
-		if err := os.Unsetenv(constants.MaxVolumesPerNodeEnv); err != nil {
-			t.Logf("failed to unset env MAX_VOLUMES_PER_NODE: %v", err)
-		}
-	}()
+	for k, v := range envVars {
+		t.Setenv(k, v)
+	}
 
 	mounterUtil := mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{})
 
