@@ -1,4 +1,3 @@
-// Package mounter
 package mounter
 
 import (
@@ -10,27 +9,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Fake the secretMap and mountOptions
-var secretMap = map[string]string{
-	"cosEndpoint":        "test-endpoint",
-	"locationConstraint": "test-loc-constraint",
-	"bucketName":         "test-bucket-name",
-	"objPath":            "test-obj-path",
-	"accessKey":          "test-access-key",
-	"secretKey":          "test-secret-key",
-	"apiKey":             "test-api-key",
-	"kpRootKeyCRN":       "test-kp-root-key-crn",
-}
+var (
+	secretMap = map[string]string{
+		"cosEndpoint":        "test-endpoint",
+		"locationConstraint": "test-loc-constraint",
+		"bucketName":         "test-bucket-name",
+		"objPath":            "test-obj-path",
+		"accessKey":          "test-access-key",
+		"secretKey":          "test-secret-key",
+		"apiKey":             "test-api-key",
+		"kpRootKeyCRN":       "test-kp-root-key-crn",
+		"uid":                "test-uid",
+	}
 
-var mountOptions = []string{"opt1=val1", "opt2=val2"}
+	mountOptions = []string{"opt1=val1", "opt2=val2", "opt3"}
+)
 
 func TestNewS3fsMounter_Success(t *testing.T) {
 	mounter := NewS3fsMounter(secretMap, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
 
 	s3fsMounter, ok := mounter.(*S3fsMounter)
-	if !ok {
-		t.Errorf("NewS3fsMounter() failed to return an instance of s3fsMounter")
-	}
+	assert.True(t, ok)
 
 	assert.Equal(t, s3fsMounter.BucketName, secretMap["bucketName"])
 	assert.Equal(t, s3fsMounter.ObjPath, secretMap["objPath"])
@@ -47,14 +46,18 @@ func TestNewS3fsMounter_Success_Hmac(t *testing.T) {
 		"accessKey":          "test-access-key",
 		"secretKey":          "test-secret-key",
 		"kpRootKeyCRN":       "test-kp-root-key-crn",
+		"mountOptions":       "\nkey1\nkey2=value2\nkey=val1=val2",
+		"tmpdir":             "test-tmpdir",
+		"use_cache":          "true",
+		"gid":                "test-gid",
 	}
+
+	mountOptions := []string{"opt1=val1", "opt2=val2", " ", "opt3"}
 
 	mounter := NewS3fsMounter(secretMap, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
 
 	s3fsMounter, ok := mounter.(*S3fsMounter)
-	if !ok {
-		t.Errorf("NewS3fsMounter() failed to return an instance of s3fsMounter")
-	}
+	assert.True(t, ok)
 
 	assert.Equal(t, s3fsMounter.BucketName, secretMap["bucketName"])
 	assert.Equal(t, s3fsMounter.ObjPath, secretMap["objPath"])
@@ -62,455 +65,221 @@ func TestNewS3fsMounter_Success_Hmac(t *testing.T) {
 	assert.Equal(t, s3fsMounter.LocConstraint, secretMap["locationConstraint"])
 }
 
-/*
-func Test_Mount_Positive(t *testing.T) {
-	mounter := NewS3fsMounter(secretMap, mountOptions,
-		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseMountFn: func(path string, comm string, args []string) error {
+func TestS3FSMount_NodeServer_Positive(t *testing.T) {
+	mountWorker = false
+
+	MakeDir = func(path string, perm os.FileMode) error {
+		return nil
+	}
+	writePassWrap = func(_, _ string) error {
+		return nil
+	}
+
+	s3fs := &S3fsMounter{
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseMountFn: func(path, comm string, args []string) error {
 				return nil
 			},
-		}))
-
-	s3fsMounter, ok := mounter.(*S3fsMounter)
-	if !ok {
-		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
+		}),
+		LocConstraint: "test-location",
+		MountOptions:  mountOptions,
+		ObjPath:       "test-objPath",
 	}
 
-	FakeMkdirAll := func(path string, perm os.FileMode) error {
-		return nil
-	}
-
-	// Replace mkdirAllFunc with the Fake function
-	mkdirAllFunc = FakeMkdirAll
-	defer func() { mkdirAllFunc = os.MkdirAll }()
-
-	FakeWritePass := func(pwFileName string, pwFileContent string) error {
-		return nil
-	}
-
-	// Replace writePassFunc with the Fake function
-	writePassFunc = FakeWritePass
-	defer func() { writePassFunc = writePass }()
-
-	target := "/tmp/test-mount"
-
-	err := s3fsMounter.Mount("source", target)
+	err := s3fs.Mount(source, target)
 	assert.NoError(t, err)
 }
 
-func Test_Mount_Positive_Hmac(t *testing.T) {
-	secretMap := map[string]string{
-		"cosEndpoint":        "test-endpoint",
-		"locationConstraint": "test-loc-constraint",
-		"bucketName":         "test-bucket-name",
-		"objPath":            "test-obj-path",
-		"accessKey":          "test-access-key",
-		"secretKey":          "test-secret-key",
-		"kpRootKeyCRN":       "test-kp-root-key-crn",
+func TestS3FSMount_WorkerNode_Positive(t *testing.T) {
+	mountWorker = true
+
+	MakeDir = func(path string, perm os.FileMode) error {
+		return nil
 	}
-	mounter := NewS3fsMounter(secretMap, mountOptions,
-		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseMountFn: func(path string, comm string, args []string) error {
+	writePassWrap = func(_, _ string) error {
+		return nil
+	}
+	mounterRequest = func(_, _ string) (string, error) {
+		return "", nil
+	}
+
+	s3fs := &S3fsMounter{
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseMountFn: func(path, comm string, args []string) error {
 				return nil
 			},
-		}))
-
-	s3fsMounter, ok := mounter.(*S3fsMounter)
-	if !ok {
-		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
+		}),
+		AuthType: "hmac",
 	}
 
-	FakeMkdirAll := func(path string, perm os.FileMode) error {
-		return nil
-	}
-
-	// Replace mkdirAllFunc with the Fake function
-	mkdirAllFunc = FakeMkdirAll
-	defer func() { mkdirAllFunc = os.MkdirAll }()
-
-	FakeWritePass := func(pwFileName string, pwFileContent string) error {
-		return nil
-	}
-
-	// Replace writePassFunc with the Fake function
-	writePassFunc = FakeWritePass
-	defer func() { writePassFunc = writePass }()
-
-	target := "/tmp/test-mount"
-
-	err := s3fsMounter.Mount("source", target)
+	err := s3fs.Mount(source, target)
 	assert.NoError(t, err)
 }
 
-func Test_Mount_Positive_Empty_ObjPath(t *testing.T) {
-	secretMap = map[string]string{
-		"cosEndpoint":        "test-endpoint",
-		"locationConstraint": "test-loc-constraint",
-		"bucketName":         "test-bucket-name",
-		"accessKey":          "test-access-key",
-		"secretKey":          "test-secret-key",
-		"apiKey":             "test-api-key",
-		"kpRootKeyCRN":       "test-kp-root-key-crn",
-	}
-	mounter := NewS3fsMounter(secretMap, mountOptions,
-		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseMountFn: func(path string, comm string, args []string) error {
-				return nil
-			},
-		}))
+func TestMount_CreateDirFails_Negative(t *testing.T) {
+	s3fs := &S3fsMounter{}
 
-	s3fsMounter, ok := mounter.(*S3fsMounter)
-	if !ok {
-		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
+	MakeDir = func(path string, perm os.FileMode) error {
+		return errors.New("failed to create directory")
 	}
 
-	FakeMkdirAll := func(path string, perm os.FileMode) error {
+	err := s3fs.Mount(source, target)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "Cannot create directory")
+}
+
+func TestMount_FailedToCreatePassFile_Negative(t *testing.T) {
+	MakeDir = func(path string, perm os.FileMode) error {
 		return nil
 	}
-
-	// Replace mkdirAllFunc with the Fake function
-	mkdirAllFunc = FakeMkdirAll
-	defer func() { mkdirAllFunc = os.MkdirAll }()
-
-	FakeWritePass := func(pwFileName string, pwFileContent string) error {
-		return nil
+	writePassWrap = func(_, _ string) error {
+		return errors.New("failed to create file")
 	}
 
-	// Replace writePassFunc with the Fake function
-	writePassFunc = FakeWritePass
-	defer func() { writePassFunc = writePass }()
+	s3fs := &S3fsMounter{}
 
-	target := "/tmp/test-mount"
+	err := s3fs.Mount(source, target)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create file")
+}
 
-	err := s3fsMounter.Mount("source", target)
+func TestS3FSMount_WorkerNode_Negative(t *testing.T) {
+	mountWorker = true
+
+	MakeDir = func(path string, perm os.FileMode) error {
+		return nil
+	}
+	writePassWrap = func(_, _ string) error {
+		return nil
+	}
+	mounterRequest = func(_, _ string) (string, error) {
+		return "", errors.New("failed to perform http request")
+	}
+
+	s3fs := &S3fsMounter{}
+
+	err := s3fs.Mount(source, target)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to perform http request")
+}
+
+func TestUnmount_NodeServer(t *testing.T) {
+	mountWorker = false
+
+	removeFile = func(_, _ string) {}
+
+	s3fs := &S3fsMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+		FuseUnmountFn: func(path string) error {
+			return nil
+		},
+	})}
+
+	err := s3fs.Unmount(target)
 	assert.NoError(t, err)
 }
 
-func Test_Mount_Positive_SingleMountOptions(t *testing.T) {
-	mounter := NewS3fsMounter(secretMap, []string{"mountOption1", "mountOption2"},
-		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseMountFn: func(path string, comm string, args []string) error {
-				return nil
-			},
-		}))
+func TestUnmount_WorkerNode(t *testing.T) {
+	mountWorker = true
 
-	s3fsMounter, ok := mounter.(*S3fsMounter)
-	if !ok {
-		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
+	removeFile = func(_, _ string) {}
+
+	s3fs := &S3fsMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+		FuseUnmountFn: func(path string) error {
+			return nil
+		},
+	})}
+
+	mounterRequest = func(_, _ string) (string, error) {
+		return "", nil
 	}
 
-	FakeMkdirAll := func(path string, perm os.FileMode) error {
-		return nil
-	}
-
-	// Replace mkdirAllFunc with the Fake function
-	mkdirAllFunc = FakeMkdirAll
-	defer func() { mkdirAllFunc = os.MkdirAll }()
-
-	FakeWritePass := func(pwFileName string, pwFileContent string) error {
-		return nil
-	}
-
-	// Replace writePassFunc with the Fake function
-	writePassFunc = FakeWritePass
-	defer func() { writePassFunc = writePass }()
-
-	target := "/tmp/test-mount"
-
-	err := s3fsMounter.Mount("source", target)
+	err := s3fs.Unmount(target)
 	assert.NoError(t, err)
 }
-*/
 
-func Test_Mount_Error_Creating_Mount_Point(t *testing.T) {
-	mounter := NewS3fsMounter(secretMap, mountOptions,
-		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseMountFn: func(path string, comm string, args []string) error {
-				return nil
-			},
-		}))
+func TestUnmount_WorkerNode_Negative(t *testing.T) {
+	mountWorker = true
 
-	s3fsMounter, ok := mounter.(*S3fsMounter)
-	if !ok {
-		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
+	s3fs := &S3fsMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+		FuseUnmountFn: func(path string) error {
+			return nil
+		},
+	})}
+
+	mounterRequest = func(_, _ string) (string, error) {
+		return "", errors.New("failed to create http request")
 	}
 
-	FakeMkdirAll := func(path string, perm os.FileMode) error {
-		return errors.New("error creating mount path")
-	}
-
-	// Replace mkdirAllFunc with the Fake function
-	MakeDir = FakeMkdirAll
-	defer func() { MakeDir = os.MkdirAll }()
-
-	target := "/tmp/test-mount"
-
-	err := s3fsMounter.Mount("source", target)
-	assert.Error(t, err, "Cannot create directory")
+	err := s3fs.Unmount(target)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create http request")
 }
 
-func Test_Mount_Error_Creating_PWFile(t *testing.T) {
-	mounter := NewS3fsMounter(secretMap, mountOptions,
-		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseMountFn: func(path string, comm string, args []string) error {
-				return nil
-			},
-		}))
+func TestUnmount_NodeServer_Negative(t *testing.T) {
+	mountWorker = false
 
-	s3fsMounter, ok := mounter.(*S3fsMounter)
-	if !ok {
-		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
+	removeFile = func(_, _ string) {}
+
+	s3fs := &S3fsMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+		FuseUnmountFn: func(path string) error {
+			return errors.New("failed to unmount")
+		},
+	})}
+
+	err := s3fs.Unmount(target)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to unmount")
+}
+
+func TestRemoveS3FSCredFile_PathNotExists(t *testing.T) {
+	Stat = func(path string) (os.FileInfo, error) {
+		return nil, os.ErrNotExist
 	}
+	removeS3FSCredFile("/test", target)
+}
 
-	FakeMkdirAll := func(path string, perm os.FileMode) error {
+func TestRemoveS3FSCredFile_StatRetryThenSuccess(t *testing.T) {
+	attempt := 0
+	Stat = func(path string) (os.FileInfo, error) {
+		if attempt == 0 {
+			attempt++
+			return nil, errors.New("stat error")
+		}
+		return nil, nil
+	}
+	Remove = func(path string) error {
 		return nil
 	}
 
-	// Replace mkdirAllFunc with the Fake function
-	MakeDir = FakeMkdirAll
-	defer func() { MakeDir = os.MkdirAll }()
-
-	FakeWritePass := func(pwFileName string, pwFileContent string) error {
-		return errors.New("error creating PWFile")
-	}
-
-	// Replace writePassFunc with the Fake function
-	writePassFunc = FakeWritePass
-	defer func() { writePassFunc = writePass }()
-
-	target := "/tmp/test-mount"
-
-	err := s3fsMounter.Mount("source", target)
-	assert.Error(t, err, "Cannot create file")
+	removeS3FSCredFile("/test", target)
 }
 
-/*
-func Test_Mount_ErrorMount(t *testing.T) {
-	mounter := NewS3fsMounter(secretMap, mountOptions,
-		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseMountFn: func(path string, comm string, args []string) error {
-				return errors.New("error mounting volume")
-			},
-		}))
-
-	s3fsMounter, ok := mounter.(*S3fsMounter)
-	if !ok {
-		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
+func TestRemoveS3FSCredFile_RemoveRetryThenSuccess(t *testing.T) {
+	Stat = func(path string) (os.FileInfo, error) {
+		return nil, nil
 	}
-
-	FakeMkdirAll := func(path string, perm os.FileMode) error {
+	attempt := 0
+	Remove = func(path string) error {
+		if attempt == 0 {
+			attempt++
+			return errors.New("remove error")
+		}
 		return nil
 	}
 
-	// Replace mkdirAllFunc with the Fake function
-	mkdirAllFunc = FakeMkdirAll
-	defer func() { mkdirAllFunc = os.MkdirAll }()
-
-	FakeWritePass := func(pwFileName string, pwFileContent string) error {
-		return nil
-	}
-
-	// Replace writePassFunc with the Fake function
-	writePassFunc = FakeWritePass
-	defer func() { writePassFunc = writePass }()
-
-	target := "/tmp/test-mount"
-
-	err := s3fsMounter.Mount("source", target)
-	assert.Error(t, err, "error mounting volume")
+	removeS3FSCredFile("/test", target)
 }
 
-
-func Test_Unmount_Positive(t *testing.T) {
-	mounter := NewS3fsMounter(secretMap, mountOptions,
-		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseUnmountFn: func(path string) error {
-				return nil
-			},
-		}))
-
-	s3fsMounter, ok := mounter.(*S3fsMounter)
-	if !ok {
-		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
+func TestRemoveS3FSCredFile_Negative(t *testing.T) {
+	called := 0
+	Stat = func(path string) (os.FileInfo, error) {
+		return nil, nil
+	}
+	Remove = func(path string) error {
+		called++
+		return errors.New("remove failed")
 	}
 
-	target := "/tmp/test-unmount"
-
-	// Creating a directory to simulate a mounted path
-	err := os.MkdirAll(target, os.ModePerm)
-	if err != nil {
-		t.Fatalf("TestS3fsMounter_Unmount() failed to create directory: %v", err)
-	}
-
-	err = s3fsMounter.Unmount(target)
-	assert.NoError(t, err)
-	if err != nil {
-		t.Errorf("TestS3fsMounter_Unmount() failed to unmount: %v", err)
-	}
-
-	err = os.RemoveAll(target)
-	if err != nil {
-		t.Errorf("Failed to remove directory: %v", err)
-	}
-}
-
-
-func Test_Unmount_Error(t *testing.T) {
-	mounter := NewS3fsMounter(secretMap, mountOptions,
-		mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseUnmountFn: func(path string) error {
-				return errors.New("error unmounting volume")
-			},
-		}))
-
-	s3fsMounter, ok := mounter.(*S3fsMounter)
-	if !ok {
-		t.Fatal("NewS3fsMounter() did not return a s3fsMounter")
-	}
-
-	target := "/tmp/test-unmount"
-
-	// Creating a directory to simulate a mounted path
-	err := os.MkdirAll(target, os.ModePerm)
-	if err != nil {
-		t.Fatalf("TestS3fsMounter_Unmount() failed to create directory: %v", err)
-	}
-
-	err = s3fsMounter.Unmount(target)
-	assert.Error(t, err, "error unmounting volume")
-
-	err = os.RemoveAll(target)
-	if err != nil {
-		t.Errorf("Failed to remove directory: %v", err)
-	}
-}
-*/
-
-func TestUpdateS3FSMountOptions(t *testing.T) {
-	defaultMountOp := []string{"option1=value1", "option2=value2"}
-	secretMap := map[string]string{
-		"tmpdir":       "/tmp",
-		"use_cache":    "true",
-		"gid":          "1001",
-		"mountOptions": "additional_option=value3",
-	}
-
-	updatedOptions := updateS3FSMountOptions(defaultMountOp, secretMap)
-
-	assert.ElementsMatch(t, updatedOptions, []string{
-		"option1=value1",
-		"option2=value2",
-		"tmpdir=/tmp",
-		"use_cache=true",
-		"gid=1001",
-		"uid=1001",
-		"additional_option=value3",
-	})
-}
-
-func TestUpdateS3FSMountOptions_SecretMapUID(t *testing.T) {
-	defaultMountOp := []string{"option1=value1", "option2=value2"}
-	secretMap := map[string]string{
-		"tmpdir":       "/tmp",
-		"use_cache":    "true",
-		"gid":          "1001",
-		"uid":          "1001",
-		"mountOptions": "additional_option=value3",
-	}
-
-	updatedOptions := updateS3FSMountOptions(defaultMountOp, secretMap)
-
-	assert.ElementsMatch(t, updatedOptions, []string{
-		"option1=value1",
-		"option2=value2",
-		"tmpdir=/tmp",
-		"use_cache=true",
-		"gid=1001",
-		"uid=1001",
-		"additional_option=value3",
-	})
-}
-
-func TestUpdateS3FSMountOptions_SingleMountOptions(t *testing.T) {
-	defaultMountOp := []string{"option1=value1", "option2=value2"}
-	secretMap := map[string]string{
-		"tmpdir":       "/tmp",
-		"use_cache":    "true",
-		"gid":          "1001",
-		"mountOptions": "value3",
-	}
-
-	updatedOptions := updateS3FSMountOptions(defaultMountOp, secretMap)
-
-	assert.ElementsMatch(t, updatedOptions, []string{
-		"option1=value1",
-		"option2=value2",
-		"tmpdir=/tmp",
-		"use_cache=true",
-		"gid=1001",
-		"uid=1001",
-		"value3",
-	})
-}
-
-func TestUpdateS3FSMountOptions_Empty_Mount_Options(t *testing.T) {
-	defaultMountOp := []string{"option1=value1", "option2=value2"}
-	secretMap := map[string]string{
-		"tmpdir":       "/tmp",
-		"use_cache":    "true",
-		"gid":          "1001",
-		"mountOptions": "",
-	}
-
-	updatedOptions := updateS3FSMountOptions(defaultMountOp, secretMap)
-
-	assert.ElementsMatch(t, updatedOptions, []string{
-		"option1=value1",
-		"option2=value2",
-		"tmpdir=/tmp",
-		"use_cache=true",
-		"gid=1001",
-		"uid=1001",
-	})
-}
-
-func TestUpdateS3FSMountOptions_Empty_Default_Mount_Options(t *testing.T) {
-	defaultMountOp := []string{}
-	secretMap := map[string]string{
-		"tmpdir":       "/tmp",
-		"use_cache":    "true",
-		"gid":          "1001",
-		"mountOptions": "additional_option=value3",
-	}
-
-	updatedOptions := updateS3FSMountOptions(defaultMountOp, secretMap)
-
-	assert.ElementsMatch(t, updatedOptions, []string{
-		"tmpdir=/tmp",
-		"use_cache=true",
-		"gid=1001",
-		"uid=1001",
-		"additional_option=value3",
-	})
-}
-
-func TestUpdateS3FSMountOptions_Invalid_Mount_Options(t *testing.T) {
-	defaultMountOp := []string{"option1=value1", "option2=value2"}
-	secretMap := map[string]string{
-		"tmpdir":       "/tmp",
-		"use_cache":    "true",
-		"gid":          "1001",
-		"mountOptions": "additional=option=value3",
-	}
-
-	updatedOptions := updateS3FSMountOptions(defaultMountOp, secretMap)
-
-	assert.ElementsMatch(t, updatedOptions, []string{
-		"option1=value1",
-		"option2=value2",
-		"tmpdir=/tmp",
-		"use_cache=true",
-		"gid=1001",
-		"uid=1001",
-	})
+	removeS3FSCredFile("/test", target)
+	assert.Equal(t, maxRetries, called)
 }
