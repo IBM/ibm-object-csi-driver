@@ -12,7 +12,6 @@ package driver
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
@@ -29,10 +28,17 @@ import (
 type nodeServer struct {
 	*S3Driver
 	csi.UnimplementedNodeServer
-	Stats        utils.StatsUtils
-	NodeID       string
+	Stats utils.StatsUtils
+	NodeServerConfig
 	Mounter      mounter.NewMounterFactory
 	MounterUtils mounterUtils.MounterUtils
+}
+
+type NodeServerConfig struct {
+	MaxVolumesPerNode int64
+	Region            string
+	Zone              string
+	NodeID            string
 }
 
 func (ns *nodeServer) NodeStageVolume(_ context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
@@ -286,28 +292,15 @@ func (ns *nodeServer) NodeGetCapabilities(_ context.Context, req *csi.NodeGetCap
 func (ns *nodeServer) NodeGetInfo(_ context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	klog.V(3).Infof("NodeGetInfo: called with args %+v", req)
 
-	nodeName := os.Getenv(constants.KubeNodeName)
-	if nodeName == "" {
-		return nil, fmt.Errorf("KUBE_NODE_NAME env variable not set")
-	}
-
-	region, zone, err := ns.Stats.GetRegionAndZone(nodeName)
-	if err != nil {
-		return nil, err
-	}
-
-	klog.V(3).Infof("NodeGetInfo: Node region %s", region)
-	klog.V(3).Infof("NodeGetInfo: Node zone %s", zone)
-
 	topology := &csi.Topology{
 		Segments: map[string]string{
-			constants.NodeRegionLabel: region,
-			constants.NodeZoneLabel:   zone,
+			constants.NodeRegionLabel: ns.Region,
+			constants.NodeZoneLabel:   ns.Zone,
 		},
 	}
 	resp := &csi.NodeGetInfoResponse{
 		NodeId:             ns.NodeID,
-		MaxVolumesPerNode:  constants.DefaultVolumesPerNode,
+		MaxVolumesPerNode:  ns.MaxVolumesPerNode,
 		AccessibleTopology: topology,
 	}
 	klog.V(2).Info("NodeGetInfo: ", resp)
