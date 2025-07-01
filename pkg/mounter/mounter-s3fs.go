@@ -42,7 +42,6 @@ type S3fsMounter struct {
 const (
 	passFile   = ".passwd-s3fs" // #nosec G101: not password
 	maxRetries = 3
-	delay      = 500 * time.Millisecond
 )
 
 var (
@@ -112,18 +111,18 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	klog.Info("-S3FSMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
 
-	var metaRoot string
+	var s3fsCredDir string
 	if mountWorker {
-		metaRoot = constants.MounterConfigPathOnHost
+		s3fsCredDir = constants.MounterConfigPathOnHost
 	} else {
-		metaRoot = constants.MounterConfigPathOnPodS3fs
+		s3fsCredDir = constants.MounterConfigPathOnPodS3fs
 	}
 
 	var bucketName string
 	var pathExist bool
 	var err error
 
-	metaPath := path.Join(metaRoot, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
+	metaPath := path.Join(s3fsCredDir, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 
 	if pathExist, err = checkPath(metaPath); err != nil {
 		klog.Errorf("S3FSMounter Mount: Cannot stat directory %s: %v", metaPath, err)
@@ -348,14 +347,14 @@ func removeS3FSCredFile(credDir, target string) {
 				return
 			}
 			klog.Errorf("removeS3FSCredFile: Attempt %d - Failed to stat path %s: %v", retry, metaPath, err)
-			time.Sleep(delay)
+			time.Sleep(constants.Interval)
 			continue
 		}
 		passwdFile := path.Join(metaPath, passFile)
 		err = Remove(passwdFile)
 		if err != nil {
 			klog.Errorf("removeS3FSCredFile: Attempt %d - Failed to remove password file %s: %v", retry, passwdFile, err)
-			time.Sleep(delay)
+			time.Sleep(constants.Interval)
 			continue
 		}
 		klog.Infof("removeS3FSCredFile: Successfully removed password file: %s", passwdFile)
