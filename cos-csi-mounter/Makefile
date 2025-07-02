@@ -114,6 +114,3 @@ clean:
 
 packages:
 packages: deb-build rpm-build tar-package clean
-
-cos-csi-mounter-1.0.1.deb
-cos-csi-mounter-1.0.1.rpm
