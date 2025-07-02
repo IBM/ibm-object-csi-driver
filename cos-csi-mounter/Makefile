@@ -8,8 +8,10 @@ MAINTAINER := "IKS Storage"
 DEB_ARCH := all
 DESCRIPTION := "IBM cos-csi-mounter service"
 
-INSTALL_TAR_FILE := "$(NAME)-$(APP_VERSION).deb.tar.gz"
-CHECKSUM_FILE := "$(INSTALL_TAR_FILE).sha256"
+INSTALL_TAR_FILE_DEB := "$(NAME)-$(APP_VERSION).deb.tar.gz"
+INSTALL_TAR_FILE_RPM := "$(NAME)-$(APP_VERSION).rpm.tar.gz"
+CHECKSUM_FILE_DEB := "$(INSTALL_TAR_FILE_DEB).sha256"
+CHECKSUM_FILE_RPM := "$(INSTALL_TAR_FILE_RPM).sha256"
 
 LICENSE := "IBM"
 RPM_ARCH := x86_64
@@ -98,10 +100,12 @@ tar-package:
 tar-package:
 	mkdir packages
 	cp ${NAME}-* packages/
-	ls packages/
-	cd packages && tar -czvf ../$(INSTALL_TAR_FILE) *
-	sha256sum $(INSTALL_TAR_FILE) > $(CHECKSUM_FILE)
-	@printf "Production - Install package created ok: $(INSTALL_TAR_FILE)\n"
+	cd packages && \
+		tar -czvf ../$(INSTALL_TAR_FILE_DEB) *.deb && \
+		tar -czvf ../$(INSTALL_TAR_FILE_RPM) *.rpm
+	sha256sum $(INSTALL_TAR_FILE_DEB) > $(CHECKSUM_FILE_DEB)
+	sha256sum $(INSTALL_TAR_FILE_RPM) > $(CHECKSUM_FILE_RPM)
+	@printf "Production - Install package created ok: $(INSTALL_TAR_FILE_DEB) and $(INSTALL_TAR_FILE_RPM)\n"
 
 clean:
 	rm -rf ${BIN_DIR}
@@ -110,3 +114,6 @@ clean:
 
 packages:
 packages: deb-build rpm-build tar-package clean
+
+cos-csi-mounter-1.0.1.deb
+cos-csi-mounter-1.0.1.rpm
