@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     branches:
-      - main
+      - rpm-pkg
 
 jobs:
   release:
@@ -34,7 +34,7 @@ jobs:
     - name: Run Unit Tests for cos csi mounter
       run: sudo make ut-coverage -C ${{ matrix.package_dir }}
 
-    - name: Build Debian Package for cos csi mounter container
+    - name: Build Debian and RPM Packagesfor cos csi mounter container
       run: |
           cd ${{ matrix.package_dir }}
           make packages
@@ -61,9 +61,9 @@ jobs:
         files: |
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.deb.tar.gz
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.deb.tar.gz.sha256
-        tag_name: v1.0.1
-        name: v1.0.1
-        body: Generate debian package
+        tag_name: v0.5.4
+        name: v0.5.4
+        body: Generate debian and rpm packages
         prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
     
     - name: Perform CodeQL Analysis
