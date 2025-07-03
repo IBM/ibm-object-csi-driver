@@ -350,22 +350,21 @@ func removeRcloneConfigFile(configPath, target string) {
 		_, err := os.Stat(configPathWithVolID)
 		if err != nil {
 			if os.IsNotExist(err) {
-				klog.Infof("removeRcloneConfigFile: Password file directory does not exist: %s", configPathWithVolID)
+				klog.Infof("removeRcloneConfigFile: Config file directory does not exist: %s", configPathWithVolID)
 				return
 			}
 			klog.Errorf("removeRcloneConfigFile: Attempt %d - Failed to stat path %s: %v", retry, configPathWithVolID, err)
 			time.Sleep(constants.Interval)
 			continue
 		}
-		configFile := path.Join(configPathWithVolID, configFileName)
-		err = os.Remove(configFile)
+		err = os.Remove(configPathWithVolID)
 		if err != nil {
-			klog.Errorf("removeRcloneConfigFile: Attempt %d - Failed to remove password file %s: %v", retry, configFile, err)
+			klog.Errorf("removeRcloneConfigFile: Attempt %d - Failed to remove config file path %s: %v", retry, configPathWithVolID, err)
 			time.Sleep(constants.Interval)
 			continue
 		}
-		klog.Infof("removeRcloneConfigFile: Successfully removed config file: %s", configFile)
+		klog.Infof("removeRcloneConfigFile: Successfully removed config file path: %s", configPathWithVolID)
 		return
 	}
-	klog.Errorf("removeRcloneConfigFile: Failed to remove config file after %d attempts", maxRetries)
+	klog.Errorf("removeRcloneConfigFile: Failed to remove config file path after %d attempts", maxRetries)
 }
