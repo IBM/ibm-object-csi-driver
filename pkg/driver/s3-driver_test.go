@@ -18,8 +18,11 @@ package driver
 
 import (
 	"bytes"
+	"errors"
+	"strconv"
 	"testing"
 
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
@@ -94,41 +97,103 @@ func TestAddNodeServiceCapabilities(t *testing.T) {
 	}
 }
 
-func TestNewS3CosDriver(t *testing.T) {
+func TestNewNodeServer(t *testing.T) {
 	vendorVersion := "test-vendor-version-1.1.2"
-	driverName := "mydriver"
+	driverName := "test-csi-driver"
 
-	endpoint := "test-endpoint"
 	nodeID := "test-nodeID"
+	testRegion := "test-region"
+	testZone := "test-zone"
 
-	fakeCosSession := &s3client.FakeCOSSessionFactory{}
-	fakeMountObj := &mounter.FakeMounterFactory{}
-
-	logger, teardown := GetTestLogger(t)
-	defer teardown()
-
-	// Setup the CSI driver
-	driver, err := Setups3Driver(defaultMode, driverName, vendorVersion, logger)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, driver)
-
-	statsUtil := utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{})
-	mounterUtil := mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{})
-
-	csiDriver, err := driver.NewS3CosDriver(nodeID, endpoint, fakeCosSession, fakeMountObj, statsUtil, mounterUtil)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, csiDriver)
-}
-
-func TestNewS3CosDriver_mode_node(t *testing.T) {
-	vendorVersion := "test-vendor-version-1.1.2"
-	driverName := "mydriver"
-
-	endpoint := "test-endpoint"
-	nodeID := "test-nodeID"
-
-	fakeCosSession := &s3client.FakeCOSSessionFactory{}
-	fakeMountObj := &mounter.FakeMounterFactory{}
+	testCases := []struct {
+		testCaseName string
+		envVars      map[string]string
+		statsUtils   utils.StatsUtils
+		verifyResult func(*testing.T, *nodeServer, error)
+		expectedErr  error
+	}{
+		{
+			testCaseName: "Positive: success",
+			envVars: map[string]string{
+				constants.KubeNodeName:         nodeID,
+				constants.MaxVolumesPerNodeEnv: "10",
+			},
+			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetRegionAndZoneFn: func(nodeName string) (string, string, error) { return testRegion, testZone, nil },
+			}),
+			verifyResult: func(t *testing.T, ns *nodeServer, err error) {
+				assert.NoError(t, err)
+				assert.NotNil(t, ns)
+				assert.Equal(t, ns.MaxVolumesPerNode, int64(10))
+				assert.Equal(t, ns.Region, testRegion)
+				assert.Equal(t, ns.Zone, testZone)
+				assert.Equal(t, ns.NodeID, nodeID)
+			},
+			expectedErr: nil,
+		},
+		{
+			testCaseName: "Negative: Failed to get KUBE_NODE_NAME env variable",
+			envVars: map[string]string{
+				constants.KubeNodeName:         "",
+				constants.MaxVolumesPerNodeEnv: "",
+			},
+			verifyResult: func(t *testing.T, ns *nodeServer, err error) {
+				assert.Nil(t, ns)
+			},
+			expectedErr: errors.New("KUBE_NODE_NAME env variable not set"),
+		},
+		{
+			testCaseName: "Negative: Failed to get region and zone",
+			envVars: map[string]string{
+				constants.KubeNodeName:         nodeID,
+				constants.MaxVolumesPerNodeEnv: "",
+			},
+			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetRegionAndZoneFn: func(nodeName string) (string, string, error) {
+					return "", "", errors.New("unable to load in-cluster configuration")
+				},
+			}),
+			verifyResult: func(t *testing.T, ns *nodeServer, err error) {
+				assert.Nil(t, ns)
+			},
+			expectedErr: errors.New("unable to load in-cluster configuration"),
+		},
+		{
+			testCaseName: "Negative: invalid value of maxVolumesPerNode",
+			envVars: map[string]string{
+				constants.KubeNodeName:         nodeID,
+				constants.MaxVolumesPerNodeEnv: "invalid",
+			},
+			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetRegionAndZoneFn: func(nodeName string) (string, string, error) {
+					return testRegion, testZone, nil
+				},
+			}),
+			verifyResult: func(t *testing.T, ns *nodeServer, err error) {
+				assert.Nil(t, ns)
+			},
+			expectedErr: errors.New("invalid syntax"),
+		},
+		{
+			testCaseName: "Positive: maxVolumesPerNode not set",
+			envVars: map[string]string{
+				constants.KubeNodeName:         nodeID,
+				constants.MaxVolumesPerNodeEnv: "",
+			},
+			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetRegionAndZoneFn: func(nodeName string) (string, string, error) { return testRegion, testZone, nil },
+			}),
+			verifyResult: func(t *testing.T, ns *nodeServer, err error) {
+				assert.NoError(t, err)
+				assert.NotNil(t, ns)
+				assert.Equal(t, ns.MaxVolumesPerNode, int64(0))
+				assert.Equal(t, ns.Region, testRegion)
+				assert.Equal(t, ns.Zone, testZone)
+				assert.Equal(t, ns.NodeID, nodeID)
+			},
+			expectedErr: nil,
+		},
+	}
 
 	logger, teardown := GetTestLogger(t)
 	defer teardown()
@@ -138,20 +203,92 @@ func TestNewS3CosDriver_mode_node(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotEmpty(t, driver)
 
-	statsUtil := utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{})
+	fakeMountObj := &mounter.FakeMounterFactory{}
 	mounterUtil := mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{})
 
-	csiDriver, err := driver.NewS3CosDriver(nodeID, endpoint, fakeCosSession, fakeMountObj, statsUtil, mounterUtil)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, csiDriver)
+	for _, tc := range testCases {
+		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
+
+		for k, v := range tc.envVars {
+			t.Setenv(k, v)
+		}
+
+		actualResp, actualErr := newNodeServer(driver, tc.statsUtils, nodeID, fakeMountObj, mounterUtil)
+
+		if tc.expectedErr != nil {
+			assert.Error(t, actualErr)
+			assert.Contains(t, actualErr.Error(), tc.expectedErr.Error())
+		} else {
+			assert.NoError(t, actualErr)
+		}
+
+		if tc.verifyResult != nil {
+			tc.verifyResult(t, actualResp, actualErr)
+		}
+	}
 }
 
-func TestNewS3CosDriver_mode_controller_node(t *testing.T) {
+func TestNewS3CosDriver(t *testing.T) {
 	vendorVersion := "test-vendor-version-1.1.2"
-	driverName := "mydriver"
+	driverName := "test-csi-driver"
 
 	endpoint := "test-endpoint"
 	nodeID := "test-nodeID"
+	testRegion := "test-region"
+	testZone := "test-zone"
+
+	envVars := map[string]string{
+		constants.KubeNodeName:         testNodeID,
+		constants.MaxVolumesPerNodeEnv: strconv.Itoa(constants.DefaultVolumesPerNode),
+	}
+
+	testCases := []struct {
+		testCaseName string
+		mode         string
+		statsUtils   utils.StatsUtils
+		verifyResult func(*testing.T, *S3Driver, error)
+		expectedErr  error
+	}{
+		{
+			testCaseName: "Positive: controller mode",
+			mode:         "controller",
+			statsUtils:   utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			verifyResult: func(t *testing.T, driver *S3Driver, err error) {
+				assert.NoError(t, err)
+				assert.NotEmpty(t, driver.cs)
+			},
+			expectedErr: nil,
+		},
+		{
+			testCaseName: "Positive: node mode",
+			mode:         "node",
+			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetRegionAndZoneFn: func(nodeName string) (string, string, error) { return testRegion, testZone, nil },
+			}),
+			verifyResult: func(t *testing.T, driver *S3Driver, err error) {
+				assert.NoError(t, err)
+				assert.NotEmpty(t, driver.ns)
+				assert.Equal(t, driver.ns.Region, testRegion)
+				assert.Equal(t, driver.ns.Zone, testZone)
+			},
+			expectedErr: nil,
+		},
+		{
+			testCaseName: "Positive: controller and node mode",
+			mode:         "controller-node",
+			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetRegionAndZoneFn: func(nodeName string) (string, string, error) { return testRegion, testZone, nil },
+			}),
+			verifyResult: func(t *testing.T, driver *S3Driver, err error) {
+				assert.NoError(t, err)
+				assert.NotEmpty(t, driver.cs)
+				assert.NotEmpty(t, driver.ns)
+				assert.Equal(t, driver.ns.Region, testRegion)
+				assert.Equal(t, driver.ns.Zone, testZone)
+			},
+			expectedErr: nil,
+		},
+	}
 
 	fakeCosSession := &s3client.FakeCOSSessionFactory{}
 	fakeMountObj := &mounter.FakeMounterFactory{}
@@ -159,17 +296,33 @@ func TestNewS3CosDriver_mode_controller_node(t *testing.T) {
 	logger, teardown := GetTestLogger(t)
 	defer teardown()
 
-	// Setup the CSI driver
-	driver, err := Setups3Driver("controller-node", driverName, vendorVersion, logger)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, driver)
+	for k, v := range envVars {
+		t.Setenv(k, v)
+	}
 
-	statsUtil := utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{})
 	mounterUtil := mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{})
 
-	csiDriver, err := driver.NewS3CosDriver(nodeID, endpoint, fakeCosSession, fakeMountObj, statsUtil, mounterUtil)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, csiDriver)
+	for _, tc := range testCases {
+		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
+
+		// Setup the CSI driver
+		driver, err := Setups3Driver(tc.mode, driverName, vendorVersion, logger)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, driver)
+
+		actualResp, actualErr := driver.NewS3CosDriver(nodeID, endpoint, fakeCosSession, fakeMountObj, tc.statsUtils, mounterUtil)
+
+		if tc.expectedErr != nil {
+			assert.Error(t, actualErr)
+			assert.Contains(t, actualErr.Error(), tc.expectedErr.Error())
+		} else {
+			assert.NoError(t, actualErr)
+		}
+
+		if tc.verifyResult != nil {
+			tc.verifyResult(t, actualResp, actualErr)
+		}
+	}
 }
 
 func TestSetups3Driver_Positive(t *testing.T) {

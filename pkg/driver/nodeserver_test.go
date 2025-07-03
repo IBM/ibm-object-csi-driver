@@ -18,8 +18,6 @@ package driver
 
 import (
 	"errors"
-	"fmt"
-	"os"
 	"reflect"
 	"testing"
 
@@ -643,64 +641,46 @@ func TestNodeGetCapabilities(t *testing.T) {
 }
 
 func TestNodeGetInfo(t *testing.T) {
+	testMaxVolumesPerNode := int64(10)
+	testRegion := "test-region"
+	testZone := "test-zone"
+
+	nodeServer := nodeServer{
+		NodeServerConfig: NodeServerConfig{
+			MaxVolumesPerNode: testMaxVolumesPerNode,
+			Region:            testRegion,
+			Zone:              testZone,
+			NodeID:            testNodeID,
+		},
+	}
+
 	testCases := []struct {
-		testCaseName     string
-		envKubeNodeName  string
-		driverStatsUtils utils.StatsUtils
-		req              *csi.NodeGetInfoRequest
-		expectedResp     *csi.NodeGetInfoResponse
-		expectedErr      error
+		testCaseName string
+		req          *csi.NodeGetInfoRequest
+		expectedResp *csi.NodeGetInfoResponse
+		expectedErr  error
 	}{
 		{
-			testCaseName:    "Positive: Successful",
-			envKubeNodeName: testNodeID,
-			req:             &csi.NodeGetInfoRequest{},
-			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
-				GetRegionAndZoneFn: func(nodeName string) (string, string, error) {
-					return "test-region", "test-zone", nil
-				},
-			}),
+			testCaseName: "Positive: Successful",
+			req:          &csi.NodeGetInfoRequest{},
 			expectedResp: &csi.NodeGetInfoResponse{
 				NodeId:            testNodeID,
-				MaxVolumesPerNode: constants.DefaultVolumesPerNode,
+				MaxVolumesPerNode: testMaxVolumesPerNode,
 				AccessibleTopology: &csi.Topology{
 					Segments: map[string]string{
-						constants.NodeRegionLabel: "test-region",
-						constants.NodeZoneLabel:   "test-zone",
+						constants.NodeRegionLabel: testRegion,
+						constants.NodeZoneLabel:   testZone,
 					},
 				},
 			},
 			expectedErr: nil,
-		},
-		{
-			testCaseName:     "Negative: Failed to get KUBE_NODE_NAME env variable",
-			envKubeNodeName:  "",
-			driverStatsUtils: &utils.DriverStatsUtils{},
-			req:              &csi.NodeGetInfoRequest{},
-			expectedResp:     nil,
-			expectedErr:      errors.New("KUBE_NODE_NAME env variable not set"),
-		},
-		{
-			testCaseName:     "Negative: Failed to get region and zone",
-			envKubeNodeName:  testNodeID,
-			driverStatsUtils: &utils.DriverStatsUtils{},
-			req:              &csi.NodeGetInfoRequest{},
-			expectedResp:     nil,
-			expectedErr:      errors.New("unable to load in-cluster configuration"),
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		_ = os.Setenv(constants.KubeNodeName, tc.envKubeNodeName)
-
-		nodeServer := nodeServer{
-			NodeID: testNodeID,
-			Stats:  tc.driverStatsUtils,
-		}
 		actualResp, actualErr := nodeServer.NodeGetInfo(ctx, tc.req)
-		fmt.Println(actualErr)
 
 		if tc.expectedErr != nil {
 			assert.Error(t, actualErr)

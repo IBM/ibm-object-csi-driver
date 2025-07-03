@@ -44,8 +44,9 @@ const (
 
 	BucketVersioning = "bucketVersioning"
 
-	IsNodeServer = "IS_NODE_SERVER"
-	KubeNodeName = "KUBE_NODE_NAME"
+	IsNodeServer         = "IS_NODE_SERVER"
+	KubeNodeName         = "KUBE_NODE_NAME"
+	MaxVolumesPerNodeEnv = "MAX_VOLUMES_PER_NODE"
 )
 
 var (
