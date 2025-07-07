@@ -357,7 +357,7 @@ func removeRcloneConfigFile(configPath, target string) {
 			time.Sleep(constants.Interval)
 			continue
 		}
-		err = os.Remove(configPathWithVolID)
+		err = RemoveAll(configPathWithVolID)
 		if err != nil {
 			klog.Errorf("removeRcloneConfigFile: Attempt %d - Failed to remove config file path %s: %v", retry, configPathWithVolID, err)
 			time.Sleep(constants.Interval)
