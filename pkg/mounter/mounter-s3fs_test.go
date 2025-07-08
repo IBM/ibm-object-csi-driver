@@ -275,7 +275,7 @@ func TestRemoveS3FSCredFile_Negative(t *testing.T) {
 	Stat = func(path string) (os.FileInfo, error) {
 		return nil, nil
 	}
-	Remove = func(path string) error {
+	RemoveAll = func(path string) error {
 		called++
 		return errors.New("remove failed")
 	}
