@@ -27,6 +27,7 @@ var (
 	Chmod      = os.Chmod
 	Stat       = os.Stat
 	Remove     = os.Remove
+	RemoveAll  = os.RemoveAll
 )
 
 type Mounter interface {

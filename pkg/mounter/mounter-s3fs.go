@@ -350,14 +350,13 @@ func removeS3FSCredFile(credDir, target string) {
 			time.Sleep(constants.Interval)
 			continue
 		}
-		passwdFile := path.Join(metaPath, passFile)
-		err = Remove(passwdFile)
+		err = RemoveAll(metaPath)
 		if err != nil {
-			klog.Errorf("removeS3FSCredFile: Attempt %d - Failed to remove password file %s: %v", retry, passwdFile, err)
+			klog.Errorf("removeS3FSCredFile: Attempt %d - Failed to remove password file path %s: %v", retry, metaPath, err)
 			time.Sleep(constants.Interval)
 			continue
 		}
-		klog.Infof("removeS3FSCredFile: Successfully removed password file: %s", passwdFile)
+		klog.Infof("removeS3FSCredFile: Successfully removed password file path: %s", metaPath)
 		return
 	}
 	klog.Errorf("removeS3FSCredFile: Failed to remove password file after %d attempts", maxRetries)
