@@ -1,5 +1,5 @@
 NAME := cos-csi-mounter
-APP_VERSION := 1.0.1
+APP_VERSION := 0.5.5
 BUILD_DIR := $(NAME)-$(APP_VERSION)
 BIN_DIR := bin
 
@@ -65,7 +65,6 @@ rpm-build: build-linux
 	echo "Summary: $(DESCRIPTION)" >> $(REDHAT_SPEC)
 	echo "License: $(LICENSE)" >>  $(REDHAT_SPEC)
 	echo "BuildArch: $(RPM_ARCH)" >>  $(REDHAT_SPEC)
-	echo "Requires: mount.ibmshare = 0.1.1" >> $(REDHAT_SPEC)
 	echo "%define _rpmfilename $(NAME)-$(APP_VERSION).rpm" >> $(REDHAT_SPEC)
 	echo "%build" >> $(REDHAT_SPEC)
 
@@ -77,7 +76,7 @@ rpm-build: build-linux
 	echo "cp -r %{_sourcedir}/* %{buildroot}/" >> $(REDHAT_SPEC)
 
 	echo "%description" >> $(REDHAT_SPEC)
-	echo "This package provides the IBM Mount Share helper container service."
+	echo "This package provides the COS CSI Mounter service."
 
 	echo "%files" >> $(REDHAT_SPEC)
 	echo "/etc/systemd/system/cos-csi-mounter.service" >> $(REDHAT_SPEC)
