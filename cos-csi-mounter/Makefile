@@ -1,5 +1,5 @@
 NAME := cos-csi-mounter
-APP_VERSION := 0.6.1
+APP_VERSION := 0.6.2
 BUILD_DIR := $(NAME)-$(APP_VERSION)
 BIN_DIR := bin
 
@@ -65,6 +65,7 @@ rpm-build: build-linux
 	echo 'Summary: $(DESCRIPTION)' >> $(REDHAT_SPEC)
 	echo 'License: $(LICENSE)' >>  $(REDHAT_SPEC)
 	echo "BuildArch: $(RPM_ARCH)" >>  $(REDHAT_SPEC)
+	echo "%define _rpmfilename $(NAME)-$(APP_VERSION).rpm" >> $(REDHAT_SPEC)
 	echo "%build" >> $(REDHAT_SPEC)
 
 	echo "%install" >> $(REDHAT_SPEC)
