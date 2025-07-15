@@ -62,10 +62,9 @@ rpm-build: build-linux
 	echo "Name: $(NAME)" > $(REDHAT_SPEC)
 	echo "Version: $(APP_VERSION)" >> $(REDHAT_SPEC)
 	echo "Release: $(RPM_RELEASE_NUM)" >> $(REDHAT_SPEC)
-	echo "Summary: $(DESCRIPTION)" >> $(REDHAT_SPEC)
-	echo "License: $(LICENSE)" >>  $(REDHAT_SPEC)
+	echo 'Summary: $(DESCRIPTION)' >> $(REDHAT_SPEC)
+	echo 'License: $(LICENSE)' >>  $(REDHAT_SPEC)
 	echo "BuildArch: $(RPM_ARCH)" >>  $(REDHAT_SPEC)
-	echo "%define _rpmfilename $(NAME)-$(APP_VERSION).rpm" >> $(REDHAT_SPEC)
 	echo "%build" >> $(REDHAT_SPEC)
 
 	echo "%install" >> $(REDHAT_SPEC)
@@ -76,7 +75,7 @@ rpm-build: build-linux
 	echo "cp -r %{_sourcedir}/* %{buildroot}/" >> $(REDHAT_SPEC)
 
 	echo "%description" >> $(REDHAT_SPEC)
-	echo "This package provides the COS CSI Mounter service."
+	echo "This package provides the COS CSI Mounter service." >> $(REDHAT_SPEC)
 
 	echo "%files" >> $(REDHAT_SPEC)
 	echo "/etc/systemd/system/cos-csi-mounter.service" >> $(REDHAT_SPEC)
