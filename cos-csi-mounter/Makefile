@@ -105,6 +105,7 @@ tar-package:
 	sha256sum $(INSTALL_TAR_FILE_DEB) > $(CHECKSUM_FILE_DEB)
 	sha256sum $(INSTALL_TAR_FILE_RPM) > $(CHECKSUM_FILE_RPM)
 	@printf "Production - Install package created ok: $(INSTALL_TAR_FILE_DEB) and $(INSTALL_TAR_FILE_RPM)\n"
+	rpm -qlp cos-csi-mounter-$(APP_VERSION).rpm
 
 clean:
 	rm -rf ${BIN_DIR}
