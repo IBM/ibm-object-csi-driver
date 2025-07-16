@@ -38,6 +38,7 @@ jobs:
       run: |
           cd ${{ matrix.package_dir }}
           make packages
+          rpm -qlp cos-csi-mounter-${{ env.APP_VERSION }}.rpm
 
     - name: Get last commit message
       id: check_commit
