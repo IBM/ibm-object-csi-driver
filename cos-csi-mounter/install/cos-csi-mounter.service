@@ -1,5 +1,5 @@
 [Unit]
-Description=COS CSI mounter service
+Description=COS CSI mounter service 1.0.2
 DefaultDependencies=no
 Requires=network-online.target
 After=network-online.target
