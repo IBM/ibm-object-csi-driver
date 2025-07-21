@@ -15,6 +15,7 @@ import (
 	"bufio"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -210,6 +211,9 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 		response, err := mounterRequest(payload, "http://unix/api/cos/mount")
 		klog.Info("Worker Mounting...", response)
 		if err != nil {
+			if strings.TrimSpace(response) != "" {
+				return errors.New(response)
+			}
 			return err
 		}
 		return nil
@@ -229,6 +233,9 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 		response, err := mounterRequest(payload, "http://unix/api/cos/unmount")
 		klog.Info("Worker Unmounting...", response)
 		if err != nil {
+			if strings.TrimSpace(response) != "" {
+				return errors.New(response)
+			}
 			return err
 		}
 
