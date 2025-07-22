@@ -1,8 +1,7 @@
 NAME := cos-csi-mounter
-APP_VERSION := 0.5.10
+APP_VERSION := 0.5.11
 BUILD_DIR := $(NAME)-$(APP_VERSION)
 BIN_DIR := bin
-
 
 DEBIAN_CONTROL := $(BUILD_DIR)/DEBIAN/control
 MAINTAINER := "IKS Storage"
@@ -28,7 +27,7 @@ ut-coverage: test
 	rm cover.html cover.out
 
 build-linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod mod -o ${BIN_DIR}/cos-csi-mounter-server -ldflags "-s -w -X main.Version=$(APP_VERSION) -X main.GitCommit=$(git rev-parse HEAD)" -a ./server
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod mod -o ${BIN_DIR}/cos-csi-mounter-server -ldflags "-s -w -X main.Version=$(APP_VERSION) -X main.GitCommit=$$(git rev-parse HEAD)" -a ./server
 	./${BIN_DIR}/cos-csi-mounter-server version
 deb-build:
 deb-build: build-linux
