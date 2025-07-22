@@ -147,7 +147,7 @@ func startService(setupSocketFunc func() (net.Listener, error), router http.Hand
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "version" {
-		fmt.Printf("cos-csi-mounter-server\nVersion: %s\nGit Commit: %s\n", Version, GitCommit)
+		fmt.Printf("Version: %s\nGit Commit: %s\n", Version, GitCommit)
 		return
 	}
 	err := startService(setupSocket, newRouter(), handleSignals)
