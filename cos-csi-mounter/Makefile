@@ -1,5 +1,5 @@
 NAME := cos-csi-mounter
-APP_VERSION := 1.0.1
+APP_VERSION := 0.5.10
 BUILD_DIR := $(NAME)-$(APP_VERSION)
 BIN_DIR := bin
 
@@ -27,8 +27,8 @@ ut-coverage: test
 	rm cover.html cover.out
 
 build-linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod mod -o ${BIN_DIR}/cos-csi-mounter-server -ldflags "-s -w" -a ./server
-
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod mod -o ${BIN_DIR}/cos-csi-mounter-server -ldflags "-s -w -X main.Version=$(APP_VERSION) -X main.GitCommit=$(git rev-parse HEAD)" -a ./server
+	./{BIN_DIR}/cos-csi-mounter-server version
 deb-build:
 deb-build: build-linux
 	rm -rf $(BUILD_DIR)

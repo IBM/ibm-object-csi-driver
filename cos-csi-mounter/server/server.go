@@ -25,6 +25,9 @@ var (
 	UnixSocketListener = func(network, address string) (net.Listener, error) {
 		return net.Listen(network, address)
 	}
+
+	Version   = "dev"
+	GitCommit = "none"
 )
 
 func init() {
@@ -137,6 +140,10 @@ func startService(setupSocketFunc func() (net.Listener, error), router http.Hand
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "version" {
+		fmt.Printf("cos-csi-mounter-server\nVersion: %s\nGit Commit: %s\n", Version, GitCommit)
+		return
+	}
 	err := startService(setupSocket, newRouter(), handleSignals)
 	if err != nil {
 		logger.Error("cos-csi-mounter exited with error", zap.Error(err))
