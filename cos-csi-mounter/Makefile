@@ -28,7 +28,7 @@ ut-coverage: test
 
 build-linux:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod mod -o ${BIN_DIR}/cos-csi-mounter-server -ldflags "-s -w -X main.Version=$(APP_VERSION) -X main.GitCommit=$(git rev-parse HEAD)" -a ./server
-	./{BIN_DIR}/cos-csi-mounter-server version
+	./${BIN_DIR}/cos-csi-mounter-server version
 deb-build:
 deb-build: build-linux
 	rm -rf $(BUILD_DIR)
