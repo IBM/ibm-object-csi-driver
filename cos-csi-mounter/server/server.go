@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -34,7 +35,7 @@ func init() {
 	_ = flag.Set("logtostderr", "true") // #nosec G104: Attempt to set flags for logging to stderr only on best-effort basis.Error cannot be usefully handled.
 	logger = setUpLogger()
 	defer func() {
-		if err := logger.Sync(); err != nil {
+		if err := logger.Sync(); err != nil && !isInvalidSync(err) {
 			fmt.Fprintf(os.Stderr, "failed to sync logger: %v\n", err)
 		}
 	}()
@@ -54,6 +55,11 @@ func setUpLogger() *zap.Logger {
 	), zap.AddCaller()).With(zap.String("ServiceName", "cos-csi-mounter"))
 	atom.SetLevel(zap.InfoLevel)
 	return logger
+}
+
+func isInvalidSync(err error) bool {
+	return strings.Contains(strings.ToLower(err.Error()), "invalid argument") ||
+		strings.Contains(strings.ToLower(err.Error()), "inappropriate ioctl") // catch edge cases on some platforms
 }
 
 func setupSocket() (net.Listener, error) {
