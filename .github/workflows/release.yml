@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     branches:
-      - ashima2
+      - main
 
 jobs:
   release:
