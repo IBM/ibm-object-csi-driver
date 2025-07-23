@@ -2,6 +2,7 @@ package mounter
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net"
@@ -219,4 +220,18 @@ func isGRPCServerAvailable(socketPath string) error {
 		return err
 	}
 	return nil
+}
+
+func parseErrFromResponse(response string) error {
+	var errFromResp map[string]string
+	err := json.Unmarshal([]byte(response), &errFromResp)
+	if err != nil {
+		klog.Warning("failed to unmarshal response from server")
+		return errors.New(response)
+	}
+	val, exists := errFromResp["error"]
+	if !exists {
+		return errors.New(response)
+	}
+	return errors.New(val)
 }

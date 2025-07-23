@@ -14,7 +14,6 @@ package mounter
 import (
 	"crypto/sha256"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -169,7 +168,7 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 		klog.Info("Worker Mounting...", response)
 		if err != nil {
 			if strings.TrimSpace(response) != "" {
-				return errors.New(response)
+				return parseErrFromResponse(response)
 			}
 			return err
 		}
@@ -192,7 +191,7 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 		klog.Info("Worker Unmounting...", response)
 		if err != nil {
 			if strings.TrimSpace(response) != "" {
-				return errors.New(response)
+				return parseErrFromResponse(response)
 			}
 			return err
 		}
