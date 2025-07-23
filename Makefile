@@ -25,7 +25,7 @@ ALL_ARCH ?= amd64 ppc64le
 
 CORE_IMAGE_NAME ?= $(EXE_DRIVER_NAME)
 CORE_DRIVER_IMG ?= $(REGISTRY)/$(CORE_IMAGE_NAME)
-GOPACKAGES=$(shell go list ./... | grep -v ./tests/... | grep -v /cmd | grep -v /mounter/utils | grep -v /pkg/utils)
+GOPACKAGES=$(shell go list ./... | grep -v ./tests/... | grep -v /mounter/utils | grep -v /pkg/utils)
 
 .PHONY: test
 test:
