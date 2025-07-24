@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -25,13 +26,16 @@ var (
 	UnixSocketListener = func(network, address string) (net.Listener, error) {
 		return net.Listen(network, address)
 	}
+
+	Version   = "dev"
+	GitCommit = "none"
 )
 
 func init() {
 	_ = flag.Set("logtostderr", "true") // #nosec G104: Attempt to set flags for logging to stderr only on best-effort basis.Error cannot be usefully handled.
 	logger = setUpLogger()
 	defer func() {
-		if err := logger.Sync(); err != nil {
+		if err := logger.Sync(); err != nil && !isInvalidSync(err) {
 			fmt.Fprintf(os.Stderr, "failed to sync logger: %v\n", err)
 		}
 	}()
@@ -51,6 +55,11 @@ func setUpLogger() *zap.Logger {
 	), zap.AddCaller()).With(zap.String("ServiceName", "cos-csi-mounter"))
 	atom.SetLevel(zap.InfoLevel)
 	return logger
+}
+
+func isInvalidSync(err error) bool {
+	return strings.Contains(strings.ToLower(err.Error()), "invalid argument") ||
+		strings.Contains(strings.ToLower(err.Error()), "inappropriate ioctl") // catch edge cases on some platforms
 }
 
 func setupSocket() (net.Listener, error) {
@@ -137,6 +146,10 @@ func startService(setupSocketFunc func() (net.Listener, error), router http.Hand
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "version" {
+		fmt.Printf("Version: %s\nGit Commit: %s\n", Version, GitCommit)
+		return
+	}
 	err := startService(setupSocket, newRouter(), handleSignals)
 	if err != nil {
 		logger.Error("cos-csi-mounter exited with error", zap.Error(err))

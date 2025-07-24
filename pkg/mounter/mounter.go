@@ -27,7 +27,6 @@ var (
 	CreateFile = os.Create
 	Chmod      = os.Chmod
 	Stat       = os.Stat
-	Remove     = os.Remove
 	RemoveAll  = os.RemoveAll
 )
 
