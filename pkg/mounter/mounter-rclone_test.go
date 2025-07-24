@@ -2,7 +2,6 @@ package mounter
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"testing"
 
@@ -190,6 +189,8 @@ func TestRcloneMount_WorkerNode_Negative(t *testing.T) {
 func TestRcloneUnmount_NodeServer(t *testing.T) {
 	mountWorker = false
 
+	removeConfigFile = func(_, _ string) {}
+
 	rclone := &RcloneMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 		FuseUnmountFn: func(path string) error {
 			return nil
@@ -202,6 +203,8 @@ func TestRcloneUnmount_NodeServer(t *testing.T) {
 
 func TestRcloneUnmount_WorkerNode(t *testing.T) {
 	mountWorker = true
+
+	removeConfigFile = func(_, _ string) {}
 
 	rclone := &RcloneMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 		FuseUnmountFn: func(path string) error {
@@ -235,6 +238,22 @@ func TestRcloneUnmount_WorkerNode_Negative(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to create http request")
 }
 
+func TestRcloneUnmount_NodeServer_Negative(t *testing.T) {
+	mountWorker = false
+
+	removeConfigFile = func(_, _ string) {}
+
+	rclone := &RcloneMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+		FuseUnmountFn: func(path string) error {
+			return errors.New("failed to unmount")
+		},
+	})}
+
+	err := rclone.Unmount(target)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to unmount")
+}
+
 func TestCreateConfig_Success(t *testing.T) {
 	rclone := &RcloneMounter{
 		AccessKeys:    "accessKey:secretKey",
@@ -247,7 +266,7 @@ func TestCreateConfig_Success(t *testing.T) {
 
 func TestCreateConfig_MakeDirFails(t *testing.T) {
 	MakeDir = func(string, os.FileMode) error {
-		return fmt.Errorf("mkdir failed")
+		return errors.New("mkdir failed")
 	}
 	err := createConfig("/tmp/testconfig", &RcloneMounter{})
 	assert.ErrorContains(t, err, "mkdir failed")
@@ -256,7 +275,7 @@ func TestCreateConfig_MakeDirFails(t *testing.T) {
 func TestCreateConfig_FileCreateFails(t *testing.T) {
 	MakeDir = func(string, os.FileMode) error { return nil }
 	CreateFile = func(string) (*os.File, error) {
-		return nil, fmt.Errorf("file create failed")
+		return nil, errors.New("file create failed")
 	}
 	err := createConfig("/tmp/testconfig", &RcloneMounter{})
 	assert.ErrorContains(t, err, "file create failed")
@@ -268,8 +287,76 @@ func TestCreateConfig_ChmodFails(t *testing.T) {
 		return os.CreateTemp("", "test")
 	}
 	Chmod = func(string, os.FileMode) error {
-		return fmt.Errorf("chmod failed")
+		return errors.New("chmod failed")
 	}
 	err := createConfig("/tmp/testconfig", &RcloneMounter{})
 	assert.ErrorContains(t, err, "chmod failed")
 }
+
+func TestRemoveRcloneConfigFile_PathNotExists(t *testing.T) {
+	Stat = func(path string) (os.FileInfo, error) {
+		return nil, os.ErrNotExist
+	}
+	defer func() {
+		Stat = os.Stat
+	}()
+
+	removeRcloneConfigFile("/test", target)
+}
+
+func TestRemoveRcloneConfigFile_StatRetryThenSuccess(t *testing.T) {
+	attempt := 0
+	Stat = func(_ string) (os.FileInfo, error) {
+		if attempt == 0 {
+			attempt++
+			return nil, errors.New("stat error")
+		}
+		return nil, nil
+	}
+	defer func() {
+		Stat = os.Stat
+	}()
+
+	RemoveAll = func(_ string) error {
+		return nil
+	}
+
+	removeRcloneConfigFile("/test1", target)
+}
+
+func TestRemoveRcloneConfigFile_RemoveRetryThenSuccess(t *testing.T) {
+	Stat = func(_ string) (os.FileInfo, error) {
+		return nil, nil
+	}
+
+	attempt := 0
+	RemoveAll = func(_ string) error {
+		if attempt == 0 {
+			attempt++
+			return errors.New("remove error")
+		}
+		return nil
+	}
+
+	defer func() {
+		Stat = os.Stat
+		RemoveAll = os.RemoveAll
+	}()
+
+	removeRcloneConfigFile("/test", target)
+	// assert.Error(t, nil)
+}
+
+// func TestRemoveRcloneConfigFile_Negative(t *testing.T) {
+// 	called := 0
+// 	Stat = func(_ string) (os.FileInfo, error) {
+// 		return nil, nil
+// 	}
+// 	RemoveAll = func(_ string) error {
+// 		called++
+// 		return errors.New("remove failed")
+// 	}
+
+// 	removeRcloneConfigFile("/test", target)
+// 	assert.Equal(t, maxRetries, called)
+// }
