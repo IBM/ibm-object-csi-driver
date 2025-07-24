@@ -28,7 +28,6 @@ var (
 	Chmod      = os.Chmod
 	Stat       = os.Stat
 	RemoveAll  = os.RemoveAll
-	IsNotExist = os.IsNotExist
 )
 
 type Mounter interface {
@@ -88,7 +87,7 @@ func checkPath(path string) (bool, error) {
 	_, err := Stat(path)
 	if err == nil {
 		return true, nil
-	} else if IsNotExist(err) {
+	} else if os.IsNotExist(err) {
 		return false, nil
 	} else if isCorruptedMnt(err) {
 		return true, err
