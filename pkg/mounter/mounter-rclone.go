@@ -352,7 +352,7 @@ func removeRcloneConfigFile(configPath, target string) {
 	for retry := 1; retry <= maxRetries; retry++ {
 		_, err := Stat(configPathWithVolID)
 		if err != nil {
-			if os.IsNotExist(err) {
+			if IsNotExist(err) {
 				klog.Infof("removeRcloneConfigFile: Config file directory does not exist: %s", configPathWithVolID)
 				return
 			}
