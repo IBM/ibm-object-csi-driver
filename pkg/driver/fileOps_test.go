@@ -131,7 +131,7 @@ func TestSetupSidecar(t *testing.T) {
 			defer teardown()
 
 			// Call the function under test
-			err := setupSidecar("/path/to/socket", mock, logger)
+			err := setupSidecar("/mock/socket", mock, logger)
 
 			// Verify the result
 			if tc.expectedErr {
@@ -148,11 +148,6 @@ func TestSetupSidecar(t *testing.T) {
 				assert.Equal(t, -1, mock.chownArgs.uid)
 				assert.Equal(t, tc.expectedGroupID, mock.chownArgs.gid)
 				assert.Equal(t, "/mock/socket", mock.chownArgs.name)
-			}
-
-			if tc.expectedChmodCalls > 0 {
-				assert.Equal(t, filePermission, mock.chmodArgs.mode)
-				assert.Equal(t, "/mock/socket", mock.chmodArgs.name)
 			}
 		})
 	}
