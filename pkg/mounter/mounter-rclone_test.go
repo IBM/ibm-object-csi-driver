@@ -344,19 +344,23 @@ func TestRemoveRcloneConfigFile_RemoveRetryThenSuccess(t *testing.T) {
 	}()
 
 	removeRcloneConfigFile("/test", target)
-	// assert.Error(t, nil)
 }
 
-// func TestRemoveRcloneConfigFile_Negative(t *testing.T) {
-// 	called := 0
-// 	Stat = func(_ string) (os.FileInfo, error) {
-// 		return nil, nil
-// 	}
-// 	RemoveAll = func(_ string) error {
-// 		called++
-// 		return errors.New("remove failed")
-// 	}
+func TestRemoveRcloneConfigFile_Negative(t *testing.T) {
+	called := 0
+	Stat = func(_ string) (os.FileInfo, error) {
+		return nil, nil
+	}
+	RemoveAll = func(_ string) error {
+		called++
+		return errors.New("remove failed")
+	}
 
-// 	removeRcloneConfigFile("/test", target)
-// 	assert.Equal(t, maxRetries, called)
-// }
+	defer func() {
+		Stat = os.Stat
+		RemoveAll = os.RemoveAll
+	}()
+
+	removeRcloneConfigFile("/test", target)
+	assert.Equal(t, maxRetries, called)
+}
