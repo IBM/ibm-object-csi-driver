@@ -50,7 +50,10 @@ const (
 	envAuth        = "true"
 )
 
-var createConfigWrap = createConfig
+var (
+	createConfigWrap = createConfig
+	removeConfigFile = removeRcloneConfigFile
+)
 
 func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
 	klog.Info("-newRcloneMounter-")
@@ -232,7 +235,7 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 			return err
 		}
 
-		removeRcloneConfigFile(constants.MounterConfigPathOnHost, target)
+		removeConfigFile(constants.MounterConfigPathOnHost, target)
 		return nil
 	}
 	klog.Info("NodeServer Unmounting...")
@@ -242,7 +245,7 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 		return err
 	}
 
-	removeRcloneConfigFile(constants.MounterConfigPathOnPodRclone, target)
+	removeConfigFile(constants.MounterConfigPathOnPodRclone, target)
 	return nil
 }
 
@@ -347,7 +350,7 @@ func removeRcloneConfigFile(configPath, target string) {
 	configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 
 	for retry := 1; retry <= maxRetries; retry++ {
-		_, err := os.Stat(configPathWithVolID)
+		_, err := Stat(configPathWithVolID)
 		if err != nil {
 			if os.IsNotExist(err) {
 				klog.Infof("removeRcloneConfigFile: Config file directory does not exist: %s", configPathWithVolID)

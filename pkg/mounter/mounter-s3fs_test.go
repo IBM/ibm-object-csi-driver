@@ -240,14 +240,14 @@ func TestRemoveS3FSCredFile_PathNotExists(t *testing.T) {
 
 func TestRemoveS3FSCredFile_StatRetryThenSuccess(t *testing.T) {
 	attempt := 0
-	Stat = func(path string) (os.FileInfo, error) {
+	Stat = func(_ string) (os.FileInfo, error) {
 		if attempt == 0 {
 			attempt++
 			return nil, errors.New("stat error")
 		}
 		return nil, nil
 	}
-	Remove = func(path string) error {
+	RemoveAll = func(_ string) error {
 		return nil
 	}
 
@@ -255,11 +255,11 @@ func TestRemoveS3FSCredFile_StatRetryThenSuccess(t *testing.T) {
 }
 
 func TestRemoveS3FSCredFile_RemoveRetryThenSuccess(t *testing.T) {
-	Stat = func(path string) (os.FileInfo, error) {
+	Stat = func(_ string) (os.FileInfo, error) {
 		return nil, nil
 	}
 	attempt := 0
-	Remove = func(path string) error {
+	RemoveAll = func(_ string) error {
 		if attempt == 0 {
 			attempt++
 			return errors.New("remove error")
@@ -272,10 +272,10 @@ func TestRemoveS3FSCredFile_RemoveRetryThenSuccess(t *testing.T) {
 
 func TestRemoveS3FSCredFile_Negative(t *testing.T) {
 	called := 0
-	Stat = func(path string) (os.FileInfo, error) {
+	Stat = func(_ string) (os.FileInfo, error) {
 		return nil, nil
 	}
-	RemoveAll = func(path string) error {
+	RemoveAll = func(_ string) error {
 		called++
 		return errors.New("remove failed")
 	}
