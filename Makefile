@@ -1,4 +1,4 @@
-mCMDS=ibm-object-csi-driver
+CMDS=ibm-object-csi-driver
 EXE_DRIVER_NAME=ibm-object-csi-driver
 
 REGISTRY=quay.io/ibm-object-csi-driver
