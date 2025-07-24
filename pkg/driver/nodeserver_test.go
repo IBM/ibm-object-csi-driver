@@ -219,6 +219,35 @@ func TestNodePublishVolume(t *testing.T) {
 			expectedErr:  errors.New("failed to valid mount"),
 		},
 		{
+			testCaseName: "Negative: s3 endpoint not provided",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:   testVolumeID,
+				TargetPath: testTargetPath,
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: volumeCapabilities[0],
+					},
+				},
+				Secrets: map[string]string{
+					"accessKey":    "testAccessKey",
+					"secretKey":    "testSecretKey",
+					"apiKey":       "testApiKey", // pragma: allowlist secret
+					"serviceId":    "testServiceId",
+					"kpRootKeyCRN": "testKpRootKeyCRN",
+					"iamEndpoint":  "testIamEndpoint",
+					"bucketName":   bucketName,
+				},
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				CheckMountFn: func(targetPath string) error {
+					return nil
+				},
+			}),
+			Mounter:      &mounter.FakeMounterFactory{},
+			expectedResp: nil,
+			expectedErr:  errors.New("S3 Service endpoint not provided"),
+		},
+		{
 			testCaseName: "Negative: Failed to fetch PV",
 			req: &csi.NodePublishVolumeRequest{
 				VolumeId:   testVolumeID,
