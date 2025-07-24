@@ -15,7 +15,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path"
 	"strings"
 	"time"
@@ -342,7 +341,7 @@ func removeS3FSCredFile(credDir, target string) {
 	for retry := 1; retry <= maxRetries; retry++ {
 		_, err := Stat(metaPath)
 		if err != nil {
-			if os.IsNotExist(err) {
+			if IsNotExist(err) {
 				klog.Infof("removeS3FSCredFile: Password file directory does not exist: %s", metaPath)
 				return
 			}
