@@ -78,6 +78,15 @@ func TestSetupSidecar(t *testing.T) {
 			expectedGroupID:    2121,
 		},
 		{
+			name:               "InvalidGroupID",
+			groupID:            "notanint",
+			expectedErr:        true,
+			chownErr:           nil,
+			chmodErr:           nil,
+			expectedChownCalls: 0,
+			expectedChmodCalls: 0,
+		},
+		{
 			name:               "EmptyGroupID",
 			groupID:            "",
 			expectedErr:        false,
