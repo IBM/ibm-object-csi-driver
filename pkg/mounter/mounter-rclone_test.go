@@ -186,6 +186,26 @@ func TestRcloneMount_WorkerNode_Negative(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to create http request")
 }
 
+func TestRcloneMount_WorkerNode_FailedToParseError(t *testing.T) {
+	mountWorker = true
+
+	MakeDir = func(path string, perm os.FileMode) error {
+		return nil
+	}
+	writePassWrap = func(_, _ string) error {
+		return nil
+	}
+	mounterRequest = func(_, _ string) (string, error) {
+		return "{\"error\": \"failed to perform http request\"}", errors.New("error")
+	}
+
+	rclone := &RcloneMounter{}
+
+	err := rclone.Mount(source, target)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to perform http request")
+}
+
 func TestRcloneUnmount_NodeServer(t *testing.T) {
 	mountWorker = false
 
@@ -236,6 +256,20 @@ func TestRcloneUnmount_WorkerNode_Negative(t *testing.T) {
 	err := rclone.Unmount(target)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create http request")
+}
+
+func TestRcloneUnmount_WorkerNode_FailedToParseError(t *testing.T) {
+	mountWorker = true
+
+	mounterRequest = func(_, _ string) (string, error) {
+		return "{\"error\": \"failed to perform http request\"}", errors.New("error")
+	}
+
+	rclone := &RcloneMounter{}
+
+	err := rclone.Unmount(target)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to perform http request")
 }
 
 func TestRcloneUnmount_NodeServer_Negative(t *testing.T) {
