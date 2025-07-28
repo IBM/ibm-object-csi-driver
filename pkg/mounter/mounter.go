@@ -179,7 +179,7 @@ func createCOSCSIMounterRequest(payload string, url string) error {
 	klog.Infof("response from cos-csi-mounter -> Response body: %s, Response code: %v", responseBody, response.StatusCode)
 
 	if response.StatusCode != http.StatusOK {
-		return parseGRPCResponse(response.StatusCode, responseBody)
+		return responseBody, fetchGRPCReturnCode(response.StatusCode)
 	}
 	return nil
 }
@@ -189,7 +189,7 @@ func parseGRPCResponse(code int, response string) error {
 	errMsg := parseErrFromResponse(response)
 	switch code {
 	case http.StatusBadRequest:
-		return status.Error(codes.InvalidArgument, errMsg)
+		return status.Error(codes.InvalidArgument, "Invalid Argument")
 	case http.StatusNotFound:
 		return status.Error(codes.NotFound, errMsg)
 	case http.StatusConflict:
@@ -207,7 +207,7 @@ func parseGRPCResponse(code int, response string) error {
 	case http.StatusUnauthorized:
 		return status.Error(codes.Unauthenticated, errMsg)
 	default:
-		return status.Error(codes.Unknown, errMsg)
+		return status.Error(codes.Unknown, "Unknown")
 	}
 }
 
