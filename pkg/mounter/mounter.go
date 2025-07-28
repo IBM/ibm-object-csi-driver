@@ -179,6 +179,7 @@ func createCOSCSIMounterRequest(payload string, url string) (string, error) {
 	klog.Infof("response from cos-csi-mounter -> Response body: %s, Response code: %v", responseBody, response.StatusCode)
 
 	if response.StatusCode != http.StatusOK {
+		klog.Infof("got Response code: %v", response.StatusCode)
 		return responseBody, fetchGRPCReturnCode(response.StatusCode)
 	}
 	return "", nil
@@ -187,6 +188,7 @@ func createCOSCSIMounterRequest(payload string, url string) (string, error) {
 func fetchGRPCReturnCode(code int) error {
 	switch code {
 	case http.StatusBadRequest:
+		klog.Infof("got Response code: %v, so error code: %v", code, http.StatusBadRequest)
 		return status.Error(codes.InvalidArgument, "Invalid Argument")
 	case http.StatusNotFound:
 		return status.Error(codes.NotFound, "Not Found")
@@ -205,6 +207,7 @@ func fetchGRPCReturnCode(code int) error {
 	case http.StatusUnauthorized:
 		return status.Error(codes.Unauthenticated, "Unauthenticated")
 	default:
+		klog.Infof("got Response code: %v, so error code: %v", code, "UNKNOWN")
 		return status.Error(codes.Unknown, "Unknown")
 	}
 }
