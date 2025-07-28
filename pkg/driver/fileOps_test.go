@@ -56,6 +56,22 @@ func (m *mockSocketPermission) Chmod(name string, mode os.FileMode) error {
 	return m.chmodErr
 }
 
+func TestChown(t *testing.T) {
+	t.Run("", func(t *testing.T) {
+		f := opsSocketPermission{}
+		err := f.Chown("test-name", 0, 0)
+		assert.Error(t, err)
+	})
+}
+
+func TestChmod(t *testing.T) {
+	t.Run("", func(t *testing.T) {
+		f := opsSocketPermission{}
+		err := f.Chmod("test-name", os.ModeDir)
+		assert.Error(t, err)
+	})
+}
+
 func TestSetupSidecar(t *testing.T) {
 	tests := []struct {
 		name               string
