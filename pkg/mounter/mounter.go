@@ -189,7 +189,7 @@ func parseGRPCResponse(code int, response string) error {
 	errMsg := parseErrFromResponse(response)
 	switch code {
 	case http.StatusBadRequest:
-		return status.Error(codes.InvalidArgument, "Invalid Argument")
+		return status.Error(codes.InvalidArgument, errMsg)
 	case http.StatusNotFound:
 		return status.Error(codes.NotFound, errMsg)
 	case http.StatusConflict:
@@ -207,7 +207,7 @@ func parseGRPCResponse(code int, response string) error {
 	case http.StatusUnauthorized:
 		return status.Error(codes.Unauthenticated, errMsg)
 	default:
-		return status.Error(codes.Unknown, "Unknown")
+		return status.Error(codes.Unknown, errMsg)
 	}
 }
 
