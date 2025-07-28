@@ -199,6 +199,8 @@ func TestRcloneMount_WorkerNode_FailedToParseError(t *testing.T) {
 		return "{\"error\": \"failed to perform http request\"}", errors.New("error")
 	}
 
+	defer func() { MakeDir = os.MkdirAll }()
+
 	rclone := &RcloneMounter{}
 
 	err := rclone.Mount(source, target)

@@ -176,6 +176,8 @@ func TestS3FSMount_WorkerNode_FailedToParseError(t *testing.T) {
 		return "{\"error\": \"failed to perform http request\"}", errors.New("error")
 	}
 
+	defer func() { MakeDir = os.MkdirAll }()
+
 	s3fs := &S3fsMounter{}
 
 	err := s3fs.Mount(source, target)
