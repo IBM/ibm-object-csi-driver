@@ -17,7 +17,7 @@ jobs:
 
     env:
       IS_LATEST_RELEASE: 'false'
-      APP_VERSION: 0.5.8
+      APP_VERSION: 0.5.9
 
     steps:
     - name: Checkout Code
@@ -63,8 +63,8 @@ jobs:
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.deb.tar.gz.sha256
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz.sha256
-        tag_name: 0.5.8
-        name: 0.5.8
+        tag_name: 0.5.9
+        name: 0.5.9
         body: Add 'version' command support to display cos-csi-mounter binary version and git commit info
         prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
     
