@@ -210,12 +210,9 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 
 		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.RClone, jsonData)
 
-		response, err := mounterRequest(payload, "http://unix/api/cos/mount")
-		klog.Info("Worker Mounting...", response)
+		err = mounterRequest(payload, "http://unix/api/cos/mount")
+		klog.Info("Worker Mounting...", err)
 		if err != nil {
-			if strings.TrimSpace(response) != "" {
-				return parseErrFromResponse(response)
-			}
 			return err
 		}
 		return nil
@@ -232,12 +229,9 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 
 		payload := fmt.Sprintf(`{"path":"%s"}`, target)
 
-		response, err := mounterRequest(payload, "http://unix/api/cos/unmount")
-		klog.Info("Worker Unmounting...", response)
+		err := mounterRequest(payload, "http://unix/api/cos/unmount")
+		klog.Info("Worker Unmounting...", err)
 		if err != nil {
-			if strings.TrimSpace(response) != "" {
-				return parseErrFromResponse(response)
-			}
 			return err
 		}
 

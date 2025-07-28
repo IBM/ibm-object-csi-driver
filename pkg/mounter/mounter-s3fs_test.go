@@ -99,8 +99,8 @@ func TestS3FSMount_WorkerNode_Positive(t *testing.T) {
 	writePassWrap = func(_, _ string) error {
 		return nil
 	}
-	mounterRequest = func(_, _ string) (string, error) {
-		return "", nil
+	mounterRequest = func(_, _ string) error {
+		return nil
 	}
 
 	s3fs := &S3fsMounter{
@@ -152,31 +152,9 @@ func TestS3FSMount_WorkerNode_Negative(t *testing.T) {
 	writePassWrap = func(_, _ string) error {
 		return nil
 	}
-	mounterRequest = func(_, _ string) (string, error) {
-		return "", errors.New("failed to perform http request")
+	mounterRequest = func(_, _ string) error {
+		return errors.New("failed to perform http request")
 	}
-
-	s3fs := &S3fsMounter{}
-
-	err := s3fs.Mount(source, target)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to perform http request")
-}
-
-func TestS3FSMount_WorkerNode_FailedToParseError(t *testing.T) {
-	mountWorker = true
-
-	MakeDir = func(path string, perm os.FileMode) error {
-		return nil
-	}
-	writePassWrap = func(_, _ string) error {
-		return nil
-	}
-	mounterRequest = func(_, _ string) (string, error) {
-		return "{\"error\": \"failed to perform http request\"}", errors.New("error")
-	}
-
-	defer func() { MakeDir = os.MkdirAll }()
 
 	s3fs := &S3fsMounter{}
 
@@ -211,8 +189,8 @@ func TestUnmount_WorkerNode(t *testing.T) {
 		},
 	})}
 
-	mounterRequest = func(_, _ string) (string, error) {
-		return "", nil
+	mounterRequest = func(_, _ string) error {
+		return nil
 	}
 
 	err := s3fs.Unmount(target)
@@ -228,27 +206,13 @@ func TestUnmount_WorkerNode_Negative(t *testing.T) {
 		},
 	})}
 
-	mounterRequest = func(_, _ string) (string, error) {
-		return "", errors.New("failed to create http request")
+	mounterRequest = func(_, _ string) error {
+		return errors.New("failed to create http request")
 	}
 
 	err := s3fs.Unmount(target)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create http request")
-}
-
-func TestUnmount_WorkerNode_FailedToParseError(t *testing.T) {
-	mountWorker = true
-
-	mounterRequest = func(_, _ string) (string, error) {
-		return "{\"error\": \"failed to perform http request\"}", errors.New("error")
-	}
-
-	s3fs := &S3fsMounter{}
-
-	err := s3fs.Unmount(target)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to perform http request")
 }
 
 func TestUnmount_NodeServer_Negative(t *testing.T) {
