@@ -165,8 +165,8 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 		klog.Info("Worker Mounting Payload...", payload)
 
 		err = mounterRequest(payload, "http://unix/api/cos/mount")
-		klog.Info("Worker Mounting...", err)
 		if err != nil {
+			klog.Info("Error occurred while performing worker mounting...", err)
 			return err
 		}
 		return nil
@@ -185,8 +185,8 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 		payload := fmt.Sprintf(`{"path":"%s"}`, target)
 
 		err := mounterRequest(payload, "http://unix/api/cos/unmount")
-		klog.Info("Worker Unmounting...", err)
 		if err != nil {
+			klog.Info("Error occurred while performing worker unmounting...", err)
 			return err
 		}
 

@@ -211,8 +211,8 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.RClone, jsonData)
 
 		err = mounterRequest(payload, "http://unix/api/cos/mount")
-		klog.Info("Worker Mounting...", err)
 		if err != nil {
+			klog.Info("Error occurred while performing worker mounting...", err)
 			return err
 		}
 		return nil
@@ -230,8 +230,8 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 		payload := fmt.Sprintf(`{"path":"%s"}`, target)
 
 		err := mounterRequest(payload, "http://unix/api/cos/unmount")
-		klog.Info("Worker Unmounting...", err)
 		if err != nil {
+			klog.Info("Error occurred while performing worker unmounting...", err)
 			return err
 		}
 
