@@ -121,43 +121,49 @@ func serverSetup(options *Options, logger *zap.Logger) {
 		logger.Fatal("Failed in initialize s3 COS driver", zap.Error(err))
 		os.Exit(1)
 	}
-	serveMetrics(options.MetricsAddress, logger)
+	serveMetrics(options.ServerMode, options.MetricsAddress, logger)
 	S3CSIDriver.Run()
 }
 
-func serveMetrics(metricsAddress string, logger *zap.Logger) {
+func serveMetrics(mode, metricsAddress string, logger *zap.Logger) {
 	logger.Info("starting metrics endpoint")
 	go func() {
 		http.Handle("/metrics", promhttp.Handler())
-		//http.Handle("/health-check", healthCheck)
-		http.Handle("/socket-health", socketHealthHandler())
-		err := http.ListenAndServe(metricsAddress, nil) // #nosec G114: use default timeout.
-		logger.Error("failed to start metrics service:", zap.Error(err))
+		if strings.Contains(mode, "node") {
+			http.HandleFunc("/socket-health", func(w http.ResponseWriter, r *http.Request) {
+				if err := checkCustomHealth(logger); err != nil {
+					http.Error(w, "unhealthy: "+err.Error(), http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte("ok"))
+			})
+		}
+
+		if err := http.ListenAndServe(metricsAddress, nil); err != nil { // #nosec G114: use default timeout.
+			logger.Error("failed to start metrics service:", zap.Error(err))
+		}
 	}()
 	// TODO
 	//metrics.RegisterAll(csiConfig.CSIPluginGithubName)
 	libMetrics.RegisterAll()
 }
 
-func socketHealthHandler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		const livenessURL = "http://localhost:9809/healthz"
+func checkCustomHealth(logger *zap.Logger) error {
+	const livenessURL = "http://localhost:9809/healthz"
 
-		resp, err := http.Get(livenessURL)
-		if err != nil {
-			http.Error(w, "liveness probe not reachable", http.StatusInternalServerError)
-			return
-		}
-		defer func() {
-			_ = resp.Body.Close()
-		}()
+	resp, err := http.Get(livenessURL)
+	if err != nil {
+		logger.Error("liveness probe not reachable", zap.Error(err))
+		return err
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
-		if resp.StatusCode != http.StatusOK {
-			http.Error(w, "liveness probe reported unhealthy", http.StatusInternalServerError)
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("OK"))
-	})
+	if resp.StatusCode != http.StatusOK {
+		logger.Error("liveness probe reported unhealthy", zap.Error(err))
+		return err
+	}
+	return nil
 }
