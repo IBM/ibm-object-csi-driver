@@ -148,7 +148,9 @@ func socketHealthHandler() http.Handler {
 			http.Error(w, "liveness probe not reachable", http.StatusInternalServerError)
 			return
 		}
-		defer resp.Body.Close()
+		defer func() {
+			_ = resp.Body.Close()
+		}()
 
 		if resp.StatusCode != http.StatusOK {
 			http.Error(w, "liveness probe reported unhealthy", http.StatusInternalServerError)
@@ -156,6 +158,6 @@ func socketHealthHandler() http.Handler {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 }
