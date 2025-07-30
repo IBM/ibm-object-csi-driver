@@ -127,7 +127,7 @@ func writePass(pwFileName string, pwFileContent string) error {
 	return nil
 }
 
-func createCOSCSIMounterRequest(payload string, url string) (string, error) {
+func createCOSCSIMounterRequest(payload string, url string) error {
 	// Get socket path
 	socketPath := os.Getenv(constants.COSCSIMounterSocketPathEnv)
 	if socketPath == "" {
@@ -137,7 +137,7 @@ func createCOSCSIMounterRequest(payload string, url string) (string, error) {
 
 	err := isGRPCServerAvailable(socketPath)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	// Create a custom dialer function for Unix socket connection
@@ -156,12 +156,12 @@ func createCOSCSIMounterRequest(payload string, url string) (string, error) {
 	// Create POST request
 	req, err := http.NewRequest("POST", url, strings.NewReader(payload))
 	if err != nil {
-		return "", err
+		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	response, err := client.Do(req)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	defer func() {
@@ -172,40 +172,42 @@ func createCOSCSIMounterRequest(payload string, url string) (string, error) {
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	responseBody := string(body)
 	klog.Infof("response from cos-csi-mounter -> Response body: %s, Response code: %v", responseBody, response.StatusCode)
 
 	if response.StatusCode != http.StatusOK {
-		return responseBody, fetchGRPCReturnCode(response.StatusCode)
+		return parseGRPCResponse(response.StatusCode, responseBody)
 	}
-	return "", nil
+	return nil
 }
 
-func fetchGRPCReturnCode(code int) error {
+// parseGRPCResponse takes both response body and error code and frames error message
+func parseGRPCResponse(code int, response string) error {
+	errMsg := parseErrFromResponse(response)
 	switch code {
 	case http.StatusBadRequest:
-		return status.Error(codes.InvalidArgument, "Invalid Argument")
+		return status.Error(codes.InvalidArgument, errMsg)
 	case http.StatusNotFound:
-		return status.Error(codes.NotFound, "Not Found")
+		return status.Error(codes.NotFound, errMsg)
 	case http.StatusConflict:
-		return status.Error(codes.AlreadyExists, "Already Exists")
+		return status.Error(codes.AlreadyExists, errMsg)
 	case http.StatusForbidden:
-		return status.Error(codes.PermissionDenied, "Permission Denied")
+		return status.Error(codes.PermissionDenied, errMsg)
 	case http.StatusTooManyRequests:
-		return status.Error(codes.ResourceExhausted, "Resource Exhausted")
+		return status.Error(codes.ResourceExhausted, errMsg)
 	case http.StatusNotImplemented:
-		return status.Error(codes.Unimplemented, "Unimplemented")
+		return status.Error(codes.Unimplemented, errMsg)
 	case http.StatusInternalServerError:
-		return status.Error(codes.Internal, "Internal")
+		return status.Error(codes.Internal, errMsg)
 	case http.StatusServiceUnavailable:
-		return status.Error(codes.Unavailable, "Unavailable")
+		return status.Error(codes.Unavailable, errMsg)
 	case http.StatusUnauthorized:
-		return status.Error(codes.Unauthenticated, "Unauthenticated")
+		return status.Error(codes.Unauthenticated, errMsg)
 	default:
-		return status.Error(codes.Unknown, "Unknown")
+		return status.Error(codes.Unknown, errMsg)
 	}
 }
 
@@ -222,16 +224,19 @@ func isGRPCServerAvailable(socketPath string) error {
 	return nil
 }
 
-func parseErrFromResponse(response string) error {
+// parseErrFromResponse fetches error from responseBody
+// e.g. ResponseBody: {"error":"invalid args for mounter: invalid s3fs args decode error: json: unknown field \"unknownkey\""}
+// parseErrFromResponse returns "invalid args for mounter: invalid s3fs args decode error: json: unknown field \"unknownkey\"
+func parseErrFromResponse(response string) string {
 	var errFromResp map[string]string
 	err := json.Unmarshal([]byte(response), &errFromResp)
 	if err != nil {
-		klog.Warning("failed to unmarshal response from server")
-		return errors.New(response)
+		klog.Warning("failed to unmarshal response from server", err)
+		return response
 	}
 	val, exists := errFromResp["error"]
 	if !exists {
-		return errors.New(response)
+		return response
 	}
-	return errors.New(val)
+	return val
 }
