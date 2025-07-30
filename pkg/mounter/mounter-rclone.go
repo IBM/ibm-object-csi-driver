@@ -212,7 +212,7 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 
 		err = mounterRequest(payload, "http://unix/api/cos/mount")
 		if err != nil {
-			klog.Info("Error occurred while performing worker mounting...", err)
+			klog.Info("failed to mount on  worker...", err)
 			return err
 		}
 		return nil
@@ -231,7 +231,7 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 
 		err := mounterRequest(payload, "http://unix/api/cos/unmount")
 		if err != nil {
-			klog.Info("Error occurred while performing worker unmounting...", err)
+			klog.Info("failed to unmount on  worker...", err)
 			return err
 		}
 

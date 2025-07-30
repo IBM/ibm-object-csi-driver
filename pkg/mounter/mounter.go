@@ -225,7 +225,8 @@ func isGRPCServerAvailable(socketPath string) error {
 }
 
 // parseErrFromResponse fetches error from responseBody
-// e.g. ResponseBody: {"error": "some error"} => parseErrFromResponse returns "some error"
+// e.g. ResponseBody: {"error":"invalid args for mounter: invalid s3fs args decode error: json: unknown field \"unknownkey\""}
+// parseErrFromResponse returns "invalid args for mounter: invalid s3fs args decode error: json: unknown field \"unknownkey\"
 func parseErrFromResponse(response string) string {
 	var errFromResp map[string]string
 	err := json.Unmarshal([]byte(response), &errFromResp)
