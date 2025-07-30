@@ -13,12 +13,15 @@ package main
 
 import (
 	"flag"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/config"
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/driver"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
@@ -131,7 +134,7 @@ func serveMetrics(mode, metricsAddress string, logger *zap.Logger) {
 		http.Handle("/metrics", promhttp.Handler())
 		if strings.Contains(mode, "node") {
 			http.HandleFunc("/socket-health", func(w http.ResponseWriter, r *http.Request) {
-				if err := checkCustomHealth(logger); err != nil {
+				if err := checkSocketHealth(); err != nil {
 					http.Error(w, "unhealthy: "+err.Error(), http.StatusInternalServerError)
 					return
 				}
@@ -143,26 +146,27 @@ func serveMetrics(mode, metricsAddress string, logger *zap.Logger) {
 		if err := http.ListenAndServe(metricsAddress, nil); err != nil { // #nosec G114: use default timeout.
 			logger.Error("failed to start metrics service:", zap.Error(err))
 		}
+		if err := http.ListenAndServe(":9809", nil); err != nil { // #nosec G114: use default timeout.
+			logger.Error("failed to start metrics service:", zap.Error(err))
+		}
 	}()
 	// TODO
 	//metrics.RegisterAll(csiConfig.CSIPluginGithubName)
 	libMetrics.RegisterAll()
 }
 
-func checkCustomHealth(logger *zap.Logger) error {
-	const livenessURL = "http://localhost:9809/healthz"
+func checkSocketHealth() error {
+	socketPath := os.Getenv(constants.COSCSIMounterSocketPathEnv)
+	if socketPath == "" {
+		socketPath = constants.COSCSIMounterSocketPath
+	}
 
-	resp, err := http.Get(livenessURL)
+	conn, err := net.DialTimeout("unix", socketPath, 500*time.Millisecond)
 	if err != nil {
-		logger.Error("liveness probe not reachable", zap.Error(err))
 		return err
 	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		logger.Error("liveness probe reported unhealthy", zap.Error(err))
+	err = conn.Close()
+	if err != nil {
 		return err
 	}
 	return nil

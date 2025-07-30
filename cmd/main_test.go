@@ -48,7 +48,7 @@ func TestServeMetrics(t *testing.T) {
 	logger := getZapLogger()
 	addr := "127.0.0.1:19191"
 
-	serveMetrics(addr, logger)
+	serveMetrics("", addr, logger)
 
 	time.Sleep(200 * time.Millisecond)
 
