@@ -139,7 +139,7 @@ func serveMetrics(mode, metricsAddress string, logger *zap.Logger) {
 					return
 				}
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte("ok"))
+				_, _ = w.Write([]byte("ok"))
 			})
 		}
 
