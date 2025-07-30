@@ -166,7 +166,7 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 
 		err = mounterRequest(payload, "http://unix/api/cos/mount")
 		if err != nil {
-			klog.Info("failed to mount on  worker...", err)
+			klog.Error("failed to mount on  worker...", err)
 			return err
 		}
 		return nil
@@ -186,7 +186,7 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 
 		err := mounterRequest(payload, "http://unix/api/cos/unmount")
 		if err != nil {
-			klog.Info("failed to unmount on  worker...", err)
+			klog.Error("failed to unmount on  worker...", err)
 			return err
 		}
 

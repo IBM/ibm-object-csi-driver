@@ -231,7 +231,7 @@ func parseErrFromResponse(response string) string {
 	var errFromResp map[string]string
 	err := json.Unmarshal([]byte(response), &errFromResp)
 	if err != nil {
-		klog.Warning("failed to unmarshal response from server")
+		klog.Warning("failed to unmarshal response from server", err)
 		return response
 	}
 	val, exists := errFromResp["error"]
