@@ -130,10 +130,32 @@ func serveMetrics(metricsAddress string, logger *zap.Logger) {
 	go func() {
 		http.Handle("/metrics", promhttp.Handler())
 		//http.Handle("/health-check", healthCheck)
+		http.Handle("/socket-health", socketHealthHandler())
 		err := http.ListenAndServe(metricsAddress, nil) // #nosec G114: use default timeout.
 		logger.Error("failed to start metrics service:", zap.Error(err))
 	}()
 	// TODO
 	//metrics.RegisterAll(csiConfig.CSIPluginGithubName)
 	libMetrics.RegisterAll()
+}
+
+func socketHealthHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		const livenessURL = "http://localhost:9809/healthz"
+
+		resp, err := http.Get(livenessURL)
+		if err != nil {
+			http.Error(w, "liveness probe not reachable", http.StatusInternalServerError)
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			http.Error(w, "liveness probe reported unhealthy", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
 }
