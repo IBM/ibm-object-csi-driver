@@ -179,7 +179,7 @@ func createCOSCSIMounterRequest(payload string, url string) error {
 	klog.Infof("response from cos-csi-mounter -> Response body: %s, Response code: %v", responseBody, response.StatusCode)
 
 	if response.StatusCode != http.StatusOK {
-		return responseBody, fetchGRPCReturnCode(response.StatusCode)
+		return parseGRPCResponse(response.StatusCode, responseBody)
 	}
 	return nil
 }
