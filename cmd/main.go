@@ -146,9 +146,6 @@ func serveMetrics(mode, metricsAddress string, logger *zap.Logger) {
 		if err := http.ListenAndServe(metricsAddress, nil); err != nil { // #nosec G114: use default timeout.
 			logger.Error("failed to start metrics service:", zap.Error(err))
 		}
-		if err := http.ListenAndServe(":9809", nil); err != nil { // #nosec G114: use default timeout.
-			logger.Error("failed to start metrics service:", zap.Error(err))
-		}
 	}()
 	// TODO
 	//metrics.RegisterAll(csiConfig.CSIPluginGithubName)
