@@ -129,22 +129,22 @@ func serverSetup(options *Options, logger *zap.Logger) {
 }
 
 func serveMetrics(mode, metricsAddress string, logger *zap.Logger) {
-	logger.Info("starting metrics endpoint")
-	go func() {
-		http.Handle("/metrics", promhttp.Handler())
-		if strings.Contains(mode, "node") {
-			http.HandleFunc("/socket-health", func(w http.ResponseWriter, r *http.Request) {
-				if err := checkSocketHealth(); err != nil {
-					http.Error(w, "unhealthy: "+err.Error(), http.StatusInternalServerError)
-					return
-				}
-				w.WriteHeader(http.StatusOK)
-				_, _ = w.Write([]byte("ok"))
-			})
-		}
+	logger.Info("starting metrics & socket-health endpoints")
+	http.Handle("/metrics", promhttp.Handler())
+	if strings.Contains(mode, "node") {
+		http.HandleFunc("/socket-health", func(w http.ResponseWriter, r *http.Request) {
+			if err := checkSocketHealth(); err != nil {
+				http.Error(w, "unhealthy: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("ok"))
+		})
+	}
 
+	go func() {
 		if err := http.ListenAndServe(metricsAddress, nil); err != nil { // #nosec G114: use default timeout.
-			logger.Error("failed to start metrics service:", zap.Error(err))
+			logger.Error("failed to start metrics & socket-health service:", zap.String("addr", metricsAddress), zap.Error(err))
 		}
 	}()
 	// TODO
