@@ -71,10 +71,10 @@ func TestCheckCosCsiMounterSocketHealth_Positive(t *testing.T) {
 	l, err := net.Listen("unix", path)
 	assert.NoError(t, err)
 	defer func() {
-		os.Remove(path)
+		_ = os.Remove(path)
 	}()
 	defer func() {
-		l.Close()
+		_ = l.Close()
 	}()
 
 	err = checkCosCsiMounterSocketHealth()
