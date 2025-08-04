@@ -132,7 +132,7 @@ func serveMetrics(mode, metricsAddress string, logger *zap.Logger) {
 	logger.Info("starting metrics & socket-health endpoints")
 	http.Handle("/metrics", promhttp.Handler())
 	if strings.Contains(mode, "node") {
-		http.HandleFunc("/socket-health", func(w http.ResponseWriter, r *http.Request) {
+		http.HandleFunc("/socket-health", func(w http.ResponseWriter, _ *http.Request) {
 			if err := checkSocketHealth(); err != nil {
 				http.Error(w, "unhealthy: "+err.Error(), http.StatusInternalServerError)
 				return
