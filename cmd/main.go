@@ -142,12 +142,16 @@ func serveMetrics(mode, metricsAddress string, logger *zap.Logger) {
 				return
 			}
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte("ok"))
+			_, err := w.Write([]byte("ok"))
+			if err != nil {
+				logger.Warn("failed to write data")
+			}
 		})
 	}
 
 	go func() {
-		if err := http.ListenAndServe(metricsAddress, nil); err != nil { // #nosec G114 -- use default timeout.
+		// #nosec G114 -- use default timeout.
+		if err := http.ListenAndServe(metricsAddress, nil); err != nil {
 			logMsg = "failed to start metrics service:"
 			if strings.Contains(mode, "node") {
 				logMsg = "failed to start metrics & cos-csi-mounter socket-health service:"
