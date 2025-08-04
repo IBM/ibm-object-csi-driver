@@ -58,10 +58,16 @@ func TestServeMetrics(t *testing.T) {
 	resp, err := http.Get("http://" + addr + "/metrics")
 	assert.NoError(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	resp, err = http.Get("http://" + addr + "/cos-csi-mounter/socket-health")
 	assert.NoError(t, err)
 	assert.NotEqual(t, 200, resp.StatusCode)
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 }
 
 func TestCheckCosCsiMounterSocketHealth_Positive(t *testing.T) {
