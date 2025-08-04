@@ -1,11 +1,13 @@
 package main
 
 import (
+	"net"
 	"net/http"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -48,15 +50,35 @@ func TestServeMetrics(t *testing.T) {
 	logger := getZapLogger()
 	addr := "127.0.0.1:19191"
 
-	serveMetrics("", addr, logger)
+	os.Setenv(constants.COSCSIMounterSocketPathEnv, "/tmp/test.sock")
 
+	go serveMetrics("node", addr, logger)
 	time.Sleep(200 * time.Millisecond)
 
 	resp, err := http.Get("http://" + addr + "/metrics")
 	assert.NoError(t, err)
-	defer func() {
-		_ = resp.Body.Close()
-	}()
+	assert.Equal(t, 200, resp.StatusCode)
 
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	resp, err = http.Get("http://" + addr + "/socket-health")
+	assert.NoError(t, err)
+	assert.NotEqual(t, 200, resp.StatusCode)
+}
+
+func TestCheckSocketHealth_Positive(t *testing.T) {
+	path := "/tmp/test.sock"
+	os.Setenv(constants.COSCSIMounterSocketPathEnv, path)
+
+	l, err := net.Listen("unix", path)
+	assert.NoError(t, err)
+	defer os.Remove(path)
+	defer l.Close()
+
+	err = checkSocketHealth()
+	assert.NoError(t, err)
+}
+
+func TestCheckSocketHealth_Negative(t *testing.T) {
+	os.Setenv(constants.COSCSIMounterSocketPathEnv, "")
+	err := checkSocketHealth()
+	assert.Error(t, err)
 }
