@@ -129,7 +129,11 @@ func serverSetup(options *Options, logger *zap.Logger) {
 }
 
 func serveMetrics(mode, metricsAddress string, logger *zap.Logger) {
-	logger.Info("starting metrics & cos-csi-mounter socket-health endpoints")
+	logMsg := "starting metrics endpoint"
+	if strings.Contains(mode, "node") {
+		logMsg = "starting metrics & cos-csi-mounter socket-health endpoints"
+	}
+	logger.Info(logMsg)
 	http.Handle("/metrics", promhttp.Handler())
 	if strings.Contains(mode, "node") {
 		http.HandleFunc("/cos-csi-mounter/socket-health", func(w http.ResponseWriter, _ *http.Request) {
@@ -144,7 +148,11 @@ func serveMetrics(mode, metricsAddress string, logger *zap.Logger) {
 
 	go func() {
 		if err := http.ListenAndServe(metricsAddress, nil); err != nil { // #nosec G114 -- use default timeout.
-			logger.Error("failed to start metrics & cos-csi-mounter socket-health service:", zap.String("addr", metricsAddress), zap.Error(err))
+			logMsg = "failed to start metrics service:"
+			if strings.Contains(mode, "node") {
+				logMsg = "failed to start metrics & cos-csi-mounter socket-health service:"
+			}
+			logger.Error(logMsg, zap.String("addr", metricsAddress), zap.Error(err))
 		}
 	}()
 	// TODO
