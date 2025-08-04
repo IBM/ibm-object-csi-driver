@@ -50,7 +50,7 @@ func TestServeMetrics(t *testing.T) {
 	logger := getZapLogger()
 	addr := "127.0.0.1:19191"
 
-	os.Setenv(constants.COSCSIMounterSocketPathEnv, "/tmp/test.sock")
+	_ = os.Setenv(constants.COSCSIMounterSocketPathEnv, "/tmp/test.sock")
 
 	go serveMetrics("node", addr, logger)
 	time.Sleep(200 * time.Millisecond)
@@ -66,19 +66,23 @@ func TestServeMetrics(t *testing.T) {
 
 func TestCheckCosCsiMounterSocketHealth_Positive(t *testing.T) {
 	path := "/tmp/test.sock"
-	os.Setenv(constants.COSCSIMounterSocketPathEnv, path)
+	_ = os.Setenv(constants.COSCSIMounterSocketPathEnv, path)
 
 	l, err := net.Listen("unix", path)
 	assert.NoError(t, err)
-	defer os.Remove(path)
-	defer l.Close()
+	defer func() {
+		os.Remove(path)
+	}()
+	defer func() {
+		l.Close()
+	}()
 
 	err = checkCosCsiMounterSocketHealth()
 	assert.NoError(t, err)
 }
 
 func TestCheckCosCsiMounterSocketHealth_Negative(t *testing.T) {
-	os.Setenv(constants.COSCSIMounterSocketPathEnv, "")
+	_ = os.Setenv(constants.COSCSIMounterSocketPathEnv, "")
 	err := checkCosCsiMounterSocketHealth()
 	assert.Error(t, err)
 }
