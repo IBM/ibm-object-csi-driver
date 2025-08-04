@@ -13,12 +13,15 @@ package main
 
 import (
 	"flag"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/config"
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/driver"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
@@ -121,19 +124,55 @@ func serverSetup(options *Options, logger *zap.Logger) {
 		logger.Fatal("Failed in initialize s3 COS driver", zap.Error(err))
 		os.Exit(1)
 	}
-	serveMetrics(options.MetricsAddress, logger)
+	serveMetrics(options.ServerMode, options.MetricsAddress, logger)
 	S3CSIDriver.Run()
 }
 
-func serveMetrics(metricsAddress string, logger *zap.Logger) {
-	logger.Info("starting metrics endpoint")
+func serveMetrics(mode, metricsAddress string, logger *zap.Logger) {
+	logMsg := "starting metrics endpoint"
+	if strings.Contains(mode, "node") {
+		logMsg = "starting metrics & cos-csi-mounter socket-health endpoints"
+	}
+	logger.Info(logMsg)
+	http.Handle("/metrics", promhttp.Handler())
+	if strings.Contains(mode, "node") {
+		http.HandleFunc("/cos-csi-mounter/socket-health", func(w http.ResponseWriter, _ *http.Request) {
+			if err := checkCosCsiMounterSocketHealth(); err != nil {
+				http.Error(w, "unhealthy: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("ok"))
+		})
+	}
+
 	go func() {
-		http.Handle("/metrics", promhttp.Handler())
-		//http.Handle("/health-check", healthCheck)
-		err := http.ListenAndServe(metricsAddress, nil) // #nosec G114: use default timeout.
-		logger.Error("failed to start metrics service:", zap.Error(err))
+		if err := http.ListenAndServe(metricsAddress, nil); err != nil { // #nosec G114 -- use default timeout.
+			logMsg = "failed to start metrics service:"
+			if strings.Contains(mode, "node") {
+				logMsg = "failed to start metrics & cos-csi-mounter socket-health service:"
+			}
+			logger.Error(logMsg, zap.String("addr", metricsAddress), zap.Error(err))
+		}
 	}()
 	// TODO
 	//metrics.RegisterAll(csiConfig.CSIPluginGithubName)
 	libMetrics.RegisterAll()
+}
+
+func checkCosCsiMounterSocketHealth() error {
+	socketPath := os.Getenv(constants.COSCSIMounterSocketPathEnv)
+	if socketPath == "" {
+		socketPath = constants.COSCSIMounterSocketPath
+	}
+
+	conn, err := net.DialTimeout("unix", socketPath, 500*time.Millisecond)
+	if err != nil {
+		return err
+	}
+	err = conn.Close()
+	if err != nil {
+		return err
+	}
+	return nil
 }

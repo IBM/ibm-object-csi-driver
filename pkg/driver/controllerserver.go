@@ -22,7 +22,7 @@ import (
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
 	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
-	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/smithy-go"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
@@ -568,7 +568,8 @@ func createBucket(sess s3client.ObjectStorageSession, bucketName, kpRootKeyCrn s
 		klog.Infof("Info:Create Volume module with user provided Bucket name: %v", msg)
 	}
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "BucketAlreadyExists" {
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "BucketAlreadyExists" {
 			klog.Warning(fmt.Sprintf("bucket '%s' already exists", bucketName))
 		} else {
 			klog.Errorf("CreateVolume: Unable to create the bucket: %v", err)
