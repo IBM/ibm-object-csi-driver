@@ -129,11 +129,11 @@ func serverSetup(options *Options, logger *zap.Logger) {
 }
 
 func serveMetrics(mode, metricsAddress string, logger *zap.Logger) {
-	logger.Info("starting metrics & socket-health endpoints")
+	logger.Info("starting metrics & cos-csi-mounter socket-health endpoints")
 	http.Handle("/metrics", promhttp.Handler())
 	if strings.Contains(mode, "node") {
-		http.HandleFunc("/socket-health", func(w http.ResponseWriter, _ *http.Request) {
-			if err := checkSocketHealth(); err != nil {
+		http.HandleFunc("/cos-csi-mounter/socket-health", func(w http.ResponseWriter, _ *http.Request) {
+			if err := checkCosCsiMounterSocketHealth(); err != nil {
 				http.Error(w, "unhealthy: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -144,7 +144,7 @@ func serveMetrics(mode, metricsAddress string, logger *zap.Logger) {
 
 	go func() {
 		if err := http.ListenAndServe(metricsAddress, nil); err != nil { // #nosec G114: use default timeout.
-			logger.Error("failed to start metrics & socket-health service:", zap.String("addr", metricsAddress), zap.Error(err))
+			logger.Error("failed to start metrics & cos-csi-mounter socket-health service:", zap.String("addr", metricsAddress), zap.Error(err))
 		}
 	}()
 	// TODO
@@ -152,7 +152,7 @@ func serveMetrics(mode, metricsAddress string, logger *zap.Logger) {
 	libMetrics.RegisterAll()
 }
 
-func checkSocketHealth() error {
+func checkCosCsiMounterSocketHealth() error {
 	socketPath := os.Getenv(constants.COSCSIMounterSocketPathEnv)
 	if socketPath == "" {
 		socketPath = constants.COSCSIMounterSocketPath

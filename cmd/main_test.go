@@ -59,12 +59,12 @@ func TestServeMetrics(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
 
-	resp, err = http.Get("http://" + addr + "/socket-health")
+	resp, err = http.Get("http://" + addr + "/cos-csi-mounter/socket-health")
 	assert.NoError(t, err)
 	assert.NotEqual(t, 200, resp.StatusCode)
 }
 
-func TestCheckSocketHealth_Positive(t *testing.T) {
+func TestCheckCosCsiMounterSocketHealth_Positive(t *testing.T) {
 	path := "/tmp/test.sock"
 	os.Setenv(constants.COSCSIMounterSocketPathEnv, path)
 
@@ -73,12 +73,12 @@ func TestCheckSocketHealth_Positive(t *testing.T) {
 	defer os.Remove(path)
 	defer l.Close()
 
-	err = checkSocketHealth()
+	err = checkCosCsiMounterSocketHealth()
 	assert.NoError(t, err)
 }
 
-func TestCheckSocketHealth_Negative(t *testing.T) {
+func TestCheckCosCsiMounterSocketHealth_Negative(t *testing.T) {
 	os.Setenv(constants.COSCSIMounterSocketPathEnv, "")
-	err := checkSocketHealth()
+	err := checkCosCsiMounterSocketHealth()
 	assert.Error(t, err)
 }
