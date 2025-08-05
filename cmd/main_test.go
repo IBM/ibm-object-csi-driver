@@ -62,7 +62,7 @@ func TestServeMetrics(t *testing.T) {
 		_ = resp.Body.Close()
 	}()
 
-	resp, err = http.Get("http://" + addr + "/cos-csi-mounter/socket-health")
+	resp, err = http.Get("http://" + addr + "/socket-health")
 	assert.NoError(t, err)
 	assert.NotEqual(t, 200, resp.StatusCode)
 	defer func() {
