@@ -136,7 +136,7 @@ func serveMetrics(mode, metricsAddress string, logger *zap.Logger) {
 	logger.Info(logMsg)
 	http.Handle("/metrics", promhttp.Handler())
 	if strings.Contains(mode, "node") {
-		http.HandleFunc("/cos-csi-mounter/socket-health", func(w http.ResponseWriter, _ *http.Request) {
+		http.HandleFunc("/socket-health", func(w http.ResponseWriter, _ *http.Request) {
 			if err := checkCosCsiMounterSocketHealth(); err != nil {
 				http.Error(w, "unhealthy: "+err.Error(), http.StatusInternalServerError)
 				return
