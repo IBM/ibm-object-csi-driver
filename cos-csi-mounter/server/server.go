@@ -137,6 +137,7 @@ func startService(setupSocketFunc func() (net.Listener, error), router http.Hand
 	server := &http.Server{
 		Handler:           router,
 		ReadHeaderTimeout: 3 * time.Second,
+		WriteTimeout:      70 * time.Second,
 	}
 	if err := server.Serve(listener); err != nil {
 		logger.Error("Error while serving HTTP requests:", zap.Error(err))
