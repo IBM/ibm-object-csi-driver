@@ -135,7 +135,7 @@ func waitForMount(path string, timeout time.Duration) error {
 			return nil
 		}
 
-		klog.Infof("Mountpoint check in progress: path=%s, isMount=%s, err=%v", path, isMount, err)
+		klog.Infof("Mountpoint check in progress: path=%s, isMount=%v, err=%v", path, isMount, err)
 		time.Sleep(constants.Interval)
 		elapsed = elapsed + constants.Interval
 		if elapsed >= timeout {
