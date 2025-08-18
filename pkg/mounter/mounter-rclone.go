@@ -322,6 +322,7 @@ func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWit
 		"--daemon",
 		"--config=" + configPathWithVolID + "/" + configFileName,
 		"--log-file=/var/log/rclone.log",
+		"--vfs-cache-mode=writes",
 	}
 
 	workerNodeOp = map[string]string{

@@ -135,9 +135,8 @@ func startService(setupSocketFunc func() (net.Listener, error), router http.Hand
 
 	// Serve HTTP requests over Unix socket
 	server := &http.Server{
-		Handler:           router,
+		Handler:           http.TimeoutHandler(router, 75*time.Second, "request timed out"),
 		ReadHeaderTimeout: 3 * time.Second,
-		WriteTimeout:      70 * time.Second,
 	}
 	if err := server.Serve(listener); err != nil {
 		logger.Error("Error while serving HTTP requests:", zap.Error(err))
