@@ -330,6 +330,7 @@ func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWit
 		"daemon":      "true",
 		"config":      configPathWithVolID + "/" + configFileName,
 		"log-file":    "/var/log/rclone.log",
+		"--vfs-cache-mode=writes",
 	}
 
 	if rclone.GID != "" {
