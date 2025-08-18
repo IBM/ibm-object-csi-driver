@@ -60,6 +60,12 @@ func (args S3FSArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, err
 	// Convert to key=value slice
 	result := []string{bucket, targetPath}
 
+	// Add passwd_file
+	if val, ok := m["passwd_file"]; ok {
+		result = append(result, fmt.Sprintf("-o passwd_file=%v", val))
+		delete(m, "passwd_file")
+	}
+
 	// Add ibm_iam_auth first
 	if val, ok := m["ibm_iam_auth"]; ok {
 		if strings.ToLower(strings.TrimSpace(val)) == "true" {
