@@ -30,6 +30,7 @@ type StatsUtils interface {
 	GetBucketUsage(volumeID string) (int64, error)
 	GetBucketNameFromPV(volumeID string) (string, error)
 	GetRegionAndZone(nodeName string) (string, string, error)
+	GetEndpoints() (string, string, error)
 	GetPVAttributes(volumeID string) (map[string]string, error)
 	GetPVC(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error)
 	GetSecret(secretName, secretNamespace string) (*v1.Secret, error)
@@ -59,6 +60,19 @@ func (su *DriverStatsUtils) GetRegionAndZone(nodeName string) (region, zone stri
 		return "", "", errorMsg
 	}
 	return region, zone, nil
+}
+
+// GetEndpoints return IAMEndpoint, COSResourceConfigEndpoint, error
+func (su *DriverStatsUtils) GetEndpoints() (string, string, error) {
+	clusterType, err := getClusterType()
+	if err != nil {
+		return "", "", err
+	}
+
+	if strings.Contains(clusterType, "vpc") {
+		return constants.PrivateIAMEndpoint, constants.ResourceConfigEPDirect, nil
+	}
+	return constants.PublicIAMEndpoint, constants.ResourceConfigEPPrivate, nil
 }
 
 func (su *DriverStatsUtils) BucketToDelete(volumeID string) (string, error) {
@@ -115,7 +129,7 @@ func (su *DriverStatsUtils) GetTotalCapacityFromPV(volumeID string) (resource.Qu
 }
 
 func (su *DriverStatsUtils) GetBucketUsage(volumeID string) (int64, error) {
-	ep, err := getEPBasedOnCluserInfra()
+	_, ep, err := su.GetEndpoints()
 	if err != nil {
 		return 0, err
 	}
@@ -305,7 +319,7 @@ func CreateK8sClient() (*kubernetes.Clientset, error) {
 	return clientset, nil
 }
 
-func getEPBasedOnCluserInfra() (string, error) {
+func getClusterType() (string, error) {
 	k8sClient, err := CreateK8sClient()
 	if err != nil {
 		return "", err
@@ -325,11 +339,7 @@ func getEPBasedOnCluserInfra() (string, error) {
 
 	clusterType := clusterConfig["cluster_type"]
 	klog.Info("Cluster Type ", clusterType)
-
-	if strings.Contains(clusterType, "vpc") {
-		return constants.ResourceConfigEPDirect, nil
-	}
-	return constants.ResourceConfigEPPrivate, nil
+	return clusterType, nil
 }
 
 func fetchSecretUsingPV(volumeID string, su *DriverStatsUtils) (*v1.Secret, error) {

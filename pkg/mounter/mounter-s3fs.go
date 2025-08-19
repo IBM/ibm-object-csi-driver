@@ -34,6 +34,7 @@ type S3fsMounter struct {
 	LocConstraint string //From Secret in SC
 	AuthType      string
 	AccessKeys    string
+	IAMEndpoint   string
 	KpRootKeyCrn  string
 	MountOptions  []string
 	MounterUtils  utils.MounterUtils
@@ -86,6 +87,9 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 	}
 	if val, check = secretMap["kpRootKeyCRN"]; check {
 		mounter.KpRootKeyCrn = val
+	}
+	if val, check = secretMap["iamEndpoint"]; check {
+		mounter.IAMEndpoint = val
 	}
 
 	if apiKey != "" {
@@ -325,10 +329,10 @@ func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string
 
 	if s3fs.AuthType != "hmac" {
 		nodeServerOp = append(nodeServerOp, "-o", "ibm_iam_auth")
-		nodeServerOp = append(nodeServerOp, "-o", "ibm_iam_endpoint="+constants.DefaultIAMEndPoint)
+		nodeServerOp = append(nodeServerOp, "-o", "ibm_iam_endpoint="+s3fs.IAMEndpoint)
 
 		workerNodeOp["ibm_iam_auth"] = "true"
-		workerNodeOp["ibm_iam_endpoint"] = constants.DefaultIAMEndPoint
+		workerNodeOp["ibm_iam_endpoint"] = s3fs.IAMEndpoint
 	} else {
 		nodeServerOp = append(nodeServerOp, "-o", "default_acl=private")
 		workerNodeOp["default_acl"] = "private"
