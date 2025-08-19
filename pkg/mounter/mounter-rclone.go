@@ -326,11 +326,11 @@ func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWit
 	}
 
 	workerNodeOp = map[string]string{
-		"allow-other":      "true",
-		"daemon":           "true",
-		"config":           configPathWithVolID + "/" + configFileName,
-		"log-file":         "/var/log/rclone.log",
-		"--vfs-cache-mode": "writes",
+		"allow-other":    "true",
+		"daemon":         "true",
+		"config":         configPathWithVolID + "/" + configFileName,
+		"log-file":       "/var/log/rclone.log",
+		"vfs-cache-mode": "writes",
 	}
 
 	if rclone.GID != "" {
