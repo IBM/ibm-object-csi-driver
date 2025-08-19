@@ -17,7 +17,7 @@ jobs:
 
     env:
       IS_LATEST_RELEASE: 'false'
-      APP_VERSION: 0.5.23
+      APP_VERSION: 0.5.24
 
     steps:
     - name: Checkout Code
@@ -63,8 +63,8 @@ jobs:
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.deb.tar.gz.sha256
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz.sha256
-        tag_name: v0.5.23
-        name: v0.5.23
+        tag_name: v0.5.24
+        name: v0.5.24
         body: "Add cos-csi-mounter api handler processing timeout and fix s3fs iam issue"
         prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
     
