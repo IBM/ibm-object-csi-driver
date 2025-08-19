@@ -72,7 +72,7 @@ func (args S3FSArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, err
 
 	// Add ibm_iam_endpoint
 	if val, ok := m["ibm_iam_endpoint"]; ok {
-		result = append(result, "-o", fmt.Sprintf("-o ibm_iam_endpoint=%v", val))
+		result = append(result, "-o", fmt.Sprintf("ibm_iam_endpoint=%v", val))
 		delete(m, "ibm_iam_endpoint")
 	}
 
