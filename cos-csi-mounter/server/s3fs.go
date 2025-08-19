@@ -60,25 +60,20 @@ func (args S3FSArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, err
 	// Convert to key=value slice
 	result := []string{bucket, targetPath}
 
-	// Add passwd_file
-	if val, ok := m["passwd_file"]; ok {
-		result = append(result, fmt.Sprintf("-o passwd_file=%v", val))
-		delete(m, "passwd_file")
-	}
-
 	// Add ibm_iam_auth first
+	var ibmIAMAuthParam, ibmIAMEndpointParam string
 	if val, ok := m["ibm_iam_auth"]; ok {
 		if strings.ToLower(strings.TrimSpace(val)) == "true" {
-			result = append(result, "-o ibm_iam_auth")
+			ibmIAMAuthParam = "-o ibm_iam_auth"
 		} else {
-			result = append(result, fmt.Sprintf("-o ibm_iam_auth=%v", val)) // pragma: allowlist secret
+			ibmIAMAuthParam = fmt.Sprintf("-o ibm_iam_auth=%v", val) // pragma: allowlist secret
 		}
 		delete(m, "ibm_iam_auth")
 	}
 
 	// Add ibm_iam_endpoint
 	if val, ok := m["ibm_iam_endpoint"]; ok {
-		result = append(result, fmt.Sprintf("-o ibm_iam_endpoint=%v", val))
+		ibmIAMEndpointParam = fmt.Sprintf("-o ibm_iam_endpoint=%v", val)
 		delete(m, "ibm_iam_endpoint")
 	}
 
@@ -89,6 +84,12 @@ func (args S3FSArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, err
 		} else {
 			result = append(result, fmt.Sprintf("%s=%v", k, v)) // -o, key=value
 		}
+	}
+	if ibmIAMAuthParam != "" {
+		result = append(result, ibmIAMAuthParam)
+	}
+	if ibmIAMEndpointParam != "" {
+		result = append(result, ibmIAMEndpointParam)
 	}
 
 	return result, nil // [bucket, path, -o, key1=value1, -o, key2=value2, -o key3, ...]
