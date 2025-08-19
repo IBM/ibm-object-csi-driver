@@ -3,7 +3,7 @@ EXE_DRIVER_NAME=ibm-object-csi-driver
 
 REGISTRY=quay.io/ibm-object-csi-driver
 
-export LINT_VERSION="2.0.2"
+export LINT_VERSION="2.3.1"
 
 COLOR_YELLOW=\033[0;33m
 COLOR_RESET=\033[0m
