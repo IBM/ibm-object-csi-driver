@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     branches:
-      - main
+      - ashima2
 
 jobs:
   release:
@@ -17,7 +17,7 @@ jobs:
 
     env:
       IS_LATEST_RELEASE: 'true'
-      APP_VERSION: 1.0.3
+      APP_VERSION: 0.9.0
 
     steps:
     - name: Checkout Code
@@ -63,8 +63,8 @@ jobs:
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.deb.tar.gz.sha256
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz.sha256
-        tag_name: v1.0.3
-        name: v1.0.3
+        tag_name: v0.9.0
+        name: v0.9.0
         ## body: 
         prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
     
