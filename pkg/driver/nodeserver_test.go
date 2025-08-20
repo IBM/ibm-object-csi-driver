@@ -347,6 +347,9 @@ func TestNodePublishVolume(t *testing.T) {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
 		nodeServer := nodeServer{
+			S3Driver: &S3Driver{
+				iamEndpoint: constants.PublicIAMEndpoint,
+			},
 			Stats:   tc.driverStatsUtils,
 			Mounter: tc.Mounter,
 		}

@@ -252,7 +252,11 @@ func TestNewS3CosDriver(t *testing.T) {
 		{
 			testCaseName: "Positive: controller mode",
 			mode:         "controller",
-			statsUtils:   utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetEndpointsFn: func() (string, string, error) {
+					return constants.PublicIAMEndpoint, "", nil
+				},
+			}),
 			verifyResult: func(t *testing.T, driver *S3Driver, err error) {
 				assert.NoError(t, err)
 				assert.NotEmpty(t, driver.cs)
@@ -263,6 +267,9 @@ func TestNewS3CosDriver(t *testing.T) {
 			testCaseName: "Positive: node mode",
 			mode:         "node",
 			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetEndpointsFn: func() (string, string, error) {
+					return constants.PublicIAMEndpoint, "", nil
+				},
 				GetRegionAndZoneFn: func(nodeName string) (string, string, error) { return testRegion, testZone, nil },
 			}),
 			verifyResult: func(t *testing.T, driver *S3Driver, err error) {
@@ -277,6 +284,9 @@ func TestNewS3CosDriver(t *testing.T) {
 			testCaseName: "Positive: controller and node mode",
 			mode:         "controller-node",
 			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetEndpointsFn: func() (string, string, error) {
+					return constants.PublicIAMEndpoint, "", nil
+				},
 				GetRegionAndZoneFn: func(nodeName string) (string, string, error) { return testRegion, testZone, nil },
 			}),
 			verifyResult: func(t *testing.T, driver *S3Driver, err error) {
@@ -287,6 +297,17 @@ func TestNewS3CosDriver(t *testing.T) {
 				assert.Equal(t, driver.ns.Zone, testZone)
 			},
 			expectedErr: nil,
+		},
+		{
+			testCaseName: "Negative: Failed to GetEndpoints",
+			mode:         "controller-node",
+			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetEndpointsFn: func() (string, string, error) {
+					return "", "", errors.New("failed")
+				},
+			}),
+			verifyResult: nil,
+			expectedErr:  errors.New("failed"),
 		},
 	}
 

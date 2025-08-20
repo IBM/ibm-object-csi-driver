@@ -82,7 +82,7 @@ func (m *FakeStatsUtilsFuncStructImpl) GetRegionAndZone(nodeName string) (string
 }
 
 func (m *FakeStatsUtilsFuncStructImpl) GetEndpoints() (string, string, error) {
-	if m.FuncStruct.GetBucketNameFromPVFn != nil {
+	if m.FuncStruct.GetEndpointsFn != nil {
 		return m.FuncStruct.GetEndpointsFn()
 	}
 	panic("requested method should not be nil")
