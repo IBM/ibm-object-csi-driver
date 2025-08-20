@@ -15,6 +15,7 @@ import (
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/mitchellh/go-ps"
 	"k8s.io/klog/v2"
+	k8sMountUtils "k8s.io/mount-utils"
 )
 
 var unmount = syscall.Unmount
@@ -35,6 +36,7 @@ func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) e
 	klog.Infof("FuseMount params:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%s>", path, comm, args)
 	out, err := command(comm, args...).CombinedOutput()
 	if err != nil {
+		klog.Infof("mount command failed: mounter: %s, error: %v, output: %s", comm, err, string(out))
 		if mounted, err1 := isMountpoint(path); err1 == nil && mounted { // check if bucket already got mounted
 			klog.Infof("bucket is already mounted using '%s' mounter", comm)
 			return nil
@@ -42,6 +44,7 @@ func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) e
 		klog.Errorf("FuseMount: command execution failed: <%s>\nargs: <%s>\nerror: <%v>\noutput: <%v>", comm, args, err, string(out))
 		return fmt.Errorf("'%s' mount failed: <%v>", comm, string(out))
 	}
+	klog.Infof("mount command returned without any error: mounter: %s, output: %s", comm, string(out))
 	if err := waitForMount(path, 10*time.Second); err != nil {
 		return err
 	}
@@ -126,20 +129,21 @@ func isMountpoint(pathname string) (bool, error) {
 
 func waitForMount(path string, timeout time.Duration) error {
 	var elapsed time.Duration
+	attempt := 1
 	for {
-		out, err := exec.Command("mountpoint", path).CombinedOutput()
-		outStr := strings.TrimSpace(string(out))
-		if err == nil && strings.HasSuffix(outStr, "is a mountpoint") {
-			klog.Infof("Path is a mountpoint: pathname - %s", path)
+		isMount, err := k8sMountUtils.New("").IsMountPoint(path)
+		if err == nil && isMount {
+			klog.Infof("Path is a mountpoint: pathname: %s", path)
 			return nil
 		}
 
-		klog.Infof("Mountpoint check in progress: path=%s, output=%s, err=%v", path, outStr, err)
+		klog.Infof("Mountpoint check in progress: attempt=%d, path=%s, isMount=%v, err=%v", attempt, path, isMount, err)
 		time.Sleep(constants.Interval)
-		elapsed = elapsed + constants.Interval
+		elapsed += constants.Interval
 		if elapsed >= timeout {
-			return fmt.Errorf("timeout waiting for mount: last check output: %s", outStr)
+			return fmt.Errorf("timeout waiting for mount. Last check response: isMount=%v, err=%v", isMount, err)
 		}
+		attempt++
 	}
 }
 
