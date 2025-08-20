@@ -33,18 +33,19 @@ type MounterOptsUtils struct {
 
 func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) error {
 	klog.Info("-FuseMount-")
-	klog.Infof("FuseMount params:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%s>", path, comm, args)
+	klog.Infof("FuseMount params:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%v>", path, comm, args)
 	out, err := command(comm, args...).CombinedOutput()
 	if err != nil {
-		klog.Infof("mount command failed: mounter: %s, error: %v, output: %s", comm, err, string(out))
+		klog.Warningf("FuseMount: mount command failed: mounter=%s, args=%v, error=%v, output=%s", comm, args, err, string(out))
+		klog.Infof("FuseMount: checking if path already exists and is a mountpoint: path=%s", path)
 		if mounted, err1 := isMountpoint(path); err1 == nil && mounted { // check if bucket already got mounted
 			klog.Infof("bucket is already mounted using '%s' mounter", comm)
 			return nil
 		}
-		klog.Errorf("FuseMount: command execution failed: <%s>\nargs: <%s>\nerror: <%v>\noutput: <%v>", comm, args, err, string(out))
+		klog.Errorf("FuseMount: path is not mountpoint, mount failed: path=%s", path)
 		return fmt.Errorf("'%s' mount failed: <%v>", comm, string(out))
 	}
-	klog.Infof("mount command returned without any error: mounter: %s, output: %s", comm, string(out))
+	klog.Infof("mount command succeeded: mounter=%s, output=%s", comm, string(out))
 	if err := waitForMount(path, 10*time.Second); err != nil {
 		return err
 	}
