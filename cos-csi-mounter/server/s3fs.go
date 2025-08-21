@@ -59,6 +59,23 @@ func (args S3FSArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, err
 
 	// Convert to key=value slice
 	result := []string{bucket, targetPath}
+
+	// Add ibm_iam_auth first before ibm_iam_endpoint for correctly setting provided iam endpoint in s3fs-fuse for fetching token
+	if val, ok := m["ibm_iam_auth"]; ok {
+		if strings.ToLower(strings.TrimSpace(val)) == "true" {
+			result = append(result, "-o", "ibm_iam_auth")
+		} else {
+			result = append(result, "-o", fmt.Sprintf("ibm_iam_auth=%v", val)) // pragma: allowlist secret
+		}
+		delete(m, "ibm_iam_auth")
+	}
+
+	// Add ibm_iam_endpoint
+	if val, ok := m["ibm_iam_endpoint"]; ok {
+		result = append(result, "-o", fmt.Sprintf("ibm_iam_endpoint=%v", val))
+		delete(m, "ibm_iam_endpoint")
+	}
+	
 	for k, v := range m {
 		result = append(result, "-o")
 		if strings.ToLower(strings.TrimSpace(v)) == "true" {
