@@ -40,6 +40,7 @@ type RCloneArgs struct {
 	VfsWriteBack          string `json:"vfs-write-back,omitempty"`
 	VfsWriteWait          string `json:"vfs-write-wait,omitempty"`
 	WriteBackCache        string `json:"write-back-cache,omitempty"`
+	InvalidValue          string `json:"invalid-value,omitempty"`
 }
 
 func (args RCloneArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, error) {
