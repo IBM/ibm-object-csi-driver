@@ -4,9 +4,9 @@
 package utils
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -35,25 +35,39 @@ func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) e
 	klog.Infof("FuseMount params:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%v>", path, comm, args)
 	cmd := command(comm, args...)
 
-	var outb, errb bytes.Buffer
-	cmd.Stdout = &outb
-	cmd.Stderr = &errb
+	// Redirect stdout and stderr to avoid blocking pipes
+	logFile, err := os.OpenFile("/var/log/rclone-manual.log",
+		os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
+	if err != nil {
+		return fmt.Errorf("FuseMount: failed to open log file: %v", err)
+	}
+	klog.Infof("FuseMount: rclone log file opened successfully for read & write. Log file: %s", "/var/log/rclone-manual.log")
+	defer logFile.Close()
 
-	err := cmd.Start()
+	cmd.Stdout = logFile
+	cmd.Stderr = logFile
+
+	err = cmd.Start()
 	if err != nil {
 		klog.Errorf("FuseMount: command start failed: <%s>\nargs: <%v>\nerror: <%v>", comm, args, err)
 		return fmt.Errorf("FuseMount: command start failed: <%s>\nerror: <%v>", comm, err)
 	}
+	klog.Infof("command 'start' succeeded for '%s' mounter", comm)
+
 	err = cmd.Wait()
 	if err != nil {
 		if mounted, err1 := isMountpoint(path); err1 == nil && mounted { // check if bucket already got mounted
 			klog.Infof("bucket is already mounted using '%s' mounter", comm)
 			return nil
 		}
-		klog.Errorf("FuseMount: command wait failed: <%s>\nargs: <%v>\nerr: <%v>\nstderr: <%s>\nstdout: <%s>", comm, args, err, errb.String(), outb.String())
-		return fmt.Errorf("'%s' mount failed: %v (stderr: %s)", comm, err, errb.String())
+		data, err := io.ReadAll(logFile)
+		if err != nil {
+			return fmt.Errorf("failed to read rclone log file content: %v", err)
+		}
+		klog.Errorf("FuseMount: command wait failed: <%s>\nargs: <%v>\nerr: <%v>\noutput: <%s>", comm, args, err, string(data))
+		return fmt.Errorf("'%s' mount failed: %v (output: %s)", comm, err, string(data))
 	}
-	klog.Infof("mount command succeeded: mounter=%s, output=%s", comm, outb.String())
+	klog.Infof("mount command succeeded for '%s' mounter", comm)
 	if err := waitForMount(path, 10*time.Second); err != nil {
 		klog.Errorf("mount succeeded but waiting for mountpoint failed: %v", err)
 		return err

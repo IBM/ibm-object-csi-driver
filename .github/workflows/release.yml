@@ -17,7 +17,7 @@ jobs:
 
     env:
       IS_LATEST_RELEASE: 'false'
-      APP_VERSION: 0.5.27
+      APP_VERSION: 0.5.28
 
     steps:
     - name: Checkout Code
@@ -63,8 +63,8 @@ jobs:
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.deb.tar.gz.sha256
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz.sha256
-        tag_name: v0.5.27
-        name: v0.5.27
+        tag_name: v0.5.28
+        name: v0.5.28
         body: Fix rclone timeout issue
         prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
     

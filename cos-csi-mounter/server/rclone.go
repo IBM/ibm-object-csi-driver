@@ -56,6 +56,11 @@ func (args RCloneArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, e
 		return nil, err
 	}
 
+	// Delete log-file option from map
+	if _, ok := m["log-file"]; ok {
+		delete(m, "log-file")
+	}
+
 	// Convert to key=value slice
 	result := []string{"mount", bucket, targetPath}
 	for k, v := range m {
