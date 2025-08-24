@@ -20,6 +20,7 @@ type RCloneArgs struct {
 	DirectIO              string `json:"direct-io,omitempty"`
 	GID                   string `json:"gid,omitempty"`
 	LogFile               string `json:"log-file,omitempty"`
+	LogLevel              string `json:"log-level,omitempty"`
 	NoModificationTime    string `json:"no-modtime,omitempty"`
 	PollInterval          string `json:"poll-interval,omitempty"`
 	ReadOnly              string `json:"read-only,omitempty"`
@@ -57,9 +58,7 @@ func (args RCloneArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, e
 	}
 
 	// Delete log-file option from map
-	if _, ok := m["log-file"]; ok {
-		delete(m, "log-file")
-	}
+	delete(m, "log-file")
 
 	// Convert to key=value slice
 	result := []string{"mount", bucket, targetPath}
