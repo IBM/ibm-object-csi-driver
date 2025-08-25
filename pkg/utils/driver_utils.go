@@ -69,9 +69,11 @@ func (su *DriverStatsUtils) GetEndpoints() (string, string, error) {
 		return "", "", err
 	}
 
-	if strings.Contains(clusterType, "vpc") {
+	if strings.Contains(strings.ToLower(clusterType), "vpc") {
+		// Use private iam endpoint for VPC clusters
 		return constants.PrivateIAMEndpoint, constants.ResourceConfigEPDirect, nil
 	}
+	// Use public iam endpoint for classic clusters
 	return constants.PublicIAMEndpoint, constants.ResourceConfigEPPrivate, nil
 }
 

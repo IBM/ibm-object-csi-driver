@@ -185,7 +185,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		klog.Infof("BucketVersioning value that will be set via storage class params: %s", bucketVersioning)
 	}
 
-	creds, err := getCredentials(secretMap, cs.iamEndpoint)
+	creds, err := getSecretData(secretMap, cs.iamEndpoint)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
 	}
@@ -325,7 +325,7 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 		secretMap = secretMapCustom
 	}
 
-	creds, err := getCredentials(secretMap, cs.iamEndpoint)
+	creds, err := getSecretData(secretMap, cs.iamEndpoint)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
 	}
@@ -438,8 +438,8 @@ func (cs *controllerServer) ControllerModifyVolume(_ context.Context, req *csi.C
 	return nil, status.Error(codes.Unimplemented, "ControllerModifyVolume")
 }
 
-func getCredentials(secretMap map[string]string, iamEP string) (*s3client.ObjectStorageCredentials, error) {
-	klog.Infof("- getCredentials-")
+func getSecretData(secretMap map[string]string, iamEP string) (*s3client.ObjectStorageCredentials, error) {
+	klog.Infof("- getSecretData-")
 	var (
 		accessKey         string
 		secretKey         string
