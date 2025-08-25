@@ -141,6 +141,10 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		return nil, status.Error(codes.InvalidArgument, "S3 Service endpoint not provided")
 	}
 
+	if len(secretMap["iamEndpoint"]) == 0 {
+		secretMap["iamEndpoint"] = ns.iamEndpoint
+	}
+
 	// If bucket name wasn't provided by user, we use temp bucket created for volume.
 	if secretMap["bucketName"] == "" {
 		tempBucketName, err := ns.Stats.GetBucketNameFromPV(volumeID)

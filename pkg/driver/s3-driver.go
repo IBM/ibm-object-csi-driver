@@ -23,6 +23,7 @@ import (
 	pkgUtils "github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"go.uber.org/zap"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -45,10 +46,11 @@ var (
 )
 
 type S3Driver struct {
-	name     string
-	version  string
-	mode     string
-	endpoint string
+	name        string
+	version     string
+	mode        string
+	endpoint    string
+	iamEndpoint string
 
 	s3client s3client.ObjectStorageSession
 
@@ -169,6 +171,13 @@ func (driver *S3Driver) NewS3CosDriver(nodeID string, endpoint string, s3cosSess
 	if err != nil {
 		return nil, err
 	}
+
+	iamEP, _, err := statsUtil.GetEndpoints()
+	if err != nil {
+		return nil, err
+	}
+	klog.Infof("iam endpoint: %v", iamEP)
+	driver.iamEndpoint = iamEP
 
 	driver.endpoint = endpoint
 	driver.s3client = s3client

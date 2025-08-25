@@ -50,6 +50,7 @@ func TestNewS3fsMounter_Success_Hmac(t *testing.T) {
 		"tmpdir":             "test-tmpdir",
 		"use_cache":          "true",
 		"gid":                "test-gid",
+		"iamEndpoint":        "test-iamEndpoint",
 	}
 
 	mountOptions := []string{"opt1=val1", "opt2=val2", " ", "opt3"}
