@@ -242,7 +242,10 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 		mountOptsMap["uid"] = secretMap["uid"]
 	}
 
-	isCipherSuitesInMO := false
+	val, check := secretMap["cipher_suites"]
+	if check {
+		mountOptsMap["cipher_suites"] = val
+	}
 
 	stringData, ok := secretMap["mountOptions"]
 	if !ok {
@@ -254,9 +257,6 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 			if strings.TrimSpace(line) == "" {
 				continue
 			}
-			if strings.Contains(line, "cipher_suites") {
-				isCipherSuitesInMO = true
-			}
 			opts := strings.Split(line, "=")
 			if len(opts) == 2 {
 				mountOptsMap[strings.TrimSpace(opts[0])] = strings.TrimSpace(opts[1])
@@ -266,11 +266,6 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 				klog.Infof("Invalid mount option: %s\n", line)
 			}
 		}
-	}
-
-	val, check := secretMap["cipher_suites"]
-	if !isCipherSuitesInMO && check {
-		mountOptsMap["cipher_suites"] = val
 	}
 
 	// Create array out of map
