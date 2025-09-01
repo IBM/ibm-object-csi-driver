@@ -21,6 +21,7 @@ var (
 		"kpRootKeyCRN":       "test-kp-root-key-crn",
 		"gid":                "fake-gid",
 		"uid":                "fake-uid",
+		"cipher_suites":      "default",
 	}
 
 	mountOptionsRClone = []string{"opt1=val1", "opt2=val2"}

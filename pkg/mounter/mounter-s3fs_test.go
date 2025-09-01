@@ -20,6 +20,7 @@ var (
 		"apiKey":             "test-api-key",
 		"kpRootKeyCRN":       "test-kp-root-key-crn",
 		"uid":                "test-uid",
+		"cipher_suites":      "default",
 	}
 
 	mountOptions = []string{"opt1=val1", "opt2=val2", "opt3"}
