@@ -145,6 +145,7 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 	}
 
 	lines := strings.Split(stringData, "\n")
+	isCipherSuitesInMO := false
 
 	// Update map
 	for _, line := range lines {
@@ -156,7 +157,15 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 			klog.Infof("Invalid mount option: %s\n", line)
 			continue
 		}
+		if mountOptsMap[strings.TrimSpace(opts[0])] == "cipher_suites" {
+			isCipherSuitesInMO = true
+		}
 		mountOptsMap[strings.TrimSpace(opts[0])] = strings.TrimSpace(opts[1])
+	}
+
+	val, check := secretMap["cipher_suites"]
+	if !isCipherSuitesInMO && check {
+		mountOptsMap["cipher_suites"] = val
 	}
 
 	// Create array out of map

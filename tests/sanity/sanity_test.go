@@ -24,6 +24,7 @@ import (
 	csiDriver "github.com/IBM/ibm-object-csi-driver/pkg/driver"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
+	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"github.com/google/uuid"
 	"github.com/kubernetes-csi/csi-test/v5/pkg/sanity"
 	"go.uber.org/zap"
@@ -256,8 +257,8 @@ func (su *FakeNewDriverStatsUtils) GetBucketNameFromPV(volumeID string) (string,
 	return "", nil
 }
 
-func (su *FakeNewDriverStatsUtils) GetRegionAndZone(nodeName string) (string, string, error) {
-	return "", "", nil
+func (su *FakeNewDriverStatsUtils) GetNodeServerData(nodeName string) (*utils.NodeServerData, error) {
+	return &utils.NodeServerData{}, nil
 }
 
 func (su *FakeNewDriverStatsUtils) GetEndpoints() (string, string, error) {
