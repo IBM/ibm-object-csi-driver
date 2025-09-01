@@ -119,7 +119,12 @@ func TestNewNodeServer(t *testing.T) {
 				constants.MaxVolumesPerNodeEnv: "10",
 			},
 			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
-				GetRegionAndZoneFn: func(nodeName string) (string, string, error) { return testRegion, testZone, nil },
+				GetNodeServerDataFn: func(nodeName string) (*utils.NodeServerData, error) {
+					return &utils.NodeServerData{
+						Region: testRegion,
+						Zone:   testZone,
+					}, nil
+				},
 			}),
 			verifyResult: func(t *testing.T, ns *nodeServer, err error) {
 				assert.NoError(t, err)
@@ -149,8 +154,8 @@ func TestNewNodeServer(t *testing.T) {
 				constants.MaxVolumesPerNodeEnv: "",
 			},
 			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
-				GetRegionAndZoneFn: func(nodeName string) (string, string, error) {
-					return "", "", errors.New("unable to load in-cluster configuration")
+				GetNodeServerDataFn: func(nodeName string) (*utils.NodeServerData, error) {
+					return nil, errors.New("unable to load in-cluster configuration")
 				},
 			}),
 			verifyResult: func(t *testing.T, ns *nodeServer, err error) {
@@ -165,8 +170,11 @@ func TestNewNodeServer(t *testing.T) {
 				constants.MaxVolumesPerNodeEnv: "invalid",
 			},
 			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
-				GetRegionAndZoneFn: func(nodeName string) (string, string, error) {
-					return testRegion, testZone, nil
+				GetNodeServerDataFn: func(nodeName string) (*utils.NodeServerData, error) {
+					return &utils.NodeServerData{
+						Region: testRegion,
+						Zone:   testZone,
+					}, nil
 				},
 			}),
 			verifyResult: func(t *testing.T, ns *nodeServer, err error) {
@@ -181,7 +189,12 @@ func TestNewNodeServer(t *testing.T) {
 				constants.MaxVolumesPerNodeEnv: "",
 			},
 			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
-				GetRegionAndZoneFn: func(nodeName string) (string, string, error) { return testRegion, testZone, nil },
+				GetNodeServerDataFn: func(nodeName string) (*utils.NodeServerData, error) {
+					return &utils.NodeServerData{
+						Region: testRegion,
+						Zone:   testZone,
+					}, nil
+				},
 			}),
 			verifyResult: func(t *testing.T, ns *nodeServer, err error) {
 				assert.NoError(t, err)
@@ -270,7 +283,12 @@ func TestNewS3CosDriver(t *testing.T) {
 				GetEndpointsFn: func() (string, string, error) {
 					return constants.PublicIAMEndpoint, "", nil
 				},
-				GetRegionAndZoneFn: func(nodeName string) (string, string, error) { return testRegion, testZone, nil },
+				GetNodeServerDataFn: func(nodeName string) (*utils.NodeServerData, error) {
+					return &utils.NodeServerData{
+						Region: testRegion,
+						Zone:   testZone,
+					}, nil
+				},
 			}),
 			verifyResult: func(t *testing.T, driver *S3Driver, err error) {
 				assert.NoError(t, err)
@@ -287,7 +305,12 @@ func TestNewS3CosDriver(t *testing.T) {
 				GetEndpointsFn: func() (string, string, error) {
 					return constants.PublicIAMEndpoint, "", nil
 				},
-				GetRegionAndZoneFn: func(nodeName string) (string, string, error) { return testRegion, testZone, nil },
+				GetNodeServerDataFn: func(nodeName string) (*utils.NodeServerData, error) {
+					return &utils.NodeServerData{
+						Region: testRegion,
+						Zone:   testZone,
+					}, nil
+				},
 			}),
 			verifyResult: func(t *testing.T, driver *S3Driver, err error) {
 				assert.NoError(t, err)

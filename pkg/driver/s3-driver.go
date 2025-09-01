@@ -140,7 +140,7 @@ func newNodeServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, nodeID string, mo
 		return nil, fmt.Errorf("KUBE_NODE_NAME env variable not set")
 	}
 
-	region, zone, err := statsUtil.GetRegionAndZone(nodeName)
+	data, err := statsUtil.GetNodeServerData(nodeName)
 	if err != nil {
 		return nil, err
 	}
@@ -158,11 +158,12 @@ func newNodeServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, nodeID string, mo
 	}
 
 	return &nodeServer{
-		S3Driver:         d,
-		Stats:            statsUtil,
-		NodeServerConfig: NodeServerConfig{MaxVolumesPerNode: maxVolumesPerNode, Region: region, Zone: zone, NodeID: nodeID},
-		Mounter:          mountObj,
-		MounterUtils:     mounterUtil,
+		S3Driver: d,
+		Stats:    statsUtil,
+		NodeServerConfig: NodeServerConfig{MaxVolumesPerNode: maxVolumesPerNode, Region: data.Region, Zone: data.Zone,
+			NodeID: nodeID, CipherSuites: data.CipherSuites},
+		Mounter:      mountObj,
+		MounterUtils: mounterUtil,
 	}, nil
 }
 
