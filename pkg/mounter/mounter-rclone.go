@@ -137,11 +137,6 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 		}
 	}
 
-	val, check := secretMap[constants.CipherSuitesMO]
-	if check {
-		mountOptsMap[constants.CipherSuitesMO] = val
-	}
-
 	stringData, ok := secretMap["mountOptions"]
 	if !ok {
 		klog.Infof("No new mountOptions found. Using default mountOptions: %v", dafaultMountOptions)

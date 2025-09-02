@@ -5,24 +5,22 @@ import (
 	"os"
 	"testing"
 
-	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/stretchr/testify/assert"
 )
 
 var (
 	secretMapRClone = map[string]string{
-		"cosEndpoint":            "test-endpoint",
-		"locationConstraint":     "test-loc-constraint",
-		"bucketName":             "test-bucket-name",
-		"objPath":                "test-obj-path",
-		"accessKey":              "test-access-key",
-		"secretKey":              "test-secret-key",
-		"apiKey":                 "test-api-key",
-		"kpRootKeyCRN":           "test-kp-root-key-crn",
-		"gid":                    "fake-gid",
-		"uid":                    "fake-uid",
-		constants.CipherSuitesMO: "default",
+		"cosEndpoint":        "test-endpoint",
+		"locationConstraint": "test-loc-constraint",
+		"bucketName":         "test-bucket-name",
+		"objPath":            "test-obj-path",
+		"accessKey":          "test-access-key",
+		"secretKey":          "test-secret-key",
+		"apiKey":             "test-api-key",
+		"kpRootKeyCRN":       "test-kp-root-key-crn",
+		"gid":                "fake-gid",
+		"uid":                "fake-uid",
 	}
 
 	mountOptionsRClone = []string{"opt1=val1", "opt2=val2"}
