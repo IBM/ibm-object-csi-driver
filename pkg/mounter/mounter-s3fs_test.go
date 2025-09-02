@@ -5,22 +5,23 @@ import (
 	"os"
 	"testing"
 
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/stretchr/testify/assert"
 )
 
 var (
 	secretMap = map[string]string{
-		"cosEndpoint":        "test-endpoint",
-		"locationConstraint": "test-loc-constraint",
-		"bucketName":         "test-bucket-name",
-		"objPath":            "test-obj-path",
-		"accessKey":          "test-access-key",
-		"secretKey":          "test-secret-key",
-		"apiKey":             "test-api-key",
-		"kpRootKeyCRN":       "test-kp-root-key-crn",
-		"uid":                "test-uid",
-		"cipher_suites":      "default",
+		"cosEndpoint":            "test-endpoint",
+		"locationConstraint":     "test-loc-constraint",
+		"bucketName":             "test-bucket-name",
+		"objPath":                "test-obj-path",
+		"accessKey":              "test-access-key",
+		"secretKey":              "test-secret-key",
+		"apiKey":                 "test-api-key",
+		"kpRootKeyCRN":           "test-kp-root-key-crn",
+		"uid":                    "test-uid",
+		constants.CipherSuitesMO: "default",
 	}
 
 	mountOptions = []string{"opt1=val1", "opt2=val2", "opt3"}

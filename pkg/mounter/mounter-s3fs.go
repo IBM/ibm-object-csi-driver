@@ -242,9 +242,9 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 		mountOptsMap["uid"] = secretMap["uid"]
 	}
 
-	val, check := secretMap["cipher_suites"]
+	val, check := secretMap[constants.CipherSuitesMO]
 	if check {
-		mountOptsMap["cipher_suites"] = val
+		mountOptsMap[constants.CipherSuitesMO] = val
 	}
 
 	stringData, ok := secretMap["mountOptions"]
@@ -279,7 +279,7 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 			option = val
 		}
 
-		if newVal, check := secretMap[key]; check {
+		if newVal, check := secretMap[key]; check && key != constants.CipherSuitesMO {
 			if isKeyValuePair {
 				option = fmt.Sprintf("%s=%s", key, newVal)
 			} else {

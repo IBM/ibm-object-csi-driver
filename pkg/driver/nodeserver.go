@@ -146,8 +146,8 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		secretMap["iamEndpoint"] = ns.iamEndpoint
 	}
 
-	if len(secretMap["cipher_suites"]) == 0 {
-		secretMap["cipher_suites"] = ns.CipherSuites
+	if len(secretMap[constants.CipherSuitesMO]) == 0 {
+		secretMap[constants.CipherSuitesMO] = ns.CipherSuites
 	}
 
 	// If bucket name wasn't provided by user, we use temp bucket created for volume.

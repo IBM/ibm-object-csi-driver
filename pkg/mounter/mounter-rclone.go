@@ -137,9 +137,9 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 		}
 	}
 
-	val, check := secretMap["cipher_suites"]
+	val, check := secretMap[constants.CipherSuitesMO]
 	if check {
-		mountOptsMap["cipher_suites"] = val
+		mountOptsMap[constants.CipherSuitesMO] = val
 	}
 
 	stringData, ok := secretMap["mountOptions"]

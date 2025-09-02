@@ -48,6 +48,8 @@ const (
 	IsNodeServer         = "IS_NODE_SERVER"
 	KubeNodeName         = "KUBE_NODE_NAME"
 	MaxVolumesPerNodeEnv = "MAX_VOLUMES_PER_NODE"
+
+	CipherSuitesMO = "cipher_suites"
 )
 
 var (
