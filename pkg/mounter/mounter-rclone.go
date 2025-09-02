@@ -138,6 +138,7 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 	}
 
 	stringData, ok := secretMap["mountOptions"]
+
 	if !ok {
 		klog.Infof("No new mountOptions found. Using default mountOptions: %v", dafaultMountOptions)
 		return dafaultMountOptions
