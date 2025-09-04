@@ -50,7 +50,7 @@ var (
 	removeFile    = removeS3FSCredFile
 )
 
-func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
+func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils, defaultParams map[string]string) Mounter {
 	klog.Info("-newS3fsMounter-")
 
 	var (
@@ -103,7 +103,7 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 	klog.Infof("newS3fsMounter args:\n\tbucketName: [%s]\n\tobjPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]\n\tkpRootKeyCrn: [%s]",
 		mounter.BucketName, mounter.ObjPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType, mounter.KpRootKeyCrn)
 
-	updatedOptions := updateS3FSMountOptions(mountOptions, secretMap)
+	updatedOptions := updateS3FSMountOptions(mountOptions, secretMap, defaultParams)
 	mounter.MountOptions = updatedOptions
 
 	mounter.MounterUtils = mounterUtils
@@ -208,7 +208,7 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 	return nil
 }
 
-func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string) []string {
+func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string, defaultParams map[string]string) []string {
 	mountOptsMap := make(map[string]string)
 
 	// Create map out of array
@@ -240,11 +240,6 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 		mountOptsMap["uid"] = secretMap["gid"]
 	} else if secretMap["uid"] != "" {
 		mountOptsMap["uid"] = secretMap["uid"]
-	}
-
-	val, check := secretMap[constants.CipherSuitesKey]
-	if check {
-		mountOptsMap[constants.CipherSuitesKey] = val
 	}
 
 	stringData, ok := secretMap["mountOptions"]
@@ -287,6 +282,12 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 			}
 		}
 
+		updatedOptions = append(updatedOptions, option)
+	}
+
+	// Mount options which are not present in secret mountOptions and need to be set by nodeserver
+	if _, ok := mountOptsMap[constants.CipherSuitesKey]; !ok {
+		option := fmt.Sprintf("%s=%s", constants.CipherSuitesKey, defaultParams[constants.CipherSuitesKey])
 		updatedOptions = append(updatedOptions, option)
 	}
 
