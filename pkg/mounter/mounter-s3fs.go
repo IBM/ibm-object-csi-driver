@@ -274,7 +274,7 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 			option = val
 		}
 
-		if newVal, check := secretMap[key]; check && key != constants.CipherSuitesKey {
+		if newVal, check := secretMap[key]; check {
 			if isKeyValuePair {
 				option = fmt.Sprintf("%s=%s", key, newVal)
 			} else {
