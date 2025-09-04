@@ -257,8 +257,8 @@ func (su *FakeNewDriverStatsUtils) GetBucketNameFromPV(volumeID string) (string,
 	return "", nil
 }
 
-func (su *FakeNewDriverStatsUtils) GetNodeServerData(nodeName string) (*utils.NodeServerData, error) {
-	return &utils.NodeServerData{}, nil
+func (su *FakeNewDriverStatsUtils) GetClusterNodeData(nodeName string) (*utils.ClusterNodeData, error) {
+	return &utils.ClusterNodeData{}, nil
 }
 
 func (su *FakeNewDriverStatsUtils) GetEndpoints() (string, string, error) {

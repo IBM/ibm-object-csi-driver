@@ -140,7 +140,7 @@ func newNodeServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, nodeID string, mo
 		return nil, fmt.Errorf("KUBE_NODE_NAME env variable not set")
 	}
 
-	data, err := statsUtil.GetNodeServerData(nodeName)
+	data, err := statsUtil.GetClusterNodeData(nodeName)
 	if err != nil {
 		return nil, err
 	}

@@ -30,10 +30,6 @@ var (
 	RemoveAll  = os.RemoveAll
 )
 
-// type  struct{
-// 	TLSCipherSuite    string
-// }
-
 type Mounter interface {
 	Mount(source string, target string) error
 	Unmount(target string) error

@@ -29,7 +29,7 @@ type StatsUtils interface {
 	GetTotalCapacityFromPV(volumeID string) (resource.Quantity, error)
 	GetBucketUsage(volumeID string) (int64, error)
 	GetBucketNameFromPV(volumeID string) (string, error)
-	GetNodeServerData(nodeName string) (*NodeServerData, error)
+	GetClusterNodeData(nodeName string) (*ClusterNodeData, error)
 	GetEndpoints() (string, string, error)
 	GetPVAttributes(volumeID string) (map[string]string, error)
 	GetPVC(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error)
@@ -40,13 +40,13 @@ type StatsUtils interface {
 type DriverStatsUtils struct {
 }
 
-type NodeServerData struct {
+type ClusterNodeData struct {
 	Region string
 	Zone   string
 	OS     string
 }
 
-func (su *DriverStatsUtils) GetNodeServerData(nodeName string) (*NodeServerData, error) {
+func (su *DriverStatsUtils) GetClusterNodeData(nodeName string) (*ClusterNodeData, error) {
 	node, err := getNodeByName(nodeName)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func (su *DriverStatsUtils) GetNodeServerData(nodeName string) (*NodeServerData,
 		ciphersuite = "AESGCM"
 	}
 
-	data := &NodeServerData{
+	data := &ClusterNodeData{
 		Region: region,
 		Zone:   zone,
 		OS:     ciphersuite,

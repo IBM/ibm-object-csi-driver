@@ -119,8 +119,8 @@ func TestNewNodeServer(t *testing.T) {
 				constants.MaxVolumesPerNodeEnv: "10",
 			},
 			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
-				GetNodeServerDataFn: func(nodeName string) (*utils.NodeServerData, error) {
-					return &utils.NodeServerData{
+				GetClusterNodeDataFn: func(nodeName string) (*utils.ClusterNodeData, error) {
+					return &utils.ClusterNodeData{
 						Region: testRegion,
 						Zone:   testZone,
 					}, nil
@@ -154,7 +154,7 @@ func TestNewNodeServer(t *testing.T) {
 				constants.MaxVolumesPerNodeEnv: "",
 			},
 			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
-				GetNodeServerDataFn: func(nodeName string) (*utils.NodeServerData, error) {
+				GetClusterNodeDataFn: func(nodeName string) (*utils.ClusterNodeData, error) {
 					return nil, errors.New("unable to load in-cluster configuration")
 				},
 			}),
@@ -170,8 +170,8 @@ func TestNewNodeServer(t *testing.T) {
 				constants.MaxVolumesPerNodeEnv: "invalid",
 			},
 			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
-				GetNodeServerDataFn: func(nodeName string) (*utils.NodeServerData, error) {
-					return &utils.NodeServerData{
+				GetClusterNodeDataFn: func(nodeName string) (*utils.ClusterNodeData, error) {
+					return &utils.ClusterNodeData{
 						Region: testRegion,
 						Zone:   testZone,
 					}, nil
@@ -189,8 +189,8 @@ func TestNewNodeServer(t *testing.T) {
 				constants.MaxVolumesPerNodeEnv: "",
 			},
 			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
-				GetNodeServerDataFn: func(nodeName string) (*utils.NodeServerData, error) {
-					return &utils.NodeServerData{
+				GetClusterNodeDataFn: func(nodeName string) (*utils.ClusterNodeData, error) {
+					return &utils.ClusterNodeData{
 						Region: testRegion,
 						Zone:   testZone,
 					}, nil
@@ -283,8 +283,8 @@ func TestNewS3CosDriver(t *testing.T) {
 				GetEndpointsFn: func() (string, string, error) {
 					return constants.PublicIAMEndpoint, "", nil
 				},
-				GetNodeServerDataFn: func(nodeName string) (*utils.NodeServerData, error) {
-					return &utils.NodeServerData{
+				GetClusterNodeDataFn: func(nodeName string) (*utils.ClusterNodeData, error) {
+					return &utils.ClusterNodeData{
 						Region: testRegion,
 						Zone:   testZone,
 					}, nil
@@ -305,8 +305,8 @@ func TestNewS3CosDriver(t *testing.T) {
 				GetEndpointsFn: func() (string, string, error) {
 					return constants.PublicIAMEndpoint, "", nil
 				},
-				GetNodeServerDataFn: func(nodeName string) (*utils.NodeServerData, error) {
-					return &utils.NodeServerData{
+				GetClusterNodeDataFn: func(nodeName string) (*utils.ClusterNodeData, error) {
+					return &utils.ClusterNodeData{
 						Region: testRegion,
 						Zone:   testZone,
 					}, nil
