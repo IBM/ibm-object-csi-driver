@@ -180,7 +180,7 @@ func FakeNewS3fsMounterFactory() *FakeS3fsMounterFactory {
 
 type Fakes3fsMounter struct{}
 
-func (s *FakeS3fsMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) mounter.Mounter {
+func (s *FakeS3fsMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string, defaultMOMap map[string]string) mounter.Mounter {
 	klog.Info("-New S3FS Fake Mounter-")
 	return &Fakes3fsMounter{}
 }

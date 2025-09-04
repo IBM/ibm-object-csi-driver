@@ -107,7 +107,7 @@ func TestNewMounter(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			factory := &CSIMounterFactory{}
 
-			result := factory.NewMounter(test.attrib, test.secretMap, test.mountOptions)
+			result := factory.NewMounter(test.attrib, test.secretMap, test.mountOptions, nil)
 
 			assert.Equal(t, result, test.expected)
 

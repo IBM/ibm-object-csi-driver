@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/IBM/ibm-csi-common/pkg/utils"
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
@@ -157,11 +158,16 @@ func newNodeServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, nodeID string, mo
 		maxVolumesPerNode = int64(constants.DefaultVolumesPerNode)
 	}
 
+	ciphersuite := "default"
+	if strings.Contains(strings.ToLower(data.OS), "ubuntu") {
+		ciphersuite = "AESGCM"
+	}
+
 	return &nodeServer{
 		S3Driver: d,
 		Stats:    statsUtil,
 		NodeServerConfig: NodeServerConfig{MaxVolumesPerNode: maxVolumesPerNode, Region: data.Region, Zone: data.Zone,
-			NodeID: nodeID, TLSCipherSuite: data.OS},
+			NodeID: nodeID, TLSCipherSuite: ciphersuite},
 		Mounter:      mountObj,
 		MounterUtils: mounterUtil,
 	}, nil
