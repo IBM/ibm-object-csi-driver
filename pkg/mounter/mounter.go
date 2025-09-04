@@ -30,6 +30,10 @@ var (
 	RemoveAll  = os.RemoveAll
 )
 
+// type  struct{
+// 	TLSCipherSuite    string
+// }
+
 type Mounter interface {
 	Mount(source string, target string) error
 	Unmount(target string) error
@@ -38,14 +42,14 @@ type Mounter interface {
 type CSIMounterFactory struct{}
 
 type NewMounterFactory interface {
-	NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) Mounter
+	NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string, defaultMOMap map[string]string) Mounter
 }
 
 func NewCSIMounterFactory() *CSIMounterFactory {
 	return &CSIMounterFactory{}
 }
 
-func (s *CSIMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) Mounter {
+func (s *CSIMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string, defaultMOMap map[string]string) Mounter {
 	klog.Info("-NewMounter-")
 	var mounter, val string
 	var check bool

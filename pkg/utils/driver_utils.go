@@ -68,9 +68,9 @@ func (su *DriverStatsUtils) GetNodeServerData(nodeName string) (*NodeServerData,
 	}
 
 	data := &NodeServerData{
-		Region:       region,
-		Zone:         zone,
-		CipherSuites: ciphersuite,
+		Region: region,
+		Zone:   zone,
+		OS:     ciphersuite,
 	}
 
 	return data, nil
