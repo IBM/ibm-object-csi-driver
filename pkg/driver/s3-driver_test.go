@@ -123,6 +123,7 @@ func TestNewNodeServer(t *testing.T) {
 					return &utils.ClusterNodeData{
 						Region: testRegion,
 						Zone:   testZone,
+						OS:     "ubuntu",
 					}, nil
 				},
 			}),
