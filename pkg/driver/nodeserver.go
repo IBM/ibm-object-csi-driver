@@ -39,7 +39,7 @@ type NodeServerConfig struct {
 	Region            string
 	Zone              string
 	NodeID            string
-	CipherSuites      string
+	TLSCipherSuite    string
 }
 
 func (ns *nodeServer) NodeStageVolume(_ context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
@@ -146,8 +146,8 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		secretMap["iamEndpoint"] = ns.iamEndpoint
 	}
 
-	if len(secretMap[constants.CipherSuitesMO]) == 0 {
-		secretMap[constants.CipherSuitesMO] = ns.CipherSuites
+	if len(secretMap[constants.CipherSuitesKey]) == 0 {
+		secretMap[constants.CipherSuitesKey] = ns.TLSCipherSuite
 	}
 
 	// If bucket name wasn't provided by user, we use temp bucket created for volume.

@@ -161,7 +161,7 @@ func newNodeServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, nodeID string, mo
 		S3Driver: d,
 		Stats:    statsUtil,
 		NodeServerConfig: NodeServerConfig{MaxVolumesPerNode: maxVolumesPerNode, Region: data.Region, Zone: data.Zone,
-			NodeID: nodeID, CipherSuites: data.CipherSuites},
+			NodeID: nodeID, TLSCipherSuite: data.CipherSuites},
 		Mounter:      mountObj,
 		MounterUtils: mounterUtil,
 	}, nil

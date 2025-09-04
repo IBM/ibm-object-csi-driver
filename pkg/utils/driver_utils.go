@@ -41,9 +41,9 @@ type DriverStatsUtils struct {
 }
 
 type NodeServerData struct {
-	Region       string
-	Zone         string
-	CipherSuites string
+	Region string
+	Zone   string
+	OS     string
 }
 
 func (su *DriverStatsUtils) GetNodeServerData(nodeName string) (*NodeServerData, error) {
