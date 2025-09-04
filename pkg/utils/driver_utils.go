@@ -61,16 +61,10 @@ func (su *DriverStatsUtils) GetClusterNodeData(nodeName string) (*ClusterNodeDat
 		return nil, errorMsg
 	}
 
-	ciphersuite := "default"
-	osImage := node.Status.NodeInfo.OSImage
-	if strings.Contains(strings.ToLower(osImage), "ubuntu") {
-		ciphersuite = "AESGCM"
-	}
-
 	data := &ClusterNodeData{
 		Region: region,
 		Zone:   zone,
-		OS:     ciphersuite,
+		OS:     node.Status.NodeInfo.OSImage,
 	}
 
 	return data, nil
