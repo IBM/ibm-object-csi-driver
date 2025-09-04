@@ -17,7 +17,7 @@ type FakeMounterFactory struct {
 	IsFailedUnmount bool
 }
 
-func (f *FakeMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) Mounter {
+func (f *FakeMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string, defaultParams map[string]string) Mounter {
 	switch f.Mounter {
 	case constants.S3FS:
 		return fakenewS3fsMounter(f.IsFailedMount, f.IsFailedUnmount)

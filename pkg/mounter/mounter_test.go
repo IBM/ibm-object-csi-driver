@@ -31,7 +31,7 @@ func TestNewMounter(t *testing.T) {
 				"apiKey":             "test-api-key",
 				"kpRootKeyCRN":       "test-kp-root-key-crn",
 			},
-			mountOptions: []string{"opt1=val1"},
+			mountOptions: []string{"opt1=val1", "cipher_suites=default"},
 			expected: &S3fsMounter{
 				BucketName:    "test-bucket-name",
 				ObjPath:       "test-obj-path",
@@ -40,7 +40,7 @@ func TestNewMounter(t *testing.T) {
 				AccessKeys:    ":test-api-key",
 				AuthType:      "iam",
 				KpRootKeyCrn:  "test-kp-root-key-crn",
-				MountOptions:  []string{"opt1=val1"},
+				MountOptions:  []string{"opt1=val1", "cipher_suites=default"},
 				MounterUtils:  &(mounterUtils.MounterOptsUtils{}),
 			},
 			expectedErr: nil,
@@ -87,7 +87,7 @@ func TestNewMounter(t *testing.T) {
 				"secretKey":          "test-secret-key",
 				"kpRootKeyCRN":       "test-kp-root-key-crn",
 			},
-			mountOptions: []string{},
+			mountOptions: []string{"cipher_suites=default"},
 			expected: &S3fsMounter{
 				BucketName:    "test-bucket-name",
 				ObjPath:       "test-obj-path",
@@ -96,7 +96,7 @@ func TestNewMounter(t *testing.T) {
 				AccessKeys:    "test-access-key:test-secret-key",
 				AuthType:      "hmac",
 				KpRootKeyCrn:  "test-kp-root-key-crn",
-				MountOptions:  []string{},
+				MountOptions:  []string{"cipher_suites=default"},
 				MounterUtils:  &(mounterUtils.MounterOptsUtils{}),
 			},
 			expectedErr: nil,
@@ -107,7 +107,7 @@ func TestNewMounter(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			factory := &CSIMounterFactory{}
 
-			result := factory.NewMounter(test.attrib, test.secretMap, test.mountOptions)
+			result := factory.NewMounter(test.attrib, test.secretMap, test.mountOptions, nil)
 
 			assert.Equal(t, result, test.expected)
 
