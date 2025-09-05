@@ -287,9 +287,11 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 
 	// Mount options which are not present in secret mountOptions and need to be set by nodeserver
 	for key, value := range defaultParams {
-		if _, ok := mountOptsMap[key]; !ok && value != "" {
-			option := fmt.Sprintf("%s=%s", key, value)
-			updatedOptions = append(updatedOptions, option)
+		if value != "" {
+			if _, ok := mountOptsMap[key]; !ok {
+				option := fmt.Sprintf("%s=%s", key, value)
+				updatedOptions = append(updatedOptions, option)
+			}
 		}
 	}
 
