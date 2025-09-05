@@ -13,19 +13,23 @@ var (
 	testBucket         = "testBucket"
 	testTargetPath     = "/var/data/kubelet/pods/"
 	testEndPoint       = "testEndPoint"
+	testIAMEndpoint    = "https://test.iam.cloud.ibm.com"
 	testPasswdFilePath = "testPasswdFilePath"
 	testURL            = "https://testURL"
 )
 
 func TestS3FSPopulateArgsSlice_Success(t *testing.T) {
 	args := S3FSArgs{
-		AllowOther: "true",
-		EndPoint:   "testEndPoint",
+		AllowOther:     "true",
+		EndPoint:       "testEndPoint",
+		IBMIamAuth:     "true",
+		IBMIamEndpoint: testIAMEndpoint,
+
 	}
 
 	resp, err := args.PopulateArgsSlice(testBucket, testTargetPath)
 	assert.NoError(t, err)
-	expectedVal := []string{testBucket, testTargetPath, "-o", "allow_other", "-o", "endpoint=" + testEndPoint}
+	expectedVal := []string{testBucket, testTargetPath, "-o", "ibm_iam_auth", "-o", "ibm_iam_endpoint=" + testIAMEndpoint, "-o", "allow_other", "-o", "endpoint=" + testEndPoint}
 	slices.Sort(expectedVal)
 	slices.Sort(resp)
 	assert.Equal(t, expectedVal, resp)
