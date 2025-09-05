@@ -38,14 +38,14 @@ type Mounter interface {
 type CSIMounterFactory struct{}
 
 type NewMounterFactory interface {
-	NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) Mounter
+	NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string, defaultMOMap map[string]string) Mounter
 }
 
 func NewCSIMounterFactory() *CSIMounterFactory {
 	return &CSIMounterFactory{}
 }
 
-func (s *CSIMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) Mounter {
+func (s *CSIMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string, defaultMOMap map[string]string) Mounter {
 	klog.Info("-NewMounter-")
 	var mounter, val string
 	var check bool
@@ -71,12 +71,12 @@ func (s *CSIMounterFactory) NewMounter(attrib map[string]string, secretMap map[s
 
 	switch mounter {
 	case constants.S3FS:
-		return NewS3fsMounter(secretMap, mountFlags, mounterUtils)
+		return NewS3fsMounter(secretMap, mountFlags, mounterUtils, defaultMOMap)
 	case constants.RClone:
 		return NewRcloneMounter(secretMap, mountFlags, mounterUtils)
 	default:
 		// default to s3fs
-		return NewS3fsMounter(secretMap, mountFlags, mounterUtils)
+		return NewS3fsMounter(secretMap, mountFlags, mounterUtils, defaultMOMap)
 	}
 }
 

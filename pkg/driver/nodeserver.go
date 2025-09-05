@@ -39,6 +39,7 @@ type NodeServerConfig struct {
 	Region            string
 	Zone              string
 	NodeID            string
+	TLSCipherSuite    string
 }
 
 func (ns *nodeServer) NodeStageVolume(_ context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
@@ -141,6 +142,10 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		return nil, status.Error(codes.InvalidArgument, "S3 Service endpoint not provided")
 	}
 
+	if len(secretMap["iamEndpoint"]) == 0 {
+		secretMap["iamEndpoint"] = ns.iamEndpoint
+	}
+
 	// If bucket name wasn't provided by user, we use temp bucket created for volume.
 	if secretMap["bucketName"] == "" {
 		tempBucketName, err := ns.Stats.GetBucketNameFromPV(volumeID)
@@ -157,7 +162,11 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		secretMap["bucketName"] = tempBucketName
 	}
 
-	mounterObj := ns.Mounter.NewMounter(attrib, secretMap, mountFlags)
+	var defaultParamsMap = map[string]string{
+		constants.CipherSuitesKey: ns.TLSCipherSuite,
+	}
+
+	mounterObj := ns.Mounter.NewMounter(attrib, secretMap, mountFlags, defaultParamsMap)
 
 	klog.Info("-NodePublishVolume-: Mount")
 	if err = mounterObj.Mount("", targetPath); err != nil {
@@ -188,7 +197,7 @@ func (ns *nodeServer) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpubl
 		return nil, status.Error(codes.NotFound, "Failed to get PV details")
 	}
 
-	mounterObj := ns.Mounter.NewMounter(attrib, nil, nil)
+	mounterObj := ns.Mounter.NewMounter(attrib, nil, nil, nil)
 
 	klog.Info("-NodeUnpublishVolume-: Unmount")
 	if err = mounterObj.Unmount(targetPath); err != nil {

@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/IBM/ibm-csi-common/pkg/utils"
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
@@ -23,6 +24,7 @@ import (
 	pkgUtils "github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"go.uber.org/zap"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -45,10 +47,11 @@ var (
 )
 
 type S3Driver struct {
-	name     string
-	version  string
-	mode     string
-	endpoint string
+	name        string
+	version     string
+	mode        string
+	endpoint    string
+	iamEndpoint string
 
 	s3client s3client.ObjectStorageSession
 
@@ -138,7 +141,7 @@ func newNodeServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, nodeID string, mo
 		return nil, fmt.Errorf("KUBE_NODE_NAME env variable not set")
 	}
 
-	region, zone, err := statsUtil.GetRegionAndZone(nodeName)
+	data, err := statsUtil.GetClusterNodeData(nodeName)
 	if err != nil {
 		return nil, err
 	}
@@ -155,12 +158,18 @@ func newNodeServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, nodeID string, mo
 		maxVolumesPerNode = int64(constants.DefaultVolumesPerNode)
 	}
 
+	ciphersuite := "default"
+	if strings.Contains(strings.ToLower(data.OS), "ubuntu") {
+		ciphersuite = "AESGCM"
+	}
+
 	return &nodeServer{
-		S3Driver:         d,
-		Stats:            statsUtil,
-		NodeServerConfig: NodeServerConfig{MaxVolumesPerNode: maxVolumesPerNode, Region: region, Zone: zone, NodeID: nodeID},
-		Mounter:          mountObj,
-		MounterUtils:     mounterUtil,
+		S3Driver: d,
+		Stats:    statsUtil,
+		NodeServerConfig: NodeServerConfig{MaxVolumesPerNode: maxVolumesPerNode, Region: data.Region, Zone: data.Zone,
+			NodeID: nodeID, TLSCipherSuite: ciphersuite},
+		Mounter:      mountObj,
+		MounterUtils: mounterUtil,
 	}, nil
 }
 
@@ -169,6 +178,13 @@ func (driver *S3Driver) NewS3CosDriver(nodeID string, endpoint string, s3cosSess
 	if err != nil {
 		return nil, err
 	}
+
+	iamEP, _, err := statsUtil.GetEndpoints()
+	if err != nil {
+		return nil, err
+	}
+	klog.Infof("iam endpoint: %v", iamEP)
+	driver.iamEndpoint = iamEP
 
 	driver.endpoint = endpoint
 	driver.s3client = s3client

@@ -3,7 +3,8 @@ package constants
 import "time"
 
 const (
-	DefaultIAMEndPoint = "https://iam.cloud.ibm.com"
+	PublicIAMEndpoint  = "https://iam.cloud.ibm.com"
+	PrivateIAMEndpoint = "https://private.iam.cloud.ibm.com"
 
 	// Maximum number of volumes that controller can publish to the node.
 	// If value is not set or zero CO SHALL decide how many volumes of
@@ -47,6 +48,8 @@ const (
 	IsNodeServer         = "IS_NODE_SERVER"
 	KubeNodeName         = "KUBE_NODE_NAME"
 	MaxVolumesPerNodeEnv = "MAX_VOLUMES_PER_NODE"
+
+	CipherSuitesKey = "cipher_suites"
 )
 
 var (

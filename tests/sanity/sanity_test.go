@@ -24,6 +24,7 @@ import (
 	csiDriver "github.com/IBM/ibm-object-csi-driver/pkg/driver"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
+	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"github.com/google/uuid"
 	"github.com/kubernetes-csi/csi-test/v5/pkg/sanity"
 	"go.uber.org/zap"
@@ -179,7 +180,7 @@ func FakeNewS3fsMounterFactory() *FakeS3fsMounterFactory {
 
 type Fakes3fsMounter struct{}
 
-func (s *FakeS3fsMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string) mounter.Mounter {
+func (s *FakeS3fsMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string, defaultMOMap map[string]string) mounter.Mounter {
 	klog.Info("-New S3FS Fake Mounter-")
 	return &Fakes3fsMounter{}
 }
@@ -256,7 +257,11 @@ func (su *FakeNewDriverStatsUtils) GetBucketNameFromPV(volumeID string) (string,
 	return "", nil
 }
 
-func (su *FakeNewDriverStatsUtils) GetRegionAndZone(nodeName string) (string, string, error) {
+func (su *FakeNewDriverStatsUtils) GetClusterNodeData(nodeName string) (*utils.ClusterNodeData, error) {
+	return &utils.ClusterNodeData{}, nil
+}
+
+func (su *FakeNewDriverStatsUtils) GetEndpoints() (string, string, error) {
 	return "", "", nil
 }
 

@@ -506,6 +506,9 @@ func TestCreateVolume(t *testing.T) {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
 		controllerServer := &controllerServer{
+			S3Driver: &S3Driver{
+				iamEndpoint: constants.PublicIAMEndpoint,
+			},
 			cosSession: tc.cosSession,
 			Stats:      tc.driverStatsUtils,
 		}
@@ -720,6 +723,9 @@ func TestDeleteVolume(t *testing.T) {
 		defer teardown()
 
 		controllerServer := &controllerServer{
+			S3Driver: &S3Driver{
+				iamEndpoint: constants.PublicIAMEndpoint,
+			},
 			Stats:      tc.driverStatsUtils,
 			cosSession: tc.cosSession,
 			Logger:     lgr,

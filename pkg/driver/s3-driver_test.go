@@ -119,7 +119,13 @@ func TestNewNodeServer(t *testing.T) {
 				constants.MaxVolumesPerNodeEnv: "10",
 			},
 			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
-				GetRegionAndZoneFn: func(nodeName string) (string, string, error) { return testRegion, testZone, nil },
+				GetClusterNodeDataFn: func(nodeName string) (*utils.ClusterNodeData, error) {
+					return &utils.ClusterNodeData{
+						Region: testRegion,
+						Zone:   testZone,
+						OS:     "ubuntu",
+					}, nil
+				},
 			}),
 			verifyResult: func(t *testing.T, ns *nodeServer, err error) {
 				assert.NoError(t, err)
@@ -149,8 +155,8 @@ func TestNewNodeServer(t *testing.T) {
 				constants.MaxVolumesPerNodeEnv: "",
 			},
 			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
-				GetRegionAndZoneFn: func(nodeName string) (string, string, error) {
-					return "", "", errors.New("unable to load in-cluster configuration")
+				GetClusterNodeDataFn: func(nodeName string) (*utils.ClusterNodeData, error) {
+					return nil, errors.New("unable to load in-cluster configuration")
 				},
 			}),
 			verifyResult: func(t *testing.T, ns *nodeServer, err error) {
@@ -165,8 +171,11 @@ func TestNewNodeServer(t *testing.T) {
 				constants.MaxVolumesPerNodeEnv: "invalid",
 			},
 			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
-				GetRegionAndZoneFn: func(nodeName string) (string, string, error) {
-					return testRegion, testZone, nil
+				GetClusterNodeDataFn: func(nodeName string) (*utils.ClusterNodeData, error) {
+					return &utils.ClusterNodeData{
+						Region: testRegion,
+						Zone:   testZone,
+					}, nil
 				},
 			}),
 			verifyResult: func(t *testing.T, ns *nodeServer, err error) {
@@ -181,7 +190,12 @@ func TestNewNodeServer(t *testing.T) {
 				constants.MaxVolumesPerNodeEnv: "",
 			},
 			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
-				GetRegionAndZoneFn: func(nodeName string) (string, string, error) { return testRegion, testZone, nil },
+				GetClusterNodeDataFn: func(nodeName string) (*utils.ClusterNodeData, error) {
+					return &utils.ClusterNodeData{
+						Region: testRegion,
+						Zone:   testZone,
+					}, nil
+				},
 			}),
 			verifyResult: func(t *testing.T, ns *nodeServer, err error) {
 				assert.NoError(t, err)
@@ -252,7 +266,11 @@ func TestNewS3CosDriver(t *testing.T) {
 		{
 			testCaseName: "Positive: controller mode",
 			mode:         "controller",
-			statsUtils:   utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetEndpointsFn: func() (string, string, error) {
+					return constants.PublicIAMEndpoint, "", nil
+				},
+			}),
 			verifyResult: func(t *testing.T, driver *S3Driver, err error) {
 				assert.NoError(t, err)
 				assert.NotEmpty(t, driver.cs)
@@ -263,7 +281,15 @@ func TestNewS3CosDriver(t *testing.T) {
 			testCaseName: "Positive: node mode",
 			mode:         "node",
 			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
-				GetRegionAndZoneFn: func(nodeName string) (string, string, error) { return testRegion, testZone, nil },
+				GetEndpointsFn: func() (string, string, error) {
+					return constants.PublicIAMEndpoint, "", nil
+				},
+				GetClusterNodeDataFn: func(nodeName string) (*utils.ClusterNodeData, error) {
+					return &utils.ClusterNodeData{
+						Region: testRegion,
+						Zone:   testZone,
+					}, nil
+				},
 			}),
 			verifyResult: func(t *testing.T, driver *S3Driver, err error) {
 				assert.NoError(t, err)
@@ -277,7 +303,15 @@ func TestNewS3CosDriver(t *testing.T) {
 			testCaseName: "Positive: controller and node mode",
 			mode:         "controller-node",
 			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
-				GetRegionAndZoneFn: func(nodeName string) (string, string, error) { return testRegion, testZone, nil },
+				GetEndpointsFn: func() (string, string, error) {
+					return constants.PublicIAMEndpoint, "", nil
+				},
+				GetClusterNodeDataFn: func(nodeName string) (*utils.ClusterNodeData, error) {
+					return &utils.ClusterNodeData{
+						Region: testRegion,
+						Zone:   testZone,
+					}, nil
+				},
 			}),
 			verifyResult: func(t *testing.T, driver *S3Driver, err error) {
 				assert.NoError(t, err)
@@ -287,6 +321,17 @@ func TestNewS3CosDriver(t *testing.T) {
 				assert.Equal(t, driver.ns.Zone, testZone)
 			},
 			expectedErr: nil,
+		},
+		{
+			testCaseName: "Negative: Failed to GetEndpoints",
+			mode:         "controller-node",
+			statsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetEndpointsFn: func() (string, string, error) {
+					return "", "", errors.New("failed")
+				},
+			}),
+			verifyResult: nil,
+			expectedErr:  errors.New("failed"),
 		},
 	}
 

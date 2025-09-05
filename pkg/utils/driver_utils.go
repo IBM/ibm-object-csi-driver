@@ -29,7 +29,8 @@ type StatsUtils interface {
 	GetTotalCapacityFromPV(volumeID string) (resource.Quantity, error)
 	GetBucketUsage(volumeID string) (int64, error)
 	GetBucketNameFromPV(volumeID string) (string, error)
-	GetRegionAndZone(nodeName string) (string, string, error)
+	GetClusterNodeData(nodeName string) (*ClusterNodeData, error)
+	GetEndpoints() (string, string, error)
 	GetPVAttributes(volumeID string) (map[string]string, error)
 	GetPVC(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error)
 	GetSecret(secretName, secretNamespace string) (*v1.Secret, error)
@@ -39,15 +40,16 @@ type StatsUtils interface {
 type DriverStatsUtils struct {
 }
 
-func (su *DriverStatsUtils) GetRegionAndZone(nodeName string) (region, zone string, err error) {
-	clientset, err := CreateK8sClient()
-	if err != nil {
-		return "", "", err
-	}
+type ClusterNodeData struct {
+	Region string
+	Zone   string
+	OS     string
+}
 
-	node, err := clientset.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
+func (su *DriverStatsUtils) GetClusterNodeData(nodeName string) (*ClusterNodeData, error) {
+	node, err := getNodeByName(nodeName)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	nodeLabels := node.Labels
@@ -56,9 +58,31 @@ func (su *DriverStatsUtils) GetRegionAndZone(nodeName string) (region, zone stri
 
 	if !regionExists || !zoneExists {
 		errorMsg := fmt.Errorf("one or few required node label(s) is/are missing [%s, %s]. Node Labels Found = [#%v]", constants.NodeRegionLabel, constants.NodeZoneLabel, nodeLabels) //nolint:golint
-		return "", "", errorMsg
+		return nil, errorMsg
 	}
-	return region, zone, nil
+
+	data := &ClusterNodeData{
+		Region: region,
+		Zone:   zone,
+		OS:     node.Status.NodeInfo.OSImage,
+	}
+
+	return data, nil
+}
+
+// GetEndpoints return IAMEndpoint, COSResourceConfigEndpoint, error
+func (su *DriverStatsUtils) GetEndpoints() (string, string, error) {
+	clusterType, err := getClusterType()
+	if err != nil {
+		return "", "", err
+	}
+
+	if strings.Contains(strings.ToLower(clusterType), "vpc") {
+		// Use private iam endpoint for VPC clusters
+		return constants.PrivateIAMEndpoint, constants.ResourceConfigEPDirect, nil
+	}
+	// Use public iam endpoint for classic clusters
+	return constants.PublicIAMEndpoint, constants.ResourceConfigEPPrivate, nil
 }
 
 func (su *DriverStatsUtils) BucketToDelete(volumeID string) (string, error) {
@@ -115,7 +139,7 @@ func (su *DriverStatsUtils) GetTotalCapacityFromPV(volumeID string) (resource.Qu
 }
 
 func (su *DriverStatsUtils) GetBucketUsage(volumeID string) (int64, error) {
-	ep, err := getEPBasedOnCluserInfra()
+	_, ep, err := su.GetEndpoints()
 	if err != nil {
 		return 0, err
 	}
@@ -305,7 +329,7 @@ func CreateK8sClient() (*kubernetes.Clientset, error) {
 	return clientset, nil
 }
 
-func getEPBasedOnCluserInfra() (string, error) {
+func getClusterType() (string, error) {
 	k8sClient, err := CreateK8sClient()
 	if err != nil {
 		return "", err
@@ -325,11 +349,7 @@ func getEPBasedOnCluserInfra() (string, error) {
 
 	clusterType := clusterConfig["cluster_type"]
 	klog.Info("Cluster Type ", clusterType)
-
-	if strings.Contains(clusterType, "vpc") {
-		return constants.ResourceConfigEPDirect, nil
-	}
-	return constants.ResourceConfigEPPrivate, nil
+	return clusterType, nil
 }
 
 func fetchSecretUsingPV(volumeID string, su *DriverStatsUtils) (*v1.Secret, error) {
@@ -362,4 +382,18 @@ func fetchSecretUsingPV(volumeID string, su *DriverStatsUtils) (*v1.Secret, erro
 
 	klog.Info("secret details found. secretName: ", secret.Name)
 	return secret, nil
+}
+
+func getNodeByName(nodeName string) (*v1.Node, error) {
+	clientset, err := CreateK8sClient()
+	if err != nil {
+		return nil, err
+	}
+
+	node, err := clientset.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	return node, nil
 }

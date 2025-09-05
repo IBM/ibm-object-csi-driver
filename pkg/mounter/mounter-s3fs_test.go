@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/stretchr/testify/assert"
 )
@@ -26,7 +27,7 @@ var (
 )
 
 func TestNewS3fsMounter_Success(t *testing.T) {
-	mounter := NewS3fsMounter(secretMap, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
+	mounter := NewS3fsMounter(secretMap, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}), map[string]string{constants.CipherSuitesKey: "default"})
 
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	assert.True(t, ok)
@@ -50,11 +51,12 @@ func TestNewS3fsMounter_Success_Hmac(t *testing.T) {
 		"tmpdir":             "test-tmpdir",
 		"use_cache":          "true",
 		"gid":                "test-gid",
+		"iamEndpoint":        "test-iamEndpoint",
 	}
 
 	mountOptions := []string{"opt1=val1", "opt2=val2", " ", "opt3"}
 
-	mounter := NewS3fsMounter(secretMap, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
+	mounter := NewS3fsMounter(secretMap, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}), nil)
 
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	assert.True(t, ok)

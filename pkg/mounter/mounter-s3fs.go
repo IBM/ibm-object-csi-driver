@@ -34,6 +34,7 @@ type S3fsMounter struct {
 	LocConstraint string //From Secret in SC
 	AuthType      string
 	AccessKeys    string
+	IAMEndpoint   string
 	KpRootKeyCrn  string
 	MountOptions  []string
 	MounterUtils  utils.MounterUtils
@@ -49,7 +50,7 @@ var (
 	removeFile    = removeS3FSCredFile
 )
 
-func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
+func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils, defaultParams map[string]string) Mounter {
 	klog.Info("-newS3fsMounter-")
 
 	var (
@@ -87,6 +88,9 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 	if val, check = secretMap["kpRootKeyCRN"]; check {
 		mounter.KpRootKeyCrn = val
 	}
+	if val, check = secretMap["iamEndpoint"]; check {
+		mounter.IAMEndpoint = val
+	}
 
 	if apiKey != "" {
 		mounter.AccessKeys = fmt.Sprintf(":%s", apiKey)
@@ -99,7 +103,7 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 	klog.Infof("newS3fsMounter args:\n\tbucketName: [%s]\n\tobjPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]\n\tkpRootKeyCrn: [%s]",
 		mounter.BucketName, mounter.ObjPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType, mounter.KpRootKeyCrn)
 
-	updatedOptions := updateS3FSMountOptions(mountOptions, secretMap)
+	updatedOptions := updateS3FSMountOptions(mountOptions, secretMap, defaultParams)
 	mounter.MountOptions = updatedOptions
 
 	mounter.MounterUtils = mounterUtils
@@ -204,7 +208,7 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 	return nil
 }
 
-func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string) []string {
+func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string, defaultParams map[string]string) []string {
 	mountOptsMap := make(map[string]string)
 
 	// Create map out of array
@@ -281,6 +285,12 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 		updatedOptions = append(updatedOptions, option)
 	}
 
+	// Mount options which are not present in secret mountOptions and need to be set by nodeserver
+	if _, ok := mountOptsMap[constants.CipherSuitesKey]; !ok {
+		option := fmt.Sprintf("%s=%s", constants.CipherSuitesKey, defaultParams[constants.CipherSuitesKey])
+		updatedOptions = append(updatedOptions, option)
+	}
+
 	klog.Infof("updated S3fsMounter Options: %v", updatedOptions)
 	return updatedOptions
 }
@@ -325,10 +335,10 @@ func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string
 
 	if s3fs.AuthType != "hmac" {
 		nodeServerOp = append(nodeServerOp, "-o", "ibm_iam_auth")
-		nodeServerOp = append(nodeServerOp, "-o", "ibm_iam_endpoint="+constants.DefaultIAMEndPoint)
+		nodeServerOp = append(nodeServerOp, "-o", "ibm_iam_endpoint="+s3fs.IAMEndpoint)
 
 		workerNodeOp["ibm_iam_auth"] = "true"
-		workerNodeOp["ibm_iam_endpoint"] = constants.DefaultIAMEndPoint
+		workerNodeOp["ibm_iam_endpoint"] = s3fs.IAMEndpoint
 	} else {
 		nodeServerOp = append(nodeServerOp, "-o", "default_acl=private")
 		workerNodeOp["default_acl"] = "private"
