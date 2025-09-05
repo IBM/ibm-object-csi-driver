@@ -72,7 +72,7 @@ jobs:
           - Fetch IAM Endpoint Dynamically
           - Add TLS cipher suites in the mount options
           - Fix issue with s3fs mount randomly taking time using IAM credentials on Private VPC clusters
-            prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
+        prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
     
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
