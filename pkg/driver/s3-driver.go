@@ -158,7 +158,7 @@ func newNodeServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, nodeID string, mo
 		maxVolumesPerNode = int64(constants.DefaultVolumesPerNode)
 	}
 
-	ciphersuite := "default"
+	ciphersuite := ""
 	if strings.Contains(strings.ToLower(data.OS), "ubuntu") {
 		ciphersuite = "AESGCM"
 	}
