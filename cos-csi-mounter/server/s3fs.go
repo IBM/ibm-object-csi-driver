@@ -75,7 +75,7 @@ func (args S3FSArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, err
 		result = append(result, "-o", fmt.Sprintf("ibm_iam_endpoint=%v", val))
 		delete(m, "ibm_iam_endpoint")
 	}
-	
+
 	for k, v := range m {
 		result = append(result, "-o")
 		if strings.ToLower(strings.TrimSpace(v)) == "true" {
