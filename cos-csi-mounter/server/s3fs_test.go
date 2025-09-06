@@ -24,7 +24,6 @@ func TestS3FSPopulateArgsSlice_Success(t *testing.T) {
 		EndPoint:       "testEndPoint",
 		IBMIamAuth:     "true",
 		IBMIamEndpoint: testIAMEndpoint,
-
 	}
 
 	resp, err := args.PopulateArgsSlice(testBucket, testTargetPath)
