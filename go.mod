@@ -14,8 +14,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/kubernetes-csi/csi-test/v5 v5.3.1
 	github.com/mitchellh/go-ps v1.0.0
-	github.com/onsi/ginkgo/v2 v2.25.1
-	github.com/onsi/gomega v1.38.1
+	github.com/onsi/ginkgo/v2 v2.25.3
+	github.com/onsi/gomega v1.38.2
 	github.com/prometheus/client_golang v1.23.0
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.27.0
@@ -27,6 +27,7 @@ require (
 	k8s.io/client-go v0.33.4
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubernetes v1.33.4
+	k8s.io/mount-utils v0.33.4
 	k8s.io/pod-security-admission v0.33.4
 )
 
@@ -173,7 +174,6 @@ require (
 	k8s.io/kube-scheduler v0.33.4 // indirect
 	k8s.io/kubectl v0.33.4 // indirect
 	k8s.io/kubelet v0.33.4 // indirect
-	k8s.io/mount-utils v0.33.4 // indirect
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 // indirect
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
