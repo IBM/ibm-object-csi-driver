@@ -17,6 +17,7 @@ type S3FSArgs struct {
 	CurlDebug               string `json:"curldbg,omitempty"`
 	DebugLevel              string `json:"dbglevel,omitempty"`
 	DefaultACL              string `json:"default_acl,omitempty"`
+	DisableNoobjCache       string `json:"disable_noobj_cache,omitempty"`
 	EndPoint                string `json:"endpoint,omitempty"`
 	GID                     string `json:"gid,omitempty"`
 	IBMIamAuth              string `json:"ibm_iam_auth,omitempty"`
@@ -122,6 +123,14 @@ func (args S3FSArgs) Validate(targetPath string) error {
 	if args.CurlDebug != "" && args.CurlDebug != "body" && args.CurlDebug != "normal" {
 		logger.Error("invalid value for 'curldbg' param. Should be either 'body' or 'normal'", zap.Any("curldbg", args.CurlDebug))
 		return fmt.Errorf("invalid value for 'curldbg' param. Should be either 'body' or 'normal': %v", args.CurlDebug)
+	}
+
+	// Check if value of disable_noobj_cache is boolean "true" or "false"
+	if args.DisableNoobjCache != "" {
+		if isBool := isBoolString(args.DisableNoobjCache); !isBool {
+			logger.Error("cannot convert value of disable_noobj_cache into boolean", zap.Any("disable_noobj_cache", args.DisableNoobjCache))
+			return fmt.Errorf("cannot convert value of disable_noobj_cache into boolean: %v", args.DisableNoobjCache)
+		}
 	}
 
 	// Check if value of gid parameter can be converted to integer
