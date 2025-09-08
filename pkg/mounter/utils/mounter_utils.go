@@ -112,17 +112,16 @@ func isMountpoint(pathname string) (bool, error) {
 		if strings.HasSuffix(outStr, "transport endpoint is not connected") {
 			return true, nil
 		}
+		if strings.HasSuffix(outStr, "is not a mountpoint") {
+			klog.Infof("Path is NOT a mountpoint: pathname - %s", pathname)
+			return false, nil
+		}
 		klog.Errorf("Failed to check mountpoint for path '%s', error: %v, output: %s", pathname, err, string(out))
 		return false, fmt.Errorf("failed to check mountpoint for path '%s', error: %v, output: %s", pathname, err, string(out))
 	}
 	if strings.HasSuffix(outStr, "is a mountpoint") {
 		klog.Infof("Path is a mountpoint: pathname - %s", pathname)
 		return true, nil
-	}
-
-	if strings.HasSuffix(outStr, "is not a mountpoint") {
-		klog.Infof("Path is NOT a mountpoint: pathname - %s", pathname)
-		return false, nil
 	}
 
 	return false, nil
