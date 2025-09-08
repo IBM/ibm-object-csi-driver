@@ -57,7 +57,9 @@ func (su *MounterOptsUtils) FuseUnmount(path string) error {
 	klog.Info("-fuseUnmount-")
 	// check if mountpoint exists
 	isMount, checkMountErr := isMountpoint(path)
-	if isMount || checkMountErr != nil {
+	if checkMountErr != nil && strings.Contains(strings.ToLower(checkMountErr.Error()), "is not mountpoint") {
+		klog.Infof("isMountpoint returned 'is not mountpoint' error, skipping unmount.")
+	} else if isMount || checkMountErr != nil {
 		klog.Infof("isMountpoint  %v", isMount)
 		err := unmount(path, 0)
 		if err != nil {
