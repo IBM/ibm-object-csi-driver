@@ -36,7 +36,7 @@ const (
 	MounterConfigPathOnPodS3fs   = "/var/lib/ibmc-s3fs"
 	MounterConfigPathOnPodRclone = "/root/.config/rclone"
 	// Interval to wait till next loop
-	Interval = 500 * time.Millisecond
+	Interval = 1 * time.Second
 
 	PVCNameKey         = "csi.storage.k8s.io/pvc/name"
 	PVCNamespaceKey    = "csi.storage.k8s.io/pvc/namespace"
