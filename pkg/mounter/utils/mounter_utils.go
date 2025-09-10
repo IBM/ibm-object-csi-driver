@@ -50,11 +50,15 @@ func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) e
 	mountCh := make(chan error, 1)
 
 	go func() {
+		klog.Infof("FuseMount: cmd.Wait() goroutine start for process %v", cmd.Process.Pid)
 		waitCh <- cmd.Wait()
+		klog.Infof("FuseMount: cmd.Wait() goroutine end for process %v", cmd.Process.Pid)
 	}()
 
 	go func() {
+		klog.Infof("FuseMount: waitForMount() goroutine start for process %v", cmd.Process.Pid)
 		mountCh <- waitForMount(ctx, path, 2*time.Second, 90*time.Second) // kubelet retries NodePublishVolume after 120 seconds
+		klog.Infof("FuseMount: waitForMount() goroutine end  for process %v", cmd.Process.Pid)
 	}()
 
 	select {
@@ -69,7 +73,7 @@ func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) e
 			return fmt.Errorf("'%s' mount failed: %v", comm, err)
 		}
 		klog.Infof("FuseMount: command 'wait' succeeded for '%s' mounter", comm)
-		if err := waitForMount(ctx, path, 0, 30*time.Second); err != nil {
+		if err := <-mountCh; err != nil {
 			return err
 		}
 
