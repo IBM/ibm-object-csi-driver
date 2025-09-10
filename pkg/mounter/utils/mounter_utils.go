@@ -34,7 +34,16 @@ type MounterOptsUtils struct {
 func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) error {
 	klog.Info("-FuseMount-")
 	klog.Infof("FuseMount params:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%v>", path, comm, args)
-	out, err := command(comm, args...).CombinedOutput()
+
+	cmd := exec.Command(comm, args...)
+
+	// Set the system process attribute
+	// This is often used to prevent a child process from being killed
+	// when its parent exits.
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true, // Set a new process group ID for the child
+	}
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		klog.Warningf("FuseMount: mount command failed: mounter=%s, args=%v, error=%v, output=%s", comm, args, err, string(out))
 		klog.Infof("FuseMount: checking if path already exists and is a mountpoint: path=%s", path)
