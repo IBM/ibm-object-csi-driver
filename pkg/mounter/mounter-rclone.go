@@ -322,6 +322,7 @@ func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWit
 		"--daemon",
 		"--config=" + configPathWithVolID + "/" + configFileName,
 		"--log-file=/var/log/rclone.log",
+		"--log-level=DEBUG",
 		"--vfs-cache-mode=writes",
 	}
 
@@ -330,6 +331,7 @@ func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWit
 		"daemon":         "true",
 		"config":         configPathWithVolID + "/" + configFileName,
 		"log-file":       "/var/log/rclone.log",
+		"log-level":      "DEBUG",
 		"vfs-cache-mode": "writes",
 	}
 
