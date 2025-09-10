@@ -20,6 +20,7 @@ import (
 )
 
 var unmount = syscall.Unmount
+var commandWithCtx = exec.CommandContext
 
 var ErrTimeoutWaitProcess = errors.New("timeout waiting for process to end")
 
@@ -38,7 +39,7 @@ func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) e
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, comm, args...)
+	cmd := commandWithCtx(ctx, comm, args...)
 	err := cmd.Start()
 	if err != nil {
 		klog.Errorf("FuseMount: command start failed: mounter=%s, args=%v, error=%v", comm, args, err)
@@ -162,9 +163,9 @@ func isMountpoint(pathname string) (bool, error) {
 	return false, nil
 }
 
-func waitForMount(ctx context.Context, path string, initialDelaySeconds, timeout time.Duration) error {
-	if initialDelaySeconds > 0 {
-		time.Sleep(initialDelaySeconds)
+func waitForMount(ctx context.Context, path string, initialDelay, timeout time.Duration) error {
+	if initialDelay > 0 {
+		time.Sleep(initialDelay)
 	}
 	var elapsed time.Duration
 	attempt := 1
