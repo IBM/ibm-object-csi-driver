@@ -137,7 +137,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	if endPoint == "" {
 		endPoint = params["cosEndpoint"]
 	} else {
-		params["cosEndpoint"] = secretMap["cosEndpoint"]
+		params["cosEndpoint"] = endPoint
 	}
 	if endPoint == "" {
 		return nil, status.Error(codes.InvalidArgument, "cosEndpoint unknown")
@@ -147,7 +147,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	if locationConstraint == "" {
 		locationConstraint = params["locationConstraint"]
 	} else {
-		params["locationConstraint"] = secretMap["locationConstraint"]
+		params["locationConstraint"] = locationConstraint
 	}
 	if locationConstraint == "" {
 		return nil, status.Error(codes.InvalidArgument, "locationConstraint unknown")
@@ -162,7 +162,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	if mounter == "" {
 		mounter = params["mounter"]
 	} else {
-		params["mounter"] = secretMap["mounter"]
+		params["mounter"] = mounter
 	}
 
 	bucketName = secretMap["bucketName"]
