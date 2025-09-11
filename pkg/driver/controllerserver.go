@@ -189,7 +189,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
 	}
-	klog.Infof("endPoint and locationConstraint getting paased to ObjectStorageSession: %s, %s", endPoint, locationConstraint)
+	klog.Infof("cosEndpoint and locationConstraint getting paased to ObjectStorageSession: %s, %s", endPoint, locationConstraint)
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
 
 	params["userProvidedBucket"] = "true"
