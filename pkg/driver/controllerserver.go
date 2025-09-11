@@ -2,7 +2,7 @@
  * IBM Confidential
  * OCO Source Materials
  * IBM Cloud Kubernetes Service, 5737-D43
- * (C) Copyright IBM Corp. 2023 All Rights Reserved.
+ * (C) Copyright IBM Corp. 2023, 2025 All Rights Reserved.
  * The source code for this program is not published or otherwise divested of
  * its trade secrets, irrespective of what has been deposited with
  * the U.S. Copyright Office.
@@ -132,8 +132,6 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 
 		secretMap = secretMapCustom
 	}
-
-	klog.Info("SecretMap Parameters:\n\t", maskSecretkeys(secretMap))
 
 	endPoint = secretMap["cosEndpoint"]
 	if endPoint == "" {
@@ -553,18 +551,6 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 	secretMapCustom[constants.BucketVersioning] = bucketVersioning
 
 	return secretMapCustom
-}
-
-func maskSecretkeys(secretMap map[string]string) map[string]string {
-	maskedSecretMap := make(map[string]string)
-	for k, v := range secretMap {
-		if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
-			maskedSecretMap[k] = "xxxxxxx"
-			continue
-		}
-		maskedSecretMap[k] = v
-	}
-	return maskedSecretMap
 }
 
 func getTempBucketName(mounterType, volumeID string) string {
