@@ -179,7 +179,9 @@ func waitForMount(ctx context.Context, path string, initialDelay, timeout time.D
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			err := ctx.Err()
+			klog.Infof("waitForMount: context is done, error: %v", err)
+			return err
 		default:
 			isMount, err := k8sMountUtils.New("").IsMountPoint(path)
 			if err == nil && isMount {
