@@ -81,6 +81,9 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	}
 
 	params := req.GetParameters()
+	if params == nil {
+		params = make(map[string]string)
+	}
 	klog.Info("CreateVolume Parameters:\n\t", params)
 
 	secretMap := req.GetSecrets()

@@ -97,6 +97,8 @@ func TestCreateVolume(t *testing.T) {
 					VolumeContext: map[string]string{
 						"bucketName":         bucketName,
 						"userProvidedBucket": "true",
+						"locationConstraint": "test-region",
+						"cosEndpoint":        "test-endpoint",
 					},
 				},
 			},
@@ -121,6 +123,7 @@ func TestCreateVolume(t *testing.T) {
 					"cosEndpoint":              "test-endpoint",
 					"kpRootKeyCRN":             "test-kpRootKeyCRN",
 					constants.BucketVersioning: "true",
+					"mounter":                  "s3fs",
 				},
 			},
 			cosSession: &s3client.FakeCOSSessionFactory{},
@@ -184,6 +187,8 @@ func TestCreateVolume(t *testing.T) {
 						constants.PVCNameKey:       testPVCName,
 						constants.PVCNamespaceKey:  testPVCNs,
 						constants.BucketVersioning: "true",
+						"locationConstraint":       "test-region",
+						"cosEndpoint":              "test-endpoint",
 					},
 				},
 			},
@@ -234,6 +239,7 @@ func TestCreateVolume(t *testing.T) {
 						},
 					},
 				},
+
 				Secrets: map[string]string{
 					"iamEndpoint":        "testIAMEndpoint",
 					"apiKey":             "testAPIKey",
