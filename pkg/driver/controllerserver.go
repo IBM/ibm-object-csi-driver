@@ -133,9 +133,13 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		secretMap = secretMapCustom
 	}
 
+	klog.Info("SecretMap Parameters:\n\t", maskSecretkeys(secretMap))
+
 	endPoint = secretMap["cosEndpoint"]
 	if endPoint == "" {
 		endPoint = params["cosEndpoint"]
+	} else {
+		params["cosEndpoint"] = secretMap["cosEndpoint"]
 	}
 	if endPoint == "" {
 		return nil, status.Error(codes.InvalidArgument, "cosEndpoint unknown")
@@ -144,15 +148,14 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	locationConstraint = secretMap["locationConstraint"]
 	if locationConstraint == "" {
 		locationConstraint = params["locationConstraint"]
+	} else {
+		params["locationConstraint"] = secretMap["locationConstraint"]
 	}
 	if locationConstraint == "" {
 		return nil, status.Error(codes.InvalidArgument, "locationConstraint unknown")
 	}
 
 	kpRootKeyCrn = secretMap["kpRootKeyCRN"]
-	if kpRootKeyCrn == "" {
-		kpRootKeyCrn = secretMapCustom["kpRootKeyCRN"]
-	}
 	if kpRootKeyCrn != "" {
 		klog.Infof("key protect root key crn provided for bucket creation")
 	}
@@ -160,12 +163,11 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	mounter := secretMap["mounter"]
 	if mounter == "" {
 		mounter = params["mounter"]
+	} else {
+		params["mounter"] = secretMap["mounter"]
 	}
 
 	bucketName = secretMap["bucketName"]
-	if bucketName == "" {
-		bucketName = secretMapCustom["bucketName"]
-	}
 
 	// Check for bucketVersioning parameter
 	if val, ok := secretMap[constants.BucketVersioning]; ok && val != "" {
@@ -189,7 +191,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
 	}
-
+	klog.Infof("endPoint and locationConstraint getting paased to ObjectStorageSession: %s, %s", endPoint, locationConstraint)
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
 
 	params["userProvidedBucket"] = "true"
@@ -551,6 +553,18 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 	secretMapCustom[constants.BucketVersioning] = bucketVersioning
 
 	return secretMapCustom
+}
+
+func maskSecretkeys(secretMap map[string]string) map[string]string {
+	maskedSecretMap := make(map[string]string)
+	for k, v := range secretMap {
+		if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
+			maskedSecretMap[k] = "xxxxxxx"
+			continue
+		}
+		maskedSecretMap[k] = v
+	}
+	return maskedSecretMap
 }
 
 func getTempBucketName(mounterType, volumeID string) string {
