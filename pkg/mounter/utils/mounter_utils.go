@@ -66,7 +66,6 @@ func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) e
 	if err := waitForMount(path, 10*time.Second); err != nil {
 		return err
 	}
-
 	klog.Infof("bucket mounted successfully using '%s' mounter", comm)
 	return nil
 }
@@ -155,11 +154,11 @@ func waitForMount(path string, timeout time.Duration) error {
 			return nil
 		}
 
-		klog.Infof("Mountpoint check in progress: attempt=%d, path=%s, isMount=%v, err=%v, timeout=%v", attempt, path, isMount, err, timeout)
+		klog.Infof("Mountpoint check in progress: attempt=%d, path=%s, isMount=%v, err=%v", attempt, path, isMount, err)
 		time.Sleep(constants.Interval)
 		elapsed += constants.Interval
 		if elapsed >= timeout {
-			return fmt.Errorf("timeout waiting for mount. Last check response: isMount=%v, err=%v, timeout=%v", isMount, err, constants.Timeout)
+			return fmt.Errorf("timeout waiting for mount. Last check response: isMount=%v, err=%v", isMount, err)
 		}
 		attempt++
 	}
