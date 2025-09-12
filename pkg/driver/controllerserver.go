@@ -51,7 +51,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		pvcNamespace       string
 		bucketVersioning   string
 	)
-	secretMapCustom := make(map[string]string)
+	var secretMapCustom map[string]string
 
 	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
 	if err != nil {
