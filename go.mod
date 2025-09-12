@@ -6,7 +6,7 @@ require (
 	github.com/IBM/go-sdk-core/v5 v5.21.0
 	github.com/IBM/ibm-cos-sdk-go v1.12.2
 	github.com/IBM/ibm-cos-sdk-go-config/v2 v2.3.0
-	github.com/IBM/ibm-csi-common v1.1.21
+	github.com/IBM/ibm-csi-common v1.1.23
 	github.com/IBM/ibmcloud-volume-interface v1.2.20
 	github.com/aws/smithy-go v1.22.5
 	github.com/container-storage-interface/spec v1.11.0
@@ -27,13 +27,14 @@ require (
 	k8s.io/client-go v0.33.4
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubernetes v1.33.4
+	k8s.io/mount-utils v0.33.4
 	k8s.io/pod-security-admission v0.33.4
 )
 
 require (
 	cel.dev/expr v0.24.0 // indirect
 	github.com/BurntSushi/toml v1.0.0 // indirect
-	github.com/IBM/secret-utils-lib v1.1.14 // indirect
+	github.com/IBM/secret-utils-lib v1.1.15 // indirect
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
@@ -173,7 +174,6 @@ require (
 	k8s.io/kube-scheduler v0.33.4 // indirect
 	k8s.io/kubectl v0.33.4 // indirect
 	k8s.io/kubelet v0.33.4 // indirect
-	k8s.io/mount-utils v0.33.4 // indirect
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 // indirect
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
