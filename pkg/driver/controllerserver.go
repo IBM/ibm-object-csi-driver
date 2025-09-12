@@ -272,7 +272,6 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 }
 
 func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-
 	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
