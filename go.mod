@@ -4,7 +4,7 @@ go 1.24.5
 
 require (
 	github.com/IBM/go-sdk-core/v5 v5.21.0
-	github.com/IBM/ibm-cos-sdk-go v1.12.2
+	github.com/IBM/ibm-cos-sdk-go v1.12.3
 	github.com/IBM/ibm-cos-sdk-go-config/v2 v2.3.0
 	github.com/IBM/ibm-csi-common v1.1.21
 	github.com/IBM/ibmcloud-volume-interface v1.2.20
@@ -27,6 +27,7 @@ require (
 	k8s.io/client-go v0.33.4
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubernetes v1.33.4
+	k8s.io/mount-utils v0.33.4
 	k8s.io/pod-security-admission v0.33.4
 )
 
@@ -173,7 +174,6 @@ require (
 	k8s.io/kube-scheduler v0.33.4 // indirect
 	k8s.io/kubectl v0.33.4 // indirect
 	k8s.io/kubelet v0.33.4 // indirect
-	k8s.io/mount-utils v0.33.4 // indirect
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 // indirect
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
