@@ -2,7 +2,7 @@
  * IBM Confidential
  * OCO Source Materials
  * IBM Cloud Kubernetes Service, 5737-D43
- * (C) Copyright IBM Corp. 2023 All Rights Reserved.
+ * (C) Copyright IBM Corp. 2023, 2025 All Rights Reserved.
  * The source code for this program is not published or otherwise divested of
  * its trade secrets, irrespective of what has been deposited with
  * the U.S. Copyright Office.
@@ -51,7 +51,6 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		pvcNamespace       string
 		bucketVersioning   string
 	)
-	secretMapCustom := make(map[string]string)
 
 	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
 	if err != nil {
@@ -81,6 +80,9 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	}
 
 	params := req.GetParameters()
+	if params == nil {
+		params = make(map[string]string)
+	}
 	klog.Info("CreateVolume Parameters:\n\t", params)
 
 	secretMap := req.GetSecrets()
@@ -127,7 +129,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret resource not found %v", err))
 		}
 
-		secretMapCustom = parseCustomSecret(secret)
+		secretMapCustom := parseCustomSecret(secret)
 		klog.Info("custom secret parameters parsed successfully, length of custom secret: ", len(secretMapCustom))
 
 		secretMap = secretMapCustom
@@ -136,6 +138,8 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	endPoint = secretMap["cosEndpoint"]
 	if endPoint == "" {
 		endPoint = params["cosEndpoint"]
+	} else {
+		params["cosEndpoint"] = endPoint
 	}
 	if endPoint == "" {
 		return nil, status.Error(codes.InvalidArgument, "cosEndpoint unknown")
@@ -144,15 +148,14 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	locationConstraint = secretMap["locationConstraint"]
 	if locationConstraint == "" {
 		locationConstraint = params["locationConstraint"]
+	} else {
+		params["locationConstraint"] = locationConstraint
 	}
 	if locationConstraint == "" {
 		return nil, status.Error(codes.InvalidArgument, "locationConstraint unknown")
 	}
 
 	kpRootKeyCrn = secretMap["kpRootKeyCRN"]
-	if kpRootKeyCrn == "" {
-		kpRootKeyCrn = secretMapCustom["kpRootKeyCRN"]
-	}
 	if kpRootKeyCrn != "" {
 		klog.Infof("key protect root key crn provided for bucket creation")
 	}
@@ -160,12 +163,11 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	mounter := secretMap["mounter"]
 	if mounter == "" {
 		mounter = params["mounter"]
+	} else {
+		params["mounter"] = mounter
 	}
 
 	bucketName = secretMap["bucketName"]
-	if bucketName == "" {
-		bucketName = secretMapCustom["bucketName"]
-	}
 
 	// Check for bucketVersioning parameter
 	if val, ok := secretMap[constants.BucketVersioning]; ok && val != "" {
@@ -189,7 +191,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
 	}
-
+	klog.Infof("cosEndpoint and locationConstraint getting paased to ObjectStorageSession: %s, %s", endPoint, locationConstraint)
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
 
 	params["userProvidedBucket"] = "true"
@@ -270,7 +272,6 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 }
 
 func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	//secretMapCustom := make(map[string]string)
 
 	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
 	if err != nil {
