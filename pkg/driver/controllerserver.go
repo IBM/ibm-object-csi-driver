@@ -51,7 +51,6 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		pvcNamespace       string
 		bucketVersioning   string
 	)
-	var secretMapCustom map[string]string
 
 	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
 	if err != nil {
@@ -130,7 +129,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret resource not found %v", err))
 		}
 
-		secretMapCustom = parseCustomSecret(secret)
+		secretMapCustom := parseCustomSecret(secret)
 		klog.Info("custom secret parameters parsed successfully, length of custom secret: ", len(secretMapCustom))
 
 		secretMap = secretMapCustom
@@ -273,7 +272,6 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 }
 
 func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	//secretMapCustom := make(map[string]string)
 
 	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
 	if err != nil {
