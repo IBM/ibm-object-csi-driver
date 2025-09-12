@@ -4,6 +4,7 @@
 package utils
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -19,7 +20,7 @@ import (
 )
 
 var unmount = syscall.Unmount
-var command = exec.Command
+var commandWithCtx = exec.CommandContext
 
 var ErrTimeoutWaitProcess = errors.New("timeout waiting for process to end")
 
@@ -33,28 +34,70 @@ type MounterOptsUtils struct {
 
 func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) error {
 	klog.Info("-FuseMount-")
-	klog.Infof("FuseMount params:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%v>", path, comm, args)
-	out, err := command(comm, args...).CombinedOutput()
-	if err != nil {
-		klog.Warningf("FuseMount: mount command failed: mounter=%s, args=%v, error=%v, output=%s", comm, args, err, string(out))
-		klog.Infof("FuseMount: checking if path already exists and is a mountpoint: path=%s", path)
-		if mounted, err1 := isMountpoint(path); err1 == nil && mounted { // check if bucket already got mounted
-			klog.Infof("bucket is already mounted using '%s' mounter", comm)
-			return nil
+	klog.Infof("FuseMount: params:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%v>", path, comm, args)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	var mounted bool
+	defer func() {
+		if !mounted {
+			cancel()
 		}
-		klog.Errorf("FuseMount: path is not mountpoint, mount failed: path=%s", path)
-		return fmt.Errorf("'%s' mount failed: <%v>", comm, string(out))
+	}()
+
+	cmd := commandWithCtx(ctx, comm, args...)
+	err := cmd.Start()
+	if err != nil {
+		klog.Errorf("FuseMount: command start failed: mounter=%s, args=%v, error=%v", comm, args, err)
+		return fmt.Errorf("FuseMount: '%s' command start failed: %v", comm, err)
 	}
-	klog.Infof("mount command succeeded: mounter=%s, output=%s", comm, string(out))
-	if err := waitForMount(path, 10*time.Second); err != nil {
-		return err
+	klog.Infof("FuseMount: command 'start' succeeded for '%s' mounter", comm)
+
+	waitCh := make(chan error, 1)
+	mountCh := make(chan error, 1)
+
+	go func() {
+		klog.Infof("FuseMount: cmd.Wait() goroutine start for mounter=%s, path=%v", comm, path)
+		waitCh <- cmd.Wait()
+		klog.Infof("FuseMount: cmd.Wait() goroutine end for mounter=%s, path=%v", comm, path)
+	}()
+
+	go func() {
+		klog.Infof("FuseMount: waitForMount() goroutine start for mounter=%s, path=%v", comm, path)
+		mountCh <- waitForMount(ctx, path, 2*time.Second, 30*time.Second) // kubelet retries NodePublishVolume after 120 seconds
+		klog.Infof("FuseMount: waitForMount() goroutine end  for mounter=%s, path=%v", comm, path)
+	}()
+
+	select {
+	case err := <-waitCh:
+		if err != nil {
+			klog.Warningf("FuseMount: command 'wait' failed: mounter=%s, args=%v, error=%v", comm, args, err)
+			klog.Infof("FuseMount: checking if path already exists and is a mountpoint: path=%s", path)
+			if isMount, err1 := isMountpoint(path); err1 == nil && isMount { // check if bucket already got mounted
+				klog.Infof("bucket is already mounted using '%s' mounter", comm)
+				mounted = true
+				return nil
+			}
+			return fmt.Errorf("'%s' mount failed: %v", comm, err)
+		}
+		klog.Infof("FuseMount: command 'wait' succeeded for '%s' mounter", comm)
+		if err := <-mountCh; err != nil {
+			return err
+		}
+
+	case err := <-mountCh:
+		if err != nil {
+			klog.Errorf("FuseMount: path is not mountpoint. Mount failed: mounter=%s, path=%s", comm, path)
+			return fmt.Errorf("'%s' mount failed: %v", comm, err)
+		}
 	}
+
 	klog.Infof("bucket mounted successfully using '%s' mounter", comm)
+	mounted = true
 	return nil
 }
 
 func (su *MounterOptsUtils) FuseUnmount(path string) error {
-	klog.Info("-fuseUnmount-")
+	klog.Info("-FuseUnmount-")
 	// check if mountpoint exists
 	isMount, checkMountErr := isMountpoint(path)
 	if isMount || checkMountErr != nil {
@@ -127,23 +170,33 @@ func isMountpoint(pathname string) (bool, error) {
 	return false, nil
 }
 
-func waitForMount(path string, timeout time.Duration) error {
+func waitForMount(ctx context.Context, path string, initialDelay, timeout time.Duration) error {
+	if initialDelay > 0 {
+		time.Sleep(initialDelay)
+	}
 	var elapsed time.Duration
 	attempt := 1
 	for {
-		isMount, err := k8sMountUtils.New("").IsMountPoint(path)
-		if err == nil && isMount {
-			klog.Infof("Path is a mountpoint: pathname: %s", path)
-			return nil
-		}
+		select {
+		case <-ctx.Done():
+			err := ctx.Err()
+			klog.Infof("waitForMount: context is done, error: %v", err)
+			return err
+		default:
+			isMount, err := k8sMountUtils.New("").IsMountPoint(path)
+			if err == nil && isMount {
+				klog.Infof("Path is a mountpoint: pathname: %s", path)
+				return nil
+			}
 
-		klog.Infof("Mountpoint check in progress: attempt=%d, path=%s, isMount=%v, err=%v", attempt, path, isMount, err)
-		time.Sleep(constants.Interval)
-		elapsed += constants.Interval
-		if elapsed >= timeout {
-			return fmt.Errorf("timeout waiting for mount. Last check response: isMount=%v, err=%v", isMount, err)
+			klog.Infof("Mountpoint check in progress: attempt=%d, path=%s, isMount=%v, err=%v, timeout=%v", attempt, path, isMount, err, timeout)
+			time.Sleep(constants.Interval)
+			elapsed += constants.Interval
+			if elapsed >= timeout {
+				return fmt.Errorf("timeout waiting for mount. Last check response: isMount=%v, err=%v, timeout=%v", isMount, err, constants.Timeout)
+			}
+			attempt++
 		}
-		attempt++
 	}
 }
 
