@@ -12,7 +12,7 @@ RUN   microdnf update --setopt=tsflags=nodocs && \
 RUN   echo "Skipping RHSM registration in public CI" && hostname
 
 RUN   microdnf update --setopt=tsflags=nodocs && \
-      microdnf install -y --nodocs iputils nfs-utils rpcbind xfsprogs udev nc e2fsprogs e4fsprogs && \
+      microdnf install -y --nodocs iputils rpcbind xfsprogs udev nc e2fsprogs e4fsprogs && \
       microdnf clean all -y
 
 RUN   microdnf update --setopt=tsflags=nodocs && \
@@ -21,7 +21,7 @@ RUN   microdnf update --setopt=tsflags=nodocs && \
       libxml2-devel openssl-devel mailcap \
       git automake make
 RUN   microdnf -y install fuse-devel
-RUN   rm /usr/bin/register-sys.sh && subscription-manager unregister && subscription-manager clean
+RUN   rm /usr/bin/register-sys.sh && subscription-manager unregister && subscription-manager clean || true
 
 RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && cd s3fs-fuse && \
     git checkout v1.94 && \
