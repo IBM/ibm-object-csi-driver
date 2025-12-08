@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/ubi:8 AS s3fs-builder
+FROM registry.access.redhat.com/ubi8/ubi:latest AS s3fs-builder
 
 ARG   RHSM_PASS=blank
 ARG   RHSM_USER=blank
