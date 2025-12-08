@@ -8,28 +8,33 @@ ENV RHSM_USER="${RHSM_USER}"
 ADD register-sys.sh /usr/bin/
 
 RUN microdnf update --setopt=tsflags=nodocs && \
-    microdnf install -y --nodocs hostname subscription-manager
+    microdnf install -y --nodocs hostname subscription-manager findutils xz && \
+    microdnf clean all -y
 
 RUN echo "Skipping RHSM registration in public CI" && hostname
 
 RUN microdnf update --setopt=tsflags=nodocs && \
-    microdnf install -y --nodocs iputils nc udev e2fsprogs && \
+    microdnf install -y --nodocs iputils nmap-ncat udev findutils && \
     microdnf clean all -y
 
 RUN microdnf update --setopt=tsflags=nodocs && \
     microdnf install -y gcc libstdc++-devel \
     gcc-c++ fuse curl-devel \
     libxml2-devel openssl-devel mailcap \
-    git automake make
+    git automake make && \
+    microdnf clean all -y
 
-RUN microdnf -y install fuse-devel
+RUN microdnf -y install fuse-devel && microdnf clean all -y
 
 RUN rm /usr/bin/register-sys.sh && subscription-manager unregister && subscription-manager clean || true
 
-RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && cd s3fs-fuse && \
+RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && \
+    cd s3fs-fuse && \
     git checkout v1.94 && \
-    ./autogen.sh && ./configure --prefix=/usr/local --with-openssl && make && make install && \
+    ./autogen.sh && ./configure --prefix=/usr/local --with-openssl && \
+    make && make install && \
     rm -rf /var/lib/apt/lists/*
+
 
 FROM registry.access.redhat.com/ubi8/ubi AS rclone-builder
 RUN yum install wget git gcc -y
@@ -55,6 +60,8 @@ RUN git clone https://github.com/rclone/rclone.git && \
       go build && ./rclone version && \
       cp rclone /usr/local/bin/rclone
 
+# ---------------------------------------------------------------------------------------
+
 FROM registry.access.redhat.com/ubi8/ubi:latest
 
 # Default values
@@ -65,7 +72,10 @@ ARG build_date=unknown
 LABEL description="IBM CSI Object Storage Plugin"
 LABEL build-date=${build_date}
 LABEL git-commit-id=${git_commit_id}
-RUN yum update -y && yum install fuse fuse-libs fuse3 fuse3-libs -y
+
+RUN yum update -y && \
+    yum install -y fuse fuse-libs fuse3 fuse3-libs && \
+    yum clean all -y
 COPY --from=s3fs-builder /usr/local/bin/s3fs /usr/bin/s3fs
 COPY --from=rclone-builder /usr/local/bin/rclone /usr/bin/rclone
 COPY ibm-object-csi-driver ibm-object-csi-driver
