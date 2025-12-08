@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/ubi:8 AS s3fs-builder  # ← CHANGED: full ubi (has rpcbind, nfs-utils, etc.)
+FROM registry.access.redhat.com/ubi8/ubi:8 AS s3fs-builder
 
 ARG   RHSM_PASS=blank
 ARG   RHSM_USER=blank
@@ -9,7 +9,7 @@ ENV   RHSM_USER="${RHSM_USER}"
 ADD   register-sys.sh /usr/bin/
 RUN   dnf update --setopt=tsflags=nodocs -y && \
       dnf install -y --nodocs hostname subscription-manager && \
-      dnf clean all
+      && dnf clean all
 
 RUN   echo "Skipping RHSM registration in public CI" && hostname
 
@@ -31,7 +31,7 @@ RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && cd s3fs-fuse && \
     rm -rf /var/lib/apt/lists/*
 
 FROM registry.access.redhat.com/ubi8/ubi AS rclone-builder
-RUN yum install wget git gcc -y
+RUN   yum install wget git gcc -y
 
 ENV ARCH=amd64
 ENV GO_VERSION=1.25.0
