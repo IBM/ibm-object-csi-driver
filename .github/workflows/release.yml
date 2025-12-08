@@ -68,18 +68,15 @@ jobs:
           touch "Passing" || touch "Failed"
 
       - name: Build driver image
-        run: make driver   # ← FIXED: removed 'make provisioner' (does not exist)
+        run: make driver
 
       - name: Publish coverage
-        if: success() && matrix.go-version == 'stable'
+        if: success() && matrix.go-version == 'stable' && (github.ref == 'refs/heads/master' || github.event_name == 'pull_request')
         env:
           GHE_TOKEN: ${{ secrets.GHE_TOKEN }}
         run: |
           ./scripts/publishCoverage.sh
 
-  # ────────────────────────
-  # Your ORIGINAL release job — 100% UNCHANGED
-  # ────────────────────────
   release:
     needs: build-and-test
     permissions: write-all
