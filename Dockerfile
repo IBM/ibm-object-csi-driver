@@ -9,7 +9,7 @@ ENV   RHSM_USER="${RHSM_USER}"
 ADD   register-sys.sh /usr/bin/
 RUN   dnf update --setopt=tsflags=nodocs -y && \
       dnf install -y --nodocs hostname subscription-manager && \
-      && dnf clean all
+      dnf clean all
 
 RUN   echo "Skipping RHSM registration in public CI" && hostname
 
