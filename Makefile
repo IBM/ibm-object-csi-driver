@@ -3,15 +3,13 @@ EXE_DRIVER_NAME=ibm-object-csi-driver
 
 REGISTRY=quay.io/ibm-object-csi-driver
 
-export LINT_VERSION="2.3.1"
+export LINT_VERSION="1.64.8"
 
 COLOR_YELLOW=\033[0;33m
 COLOR_RESET=\033[0m
 GOFILES=$(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
-
 all: build
-
 
 .PHONY: build-% clean
 
@@ -29,13 +27,14 @@ GOPACKAGES=$(shell go list ./... | grep -v ./tests/... | grep -v /mounter/utils 
 
 .PHONY: test
 test:
-	go test -v -race ${GOPACKAGES} -coverprofile=coverage.out
+	go run github.com/pierrre/gotestcover@latest -v -race -coverprofile=coverage.out ${GOPACKAGES}
 
 .PHONY: deps
 deps:
-	echo "Installing dependencies ..."
+	@echo "Installing dependencies ..."
 	@if ! which golangci-lint >/dev/null || [[ "$$(golangci-lint --version)" != *${LINT_VERSION}* ]]; then \
-		go install github.com/golangci/golangci-lint/cmd/golangci-lint@v${LINT_VERSION}; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
+		sh -s -- -b $(shell go env GOPATH)/bin v${LINT_VERSION}; \
 	fi
 
 .PHONY: fmt
@@ -44,9 +43,10 @@ fmt: lint
 
 .PHONY: coverage
 coverage: test
-	cat coverage.out | grep -v /fake > cover.out;
-	# go tool cover -html=cover.out -o=cover.html
-	go tool cover -func=cover.out | fgrep total
+	cat coverage.out | grep -v /fake > cover.out
+	go tool cover -html=cover.out -o cover.html
+	@echo "Coverage report: cover.html"
+	@./scripts/calculateCoverage.sh
 
 clean:
 	-rm -rf bin
