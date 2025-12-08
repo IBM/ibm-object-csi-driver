@@ -9,7 +9,8 @@ ENV   RHSM_USER="${RHSM_USER}"
 ADD   register-sys.sh /usr/bin/
 RUN   microdnf update --setopt=tsflags=nodocs && \
       microdnf install -y --nodocs hostname subscription-manager
-RUN   hostname; chmod 755 /usr/bin/register-sys.sh &&  /usr/bin/register-sys.sh
+RUN   echo "Skipping RHSM registration in public CI" && hostname
+
 RUN   microdnf update --setopt=tsflags=nodocs && \
       microdnf install -y --nodocs iputils nfs-utils rpcbind xfsprogs udev nc e2fsprogs e4fsprogs && \
       microdnf clean all -y
