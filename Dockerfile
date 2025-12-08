@@ -13,9 +13,10 @@ RUN   dnf update --setopt=tsflags=nodocs -y && \
 
 RUN   echo "Skipping RHSM registration in public CI" && hostname
 
-RUN   dnf update --setopt=tsflags=nodocs -y && \
-      dnf install -y --nodocs iputils nfs-utils rpcbind xfsprogs udev nc e2fsprogs e4fsprogs && \
-      dnf clean all -y
+RUN dnf update --setopt=tsflags=nodocs -y && \
+    dnf install -y --nodocs --enablerepo=ubi-8-baseos,ubi-8-appstream \
+     iputils nfs-utils rpcbind xfsprogs udev nc e2fsprogs && \
+    dnf clean all -y
 
 RUN   dnf update --setopt=tsflags=nodocs -y && \
       dnf install -y gcc libstdc++-devel \
