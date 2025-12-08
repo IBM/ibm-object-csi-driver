@@ -1,13 +1,27 @@
 package mounter
 
 import (
+	"reflect"
+	"sort"
+	"testing"
+
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/stretchr/testify/assert"
-
-	"reflect"
-	"testing"
 )
+
+func stringSlicesEqualIgnoreOrder(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	aCopy := make([]string, len(a)
+	bCopy := make([]string, len(b)
+	copy(aCopy, a)
+	copy(bCopy, b)
+	sort.Strings(aCopy)
+	sort.Strings(bCopy)
+	return reflect.DeepEqual(aCopy, bCopy)
+}
 
 func TestNewMounter(t *testing.T) {
 	tests := []struct {
@@ -40,7 +54,7 @@ func TestNewMounter(t *testing.T) {
 				AccessKeys:    ":test-api-key",
 				AuthType:      "iam",
 				KpRootKeyCrn:  "test-kp-root-key-crn",
-				MountOptions:  []string{"opt1=val1", "cipher_suites=default"},
+				MountOptions:  []string{"opt1=val1", "cipher_suites=default"}, // order doesn't matter
 				MounterUtils:  &(mounterUtils.MounterOptsUtils{}),
 			},
 			expectedErr: nil,
@@ -108,6 +122,21 @@ func TestNewMounter(t *testing.T) {
 			factory := &CSIMounterFactory{}
 
 			result := factory.NewMounter(test.attrib, test.secretMap, test.mountOptions, nil)
+
+			if s3fs, ok := result.(*S3fsMounter); ok {
+				if !stringSlicesEqualIgnoreOrder(s3fs.MountOptions, test.expected.(*S3fsMounter).MountOptions) {
+					t.Errorf("MountOptions mismatch.\nGot:  %v\nWant: %v", s3fs.MountOptions, test.expected.(*S3fsMounter).MountOptions)
+				}
+				s3fs.MountOptions = nil
+				test.expected.(*S3fsMounter).MountOptions = nil
+			}
+			if rclone, ok := result.(*RcloneMounter); ok {
+				if !stringSlicesEqualIgnoreOrder(rclone.MountOptions, test.expected.(*RcloneMounter).MountOptions) {
+					t.Errorf("MountOptions mismatch.\nGot:  %v\nWant: %v", rclone.MountOptions, test.expected.(*RcloneMounter).MountOptions)
+				}
+				rclone.MountOptions = nil
+				test.expected.(*RcloneMounter).MountOptions = nil
+			}
 
 			assert.Equal(t, result, test.expected)
 
