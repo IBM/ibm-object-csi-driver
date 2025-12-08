@@ -114,11 +114,10 @@ jobs:
         id: check_commit
         run: |
           message=$(git log -1 --pretty=%B)
-          message="${message//'%'/'%25'}"  # Escape '%'
-          message="${message//$'\n'/'%0A'}"  # Escape newlines
-          message="${message//$'\r'/'%0D'}"  # Escape carriage returns
+          message="${message//'%'/'%25'}"
+          message="${message//$'\n'/'%0A'}"
+          message="${message//$'\r'/'%0D'}"
           echo "message=$message" >> "$GITHUB_OUTPUT"
-        shell: bash
 
       - name: Check Commit Message
         run: echo "Commit Message: ${{ steps.check_commit.outputs.message }}"
