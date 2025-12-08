@@ -1,30 +1,30 @@
-FROM registry.access.redhat.com/ubi8/ubi:latest AS s3fs-builder
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10-1179.1741863533 AS s3fs-builder
 
-ARG   RHSM_PASS=blank
-ARG   RHSM_USER=blank
+ARG RHSM_PASS=blank
+ARG RHSM_USER=blank
+ENV RHSM_PASS="${RHSM_PASS}"
+ENV RHSM_USER="${RHSM_USER}"
 
-ENV   RHSM_PASS="${RHSM_PASS}"
-ENV   RHSM_USER="${RHSM_USER}"
+ADD register-sys.sh /usr/bin/
 
-ADD   register-sys.sh /usr/bin/
-RUN   dnf update --setopt=tsflags=nodocs -y && \
-      dnf install -y --nodocs hostname subscription-manager && \
-      dnf clean all
+RUN microdnf update --setopt=tsflags=nodocs && \
+    microdnf install -y --nodocs hostname subscription-manager
 
-RUN   echo "Skipping RHSM registration in public CI" && hostname
+RUN echo "Skipping RHSM registration in public CI" && hostname
 
-RUN dnf update --setopt=tsflags=nodocs -y && \
-    dnf install -y --nodocs --enablerepo=ubi-8-baseos,ubi-8-appstream \
-     iputils nfs-utils rpcbind xfsprogs udev nc e2fsprogs && \
-    dnf clean all -y
+RUN microdnf update --setopt=tsflags=nodocs && \
+    microdnf install -y --nodocs iputils nc udev e2fsprogs && \
+    microdnf clean all -y
 
-RUN   dnf update --setopt=tsflags=nodocs -y && \
-      dnf install -y gcc libstdc++-devel \
-      gcc-c++ fuse curl-devel \
-      libxml2-devel openssl-devel mailcap \
-      git automake make
-RUN   dnf -y install fuse-devel
-RUN   rm /usr/bin/register-sys.sh && subscription-manager unregister && subscription-manager clean || true
+RUN microdnf update --setopt=tsflags=nodocs && \
+    microdnf install -y gcc libstdc++-devel \
+    gcc-c++ fuse curl-devel \
+    libxml2-devel openssl-devel mailcap \
+    git automake make
+
+RUN microdnf -y install fuse-devel
+
+RUN rm /usr/bin/register-sys.sh && subscription-manager unregister && subscription-manager clean || true
 
 RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && cd s3fs-fuse && \
     git checkout v1.94 && \
@@ -32,7 +32,7 @@ RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && cd s3fs-fuse && \
     rm -rf /var/lib/apt/lists/*
 
 FROM registry.access.redhat.com/ubi8/ubi AS rclone-builder
-RUN   yum install wget git gcc -y
+RUN yum install wget git gcc -y
 
 ENV ARCH=amd64
 ENV GO_VERSION=1.25.0
@@ -50,7 +50,7 @@ ENV PATH=$GOPATH/bin:$GOROOT/bin:$PATH
 ENV GOARCH=$ARCH
 ENV GO111MODULE=on
 
-RUN   git clone https://github.com/rclone/rclone.git && \
+RUN git clone https://github.com/rclone/rclone.git && \
       cd rclone && git checkout tags/v1.69.0 && \
       go build && ./rclone version && \
       cp rclone /usr/local/bin/rclone
