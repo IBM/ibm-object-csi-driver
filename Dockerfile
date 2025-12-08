@@ -12,10 +12,11 @@ RUN   microdnf update --setopt=tsflags=nodocs && \
 RUN   echo "Skipping RHSM registration in public CI" && hostname
 
 RUN   microdnf update --setopt=tsflags=nodocs && \
-      microdnf --enablerepo=codeready-builder install -y --nodocs iputils nfs-utils rpcbind xfsprogs udev nc e2fsprogs e4fsprogs && \
+      microdnf install -y --nodocs iputils nfs-utils rpcbind xfsprogs udev nc e2fsprogs e4fsprogs && \
       microdnf clean all -y
+
 RUN   microdnf update --setopt=tsflags=nodocs && \
-      microdnf --enablerepo=codeready-builder install -y gcc libstdc++-devel \
+      microdnf install -y gcc libstdc++-devel \
       gcc-c++ fuse curl-devel \
       libxml2-devel openssl-devel mailcap \
       git automake make
