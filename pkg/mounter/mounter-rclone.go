@@ -36,6 +36,7 @@ type RcloneMounter struct {
 	AuthType      string
 	AccessKeys    string
 	KpRootKeyCrn  string
+	IAMEndpoint   string
 	UID           string
 	GID           string
 	MountOptions  []string
@@ -63,8 +64,8 @@ func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounte
 		check     bool
 		accessKey string
 		secretKey string
-		// apiKey    string
-		mounter *RcloneMounter
+		apiKey    string
+		mounter   *RcloneMounter
 	)
 
 	mounter = &RcloneMounter{}
@@ -90,21 +91,20 @@ func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounte
 	if val, check = secretMap["kpRootKeyCRN"]; check {
 		mounter.KpRootKeyCrn = val
 	}
+	if val, check = secretMap["iamEndpoint"]; check {
+		mounter.IAMEndpoint = val
+	}
+	if val, check = secretMap["apiKey"]; check {
+		apiKey = val
+	}
 
-	// Since IAM support for rClone is not there and api key is required param now, commented below piece of code
-	// Uncommnet when IAM support for rClone is available
-
-	// if val, check = secretMap["apiKey"]; check {
-	// 	apiKey = val
-	// }
-
-	// if apiKey != "" {
-	// 	mounter.AccessKeys = fmt.Sprintf(":%s", apiKey)
-	// 	mounter.AuthType = "iam"
-	// } else {
-	mounter.AccessKeys = fmt.Sprintf("%s:%s", accessKey, secretKey)
-	mounter.AuthType = "hmac"
-	// }
+	if apiKey != "" {
+		mounter.AccessKeys = fmt.Sprintf(":%s", apiKey)
+		mounter.AuthType = "iam"
+	} else {
+		mounter.AccessKeys = fmt.Sprintf("%s:%s", accessKey, secretKey)
+		mounter.AuthType = "hmac"
+	}
 
 	if val, check = secretMap["gid"]; check {
 		mounter.GID = val
@@ -250,11 +250,13 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 }
 
 func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
-	var accessKey, secretKey string
+	var accessKey, secretKey, apiKey string
 	keys := strings.Split(rclone.AccessKeys, ":")
 	if len(keys) == 2 {
 		accessKey = keys[0]
 		secretKey = keys[1]
+	} else {
+		apiKey = keys[1]
 	}
 	configParams := []string{
 		"[" + remote + "]",
@@ -264,6 +266,7 @@ func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
 		"env_auth = " + envAuth,
 		"access_key_id = " + accessKey,
 		"secret_access_key = " + secretKey,
+		"ibm_api_key = " + apiKey,
 	}
 
 	if rclone.LocConstraint != "" {
