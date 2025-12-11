@@ -48,7 +48,8 @@ const (
 	remote         = "ibmcos"
 	s3Type         = "s3"
 	cosProvider    = "IBMCOS"
-	envAuth        = "true"
+	//envAuth        = "true"
+	//v2Auth		   = "true"
 )
 
 var (
@@ -99,7 +100,7 @@ func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounte
 	}
 
 	if apiKey != "" {
-		mounter.AccessKeys = fmt.Sprintf(":%s", apiKey)
+		mounter.AccessKeys = fmt.Sprintf("%s", apiKey)
 		mounter.AuthType = "iam"
 	} else {
 		mounter.AccessKeys = fmt.Sprintf("%s:%s", accessKey, secretKey)
@@ -250,20 +251,26 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 }
 
 func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
-	var accessKey, secretKey, apiKey string
-	keys := strings.Split(rclone.AccessKeys, ":")
-	if len(keys) == 2 {
+	var accessKey, secretKey, apiKey, envAuth, v2Auth string
+	if rclone.AuthType == "hmac" {
+		keys := strings.Split(rclone.AccessKeys, ":")
 		accessKey = keys[0]
 		secretKey = keys[1]
+		envAuth = "true"
+		v2Auth = "false"
 	} else {
-		apiKey = keys[1]
+		apiKey = rclone.AccessKeys
+		v2Auth = "true"
+		envAuth = "false"
 	}
+
 	configParams := []string{
 		"[" + remote + "]",
 		"type = " + s3Type,
 		"endpoint = " + rclone.EndPoint,
 		"provider = " + cosProvider,
 		"env_auth = " + envAuth,
+		"v2_auth = " + v2Auth,
 		"access_key_id = " + accessKey,
 		"secret_access_key = " + secretKey,
 		"ibm_api_key = " + apiKey,
