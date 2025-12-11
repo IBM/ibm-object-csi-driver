@@ -29,18 +29,19 @@ import (
 // Mounter interface defined in mounter.go
 // rcloneMounter Implements Mounter
 type RcloneMounter struct {
-	BucketName    string //From Secret in SC
-	ObjPath       string //From Secret in SC
-	EndPoint      string //From Secret in SC
-	LocConstraint string //From Secret in SC
-	AuthType      string
-	AccessKeys    string
-	KpRootKeyCrn  string
-	IAMEndpoint   string
-	UID           string
-	GID           string
-	MountOptions  []string
-	MounterUtils  utils.MounterUtils
+	BucketName        string //From Secret in SC
+	ObjPath           string //From Secret in SC
+	EndPoint          string //From Secret in SC
+	LocConstraint     string //From Secret in SC
+	AuthType          string
+	AccessKeys        string
+	serviceInstanceID string
+	KpRootKeyCrn      string
+	IAMEndpoint       string
+	UID               string
+	GID               string
+	MountOptions      []string
+	MounterUtils      utils.MounterUtils
 }
 
 const (
@@ -66,6 +67,7 @@ func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounte
 		accessKey string
 		secretKey string
 		apiKey    string
+		serviceId string
 		mounter   *RcloneMounter
 	)
 
@@ -98,9 +100,13 @@ func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounte
 	if val, check = secretMap["apiKey"]; check {
 		apiKey = val
 	}
+	if val, check = secretMap["serviceId"]; check {
+		serviceId = val
+	}
 
-	if apiKey != "" {
-		mounter.AccessKeys = fmt.Sprintf("%s", apiKey)
+	if apiKey != "" && serviceId != "" {
+		mounter.AccessKeys = apiKey
+		mounter.serviceInstanceID = secretMap["serviceId"]
 		mounter.AuthType = "iam"
 	} else {
 		mounter.AccessKeys = fmt.Sprintf("%s:%s", accessKey, secretKey)
@@ -274,6 +280,7 @@ func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
 		"access_key_id = " + accessKey,
 		"secret_access_key = " + secretKey,
 		"ibm_api_key = " + apiKey,
+		"ibm_resource_instance_id = " + rclone.serviceInstanceID,
 	}
 
 	if rclone.LocConstraint != "" {
