@@ -100,7 +100,6 @@ jobs:
       uses: github/codeql-action/init@v3
       with:
         languages: "go"
-     
     - name: Run Unit Tests for cos csi mounter
       run: sudo make ut-coverage -C ${{ matrix.package_dir }}
 
@@ -111,11 +110,11 @@ jobs:
 
     - name: Get last commit message
       id: check_commit
-      run: |
+      run:  |
             message=$(git log -1 --pretty=%B)
-            message="${message//'%'/'%25'}"
-            message="${message//$'\n'/'%0A'}"
-            message="${message//$'\r'/'%0D'}"
+            message="${message//'%'/'%25'}"  # Escape '%'
+            message="${message//$'\n'/'%0A'}"  # Escape newlines
+            message="${message//$'\r'/'%0D'}"  # Escape carriage returns
             echo "message=$message" >> "$GITHUB_OUTPUT"
       shell: bash
 
@@ -139,6 +138,5 @@ jobs:
           ## 🚀 What’s New
           - Fix for rclone mount hang issue
         prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
-   
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3

@@ -1,66 +1,66 @@
 FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10-1179.1741863533 AS s3fs-builder
 
-ARG RHSM_PASS=blank
-ARG RHSM_USER=blank
-ENV RHSM_PASS="${RHSM_PASS}"
-ENV RHSM_USER="${RHSM_USER}"
+ARG   RHSM_PASS=blank
+ARG   RHSM_USER=blank
 
-ADD register-sys.sh /usr/bin/
+ENV   RHSM_PASS="${RHSM_PASS}"
+ENV   RHSM_USER="${RHSM_USER}"
 
-RUN microdnf update --setopt=tsflags=nodocs && \
-    microdnf install -y --nodocs hostname subscription-manager findutils xz && \
-    microdnf clean all -y
+ADD   register-sys.sh /usr/bin/
 
-RUN echo "Skipping RHSM registration in public CI" && hostname
+RUN   microdnf update --setopt=tsflags=nodocs && \
+      microdnf install -y --nodocs hostname subscription-manager findutils xz && \
+      microdnf clean all -y
 
-RUN microdnf update --setopt=tsflags=nodocs && \
-    microdnf install -y --nodocs iputils nmap-ncat udev findutils && \
-    microdnf clean all -y
+RUN   echo "Skipping RHSM registration in public CI" && hostname
 
-RUN microdnf update --setopt=tsflags=nodocs && \
-    microdnf install -y gcc libstdc++-devel \
-    gcc-c++ fuse curl-devel \
-    libxml2-devel openssl-devel mailcap \
-    git automake make && \
-    microdnf clean all -y
+RUN   microdnf update --setopt=tsflags=nodocs && \
+      microdnf install -y --nodocs iputils nmap-ncat udev findutils && \
+      microdnf clean all -y
 
-RUN microdnf -y install fuse-devel && microdnf clean all -y
+RUN   microdnf update --setopt=tsflags=nodocs && \
+      microdnf install -y gcc libstdc++-devel \
+      gcc-c++ fuse curl-devel \
+      libxml2-devel openssl-devel mailcap \
+      git automake make && \
+      microdnf clean all -y
 
-RUN rm /usr/bin/register-sys.sh && subscription-manager unregister && subscription-manager clean || true
+RUN   microdnf -y install fuse-devel && microdnf clean all -y
 
-RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && \
-    cd s3fs-fuse && \
-    git checkout v1.94 && \
-    ./autogen.sh && ./configure --prefix=/usr/local --with-openssl && \
-    make && make install && \
-    rm -rf /var/lib/apt/lists/*
+RUN   rm /usr/bin/register-sys.sh && subscription-manager unregister && subscription-manager clean || true
+
+RUN   git clone https://github.com/s3fs-fuse/s3fs-fuse.git && \
+      cd s3fs-fuse && \
+      git checkout v1.94 && \
+      ./autogen.sh && ./configure --prefix=/usr/local --with-openssl && \
+      make && make install && \
+      rm -rf /var/lib/apt/lists/*
 
 
-FROM registry.access.redhat.com/ubi8/ubi AS rclone-builder
-RUN yum install wget git gcc -y
+FROM  registry.access.redhat.com/ubi8/ubi AS rclone-builder
+RUN   yum install wget git gcc -y
 
-ENV ARCH=amd64
-ENV GO_VERSION=1.25.0
+ENV   ARCH=amd64
+ENV   GO_VERSION=1.25.0
 
-RUN echo $ARCH $GO_VERSION
+RUN   echo $ARCH $GO_VERSION
 
-RUN wget -q https://dl.google.com/go/go$GO_VERSION.linux-$ARCH.tar.gz && \
-  tar -xf go$GO_VERSION.linux-$ARCH.tar.gz && \
-  rm go$GO_VERSION.linux-$ARCH.tar.gz && \
-  mv go /usr/local
+RUN   wget -q https://dl.google.com/go/go$GO_VERSION.linux-$ARCH.tar.gz && \
+      tar -xf go$GO_VERSION.linux-$ARCH.tar.gz && \
+      rm go$GO_VERSION.linux-$ARCH.tar.gz && \
+      mv go /usr/local
 
-ENV GOROOT=/usr/local/go
-ENV GOPATH=/go
-ENV PATH=$GOPATH/bin:$GOROOT/bin:$PATH
-ENV GOARCH=$ARCH
-ENV GO111MODULE=on
+ENV   GOROOT=/usr/local/go
+ENV   GOPATH=/go
+ENV   PATH=$GOPATH/bin:$GOROOT/bin:$PATH
+ENV   GOARCH=$ARCH
+ENV   GO111MODULE=on
 
 RUN git clone https://github.com/rclone/rclone.git && \
       cd rclone && git checkout tags/v1.69.0 && \
       go build && ./rclone version && \
       cp rclone /usr/local/bin/rclone
 
-# ---------------------------------------------------------------------------------------
 
 FROM registry.access.redhat.com/ubi8/ubi:latest
 
