@@ -49,8 +49,6 @@ const (
 	remote         = "ibmcos"
 	s3Type         = "s3"
 	cosProvider    = "IBMCOS"
-	//envAuth        = "true"
-	//v2Auth		   = "true"
 )
 
 var (
