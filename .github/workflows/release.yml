@@ -87,6 +87,9 @@ jobs:
       IS_LATEST_RELEASE: 'true'
       APP_VERSION: 1.0.5
 
+    # Add the condition to trigger release based on commit message containing "release"
+    if: contains(github.event.head_commit.message, 'release')
+
     steps:
     - name: Checkout Code
       uses: actions/checkout@v5
