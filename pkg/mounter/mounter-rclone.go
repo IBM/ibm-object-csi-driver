@@ -104,7 +104,7 @@ func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounte
 
 	if apiKey != "" && serviceId != "" {
 		mounter.AccessKeys = apiKey
-		mounter.serviceInstanceID = secretMap["serviceId"]
+		mounter.serviceInstanceID = serviceId
 		mounter.AuthType = "iam"
 	} else {
 		mounter.AccessKeys = fmt.Sprintf("%s:%s", accessKey, secretKey)
