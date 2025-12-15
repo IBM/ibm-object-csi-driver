@@ -13,15 +13,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  common-steps:
+  build-and-test:
     runs-on: ubuntu-latest
-    outputs:
-      common-dependencies: ${{ steps.common-steps.outputs.deps }}
     permissions:
       contents: write      # needed to push coverage to gh-pages
       pull-requests: write # needed to comment on PRs
 
-      write-all: true      # necessary for release creation and publishing
+    strategy:
+      matrix:
+        go-version: ["1.24.5"]
+      fail-fast: false
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -49,15 +51,9 @@ jobs:
           go mod tidy
           make deps
 
-  build-and-test:
-    needs: common-steps
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: ["1.24.5"]
-      fail-fast: false
+      - name: Check code formatting
+        run: make fmt
 
-    steps:
       - name: Run unit tests
         run: make test
 
@@ -78,7 +74,8 @@ jobs:
           ./scripts/publishCoverage.sh
 
   release:
-    needs: common-steps
+    needs: build-and-test
+    permissions: write-all
     runs-on: ubuntu-latest
 
     strategy:
