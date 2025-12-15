@@ -87,11 +87,11 @@ curl -s "https://img.shields.io/badge/coverage-${NEW_COVERAGE}%25-${BADGE_COLOR}
 
 # Result message
 if (( $(echo "$OLD_COVERAGE > $NEW_COVERAGE" | bc -l) )); then
-    RESULT_MESSAGE="Coverage decreased from **$OLD_COVERAGE%** → **$NEW_COVERAGE%**"
+    RESULT_MESSAGE=":red_circle: Coverage decreased from $OLD_COVERAGE% to $NEW_COVERAGE%"
 elif (( $(echo "$OLD_COVERAGE == $NEW_COVERAGE" | bc -l) )); then
-    RESULT_MESSAGE="Coverage remained the same at **$NEW_COVERAGE%**"
+    RESULT_MESSAGE=":thumbsup: Coverage remained same at $NEW_COVERAGE%"
 else
-    RESULT_MESSAGE="Coverage increased from **$OLD_COVERAGE%** → **$NEW_COVERAGE%**"
+    RESULT_MESSAGE=":thumbsup: Coverage increased from $OLD_COVERAGE% to $NEW_COVERAGE%"
 fi
 
 # Push to gh-pages (only on push)

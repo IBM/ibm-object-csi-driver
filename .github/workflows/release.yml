@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+*"
   pull_request:
     branches:
       - main
@@ -15,17 +13,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
+  common-steps:
     runs-on: ubuntu-latest
+    outputs:
+      common-dependencies: ${{ steps.common-steps.outputs.deps }}
     permissions:
       contents: write      # needed to push coverage to gh-pages
       pull-requests: write # needed to comment on PRs
 
-    strategy:
-      matrix:
-        go-version: ["1.24.5"]
-      fail-fast: false
-
+      write-all: true      # necessary for release creation and publishing
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -53,9 +49,15 @@ jobs:
           go mod tidy
           make deps
 
-      - name: Check code formatting
-        run: make fmt
+  build-and-test:
+    needs: common-steps
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ["1.24.5"]
+      fail-fast: false
 
+    steps:
       - name: Run unit tests
         run: make test
 
@@ -76,8 +78,7 @@ jobs:
           ./scripts/publishCoverage.sh
 
   release:
-    needs: build-and-test
-    permissions: write-all
+    needs: common-steps
     runs-on: ubuntu-latest
 
     strategy:
