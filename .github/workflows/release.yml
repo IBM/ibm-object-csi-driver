@@ -24,6 +24,14 @@ jobs:
         with:
           fetch-depth: 0
       
+      - name: Export Secrets
+        run: |
+          echo "RHSM_PASS=${{ secrets.RHSM_PASS }}" >> $GITHUB_ENV
+          echo "RHSM_USER=${{ secrets.RHSM_USER }}" >> $GITHUB_ENV
+        env:
+          RHSM_PASS: ${{ secrets.RHSM_PASS }}
+          RHSM_USER: ${{ secrets.RHSM_USER }}
+      
       - name: Get commit message
         id: get_commit
         run: |
