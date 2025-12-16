@@ -96,7 +96,8 @@ jobs:
           touch "Passing" || touch "Failed"
 
       - name: Build driver image
-        run: make driver
+        run: |
+          docker build --build-arg RHSM_USER=${{ secrets.RHSM_USER }} --build-arg RHSM_PASS=${{ secrets.RHSM_PASS }} .
 
       - name: Publish coverage
         if: success()
