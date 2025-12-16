@@ -10,6 +10,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func stringSlicesEqualIgnoreOrder(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	aCopy := make([]string, len(a))
+	bCopy := make([]string, len(b))
+	copy(aCopy, a)
+	copy(bCopy, b)
+	sort.Strings(aCopy)
+	sort.Strings(bCopy)
+	return reflect.DeepEqual(aCopy, bCopy)
+}
+
 func TestNewMounter(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -41,8 +54,8 @@ func TestNewMounter(t *testing.T) {
 				AccessKeys:    ":test-api-key",
 				AuthType:      "iam",
 				KpRootKeyCrn:  "test-kp-root-key-crn",
-				MountOptions:  []string{"cipher_suites=default", "opt1=val1"},
-				MounterUtils:  &(mounterUtils.MounterOptsUtils{}),
+				MountOptions:  []string{"opt1=val1", "cipher_suites=default"},
+				MounterUtils:  &mounterUtils.MounterOptsUtils{},
 			},
 			expectedErr: nil,
 		},
@@ -72,7 +85,7 @@ func TestNewMounter(t *testing.T) {
 				UID:           "fake-uid",
 				GID:           "fake-gid",
 				MountOptions:  []string{"opt1=val1", "opt2=val2"},
-				MounterUtils:  &(mounterUtils.MounterOptsUtils{}),
+				MounterUtils:  &mounterUtils.MounterOptsUtils{},
 			},
 			expectedErr: nil,
 		},
@@ -98,7 +111,7 @@ func TestNewMounter(t *testing.T) {
 				AuthType:      "hmac",
 				KpRootKeyCrn:  "test-kp-root-key-crn",
 				MountOptions:  []string{"cipher_suites=default"},
-				MounterUtils:  &(mounterUtils.MounterOptsUtils{}),
+				MounterUtils:  &mounterUtils.MounterOptsUtils{},
 			},
 			expectedErr: nil,
 		},
@@ -110,8 +123,23 @@ func TestNewMounter(t *testing.T) {
 
 			result := factory.NewMounter(test.attrib, test.secretMap, test.mountOptions, nil)
 
-			sort.Strings(test.expected.(*S3fsMounter).MountOptions)
-			sort.Strings(result.(*S3fsMounter).MountOptions)
+			if s3fs, ok := result.(*S3fsMounter); ok {
+				expected := test.expected.(*S3fsMounter)
+				if !stringSlicesEqualIgnoreOrder(s3fs.MountOptions, expected.MountOptions) {
+					t.Errorf("MountOptions mismatch.\nGot:  %v\nWant: %v", s3fs.MountOptions, expected.MountOptions)
+				}
+				s3fs.MountOptions = nil
+				expected.MountOptions = nil
+			}
+			if rclone, ok := result.(*RcloneMounter); ok {
+				expected := test.expected.(*RcloneMounter)
+				if !stringSlicesEqualIgnoreOrder(rclone.MountOptions, expected.MountOptions) {
+					t.Errorf("MountOptions mismatch.\nGot:  %v\nWant: %v", rclone.MountOptions, expected.MountOptions)
+				}
+				rclone.MountOptions = nil
+				expected.MountOptions = nil
+			}
+
 			assert.Equal(t, result, test.expected)
 
 			if !reflect.DeepEqual(result, test.expected) {
