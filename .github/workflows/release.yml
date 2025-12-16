@@ -13,16 +13,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  common-setup:
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.check_release.outputs.should_release }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      
+      - name: Get commit message
+        id: get_commit
+        run: |
+          message=$(git log -1 --pretty=%B)
+          echo "message=$message" >> "$GITHUB_OUTPUT"
+      
+      - name: Check if release should be triggered
+        id: check_release
+        run: |
+          if [[ "${{ steps.get_commit.outputs.message }}" == *"release"* ]]; then
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "Release will be triggered (found 'release' in commit message)"
+          else
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "Release will NOT be triggered (no 'release' in commit message)"
+          fi
+
   build-and-test:
+    needs: common-setup
     runs-on: ubuntu-latest
     permissions:
       contents: write      # needed to push coverage to gh-pages
       pull-requests: write # needed to comment on PRs
-
-    strategy:
-      matrix:
-        go-version: ["1.24.5"]
-      fail-fast: false
 
     steps:
       - name: Checkout code
@@ -33,7 +57,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: "1.24.5"
           check-latest: true
           cache: true
 
@@ -74,7 +98,8 @@ jobs:
           ./scripts/publishCoverage.sh
 
   release:
-    needs: build-and-test
+    needs: [common-setup, build-and-test]
+    if: needs.common-setup.outputs.should_release == 'true'
     permissions: write-all
     runs-on: ubuntu-latest
 
@@ -87,57 +112,66 @@ jobs:
       IS_LATEST_RELEASE: 'true'
       APP_VERSION: 1.0.5
 
-    # Add the condition to trigger release based on commit message containing "release"
-    if: contains(github.event.head_commit.message, 'release')
-
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v5
+      - name: Checkout Code
+        uses: actions/checkout@v5
 
-    - name: Print Go Version
-      run: go version
+      - name: Print Go Version
+        run: go version
 
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
-      with:
-        languages: "go"
-    - name: Run Unit Tests for cos csi mounter
-      run: sudo make ut-coverage -C ${{ matrix.package_dir }}
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: "go"
+          
+      - name: Run Unit Tests for cos csi mounter
+        run: sudo make ut-coverage -C ${{ matrix.package_dir }}
 
-    - name: Build Debian and RPM packages for cos-csi-mounter systemd service
-      run: |
+      - name: Build Debian and RPM packages for cos-csi-mounter systemd service
+        run: |
           cd ${{ matrix.package_dir }}
           make packages
 
-    - name: Get last commit message
-      id: check_commit
-      run:  |
-            message=$(git log -1 --pretty=%B)
-            message="${message//'%'/'%25'}"  # Escape '%'
-            message="${message//$'\n'/'%0A'}"  # Escape newlines
-            message="${message//$'\r'/'%0D'}"  # Escape carriage returns
-            echo "message=$message" >> "$GITHUB_OUTPUT"
-      shell: bash
+      - name: Get last commit message
+        id: check_commit
+        run:  |
+          message=$(git log -1 --pretty=%B)
+          message="${message//'%'/'%25'}"  # Escape '%'
+          message="${message//$'\n'/'%0A'}"  # Escape newlines
+          message="${message//$'\r'/'%0D'}"  # Escape carriage returns
+          echo "message=$message" >> "$GITHUB_OUTPUT"
+        shell: bash
 
-    - name: Check Commit Message
-      run: |
+      - name: Check Commit Message
+        run: |
           echo "Commit Message: ${{ steps.check_commit.outputs.message }}"
 
-    - name: Latest Version (Tag and Release)
-      id: release
-      if: contains(steps.check_commit.outputs.message, 'publish')
-      uses: softprops/action-gh-release@v2
-      with:
-        files: |
-          /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.deb.tar.gz
-          /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.deb.tar.gz.sha256
-          /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz
-          /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz.sha256
-        tag_name: v1.0.5
-        name: v1.0.5
-        body: |
-          ## 🚀 What’s New
-          - Fix for rclone mount hang issue
-        prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
+      - name: Check Commit Message for Release Trigger
+        id: check_commit_condition
+        run: |
+          echo "Commit Message: ${{ steps.check_commit.outputs.message }}"
+          if [[ "${{ steps.check_commit.outputs.message }}" == *"release"* ]]; then
+            echo "Release job triggered"
+          else
+            echo "No 'release' keyword found in the commit message. Skipping release job."
+            exit 0  # Exit early to skip the release job
+          fi
+
+      - name: Latest Version (Tag and Release)
+        if: success()
+        id: release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.deb.tar.gz
+            /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.deb.tar.gz.sha256
+            /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz
+            /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz.sha256
+          tag_name: v1.0.5
+          name: v1.0.5
+          body: |
+            ## 🚀 What’s New
+            - Fix for rclone mount hang issue
+          prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
