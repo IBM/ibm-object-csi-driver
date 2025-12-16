@@ -48,6 +48,11 @@ jobs:
       pull-requests: write # needed to comment on PRs
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
       - name: Install system dependencies (bc + docker)
         run: |
           sudo apt-get update -qq
@@ -101,6 +106,9 @@ jobs:
       APP_VERSION: 1.0.5
 
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v5
+
       - name: Print Go Version
         run: go version
 
@@ -109,8 +117,8 @@ jobs:
         with:
           languages: "go"
         
-      - name: Run Unit Tests for entire repo
-        run: sudo make ut-coverage
+      - name: Run Unit Tests for cos csi mounter
+        run: sudo make ut-coverage -C ${{ matrix.package_dir }}
 
       - name: Build Debian and RPM packages for cos-csi-mounter systemd service
         run: |
