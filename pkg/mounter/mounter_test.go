@@ -1,12 +1,13 @@
 package mounter
 
 import (
+	"reflect"
+	"sort"
+	"testing"
+
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/stretchr/testify/assert"
-
-	"reflect"
-	"testing"
 )
 
 func TestNewMounter(t *testing.T) {
@@ -40,7 +41,7 @@ func TestNewMounter(t *testing.T) {
 				AccessKeys:    ":test-api-key",
 				AuthType:      "iam",
 				KpRootKeyCrn:  "test-kp-root-key-crn",
-				MountOptions:  []string{"opt1=val1", "cipher_suites=default"},
+				MountOptions:  []string{"cipher_suites=default", "opt1=val1"},
 				MounterUtils:  &(mounterUtils.MounterOptsUtils{}),
 			},
 			expectedErr: nil,
@@ -109,6 +110,8 @@ func TestNewMounter(t *testing.T) {
 
 			result := factory.NewMounter(test.attrib, test.secretMap, test.mountOptions, nil)
 
+			sort.Strings(test.expected.(*S3fsMounter).MountOptions)
+			sort.Strings(result.(*S3fsMounter).MountOptions)
 			assert.Equal(t, result, test.expected)
 
 			if !reflect.DeepEqual(result, test.expected) {
