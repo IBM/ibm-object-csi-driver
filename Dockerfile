@@ -26,7 +26,7 @@ RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && cd s3fs-fuse && \
     ./autogen.sh && ./configure --prefix=/usr/local --with-openssl && make && make install && \
     rm -rf /var/lib/apt/lists/*
 
-FROM registry.access.redhat.com/ubi8/ubi AS rclone-builder
+FROM registry.access.redhat.com/ubi8/ubi:latest AS rclone-builder
 RUN yum install wget git gcc -y
 
 ENV ARCH=amd64
@@ -63,5 +63,7 @@ LABEL git-commit-id=${git_commit_id}
 RUN yum update -y && yum install fuse fuse-libs fuse3 fuse3-libs -y
 COPY --from=s3fs-builder /usr/local/bin/s3fs /usr/bin/s3fs
 COPY --from=rclone-builder /usr/local/bin/rclone /usr/bin/rclone
-COPY ibm-object-csi-driver ibm-object-csi-driver
+RUN ls -alh ./ibm-object-csi-driver || echo "ibm-object-csi-driver file not found"
+
+COPY ./ibm-object-csi-driver /ibm-object-csi-driver
 ENTRYPOINT ["/ibm-object-csi-driver"]
