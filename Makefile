@@ -27,7 +27,7 @@ GOPACKAGES=$(shell go list ./... | grep -v ./tests/... | grep -v /mounter/utils 
 
 .PHONY: test
 test:
-	go run github.com/pierrre/gotestcover@latest -v -race -coverprofile=coverage.out ${GOPACKAGES}
+	go test -v -race ${GOPACKAGES} -coverprofile=coverage.out
 
 .PHONY: deps
 deps:

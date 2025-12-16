@@ -97,7 +97,10 @@ jobs:
 
       - name: Build driver image
         run: |
-          docker build --build-arg RHSM_USER=${{ secrets.RHSM_USER }} --build-arg RHSM_PASS=${{ secrets.RHSM_PASS }} .
+          make driver
+        env:
+          RHSM_USER: ${{ secrets.RHSM_USER }}
+          RHSM_PASS: ${{ secrets.RHSM_PASS }}
 
       - name: Publish coverage
         if: success()
