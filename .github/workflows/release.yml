@@ -19,11 +19,6 @@ jobs:
       should_release: ${{ steps.check_release.outputs.should_release }}
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
       - name: Print Go Version
         run: go version
 
@@ -118,9 +113,9 @@ jobs:
         with:
           languages: "go"
         
-      - name: Run Unit Tests for cos csi mounter
-        run: sudo make ut-coverage -C ${{ matrix.package_dir }}
-
+      - name: Run Unit Tests for entire repo
+        run: |
+          sudo make ut-coverage
       - name: Build Debian and RPM packages for cos-csi-mounter systemd service
         run: |
           cd ${{ matrix.package_dir }}
