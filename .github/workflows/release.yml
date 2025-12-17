@@ -36,12 +36,12 @@ jobs:
       - name: Check if release should be triggered
         id: check_release
         run: |
-          if [[ "${{ steps.get_commit.outputs.message }}" == *"release"* ]]; then
+          if [[ "${{ steps.get_commit.outputs.message }}" == *"publish"* ]]; then
             echo "should_release=true" >> "$GITHUB_OUTPUT"
-            echo "Release will be triggered (found 'release' in commit message)"
+            echo "Publish will be triggered (found 'publish' in commit message)"
           else
             echo "should_release=false" >> "$GITHUB_OUTPUT"
-            echo "Release will NOT be triggered (no 'release' in commit message)"
+            echo "Publish will NOT be triggered (no 'publish' in commit message)"
           fi
 
   build-and-test:
@@ -95,7 +95,7 @@ jobs:
           ./scripts/publishCoverage.sh
 
   release:
-    needs: [common-setup, build-and-test]
+    needs: common-setup
     if: needs.common-setup.outputs.should_release == 'true'
     permissions: write-all
     runs-on: ubuntu-latest
