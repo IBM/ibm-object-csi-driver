@@ -19,6 +19,11 @@ jobs:
       should_release: ${{ steps.check_release.outputs.should_release }}
     
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          
       - name: Print Go Version
         run: go version
 
