@@ -137,16 +137,6 @@ jobs:
         run: |
           echo "Commit Message: ${{ steps.check_commit.outputs.message }}"
 
-      - name: Check Commit Message for Release Trigger
-        id: check_commit_condition
-        run: |
-          echo "Commit Message: ${{ steps.check_commit.outputs.message }}"
-          if [[ "${{ steps.check_commit.outputs.message }}" == *"release"* ]]; then
-            echo "Release job triggered"
-          else
-            echo "No 'release' keyword found in the commit message. Skipping release job."
-            exit 0  # Exit early to skip the release job
-          fi
 
       - name: Latest Version (Tag and Release)
         if: success()
