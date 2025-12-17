@@ -52,11 +52,6 @@ jobs:
       pull-requests: write # needed to comment on PRs
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
       - name: Install system dependencies (bc + docker)
         run: |
           sudo apt-get update -qq
@@ -110,9 +105,6 @@ jobs:
       APP_VERSION: 1.0.5
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v5
-
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
