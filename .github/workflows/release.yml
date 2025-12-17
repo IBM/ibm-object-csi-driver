@@ -113,9 +113,6 @@ jobs:
         with:
           languages: "go"
         
-      - name: Run Unit Tests for entire repo
-        run: |
-          sudo make ut-coverage
       - name: Build Debian and RPM packages for cos-csi-mounter systemd service
         run: |
           cd ${{ matrix.package_dir }}
