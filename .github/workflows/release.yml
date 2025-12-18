@@ -21,27 +21,33 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
           
       - name: Print Go Version
         run: go version
 
-      - name: Get commit message
-        id: get_commit
-        run: |
+      - name: Get last commit message
+        id: check_commit
+        run:  |
           message=$(git log -1 --pretty=%B)
+          message="${message//'%'/'%25'}"  # Escape '%'
+          message="${message//$'\n'/'%0A'}"  # Escape newlines
+          message="${message//$'\r'/'%0D'}"  # Escape carriage returns
           echo "message=$message" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Check Commit Message
+        run: |
+          echo "Commit Message: ${{ steps.check_commit.outputs.message }}"
       
       - name: Check if release should be triggered
         id: check_release
         run: |
-          if [[ "${{ steps.get_commit.outputs.message }}" == *"publish"* ]]; then
+          if [[ "${{ steps.check_commit.outputs.message }}" == *"publish"* ]]; then
             echo "should_release=true" >> "$GITHUB_OUTPUT"
-            echo "Publish will be triggered (found 'publish' in commit message)"
+            echo "Debian/RPM packages will be created"
           else
             echo "should_release=false" >> "$GITHUB_OUTPUT"
-            echo "Publish will NOT be triggered (no 'publish' in commit message)"
+            echo "Debian/RPM packages will not be created"
           fi
 
   build-and-test:
@@ -122,21 +128,6 @@ jobs:
         run: |
           cd ${{ matrix.package_dir }}
           make packages
-
-      - name: Get last commit message
-        id: check_commit
-        run:  |
-          message=$(git log -1 --pretty=%B)
-          message="${message//'%'/'%25'}"  # Escape '%'
-          message="${message//$'\n'/'%0A'}"  # Escape newlines
-          message="${message//$'\r'/'%0D'}"  # Escape carriage returns
-          echo "message=$message" >> "$GITHUB_OUTPUT"
-        shell: bash
-
-      - name: Check Commit Message
-        run: |
-          echo "Commit Message: ${{ steps.check_commit.outputs.message }}"
-
 
       - name: Latest Version (Tag and Release)
         if: success()
