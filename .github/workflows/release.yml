@@ -144,6 +144,8 @@ jobs:
           body: |
             ## 🚀 What’s New
             - Fix for rclone mount hang issue
+            - Add support for s3fs disable_noobj_cache flag
+            - Skip unmount for 'is not a mountpoint' error
           prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
 
       - name: Perform CodeQL Analysis
