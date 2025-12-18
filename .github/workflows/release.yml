@@ -154,5 +154,6 @@ jobs:
             ## 🚀 What’s New
             - Fix for rclone mount hang issue
           prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
+
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
