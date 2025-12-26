@@ -86,7 +86,7 @@ func TestNewRcloneMounter_MountOptsInSecret(t *testing.T) {
 	assert.True(t, ok)
 
 	assert.Equal(t, rCloneMounter.BucketName, secretMap["bucketName"])
-	assert.Equal(t, rCloneMounter.ObjectPath, secretMap["objectPath"])
+	assert.Equal(t, rCloneMounter.objectPath, secretMap["objectPath"])
 	assert.Equal(t, rCloneMounter.EndPoint, secretMap["cosEndpoint"])
 	assert.Equal(t, rCloneMounter.LocConstraint, secretMap["locationConstraint"])
 	assert.Equal(t, rCloneMounter.UID, secretMap["uid"])

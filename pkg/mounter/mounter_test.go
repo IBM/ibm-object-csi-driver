@@ -48,7 +48,7 @@ func TestNewMounter(t *testing.T) {
 			mountOptions: []string{"opt1=val1", "cipher_suites=default"},
 			expected: &S3fsMounter{
 				BucketName:    "test-bucket-name",
-				ObjectPath:    "test-obj-path",
+				objectPath:    "test-obj-path",
 				EndPoint:      "test-endpoint",
 				LocConstraint: "test-loc-constraint",
 				AccessKeys:    ":test-api-key",
@@ -76,7 +76,7 @@ func TestNewMounter(t *testing.T) {
 			mountOptions: []string{"opt1=val1", "opt2=val2"},
 			expected: &RcloneMounter{
 				BucketName:    "test-bucket-name",
-				ObjectPath:    "test-obj-path",
+				objectPath:    "test-obj-path",
 				EndPoint:      "test-endpoint",
 				LocConstraint: "test-loc-constraint",
 				AccessKeys:    "test-access-key:test-secret-key",
@@ -104,7 +104,7 @@ func TestNewMounter(t *testing.T) {
 			mountOptions: []string{"cipher_suites=default"},
 			expected: &S3fsMounter{
 				BucketName:    "test-bucket-name",
-				ObjectPath:    "test-obj-path",
+				objectPath:    "test-obj-path",
 				EndPoint:      "test-endpoint",
 				LocConstraint: "test-loc-constraint",
 				AccessKeys:    "test-access-key:test-secret-key",
