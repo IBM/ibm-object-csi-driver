@@ -4,7 +4,7 @@ import "errors"
 
 type fakercloneMounter struct {
 	bucketName    string
-	objPath       string
+	objectPath    string
 	endPoint      string
 	locConstraint string
 	authType      string
@@ -20,7 +20,7 @@ type fakercloneMounter struct {
 func fakenewRcloneMounter(isFailedMount, isFailedUnmount bool) Mounter {
 	return &fakercloneMounter{
 		bucketName:      bucketName,
-		objPath:         objPath,
+		objectPath:      objectPath,
 		endPoint:        endPoint,
 		locConstraint:   region,
 		accessKeys:      keys,
