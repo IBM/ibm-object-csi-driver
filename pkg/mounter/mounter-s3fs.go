@@ -29,7 +29,7 @@ import (
 // s3fsMounter Implements Mounter
 type S3fsMounter struct {
 	BucketName    string //From Secret in SC
-	ObjPath       string //From Secret in SC
+	objectPath    string //From Secret in SC
 	EndPoint      string //From Secret in SC
 	LocConstraint string //From Secret in SC
 	AuthType      string
@@ -73,8 +73,8 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 	if val, check = secretMap["bucketName"]; check {
 		mounter.BucketName = val
 	}
-	if val, check = secretMap["objPath"]; check {
-		mounter.ObjPath = val
+	if val, check = secretMap["objectPath"]; check {
+		mounter.objectPath = val
 	}
 	if val, check = secretMap["accessKey"]; check {
 		accessKey = val
@@ -100,8 +100,8 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 		mounter.AuthType = "hmac"
 	}
 
-	klog.Infof("newS3fsMounter args:\n\tbucketName: [%s]\n\tobjPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]\n\tkpRootKeyCrn: [%s]",
-		mounter.BucketName, mounter.ObjPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType, mounter.KpRootKeyCrn)
+	klog.Infof("newS3fsMounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]\n\tkpRootKeyCrn: [%s]",
+		mounter.BucketName, mounter.objectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType, mounter.KpRootKeyCrn)
 
 	updatedOptions := updateS3FSMountOptions(mountOptions, secretMap, defaultParams)
 	mounter.MountOptions = updatedOptions
@@ -147,8 +147,12 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 		return fmt.Errorf("S3FSMounter Mount: Cannot create file %s: %v", passwdFile, err)
 	}
 
-	if s3fs.ObjPath != "" {
-		bucketName = fmt.Sprintf("%s:/%s", s3fs.BucketName, s3fs.ObjPath)
+	if s3fs.objectPath != "" {
+		path := strings.TrimPrefix(s3fs.objectPath, "/")
+		if path != "" {
+			path = "/" + path
+		}
+		bucketName = fmt.Sprintf("%s:%s", s3fs.BucketName, path)
 	} else {
 		bucketName = s3fs.BucketName
 	}
