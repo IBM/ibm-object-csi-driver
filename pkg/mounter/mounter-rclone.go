@@ -30,7 +30,7 @@ import (
 // rcloneMounter Implements Mounter
 type RcloneMounter struct {
 	BucketName    string //From Secret in SC
-	objectPath    string //From Secret in SC
+	ObjectPath    string //From Secret in SC
 	EndPoint      string //From Secret in SC
 	LocConstraint string //From Secret in SC
 	AuthType      string
@@ -79,7 +79,7 @@ func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounte
 		mounter.BucketName = val
 	}
 	if val, check = secretMap["objectPath"]; check {
-		mounter.objectPath = val
+		mounter.ObjectPath = val
 	}
 	if val, check = secretMap["accessKey"]; check {
 		accessKey = val
@@ -116,7 +116,7 @@ func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounte
 	}
 
 	klog.Infof("newRcloneMounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
-		mounter.BucketName, mounter.objectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType)
+		mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType)
 
 	updatedOptions := updateMountOptions(mountOptions, secretMap)
 	mounter.MountOptions = updatedOptions
@@ -191,8 +191,8 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 		return err
 	}
 
-	if rclone.objectPath != "" {
-		bucketName = fmt.Sprintf("%s:%s/%s", remote, rclone.BucketName, rclone.objectPath)
+	if rclone.ObjectPath != "" {
+		bucketName = fmt.Sprintf("%s:%s/%s", remote, rclone.BucketName, rclone.ObjectPath)
 	} else {
 		bucketName = fmt.Sprintf("%s:%s", remote, rclone.BucketName)
 	}

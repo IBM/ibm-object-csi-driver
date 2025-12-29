@@ -33,7 +33,7 @@ func TestNewS3fsMounter_Success(t *testing.T) {
 	assert.True(t, ok)
 
 	assert.Equal(t, s3fsMounter.BucketName, secretMap["bucketName"])
-	assert.Equal(t, s3fsMounter.objectPath, secretMap["objectPath"])
+	assert.Equal(t, s3fsMounter.ObjectPath, secretMap["objectPath"])
 	assert.Equal(t, s3fsMounter.EndPoint, secretMap["cosEndpoint"])
 	assert.Equal(t, s3fsMounter.LocConstraint, secretMap["locationConstraint"])
 }
@@ -62,7 +62,7 @@ func TestNewS3fsMounter_Success_Hmac(t *testing.T) {
 	assert.True(t, ok)
 
 	assert.Equal(t, s3fsMounter.BucketName, secretMap["bucketName"])
-	assert.Equal(t, s3fsMounter.objectPath, secretMap["objectPath"])
+	assert.Equal(t, s3fsMounter.ObjectPath, secretMap["objectPath"])
 	assert.Equal(t, s3fsMounter.EndPoint, secretMap["cosEndpoint"])
 	assert.Equal(t, s3fsMounter.LocConstraint, secretMap["locationConstraint"])
 }
@@ -85,7 +85,7 @@ func TestS3FSMount_NodeServer_Positive(t *testing.T) {
 		}),
 		LocConstraint: "test-location",
 		MountOptions:  mountOptions,
-		objectPath:    "test-objectPath",
+		ObjectPath:    "test-objectPath",
 	}
 
 	err := s3fs.Mount(source, target)
