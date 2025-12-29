@@ -192,7 +192,8 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 	}
 
 	if rclone.ObjectPath != "" {
-		bucketName = fmt.Sprintf("%s:%s/%s", remote, rclone.BucketName, rclone.ObjectPath)
+		trimmedPath := strings.TrimPrefix(rclone.ObjectPath, "/")
+		bucketName = fmt.Sprintf("%s:%s/%s", remote, rclone.BucketName, trimmedPath)
 	} else {
 		bucketName = fmt.Sprintf("%s:%s", remote, rclone.BucketName)
 	}
