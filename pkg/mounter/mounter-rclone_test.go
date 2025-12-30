@@ -255,6 +255,22 @@ func TestRcloneUnmount_NodeServer_Negative(t *testing.T) {
 }
 
 func TestCreateConfig_Success(t *testing.T) {
+	originalMakeDir := MakeDir
+	originalCreateFile := CreateFile
+	originalChmod := Chmod
+
+	MakeDir = func(string, os.FileMode) error { return nil }
+	CreateFile = func(string) (*os.File, error) {
+		return os.CreateTemp("", "rclone-test-*.conf")
+	}
+	Chmod = func(string, os.FileMode) error { return nil }
+
+	defer func() {
+		MakeDir = originalMakeDir
+		CreateFile = originalCreateFile
+		Chmod = originalChmod
+	}()
+
 	rclone := &RcloneMounter{
 		AccessKeys:    "accessKey:secretKey",
 		LocConstraint: "us-south",
@@ -265,6 +281,8 @@ func TestCreateConfig_Success(t *testing.T) {
 }
 
 func TestCreateConfig_MakeDirFails(t *testing.T) {
+	originalMakeDir := MakeDir
+	defer func() { MakeDir = originalMakeDir }()
 	MakeDir = func(string, os.FileMode) error {
 		return errors.New("mkdir failed")
 	}
@@ -273,6 +291,13 @@ func TestCreateConfig_MakeDirFails(t *testing.T) {
 }
 
 func TestCreateConfig_FileCreateFails(t *testing.T) {
+	originalMakeDir := MakeDir
+	originalCreateFile := CreateFile
+	defer func() {
+		MakeDir = originalMakeDir
+		CreateFile = originalCreateFile
+	}()
+
 	MakeDir = func(string, os.FileMode) error { return nil }
 	CreateFile = func(string) (*os.File, error) {
 		return nil, errors.New("file create failed")
@@ -282,14 +307,29 @@ func TestCreateConfig_FileCreateFails(t *testing.T) {
 }
 
 func TestCreateConfig_ChmodFails(t *testing.T) {
+	originalMakeDir := MakeDir
+	originalCreateFile := CreateFile
+	originalChmod := Chmod
+	defer func() {
+		MakeDir = originalMakeDir
+		CreateFile = originalCreateFile
+		Chmod = originalChmod
+	}()
+
+	tmpfile, err := os.CreateTemp("", "test-*.conf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpfile.Name())
+
 	MakeDir = func(string, os.FileMode) error { return nil }
 	CreateFile = func(string) (*os.File, error) {
-		return os.CreateTemp("", "test")
+		return tmpfile, nil
 	}
 	Chmod = func(string, os.FileMode) error {
 		return errors.New("chmod failed")
 	}
-	err := createConfig("/tmp/testconfig", &RcloneMounter{})
+	err = createConfig("/tmp/testconfig", &RcloneMounter{})
 	assert.ErrorContains(t, err, "chmod failed")
 }
 
