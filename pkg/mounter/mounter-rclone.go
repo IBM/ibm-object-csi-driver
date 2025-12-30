@@ -255,7 +255,7 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 }
 
 func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
-	var accessKey, secretKey, apiKey, envAuth, v2Auth string
+	var accessKey, secretKey, apiKey, envAuth, v2Auth, iamEndpoint string
 	if rclone.AuthType == "hmac" {
 		keys := strings.Split(rclone.AccessKeys, ":")
 		accessKey = keys[0]
@@ -266,6 +266,10 @@ func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
 		apiKey = rclone.AccessKeys
 		v2Auth = "true"
 		envAuth = "false"
+	}
+
+	if rclone.IAMEndpoint != "" {
+		iamEndpoint = rclone.IAMEndpoint
 	}
 
 	configParams := []string{
@@ -279,6 +283,7 @@ func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
 		"secret_access_key = " + secretKey,
 		"ibm_api_key = " + apiKey,
 		"ibm_resource_instance_id = " + rclone.serviceInstanceID,
+		"ibm_iam_endpoint = " + iamEndpoint,
 	}
 
 	if rclone.LocConstraint != "" {
