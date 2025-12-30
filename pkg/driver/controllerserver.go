@@ -549,7 +549,6 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 
 	if bytesVal, ok := secret.Data["objectPath"]; ok {
 		objectPath = string(bytesVal)
-		klog.Infof("parseCustomSecret: Found objectPath: %s", objectPath)
 	}
 
 	secretMapCustom["accessKey"] = accessKey
