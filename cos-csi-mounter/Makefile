@@ -18,14 +18,6 @@ RPM_ARCH := x86_64
 RPM_RELEASE_NUM := 1
 REDHAT_SPEC := $(BUILD_DIR)/red-hat.spec
 
-test:
-	go test -v -timeout 1800s -coverprofile=cover.out ./...
-	go tool cover -html=cover.out -o=cover.html
-
-ut-coverage: test
-	@./scripts/coverage.sh
-	rm cover.html cover.out
-
 build-linux:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod mod -o ${BIN_DIR}/cos-csi-mounter-server -ldflags "-s -w -X main.Version=$(APP_VERSION) -X main.GitCommit=$$(git rev-parse HEAD)" -a ./server
 	./${BIN_DIR}/cos-csi-mounter-server version
