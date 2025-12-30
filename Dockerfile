@@ -26,8 +26,9 @@ RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && cd s3fs-fuse && \
     ./autogen.sh && ./configure --prefix=/usr/local --with-openssl && make && make install && \
     rm -rf /var/lib/apt/lists/*
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.3-1612 AS rclone-builder
-RUN yum install wget git gcc -y
+FROM  registry.access.redhat.com/ubi9/ubi-minimal:9.3-1612 AS rclone-builder
+RUN   microdnf update --setopt=tsflags=nodocs && \
+      microdnf install -y --nodocs wget git gcc
 
 ENV ARCH=amd64
 ENV GO_VERSION=1.25.0
