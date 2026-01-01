@@ -320,7 +320,11 @@ func TestCreateConfig_ChmodFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer func() {
+		if removeErr := os.Remove(tmpfile.Name()); removeErr != nil && !os.IsNotExist(removeErr) {
+			t.Logf("Failed to remove temp file: %v", removeErr)
+		}
+	}()
 
 	MakeDir = func(string, os.FileMode) error { return nil }
 	CreateFile = func(string) (*os.File, error) {
