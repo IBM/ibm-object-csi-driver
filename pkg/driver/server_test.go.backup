@@ -29,8 +29,6 @@ import (
 )
 
 func TestNonBlockingGRPCServer(t *testing.T) {
-	t.Skip("Temporarily skipping due to socket binding issues")
-
 	t.Run("Positive", func(t *testing.T) {
 		lgr, teardown := GetTestLogger(t)
 		defer teardown()
