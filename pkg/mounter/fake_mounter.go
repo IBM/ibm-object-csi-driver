@@ -4,7 +4,7 @@ import "github.com/IBM/ibm-object-csi-driver/pkg/constants"
 
 const (
 	bucketName = "fakeBucketName"
-	objPath    = "fakePath"
+	objectPath = "fakePath"
 	endPoint   = "fakeEndPoint"
 	region     = "fakeRegion"
 	keys       = "fakeKeys"

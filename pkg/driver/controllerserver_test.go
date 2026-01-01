@@ -62,6 +62,7 @@ var (
 		"cosEndpoint":        "test-endpoint",
 		"iamEndpoint":        "testIamEndpoint",
 		"bucketName":         bucketName,
+		"objectPath":         "test/object/path",
 	}
 
 	testEndpoint = flag.String("endpoint", "unix:/tmp/testcsi.sock", "Test CSI endpoint")
@@ -192,6 +193,7 @@ func TestCreateVolume(t *testing.T) {
 						constants.BucketVersioning: "true",
 						"locationConstraint":       "test-region",
 						"cosEndpoint":              "test-endpoint",
+						"objectPath":               "test/object/path",
 					},
 				},
 			},

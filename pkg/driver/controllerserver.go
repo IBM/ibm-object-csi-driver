@@ -132,6 +132,13 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		secretMapCustom := parseCustomSecret(secret)
 		klog.Info("custom secret parameters parsed successfully, length of custom secret: ", len(secretMapCustom))
 
+		if objectPath, exists := secretMapCustom["objectPath"]; exists {
+			klog.Infof("volume_id:%q objectPath found in secret: %q", volumeID, objectPath)
+			params["objectPath"] = objectPath
+		} else {
+			klog.Infof("volume_id:%q no objectPath in secret (mounting bucket root)", volumeID)
+		}
+
 		secretMap = secretMapCustom
 	}
 
@@ -497,6 +504,7 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 		cosEndpoint        string
 		locationConstraint string
 		bucketVersioning   string
+		objectPath         string
 	)
 
 	if bytesVal, ok := secret.Data["accessKey"]; ok {
@@ -539,6 +547,10 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 		bucketVersioning = string(bytesVal)
 	}
 
+	if bytesVal, ok := secret.Data["objectPath"]; ok {
+		objectPath = string(bytesVal)
+	}
+
 	secretMapCustom["accessKey"] = accessKey
 	secretMapCustom["secretKey"] = secretKey
 	secretMapCustom["apiKey"] = apiKey
@@ -549,6 +561,7 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 	secretMapCustom["cosEndpoint"] = cosEndpoint
 	secretMapCustom["locationConstraint"] = locationConstraint
 	secretMapCustom[constants.BucketVersioning] = bucketVersioning
+	secretMapCustom["objectPath"] = objectPath
 
 	return secretMapCustom
 }
