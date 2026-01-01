@@ -100,7 +100,6 @@ func TestCreateVolume(t *testing.T) {
 						"userProvidedBucket": "true",
 						"locationConstraint": "test-region",
 						"cosEndpoint":        "test-endpoint",
-						"objectPath":         "test/object/path",
 					},
 				},
 			},
