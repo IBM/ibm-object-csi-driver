@@ -80,7 +80,7 @@ func TestSetup(t *testing.T) {
 		},
 		{
 			testCaseName: "Negative: Wrong Scheme",
-			endpoint:     flag.String("wrongschemaendpoint", "wrong-scheme:/tmp/testcsi.sock", "Test CSI endpoint"),
+			endpoint:     flag.String("wrongschemaendpoint", "wrong-scheme:///tmp/testcsi.sock", "Test CSI endpoint"),
 			mode:         "controller",
 			expectedErr:  errors.New("endpoint scheme not supported"),
 		},
