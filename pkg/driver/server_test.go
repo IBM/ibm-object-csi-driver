@@ -62,7 +62,7 @@ func TestSetup(t *testing.T) {
 		},
 		{
 			testCaseName: "Positive: TCP Scheme",
-			endpoint:     flag.String("tcpendpoint", "tcp:/tmp/testtcpcsi.sock", "Test CSI endpoint"),
+			endpoint:     flag.String("tcpendpoint", "tcp://127.0.0.1:0", "Test CSI endpoint"),
 			mode:         "node",
 			expectedErr:  nil,
 		},
@@ -74,9 +74,9 @@ func TestSetup(t *testing.T) {
 		},
 		{
 			testCaseName: "Negative: Wrong endpoint format",
-			endpoint:     flag.String("wrongendpoint", "---:/tmp/testcsi.sock", "Test CSI endpoint"),
+			endpoint:     flag.String("wrongendpoint", "://", "Test CSI endpoint"),
 			mode:         "controller",
-			expectedErr:  errors.New("first path segment in URL cannot contain colon"),
+			expectedErr:  errors.New("missing protocol scheme"),
 		},
 		{
 			testCaseName: "Negative: Wrong Scheme",
