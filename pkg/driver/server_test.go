@@ -29,8 +29,6 @@ import (
 )
 
 func TestNonBlockingGRPCServer(t *testing.T) {
-	t.Skip("Temporarily skipping due to socket binding issues")
-
 	t.Run("Positive", func(t *testing.T) {
 		lgr, teardown := GetTestLogger(t)
 		defer teardown()
@@ -64,7 +62,7 @@ func TestSetup(t *testing.T) {
 		},
 		{
 			testCaseName: "Positive: TCP Scheme",
-			endpoint:     flag.String("tcpendpoint", "tcp://127.0.0.1:0", "Test CSI endpoint"),
+			endpoint:     flag.String("tcpendpoint", "tcp:/tmp/testtcpcsi.sock", "Test CSI endpoint"),
 			mode:         "node",
 			expectedErr:  nil,
 		},
@@ -76,13 +74,13 @@ func TestSetup(t *testing.T) {
 		},
 		{
 			testCaseName: "Negative: Wrong endpoint format",
-			endpoint:     flag.String("wrongendpoint", "://", "Test CSI endpoint"),
+			endpoint:     flag.String("wrongendpoint", "---:/tmp/testcsi.sock", "Test CSI endpoint"),
 			mode:         "controller",
-			expectedErr:  errors.New("missing protocol scheme"),
+			expectedErr:  errors.New("first path segment in URL cannot contain colon"),
 		},
 		{
 			testCaseName: "Negative: Wrong Scheme",
-			endpoint:     flag.String("wrongschemaendpoint", "wrong-scheme:///tmp/testcsi.sock", "Test CSI endpoint"),
+			endpoint:     flag.String("wrongschemaendpoint", "wrong-scheme:/tmp/testcsi.sock", "Test CSI endpoint"),
 			mode:         "controller",
 			expectedErr:  errors.New("endpoint scheme not supported"),
 		},
