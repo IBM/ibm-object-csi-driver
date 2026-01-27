@@ -56,3 +56,7 @@ func (s *fakeCOSSession) DeleteBucket(bucket string) error {
 	}
 	return nil
 }
+
+func (s *fakeCOSSession) UpdateQuotaLimit(quota int64, apiKey, bucketName, osEndpoint, iamEndpoint string) error {
+	return nil
+}

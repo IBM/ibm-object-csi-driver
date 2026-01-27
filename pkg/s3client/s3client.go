@@ -65,6 +65,8 @@ type ObjectStorageSession interface {
 	DeleteBucket(bucket string) error
 
 	SetBucketVersioning(bucket string, enable bool) error
+
+	UpdateQuotaLimit(quota int64, apiKey, bucketName, osEndpoint, iamEndpoint string) error
 }
 
 // COSSessionFactory represents a COS (S3) session factory
@@ -236,6 +238,10 @@ func (s *COSSessionFactory) NewObjectStorageSession(endpoint, locationConstraint
 		svc:    s3.New(sess),
 		logger: lgr,
 	}
+}
+
+func (s *COSSession) UpdateQuotaLimit(quota int64, apiKey, bucketName, osEndpoint, iamEndpoint string) error {
+	return UpdateQuotaLimit(quota, apiKey, bucketName, osEndpoint, iamEndpoint)
 }
 
 func UpdateQuotaLimit(quotaBytes int64, apiKey, bucketName, osEndpoint, iamEndpoint string) error {
