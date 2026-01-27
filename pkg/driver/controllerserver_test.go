@@ -60,7 +60,7 @@ var (
 		"kpRootKeyCRN":       "testKpRootKeyCRN",
 		"locationConstraint": "test-region",
 		"cosEndpoint":        "test-endpoint",
-		"iamEndpoint":        "testIamEndpoint",
+		"iamEndpoint":        "https://testIamEndpoint",
 		"bucketName":         bucketName,
 		"objectPath":         "test/object/path",
 	}
