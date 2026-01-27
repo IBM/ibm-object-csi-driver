@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/IBM/go-sdk-core/v5/core"
+	resourceconfigurationv1 "github.com/IBM/ibm-cos-sdk-go-config/resourceconfigurationv1"
 	"github.com/IBM/ibm-cos-sdk-go/aws"
 	"github.com/IBM/ibm-cos-sdk-go/aws/awserr"
 	"github.com/IBM/ibm-cos-sdk-go/aws/credentials"
@@ -234,4 +236,38 @@ func (s *COSSessionFactory) NewObjectStorageSession(endpoint, locationConstraint
 		svc:    s3.New(sess),
 		logger: lgr,
 	}
+}
+
+func UpdateQuotaLimit(quotaBytes int64, apiKey, bucketName, osEndpoint, iamEndpoint string) error {
+	var configEndpoint string
+	if strings.Contains(strings.ToLower(osEndpoint), "private") {
+		configEndpoint = constants.ResourceConfigEPPrivate
+	} else {
+		configEndpoint = constants.ResourceConfigEPDirect
+	}
+
+	authenticator := &core.IamAuthenticator{
+		ApiKey: apiKey,
+		URL:    iamEndpoint,
+	}
+
+	service, err := resourceconfigurationv1.NewResourceConfigurationV1(&resourceconfigurationv1.ResourceConfigurationV1Options{
+		Authenticator: authenticator,
+		URL:           configEndpoint,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create resource configuration service: %w", err)
+	}
+
+	options := &resourceconfigurationv1.UpdateBucketConfigOptions{
+		Bucket:    core.StringPtr(bucketName),
+		HardQuota: core.Int64Ptr(quotaBytes),
+	}
+
+	_, err = service.UpdateBucketConfig(options)
+	if err != nil {
+		return fmt.Errorf("failed to update quota for bucket %s to %d bytes: %w", bucketName, quotaBytes, err)
+	}
+
+	return nil
 }

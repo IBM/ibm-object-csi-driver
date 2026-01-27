@@ -68,6 +68,20 @@ var (
 	testEndpoint = flag.String("endpoint", "unix:/tmp/testcsi.sock", "Test CSI endpoint")
 )
 
+func secretWithQuota(quotaValue, resConfApiKeyValue string) map[string]string {
+	s := make(map[string]string)
+	for k, v := range testSecret {
+		s[k] = v
+	}
+	if quotaValue != "" {
+		s[constants.QuotaLimitKey] = quotaValue
+	}
+	if resConfApiKeyValue != "" {
+		s[constants.ResConfApiKey] = resConfApiKeyValue
+	}
+	return s
+}
+
 func TestCreateVolume(t *testing.T) {
 	testCases := []struct {
 		testCaseName     string
@@ -510,6 +524,85 @@ func TestCreateVolume(t *testing.T) {
 			}),
 			expectedResp: nil,
 			expectedErr:  errors.New("Invalid bucketVersioning value in storage class"),
+		},
+
+		{
+			testCaseName: "Positive: quotaLimit=true with res-conf-apikey",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
+				},
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 10 * 1024 * 1024 * 1024},
+				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
+			},
+			cosSession: &s3client.FakeCOSSessionFactory{},
+			expectedResp: &csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					VolumeId:      testVolumeName,
+					CapacityBytes: 10 * 1024 * 1024 * 1024,
+					VolumeContext: map[string]string{
+						"bucketName":         bucketName,
+						"userProvidedBucket": "true",
+						"locationConstraint": "test-region",
+						"cosEndpoint":        "test-endpoint",
+					},
+				},
+			},
+			expectedErr: nil,
+		},
+		{
+			testCaseName: "Positive: quotaLimit=true with regular apiKey fallback",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
+				},
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 5 * 1024 * 1024 * 1024},
+				Secrets:       secretWithQuota("true", ""),
+			},
+			cosSession: &s3client.FakeCOSSessionFactory{},
+			expectedResp: &csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					VolumeId:      testVolumeName,
+					CapacityBytes: 5 * 1024 * 1024 * 1024,
+					VolumeContext: map[string]string{
+						"bucketName":         bucketName,
+						"userProvidedBucket": "true",
+						"locationConstraint": "test-region",
+						"cosEndpoint":        "test-endpoint",
+					},
+				},
+			},
+			expectedErr: nil,
+		},
+		{
+			testCaseName: "Negative: quotaLimit=true but missing both apiKeys",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
+				},
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 5 * 1024 * 1024 * 1024},
+				Secrets:       secretWithQuota("true", ""),
+			},
+			cosSession:   &s3client.FakeCOSSessionFactory{},
+			expectedResp: nil,
+			expectedErr:  status.Error(codes.InvalidArgument, "requires res-conf-apikey or apiKey"),
+		},
+		{
+			testCaseName: "Negative: quotaLimit=true but zero capacity",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
+				},
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 0},
+				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
+			},
+			cosSession:   &s3client.FakeCOSSessionFactory{},
+			expectedResp: nil,
+			expectedErr:  status.Error(codes.InvalidArgument, "no positive storage size"),
 		},
 	}
 
