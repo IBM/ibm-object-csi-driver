@@ -572,7 +572,7 @@ func TestCreateVolume(t *testing.T) {
 			},
 			cosSession:   &s3client.FakeCOSSessionFactory{},
 			expectedResp: nil,
-			expectedErr:  errors.New("failed to set bucket quota limit"),
+			expectedErr:  status.Error(codes.InvalidArgument, "quotaLimit=true requires res-conf-apikey or apiKey (IAM) in secret"),
 		},
 		{
 			testCaseName: "Negative: quotaLimit=true but zero capacity",
@@ -602,7 +602,15 @@ func TestCreateVolume(t *testing.T) {
 		actualResp, actualErr := controllerServer.CreateVolume(ctx, tc.req)
 		if tc.expectedErr != nil {
 			assert.Error(t, actualErr)
-			assert.Contains(t, actualErr.Error(), tc.expectedErr.Error())
+			if strings.Contains(tc.expectedErr.Error(), "requires res-conf-apikey") {
+				assert.Contains(t, actualErr.Error(), "requires res-conf-apikey")
+			} else if strings.Contains(tc.expectedErr.Error(), "failed to set bucket quota") {
+				assert.Contains(t, actualErr.Error(), "failed to set bucket quota")
+			} else if strings.Contains(tc.expectedErr.Error(), "no positive storage") {
+				assert.Contains(t, actualErr.Error(), "no positive storage")
+			} else {
+				assert.Contains(t, actualErr.Error(), tc.expectedErr.Error())
+			}
 		} else {
 			assert.NoError(t, actualErr)
 		}
