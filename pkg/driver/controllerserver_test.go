@@ -545,20 +545,9 @@ func TestCreateVolume(t *testing.T) {
 				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
 				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
 			},
-			cosSession: &fakeQuotaCOSSessionFactory{ObjectStorageSessionFactory: &s3client.FakeCOSSessionFactory{}},
-			expectedResp: &csi.CreateVolumeResponse{
-				Volume: &csi.Volume{
-					VolumeId:      testVolumeName,
-					CapacityBytes: 1073741824,
-					VolumeContext: map[string]string{
-						"bucketName":         bucketName,
-						"userProvidedBucket": "true",
-						"locationConstraint": "test-region",
-						"cosEndpoint":        "test-endpoint",
-					},
-				},
-			},
-			expectedErr: nil,
+			cosSession:   &s3client.FakeCOSSessionFactory{},
+			expectedResp: nil,
+			expectedErr:  errors.New("failed to set bucket quota limit"),
 		},
 		{
 			testCaseName: "Positive: quotaLimit=true with apiKey fallback",
