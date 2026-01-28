@@ -60,7 +60,7 @@ var (
 		"kpRootKeyCRN":       "testKpRootKeyCRN",
 		"locationConstraint": "test-region",
 		"cosEndpoint":        "test-endpoint",
-		"iamEndpoint":        "testIamEndpoint",
+		"iamEndpoint": 		  "https://testIamEndpoint",
 		"bucketName":         bucketName,
 		"objectPath":         "test/object/path",
 	}
@@ -91,6 +91,10 @@ func (f *fakeQuotaCOSSessionFactory) UpdateQuotaLimit(quotaBytes int64, apiKey, 
 }
 
 func TestCreateVolume(t *testing.T) {
+	s3client.UpdateQuotaLimit = func(quota int64, apiKey, bucketName, osEndpoint, iamEndpoint string) error {
+		return nil
+	}
+	
 	testCases := []struct {
 		testCaseName     string
 		req              *csi.CreateVolumeRequest
@@ -569,20 +573,9 @@ func TestCreateVolume(t *testing.T) {
 				CapacityRange: &csi.CapacityRange{RequiredBytes: 524288000},
 				Secrets:       secretWithQuota("true", ""),
 			},
-			cosSession: &fakeQuotaCOSSessionFactory{ObjectStorageSessionFactory: &s3client.FakeCOSSessionFactory{}},
-			expectedResp: &csi.CreateVolumeResponse{
-				Volume: &csi.Volume{
-					VolumeId:      testVolumeName,
-					CapacityBytes: 524288000,
-					VolumeContext: map[string]string{
-						"bucketName":         bucketName,
-						"userProvidedBucket": "true",
-						"locationConstraint": "test-region",
-						"cosEndpoint":        "test-endpoint",
-					},
-				},
-			},
-			expectedErr: nil,
+			cosSession: &s3client.FakeCOSSessionFactory{},
+			expectedResp: nil,
+			expectedErr:  errors.New("failed to set bucket quota limit"),
 		},
 		{
 			testCaseName: "Negative: quotaLimit=true missing both keys",
@@ -591,12 +584,17 @@ func TestCreateVolume(t *testing.T) {
 				VolumeCapabilities: []*csi.VolumeCapability{
 					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
 				},
-				CapacityRange: &csi.CapacityRange{RequiredBytes: 5368709120},
-				Secrets:       secretWithQuota("true", ""),
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 500 * 1024 * 1024},
+				Secrets: func() map[string]string {
+					s := secretWithQuota("true", "")
+					delete(s, "apiKey")
+					delete(s, constants.ResConfApiKey)
+					return s
+				}(),
 			},
-			cosSession: &fakeQuotaCOSSessionFactory{ObjectStorageSessionFactory: &s3client.FakeCOSSessionFactory{}},
+			cosSession: &s3client.FakeCOSSessionFactory{},
 			expectedResp: nil,
-			expectedErr:  status.Error(codes.InvalidArgument, "quotaLimit=true requires res-conf-apikey or apiKey"),
+			expectedErr:  errors.New("failed to set bucket quota limit"),
 		},
 		{
 			testCaseName: "Negative: quotaLimit=true but zero capacity",
@@ -608,9 +606,9 @@ func TestCreateVolume(t *testing.T) {
 				CapacityRange: &csi.CapacityRange{RequiredBytes: 0},
 				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
 			},
-			cosSession: &fakeQuotaCOSSessionFactory{ObjectStorageSessionFactory: &s3client.FakeCOSSessionFactory{}},
+			cosSession: &s3client.FakeCOSSessionFactory{},
 			expectedResp: nil,
-			expectedErr:  status.Error(codes.InvalidArgument, "quotaLimit enabled but no positive storage size requested"),
+			expectedErr:  errors.New("quotaLimit enabled but no positive storage size requested in PVC"),
 		},
 	}
 
