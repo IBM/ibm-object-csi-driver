@@ -91,9 +91,6 @@ func (f *fakeQuotaCOSSessionFactory) UpdateQuotaLimit(quotaBytes int64, apiKey, 
 }
 
 func TestCreateVolume(t *testing.T) {
-	s3client.UpdateQuotaLimit = func(quota int64, apiKey, bucketName, osEndpoint, iamEndpoint string) error {
-		return nil
-	}
 
 	testCases := []struct {
 		testCaseName     string
