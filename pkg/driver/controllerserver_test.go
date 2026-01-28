@@ -82,14 +82,6 @@ func secretWithQuota(quotaValue, resConfApiKeyValue string) map[string]string {
 	return s
 }
 
-type fakeQuotaCOSSessionFactory struct {
-	s3client.ObjectStorageSessionFactory
-}
-
-func (f *fakeQuotaCOSSessionFactory) UpdateQuotaLimit(quotaBytes int64, apiKey, bucketName, osEndpoint, iamEndpoint string) error {
-	return nil
-}
-
 func TestCreateVolume(t *testing.T) {
 
 	testCases := []struct {
