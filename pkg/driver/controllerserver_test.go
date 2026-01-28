@@ -60,7 +60,7 @@ var (
 		"kpRootKeyCRN":       "testKpRootKeyCRN",
 		"locationConstraint": "test-region",
 		"cosEndpoint":        "test-endpoint",
-		"iamEndpoint":        "https://testIamEndpoint",
+		"iamEndpoint":        "testIamEndpoint",
 		"bucketName":         bucketName,
 		"objectPath":         "test/object/path",
 	}
@@ -80,6 +80,14 @@ func secretWithQuota(quotaValue, resConfApiKeyValue string) map[string]string {
 		s[constants.ResConfApiKey] = resConfApiKeyValue
 	}
 	return s
+}
+
+type fakeQuotaCOSSessionFactory struct {
+	s3client.ObjectStorageSessionFactory
+}
+
+func (f *fakeQuotaCOSSessionFactory) UpdateQuotaLimit(quotaBytes int64, apiKey, bucketName, osEndpoint, iamEndpoint string) error {
+	return nil
 }
 
 func TestCreateVolume(t *testing.T) {
@@ -533,14 +541,14 @@ func TestCreateVolume(t *testing.T) {
 				VolumeCapabilities: []*csi.VolumeCapability{
 					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
 				},
-				CapacityRange: &csi.CapacityRange{RequiredBytes: 10 * 1024 * 1024 * 1024},
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
 				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
 			},
-			cosSession: &s3client.FakeCOSSessionFactory{},
+			cosSession: &fakeQuotaCOSSessionFactory{ObjectStorageSessionFactory: &s3client.FakeCOSSessionFactory{}},
 			expectedResp: &csi.CreateVolumeResponse{
 				Volume: &csi.Volume{
 					VolumeId:      testVolumeName,
-					CapacityBytes: 10 * 1024 * 1024 * 1024,
+					CapacityBytes: 1073741824,
 					VolumeContext: map[string]string{
 						"bucketName":         bucketName,
 						"userProvidedBucket": "true",
@@ -552,20 +560,20 @@ func TestCreateVolume(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			testCaseName: "Positive: quotaLimit=true with regular apiKey fallback",
+			testCaseName: "Positive: quotaLimit=true with apiKey fallback",
 			req: &csi.CreateVolumeRequest{
 				Name: testVolumeName,
 				VolumeCapabilities: []*csi.VolumeCapability{
 					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
 				},
-				CapacityRange: &csi.CapacityRange{RequiredBytes: 5 * 1024 * 1024 * 1024},
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 524288000},
 				Secrets:       secretWithQuota("true", ""),
 			},
-			cosSession: &s3client.FakeCOSSessionFactory{},
+			cosSession: &fakeQuotaCOSSessionFactory{ObjectStorageSessionFactory: &s3client.FakeCOSSessionFactory{}},
 			expectedResp: &csi.CreateVolumeResponse{
 				Volume: &csi.Volume{
 					VolumeId:      testVolumeName,
-					CapacityBytes: 5 * 1024 * 1024 * 1024,
+					CapacityBytes: 524288000,
 					VolumeContext: map[string]string{
 						"bucketName":         bucketName,
 						"userProvidedBucket": "true",
@@ -577,18 +585,18 @@ func TestCreateVolume(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			testCaseName: "Negative: quotaLimit=true but missing both apiKeys",
+			testCaseName: "Negative: quotaLimit=true missing both keys",
 			req: &csi.CreateVolumeRequest{
 				Name: testVolumeName,
 				VolumeCapabilities: []*csi.VolumeCapability{
 					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
 				},
-				CapacityRange: &csi.CapacityRange{RequiredBytes: 5 * 1024 * 1024 * 1024},
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 5368709120},
 				Secrets:       secretWithQuota("true", ""),
 			},
-			cosSession:   &s3client.FakeCOSSessionFactory{},
+			cosSession: &s3client.FakeCOSSessionFactory{},
 			expectedResp: nil,
-			expectedErr:  status.Error(codes.InvalidArgument, "requires res-conf-apikey or apiKey"),
+			expectedErr:  status.Error(codes.InvalidArgument, "quotaLimit=true requires res-conf-apikey or apiKey"),
 		},
 		{
 			testCaseName: "Negative: quotaLimit=true but zero capacity",
@@ -600,15 +608,14 @@ func TestCreateVolume(t *testing.T) {
 				CapacityRange: &csi.CapacityRange{RequiredBytes: 0},
 				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
 			},
-			cosSession:   &s3client.FakeCOSSessionFactory{},
+			cosSession: &s3client.FakeCOSSessionFactory{},
 			expectedResp: nil,
-			expectedErr:  status.Error(codes.InvalidArgument, "no positive storage size"),
+			expectedErr:  status.Error(codes.InvalidArgument, "quotaLimit enabled but no positive storage size requested"),
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
-
 		controllerServer := &controllerServer{
 			S3Driver: &S3Driver{
 				iamEndpoint: constants.PublicIAMEndpoint,
@@ -617,21 +624,18 @@ func TestCreateVolume(t *testing.T) {
 			Stats:      tc.driverStatsUtils,
 		}
 		actualResp, actualErr := controllerServer.CreateVolume(ctx, tc.req)
-
 		if tc.expectedErr != nil {
 			assert.Error(t, actualErr)
 			assert.Contains(t, actualErr.Error(), tc.expectedErr.Error())
 		} else {
 			assert.NoError(t, actualErr)
 		}
-
 		if len(tc.req.Name) > 63 {
 			tc.expectedResp.Volume.VolumeId = actualResp.Volume.VolumeId
 		}
 		if actualResp != nil && strings.Contains(actualResp.Volume.VolumeContext["bucketName"], actualResp.Volume.VolumeId) {
 			tc.expectedResp.Volume.VolumeContext["bucketName"] = actualResp.Volume.VolumeContext["bucketName"]
 		}
-
 		if !reflect.DeepEqual(tc.expectedResp, actualResp) {
 			t.Errorf("Expected %v but got %v", tc.expectedResp, actualResp)
 		}
