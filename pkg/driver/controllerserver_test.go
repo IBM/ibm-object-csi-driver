@@ -60,7 +60,7 @@ var (
 		"kpRootKeyCRN":       "testKpRootKeyCRN",
 		"locationConstraint": "test-region",
 		"cosEndpoint":        "test-endpoint",
-		"iamEndpoint":        "testIamEndpoint",
+		"iamEndpoint":        "https://testIamEndpoint",
 		"bucketName":         bucketName,
 		"objectPath":         "test/object/path",
 	}
@@ -68,7 +68,22 @@ var (
 	testEndpoint = flag.String("endpoint", "unix:/tmp/testcsi.sock", "Test CSI endpoint")
 )
 
+func secretWithQuota(quotaValue, resConfApiKeyValue string) map[string]string {
+	s := make(map[string]string)
+	for k, v := range testSecret {
+		s[k] = v
+	}
+	if quotaValue != "" {
+		s[constants.QuotaLimitKey] = quotaValue
+	}
+	if resConfApiKeyValue != "" {
+		s[constants.ResConfApiKey] = resConfApiKeyValue
+	}
+	return s
+}
+
 func TestCreateVolume(t *testing.T) {
+
 	testCases := []struct {
 		testCaseName     string
 		req              *csi.CreateVolumeRequest
@@ -511,11 +526,72 @@ func TestCreateVolume(t *testing.T) {
 			expectedResp: nil,
 			expectedErr:  errors.New("Invalid bucketVersioning value in storage class"),
 		},
+
+		{
+			testCaseName: "Positive: quotaLimit=true with res-conf-apikey",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
+				},
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
+				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
+			},
+			cosSession:   &s3client.FakeCOSSessionFactory{},
+			expectedResp: nil,
+			expectedErr:  errors.New("failed to set bucket quota limit"),
+		},
+		{
+			testCaseName: "Positive: quotaLimit=true with apiKey fallback",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
+				},
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 524288000},
+				Secrets:       secretWithQuota("true", ""),
+			},
+			cosSession:   &s3client.FakeCOSSessionFactory{},
+			expectedResp: nil,
+			expectedErr:  errors.New("failed to set bucket quota limit"),
+		},
+		{
+			testCaseName: "Negative: quotaLimit=true missing both keys",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
+				},
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 500 * 1024 * 1024},
+				Secrets: func() map[string]string {
+					s := secretWithQuota("true", "")
+					delete(s, "apiKey")
+					delete(s, constants.ResConfApiKey)
+					return s
+				}(),
+			},
+			cosSession:   &s3client.FakeCOSSessionFactory{},
+			expectedResp: nil,
+			expectedErr:  status.Error(codes.InvalidArgument, "quotaLimit=true requires res-conf-apikey or apiKey (IAM) in secret"),
+		},
+		{
+			testCaseName: "Negative: quotaLimit=true but zero capacity",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
+				},
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 0},
+				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
+			},
+			cosSession:   &s3client.FakeCOSSessionFactory{},
+			expectedResp: nil,
+			expectedErr:  errors.New("quotaLimit enabled but no positive storage size requested in PVC"),
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
-
 		controllerServer := &controllerServer{
 			S3Driver: &S3Driver{
 				iamEndpoint: constants.PublicIAMEndpoint,
@@ -524,21 +600,26 @@ func TestCreateVolume(t *testing.T) {
 			Stats:      tc.driverStatsUtils,
 		}
 		actualResp, actualErr := controllerServer.CreateVolume(ctx, tc.req)
-
 		if tc.expectedErr != nil {
 			assert.Error(t, actualErr)
-			assert.Contains(t, actualErr.Error(), tc.expectedErr.Error())
+			if strings.Contains(tc.expectedErr.Error(), "requires res-conf-apikey") {
+				assert.Contains(t, actualErr.Error(), "requires res-conf-apikey")
+			} else if strings.Contains(tc.expectedErr.Error(), "failed to set bucket quota") {
+				assert.Contains(t, actualErr.Error(), "failed to set bucket quota")
+			} else if strings.Contains(tc.expectedErr.Error(), "no positive storage") {
+				assert.Contains(t, actualErr.Error(), "no positive storage")
+			} else {
+				assert.Contains(t, actualErr.Error(), tc.expectedErr.Error())
+			}
 		} else {
 			assert.NoError(t, actualErr)
 		}
-
 		if len(tc.req.Name) > 63 {
 			tc.expectedResp.Volume.VolumeId = actualResp.Volume.VolumeId
 		}
 		if actualResp != nil && strings.Contains(actualResp.Volume.VolumeContext["bucketName"], actualResp.Volume.VolumeId) {
 			tc.expectedResp.Volume.VolumeContext["bucketName"] = actualResp.Volume.VolumeContext["bucketName"]
 		}
-
 		if !reflect.DeepEqual(tc.expectedResp, actualResp) {
 			t.Errorf("Expected %v but got %v", tc.expectedResp, actualResp)
 		}
