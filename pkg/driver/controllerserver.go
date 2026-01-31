@@ -141,7 +141,30 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 
 		secretMap = secretMapCustom
 
-		klog.Infof("quotaLimit from secretMap: %q", secretMap[constants.QuotaLimitKey])
+		if quotaVal, ok := secretMap[constants.QuotaLimitKey]; ok && quotaVal != "" {
+			klog.Infof("quotaLimit from secretMap: %q", quotaVal)
+		}
+
+		quotaLimitStr := secretMap[constants.QuotaLimitKey]
+
+		if quotaLimitStr != "" {
+			normalized := strings.TrimSpace(strings.ToLower(quotaLimitStr))
+			if normalized != "true" && normalized != "false" {
+				return nil, status.Error(codes.InvalidArgument,
+					fmt.Sprintf("invalid quotaLimit value %q: must be 'true' or 'false' (case-insensitive)", quotaLimitStr))
+			}
+
+			if normalized == "true" {
+				apiKey := secretMap[constants.ResConfApiKey]
+				if apiKey == "" {
+					apiKey = secretMap["apiKey"]
+				}
+				if apiKey == "" {
+					return nil, status.Error(codes.InvalidArgument,
+						"quotaLimit=true requires res-conf-apikey or apiKey in secret")
+				}
+			}
+		}
 	}
 
 	endPoint = secretMap["cosEndpoint"]
@@ -570,7 +593,7 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 		bucketVersioning   string
 		objectPath         string
 		resConfApiKey      string
-		quotaLimit 		   string
+		quotaLimit         string
 	)
 
 	if bytesVal, ok := secret.Data["accessKey"]; ok {
@@ -622,10 +645,10 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 	}
 
 	if val, ok := secret.StringData[constants.QuotaLimitKey]; ok {
-        quotaLimit = val
-    } else if bytesVal, ok := secret.Data[constants.QuotaLimitKey]; ok {
-        quotaLimit = string(bytesVal)
-    }
+		quotaLimit = val
+	} else if bytesVal, ok := secret.Data[constants.QuotaLimitKey]; ok {
+		quotaLimit = string(bytesVal)
+	}
 
 	secretMapCustom["accessKey"] = accessKey
 	secretMapCustom["secretKey"] = secretKey
@@ -639,7 +662,7 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 	secretMapCustom[constants.BucketVersioning] = bucketVersioning
 	secretMapCustom["objectPath"] = objectPath
 	secretMapCustom[constants.ResConfApiKey] = resConfApiKey
-    secretMapCustom[constants.QuotaLimitKey] = quotaLimit
+	secretMapCustom[constants.QuotaLimitKey] = quotaLimit
 
 	return secretMapCustom
 }
