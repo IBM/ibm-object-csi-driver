@@ -246,7 +246,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			quotaBytes := req.GetCapacityRange().GetRequiredBytes()
 			if quotaBytes <= 0 {
 				if params["userProvidedBucket"] == "false" {
-					_ = sess.DeleteBucket(bucketName)
+					_ = sess.DeleteBucket(bucketName) // #nosec G104 -- intentional: best-effort cleanup in error path, don't mask original error
 				}
 				return nil, status.Error(codes.InvalidArgument, "quotaLimit enabled but no positive storage size requested in PVC")
 			}
@@ -257,7 +257,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			}
 			if apiKey == "" {
 				if params["userProvidedBucket"] == "false" {
-					_ = sess.DeleteBucket(bucketName)
+					_ = sess.DeleteBucket(bucketName) // #nosec G104 -- intentional: best-effort cleanup in error path, don't mask original error
 				}
 				return nil, status.Error(codes.InvalidArgument, "quotaLimit=true requires res-conf-apikey or apiKey (IAM) in secret")
 			}
@@ -268,7 +268,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			if err != nil {
 				klog.Errorf("Failed to set quota limit on bucket %s: %v", bucketName, err)
 				if params["userProvidedBucket"] == "false" {
-					_ = sess.DeleteBucket(bucketName)
+					_ = sess.DeleteBucket(bucketName) // #nosec G104 -- intentional: best-effort cleanup in error path, don't mask original error
 				}
 				return nil, status.Error(codes.Internal, fmt.Sprintf("failed to set bucket quota limit: %v", err))
 			}
@@ -310,7 +310,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		if quotaRequested && strings.ToLower(strings.TrimSpace(quotaLimitStr)) == "true" {
 			quotaBytes := req.GetCapacityRange().GetRequiredBytes()
 			if quotaBytes <= 0 {
-				_ = sess.DeleteBucket(tempBucketName)
+				_ = sess.DeleteBucket(tempBucketName) // #nosec G104 -- intentional: best-effort cleanup in error path, don't mask original error
 				return nil, status.Error(codes.InvalidArgument, "quotaLimit enabled but no positive storage size requested")
 			}
 
@@ -319,7 +319,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 				apiKey = creds.APIKey
 			}
 			if apiKey == "" {
-				_ = sess.DeleteBucket(tempBucketName)
+				_ = sess.DeleteBucket(tempBucketName) // #nosec G104 -- intentional: best-effort cleanup in error path, don't mask original error
 				return nil, status.Error(codes.InvalidArgument, "quotaLimit=true requires res-conf-apikey or apiKey (IAM) in secret")
 			}
 
@@ -328,7 +328,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			err = s3client.UpdateQuotaLimit(quotaBytes, apiKey, tempBucketName, endPoint, creds.IAMEndpoint)
 			if err != nil {
 				klog.Errorf("Failed to set quota limit on temp bucket %s: %v", tempBucketName, err)
-				_ = sess.DeleteBucket(tempBucketName)
+				_ = sess.DeleteBucket(tempBucketName) // #nosec G104 -- intentional: best-effort cleanup in error path, don't mask original error
 				return nil, status.Error(codes.Internal, fmt.Sprintf("failed to set bucket quota limit: %v", err))
 			}
 			klog.Infof("Successfully applied hard quota %d bytes to temp bucket %s", quotaBytes, tempBucketName)

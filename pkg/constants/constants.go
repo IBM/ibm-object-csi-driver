@@ -45,7 +45,7 @@ const (
 
 	BucketVersioning = "bucketVersioning"
 	QuotaLimitKey    = "quotaLimit"
-	ResConfApiKey    = "res-conf-apikey"
+	ResConfApiKey    = "res-conf-apikey" // #nosec G101 -- this is just a map key name, not a real credential
 
 	IsNodeServer         = "IS_NODE_SERVER"
 	KubeNodeName         = "KUBE_NODE_NAME"
