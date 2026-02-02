@@ -10,10 +10,14 @@ github.com/IBM/ibm-cos-sdk-go-config/v2 v2.3.0 h1:956Nqk0eKI3lq+AkzWXZDid4UZHRz0
 github.com/IBM/ibm-cos-sdk-go-config/v2 v2.3.0/go.mod h1:chnQxV+i38wD0aIi4KNU5bP2uzPtc7EHqB3/8Rhyjlg=
 github.com/IBM/ibm-csi-common v1.1.21 h1:/OmjpF+YgmkLmtehFmmfWp9kHGP9iMNkTU/KQDYXzrY=
 github.com/IBM/ibm-csi-common v1.1.21/go.mod h1:AgjHhkYgDwYz1OmFGTgtOv+GCMsD67Yel+ZKsY90PYY=
+github.com/IBM/ibm-csi-common v1.1.24 h1:uHgWTtXcQO7FxEEoRpBcLUD1yNFmdLi4mEC5zZdPFXw=
+github.com/IBM/ibm-csi-common v1.1.24/go.mod h1:QW28zxMAqx8O1iMK57rK/C4CBnLuAol+0mNDZ3asOA8=
 github.com/IBM/ibmcloud-volume-interface v1.2.20 h1:VZlP9fhFLX3evH9QlcXulYX4v4GNeTtbW7nl4Chg+ls=
 github.com/IBM/ibmcloud-volume-interface v1.2.20/go.mod h1:PMe4wOp+EEkVNwlo/iJahh+6/aIvjWo+nAdHB1oGBFE=
 github.com/IBM/secret-utils-lib v1.1.14 h1:Gv5Ca2hZTQMr9+PkOq7AE2lUUnNEeQJ0uiKaxKT1Sdk=
 github.com/IBM/secret-utils-lib v1.1.14/go.mod h1:wAAmS6JOrgcASOuyDkclmxWdKMcbVxshW5QWlMn21X8=
+github.com/IBM/secret-utils-lib v1.1.15 h1:wW6/TdsjQVz/WDg7yQjD8Jmvb2NqYE851pDYxJVOo3s=
+github.com/IBM/secret-utils-lib v1.1.15/go.mod h1:Hbslikwj+zwxz4MYKqckSmcGYcxB1w5EkwHJHa+kxgQ=
 github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab h1:UKkYhof1njT1/xq4SEg5z+VpTgjmNeHwPGRQl7takDI=
 github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab/go.mod h1:3VYc5hodBMJ5+l/7J4xAyMeuM2PNuepvHlGs8yilUCA=
 github.com/Masterminds/semver/v3 v3.4.0 h1:Zog+i5UMtVoCU8oKka5P7i9q9HgrJeGzI9SA1Xbatp0=
