@@ -1,0 +1,3898 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>cmd: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/IBM/ibm-object-csi-driver/cmd/main.go (54.9%)</option>
+				
+				<option value="file1">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/rclone.go (96.4%)</option>
+				
+				<option value="file2">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/s3fs.go (95.9%)</option>
+				
+				<option value="file3">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/server.go (82.9%)</option>
+				
+				<option value="file4">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/utils.go (91.9%)</option>
+				
+				<option value="file5">github.com/IBM/ibm-object-csi-driver/pkg/driver/controllerserver.go (93.3%)</option>
+				
+				<option value="file6">github.com/IBM/ibm-object-csi-driver/pkg/driver/fileOps.go (100.0%)</option>
+				
+				<option value="file7">github.com/IBM/ibm-object-csi-driver/pkg/driver/identityserver.go (100.0%)</option>
+				
+				<option value="file8">github.com/IBM/ibm-object-csi-driver/pkg/driver/nodeserver.go (97.0%)</option>
+				
+				<option value="file9">github.com/IBM/ibm-object-csi-driver/pkg/driver/s3-driver.go (91.4%)</option>
+				
+				<option value="file10">github.com/IBM/ibm-object-csi-driver/pkg/driver/server.go (69.5%)</option>
+				
+				<option value="file11">github.com/IBM/ibm-object-csi-driver/pkg/mounter/mounter-rclone.go (96.4%)</option>
+				
+				<option value="file12">github.com/IBM/ibm-object-csi-driver/pkg/mounter/mounter-s3fs.go (96.6%)</option>
+				
+				<option value="file13">github.com/IBM/ibm-object-csi-driver/pkg/mounter/mounter.go (17.8%)</option>
+				
+				<option value="file14">github.com/IBM/ibm-object-csi-driver/pkg/s3client/s3client.go (87.7%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">no coverage</span>
+				<span class="cov1">low coverage</span>
+				<span class="cov2">*</span>
+				<span class="cov3">*</span>
+				<span class="cov4">*</span>
+				<span class="cov5">*</span>
+				<span class="cov6">*</span>
+				<span class="cov7">*</span>
+				<span class="cov8">*</span>
+				<span class="cov9">*</span>
+				<span class="cov10">high coverage</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">/*******************************************************************************
+ * IBM Confidential
+ * OCO Source Materials
+ * IBM Cloud Kubernetes Service, 5737-D43
+ * (C) Copyright IBM Corp. 2023 All Rights Reserved.
+ * The source code for this program is not published or otherwise divested of
+ * its trade secrets, irrespective of what has been deposited with
+ * the U.S. Copyright Office.
+ ******************************************************************************/
+
+// Package main ...
+package main
+
+import (
+        "flag"
+        "net"
+        "net/http"
+        "os"
+        "strconv"
+        "strings"
+        "time"
+
+        "github.com/IBM/ibm-object-csi-driver/config"
+        "github.com/IBM/ibm-object-csi-driver/pkg/constants"
+        "github.com/IBM/ibm-object-csi-driver/pkg/driver"
+        "github.com/IBM/ibm-object-csi-driver/pkg/mounter"
+        mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
+        "github.com/IBM/ibm-object-csi-driver/pkg/s3client"
+        "github.com/IBM/ibm-object-csi-driver/pkg/utils"
+        libMetrics "github.com/IBM/ibmcloud-volume-interface/lib/metrics"
+        "github.com/prometheus/client_golang/prometheus/promhttp"
+        "go.uber.org/zap"
+        "go.uber.org/zap/zapcore"
+        "k8s.io/klog/v2"
+)
+
+// Options is the combined set of options for all operating modes.
+type Options struct {
+        ServerMode     string
+        Endpoint       string
+        NodeID         string
+        MetricsAddress string
+}
+
+func getOptions() *Options <span class="cov1" title="1">{
+        var (
+                endpoint       = flag.String("endpoint", "unix:/tmp/csi.sock", "CSI endpoint")
+                serverMode     = flag.String("servermode", "controller", "Server Mode node/controller")
+                nodeID         = flag.String("nodeid", "host01", "node id")
+                metricsAddress = flag.String("metrics-address", "0.0.0.0:9080", "Metrics address")
+        )
+        _ = flag.Set("logtostderr", "true") // #nosec G104: Attempt to set flags for logging to stderr only on best-effort basis.Error cannot be usefully handled.
+        flag.Parse()
+        return &amp;Options{
+                ServerMode:     *serverMode,
+                Endpoint:       *endpoint,
+                NodeID:         *nodeID,
+                MetricsAddress: *metricsAddress,
+        }
+}</span>
+
+func getZapLogger() *zap.Logger <span class="cov5" title="2">{
+        // Prepare a new logger
+        atom := zap.NewAtomicLevel()
+        encoderCfg := zap.NewProductionEncoderConfig()
+        encoderCfg.TimeKey = "timestamp"
+        encoderCfg.EncodeTime = zapcore.ISO8601TimeEncoder
+
+        logger := zap.New(zapcore.NewCore(
+                zapcore.NewJSONEncoder(encoderCfg),
+                zapcore.Lock(os.Stdout),
+                atom,
+        ), zap.AddCaller()).With(zap.String("name", config.CSIPluginGithubName)).With(zap.String("CSIDriverName", "IBM CSI Object Driver"))
+
+        atom.SetLevel(zap.InfoLevel)
+        return logger
+}</span>
+
+func getEnv(key string) string <span class="cov10" title="4">{
+        return os.Getenv(strings.ToUpper(key))
+}</span>
+
+func getConfigBool(envKey string, defaultConf bool, logger zap.Logger) bool <span class="cov8" title="3">{
+        if val := getEnv(envKey); val != "" </span><span class="cov5" title="2">{
+                if envBool, err := strconv.ParseBool(val); err == nil </span><span class="cov1" title="1">{
+                        return envBool
+                }</span>
+                <span class="cov1" title="1">logger.Error("error parsing env val to bool", zap.String("env", envKey))</span>
+        }
+        <span class="cov5" title="2">return defaultConf</span>
+}
+
+func main() <span class="cov0" title="0">{
+        klog.InitFlags(nil)
+        defer klog.Flush()
+
+        logger := getZapLogger()
+        loggerLevel := zap.NewAtomicLevel()
+        options := getOptions()
+
+        klog.V(1).Info("Starting Server...")
+
+        debugTrace := getConfigBool("DEBUG_TRACE", false, *logger)
+        if debugTrace </span><span class="cov0" title="0">{
+                loggerLevel.SetLevel(zap.DebugLevel)
+        }</span>
+
+        <span class="cov0" title="0">serverSetup(options, logger)
+        os.Exit(0)</span>
+}
+
+func serverSetup(options *Options, logger *zap.Logger) <span class="cov0" title="0">{
+        csiDriver, err := driver.Setups3Driver(options.ServerMode, config.CSIDriverName, config.VendorVersion, logger)
+        if err != nil </span><span class="cov0" title="0">{
+                logger.Fatal("Failed to setup s3 driver", zap.Error(err))
+                os.Exit(1)
+        }</span>
+
+        <span class="cov0" title="0">statsUtil := &amp;(utils.DriverStatsUtils{})
+        mounterUtil := &amp;(mounterUtils.MounterOptsUtils{})
+
+        S3CSIDriver, err := csiDriver.NewS3CosDriver(options.NodeID, options.Endpoint, s3client.NewObjectStorageSessionFactory(), mounter.NewCSIMounterFactory(), statsUtil, mounterUtil)
+        if err != nil </span><span class="cov0" title="0">{
+                logger.Fatal("Failed in initialize s3 COS driver", zap.Error(err))
+                os.Exit(1)
+        }</span>
+        <span class="cov0" title="0">serveMetrics(options.ServerMode, options.MetricsAddress, logger)
+        S3CSIDriver.Run()</span>
+}
+
+func serveMetrics(mode, metricsAddress string, logger *zap.Logger) <span class="cov1" title="1">{
+        logMsg := "starting metrics endpoint"
+        if strings.Contains(mode, "node") </span><span class="cov1" title="1">{
+                logMsg = "starting metrics &amp; cos-csi-mounter socket-health endpoints"
+        }</span>
+        <span class="cov1" title="1">logger.Info(logMsg)
+        http.Handle("/metrics", promhttp.Handler())
+        if strings.Contains(mode, "node") </span><span class="cov1" title="1">{
+                http.HandleFunc("/cos-csi-mounter/socket-health", func(w http.ResponseWriter, _ *http.Request) </span><span class="cov1" title="1">{
+                        if err := checkCosCsiMounterSocketHealth(); err != nil </span><span class="cov1" title="1">{
+                                http.Error(w, "unhealthy: "+err.Error(), http.StatusInternalServerError)
+                                return
+                        }</span>
+                        <span class="cov0" title="0">w.WriteHeader(http.StatusOK)
+                        _, err := w.Write([]byte("ok"))
+                        if err != nil </span><span class="cov0" title="0">{
+                                logger.Warn("failed to write data")
+                        }</span>
+                })
+        }
+
+        <span class="cov1" title="1">go func() </span><span class="cov1" title="1">{
+                // #nosec G114 -- use default timeout.
+                if err := http.ListenAndServe(metricsAddress, nil); err != nil </span><span class="cov0" title="0">{
+                        logMsg = "failed to start metrics service:"
+                        if strings.Contains(mode, "node") </span><span class="cov0" title="0">{
+                                logMsg = "failed to start metrics &amp; cos-csi-mounter socket-health service:"
+                        }</span>
+                        <span class="cov0" title="0">logger.Error(logMsg, zap.String("addr", metricsAddress), zap.Error(err))</span>
+                }
+        }()
+        // TODO
+        //metrics.RegisterAll(csiConfig.CSIPluginGithubName)
+        <span class="cov1" title="1">libMetrics.RegisterAll()</span>
+}
+
+func checkCosCsiMounterSocketHealth() error <span class="cov8" title="3">{
+        socketPath := os.Getenv(constants.COSCSIMounterSocketPathEnv)
+        if socketPath == "" </span><span class="cov1" title="1">{
+                socketPath = constants.COSCSIMounterSocketPath
+        }</span>
+
+        <span class="cov8" title="3">conn, err := net.DialTimeout("unix", socketPath, 500*time.Millisecond)
+        if err != nil </span><span class="cov5" title="2">{
+                return err
+        }</span>
+        <span class="cov1" title="1">err = conn.Close()
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov1" title="1">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package main
+
+import (
+        "encoding/json"
+        "fmt"
+
+        "go.uber.org/zap"
+)
+
+type RCloneArgs struct {
+        AllowOther            string `json:"allow-other,omitempty"`
+        AllowRoot             string `json:"allow-root,omitempty"`
+        AsyncRead             string `json:"async-read,omitempty"`
+        AttrTimeout           string `json:"attr-timeout,omitempty"`
+        ConfigPath            string `json:"config,omitempty"`
+        Daemon                string `json:"daemon,omitempty"`
+        DaemonTimeout         string `json:"daemon-timeout,omitempty"`
+        DaemonWait            string `json:"daemon-wait,omitempty"`
+        DirCacheTime          string `json:"dir-cache-time,omitempty"`
+        DirectIO              string `json:"direct-io,omitempty"`
+        GID                   string `json:"gid,omitempty"`
+        LogFile               string `json:"log-file,omitempty"`
+        LogLevel              string `json:"log-level,omitempty"`
+        NoModificationTime    string `json:"no-modtime,omitempty"`
+        PollInterval          string `json:"poll-interval,omitempty"`
+        ReadOnly              string `json:"read-only,omitempty"`
+        UID                   string `json:"uid,omitempty"`
+        UMask                 string `json:"umask,omitempty"`
+        VfsCacheMaxAge        string `json:"vfs-cache-max-age,omitempty"`
+        VfsCacheMaxSize       string `json:"vfs-cache-max-size,omitempty"`
+        VfsCacheMinFreeSpace  string `json:"vfs-cache-min-free-space,omitempty"`
+        VfsCacheMode          string `json:"vfs-cache-mode,omitempty"`
+        VfsCachePollInterval  string `json:"vfs-cache-poll-interval,omitempty"`
+        VfsDiskSpaceTotalSize string `json:"vfs-disk-space-total-size,omitempty"`
+        VfsReadAhead          string `json:"vfs-read-ahead,omitempty"`
+        VfsReadChunkSize      string `json:"vfs-read-chunk-size,omitempty"`
+        VfsReadChunkSizeLimit string `json:"vfs-read-chunk-size-limit,omitempty"`
+        VfsReadChunkStreams   string `json:"vfs-read-chunk-streams,omitempty"`
+        VfsReadWait           string `json:"vfs-read-wait,omitempty"`
+        VfsRefresh            string `json:"vfs-refresh,omitempty"`
+        VfsWriteBack          string `json:"vfs-write-back,omitempty"`
+        VfsWriteWait          string `json:"vfs-write-wait,omitempty"`
+        WriteBackCache        string `json:"write-back-cache,omitempty"`
+}
+
+func (args RCloneArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, error) <span class="cov3" title="2">{
+        // Marshal to JSON
+        raw, err := json.Marshal(args)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        // Unmarshal into map[string]string
+        <span class="cov3" title="2">var m map[string]string
+        if err := json.Unmarshal(raw, &amp;m); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        // Convert to key=value slice
+        <span class="cov3" title="2">result := []string{"mount", bucket, targetPath}
+        for k, v := range m </span><span class="cov1" title="1">{
+                result = append(result, fmt.Sprintf("--%s=%v", k, v)) // --key=value
+        }</span>
+
+        <span class="cov3" title="2">return result, nil</span> // [mount, bucket, path, --key1=value1, --key2=value2, ...]
+}
+
+func (args RCloneArgs) Validate(targetPath string) error <span class="cov10" title="15">{
+        if err := pathValidator(targetPath); err != nil </span><span class="cov3" title="2">{
+                return err
+        }</span>
+
+        // Check if value of allow-other parameter is boolean "true" or "false"
+        <span class="cov9" title="13">if args.AllowOther != "" </span><span class="cov1" title="1">{
+                if isBool := isBoolString(args.AllowOther); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of allow-other into boolean", zap.Any("allow-other", args.AllowOther))
+                        return fmt.Errorf("cannot convert value of allow-other into boolean: %v", args.AllowOther)
+                }</span>
+        }
+
+        // Check if value of allow-root parameter is boolean "true" or "false"
+        <span class="cov9" title="12">if args.AllowRoot != "" </span><span class="cov1" title="1">{
+                if isBool := isBoolString(args.AllowRoot); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of allow-root into boolean", zap.Any("allow-root", args.AllowRoot))
+                        return fmt.Errorf("cannot convert value of allow-root into boolean: %v", args.AllowRoot)
+                }</span>
+        }
+
+        // Check if value of async-read parameter is boolean "true" or "false"
+        <span class="cov8" title="11">if args.AsyncRead != "" </span><span class="cov1" title="1">{
+                if isBool := isBoolString(args.AsyncRead); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of async-read into boolean", zap.Any("async-read", args.AsyncRead))
+                        return fmt.Errorf("cannot convert value of async-read into boolean: %v", args.AsyncRead)
+                }</span>
+        }
+
+        // Check if rclone config file exists or not
+        <span class="cov8" title="10">if exists, err := FileExists(args.ConfigPath); err != nil </span><span class="cov1" title="1">{
+                logger.Error("error checking rclone config file existence")
+                return fmt.Errorf("error checking rclone config file existence")
+        }</span> else<span class="cov8" title="9"> if !exists </span><span class="cov1" title="1">{
+                logger.Error("rclone config file not found")
+                return fmt.Errorf("rclone config file not found")
+        }</span>
+
+        // Check if value of daemon parameter is boolean "true" or "false"
+        <span class="cov7" title="8">if args.Daemon != "" </span><span class="cov1" title="1">{
+                if isBool := isBoolString(args.Daemon); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of daemon into boolean", zap.Any("daemon", args.Daemon))
+                        return fmt.Errorf("cannot convert value of daemon into boolean: %v", args.Daemon)
+                }</span>
+        }
+
+        // Check if value of direct-io parameter is boolean "true" or "false"
+        <span class="cov7" title="7">if args.DirectIO != "" </span><span class="cov1" title="1">{
+                if isBool := isBoolString(args.DirectIO); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of direct-io into boolean", zap.Any("direct-io", args.DirectIO))
+                        return fmt.Errorf("cannot convert value of direct-io into boolean: %v", args.DirectIO)
+                }</span>
+        }
+
+        // Check if value of no-modtime parameter is boolean "true" or "false"
+        <span class="cov6" title="6">if args.NoModificationTime != "" </span><span class="cov1" title="1">{
+                if isBool := isBoolString(args.NoModificationTime); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of no-modtime into boolean", zap.Any("no-modtime", args.NoModificationTime))
+                        return fmt.Errorf("cannot convert value of no-modtime into boolean: %v", args.NoModificationTime)
+                }</span>
+        }
+
+        // Check if value of read-only parameter is boolean "true" or "false"
+        <span class="cov6" title="5">if args.ReadOnly != "" </span><span class="cov1" title="1">{
+                if isBool := isBoolString(args.ReadOnly); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of read-only into boolean", zap.Any("read-only", args.ReadOnly))
+                        return fmt.Errorf("cannot convert value of read-only into boolean: %v", args.ReadOnly)
+                }</span>
+        }
+
+        // Check if value of vfs-refresh parameter is boolean "true" or "false"
+        <span class="cov5" title="4">if args.VfsRefresh != "" </span><span class="cov1" title="1">{
+                if isBool := isBoolString(args.VfsRefresh); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of vfs-refresh into boolean", zap.Any("vfs-refresh", args.VfsRefresh))
+                        return fmt.Errorf("cannot convert value of vfs-refresh into boolean: %v", args.VfsRefresh)
+                }</span>
+        }
+
+        // Check if value of write-back-cache parameter is boolean "true" or "false"
+        <span class="cov4" title="3">if args.WriteBackCache != "" </span><span class="cov1" title="1">{
+                if isBool := isBoolString(args.WriteBackCache); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of write-back-cache into boolean", zap.Any("write-back-cache", args.WriteBackCache))
+                        return fmt.Errorf("cannot convert value of write-back-cache into boolean: %v", args.WriteBackCache)
+                }</span>
+        }
+
+        <span class="cov3" title="2">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package main
+
+import (
+        "encoding/json"
+        "fmt"
+        "strconv"
+        "strings"
+
+        "go.uber.org/zap"
+)
+
+type S3FSArgs struct {
+        AllowOther              string `json:"allow_other,omitempty"`
+        AutoCache               string `json:"auto_cache,omitempty"`
+        CipherSuites            string `json:"cipher_suites,omitempty"`
+        ConnectTimeoutSeconds   string `json:"connect_timeout,omitempty"`
+        CurlDebug               string `json:"curldbg,omitempty"`
+        DebugLevel              string `json:"dbglevel,omitempty"`
+        DefaultACL              string `json:"default_acl,omitempty"`
+        DisableNoobjCache       string `json:"disable_noobj_cache,omitempty"`
+        EndPoint                string `json:"endpoint,omitempty"`
+        GID                     string `json:"gid,omitempty"`
+        IBMIamAuth              string `json:"ibm_iam_auth,omitempty"`
+        IBMIamEndpoint          string `json:"ibm_iam_endpoint,omitempty"`
+        InstanceName            string `json:"instance_name,omitempty"`
+        KernelCache             string `json:"kernel_cache,omitempty"`
+        MaxBackground           string `json:"max_background,omitempty"`
+        MaxDirtyData            string `json:"max_dirty_data,omitempty"`
+        MaxStatCacheSize        string `json:"max_stat_cache_size,omitempty"`
+        MPUmask                 string `json:"mp_umask,omitempty"`
+        MultiPartSize           string `json:"multipart_size,omitempty"`
+        MultiReqMax             string `json:"multireq_max,omitempty"`
+        ParallelCount           string `json:"parallel_count,omitempty"`
+        PasswdFilePath          string `json:"passwd_file,omitempty"`
+        ReadOnly                string `json:"ro,omitempty"`
+        ReadwriteTimeoutSeconds string `json:"readwrite_timeout,omitempty"`
+        RetryCount              string `json:"retries,omitempty"`
+        SigV2                   string `json:"sigv2,omitempty"`
+        SigV4                   string `json:"sigv4,omitempty"`
+        StatCacheExpireSeconds  string `json:"stat_cache_expire,omitempty"`
+        UID                     string `json:"uid,omitempty"`
+        Umask                   string `json:"umask,omitempty"`
+        URL                     string `json:"url,omitempty"`
+        UsePathRequestStyle     string `json:"use_path_request_style,omitempty"`
+        UseXattr                string `json:"use_xattr,string,omitempty"`
+}
+
+func (args S3FSArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, error) <span class="cov2" title="2">{
+        // Marshal to JSON
+        raw, err := json.Marshal(args)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        // Unmarshal into map[string]string
+        <span class="cov2" title="2">var m map[string]string
+        if err := json.Unmarshal(raw, &amp;m); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        // Convert to key=value slice
+        <span class="cov2" title="2">result := []string{bucket, targetPath}
+
+        // Add ibm_iam_auth first before ibm_iam_endpoint for correctly setting provided iam endpoint in s3fs-fuse for fetching token
+        if val, ok := m["ibm_iam_auth"]; ok </span><span class="cov1" title="1">{
+                if strings.ToLower(strings.TrimSpace(val)) == "true" </span><span class="cov1" title="1">{
+                        result = append(result, "-o", "ibm_iam_auth")
+                }</span> else<span class="cov0" title="0"> {
+                        result = append(result, "-o", fmt.Sprintf("ibm_iam_auth=%v", val)) // pragma: allowlist secret
+                }</span>
+                <span class="cov1" title="1">delete(m, "ibm_iam_auth")</span>
+        }
+
+        // Add ibm_iam_endpoint
+        <span class="cov2" title="2">if val, ok := m["ibm_iam_endpoint"]; ok </span><span class="cov1" title="1">{
+                result = append(result, "-o", fmt.Sprintf("ibm_iam_endpoint=%v", val))
+                delete(m, "ibm_iam_endpoint")
+        }</span>
+
+        <span class="cov2" title="2">for k, v := range m </span><span class="cov3" title="3">{
+                result = append(result, "-o")
+                if strings.ToLower(strings.TrimSpace(v)) == "true" </span><span class="cov1" title="1">{
+                        result = append(result, k) // -o, key
+                }</span> else<span class="cov2" title="2"> {
+                        result = append(result, fmt.Sprintf("%s=%v", k, v)) // -o, key=value
+                }</span>
+        }
+
+        <span class="cov2" title="2">return result, nil</span> // [bucket, path, -o, key1=value1, -o, key2=value2, -o key3, ...]
+}
+
+func (args S3FSArgs) Validate(targetPath string) error <span class="cov10" title="32">{
+        if err := pathValidator(targetPath); err != nil </span><span class="cov2" title="2">{
+                return err
+        }</span>
+
+        // Check if value of allow_other parameter is boolean "true" or "false"
+        <span class="cov9" title="30">if args.AllowOther != "" </span><span class="cov1" title="1">{
+                if isBool := isBoolString(args.AllowOther); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of allow_other into boolean", zap.Any("allow_other", args.AllowOther))
+                        return fmt.Errorf("cannot convert value of allow_other into boolean: %v", args.AllowOther)
+                }</span>
+        }
+
+        // Check if value of auto_cache parameter is boolean "true" or "false"
+        <span class="cov9" title="29">if args.AutoCache != "" </span><span class="cov1" title="1">{
+                if isBool := isBoolString(args.AutoCache); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of auto_cache into boolean", zap.Any("auto_cache", args.AutoCache))
+                        return fmt.Errorf("cannot convert value of auto_cache into boolean: %v", args.AutoCache)
+                }</span>
+        }
+
+        // Check if value of connect_timeout parameter can be converted to integer
+        <span class="cov9" title="28">if args.ConnectTimeoutSeconds != "" </span><span class="cov1" title="1">{
+                _, err := strconv.Atoi(args.ConnectTimeoutSeconds)
+                if err != nil </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of connect_timeout into integer", zap.Error(err))
+                        return fmt.Errorf("cannot convert value of connect_timeout into integer: %v", err)
+                }</span>
+        }
+
+        // Check if value of curldbg parameter is either "body" or "normal"
+        <span class="cov9" title="27">if args.CurlDebug != "" &amp;&amp; args.CurlDebug != "body" &amp;&amp; args.CurlDebug != "normal" </span><span class="cov1" title="1">{
+                logger.Error("invalid value for 'curldbg' param. Should be either 'body' or 'normal'", zap.Any("curldbg", args.CurlDebug))
+                return fmt.Errorf("invalid value for 'curldbg' param. Should be either 'body' or 'normal': %v", args.CurlDebug)
+        }</span>
+
+        // Check if value of disable_noobj_cache is boolean "true" or "false"
+        <span class="cov9" title="26">if args.DisableNoobjCache != "" </span><span class="cov0" title="0">{
+                if isBool := isBoolString(args.DisableNoobjCache); !isBool </span><span class="cov0" title="0">{
+                        logger.Error("cannot convert value of disable_noobj_cache into boolean", zap.Any("disable_noobj_cache", args.DisableNoobjCache))
+                        return fmt.Errorf("cannot convert value of disable_noobj_cache into boolean: %v", args.DisableNoobjCache)
+                }</span>
+        }
+
+        // Check if value of gid parameter can be converted to integer
+        <span class="cov9" title="26">if args.GID != "" </span><span class="cov1" title="1">{
+                _, err := strconv.Atoi(args.GID)
+                if err != nil </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of gid into integer", zap.Error(err))
+                        return fmt.Errorf("cannot convert value of gid into integer: %v", err)
+                }</span>
+        }
+
+        // Check if value of ibm_iam_auth parameter is boolean "true" or "false"
+        <span class="cov9" title="25">if args.IBMIamAuth != "" </span><span class="cov1" title="1">{
+                if isBool := isBoolString(args.IBMIamAuth); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of ibm_iam_auth into boolean", zap.Any("ibm_iam_auth", args.IBMIamAuth))
+                        return fmt.Errorf("cannot convert value of ibm_iam_auth into boolean: %v", args.IBMIamAuth)
+                }</span>
+        }
+
+        <span class="cov9" title="24">if args.IBMIamEndpoint != "" </span><span class="cov1" title="1">{
+                if !strings.HasPrefix(args.IBMIamEndpoint, "https://") &amp;&amp; !strings.HasPrefix(args.IBMIamEndpoint, "http://") </span><span class="cov1" title="1">{
+                        logger.Error("bad value for ibm_iam_endpoint."+
+                                " Must be of the form https://&lt;hostname&gt; or http://&lt;hostname&gt;",
+                                zap.String("ibm_iam_endpoint", args.IBMIamEndpoint))
+                        return fmt.Errorf("bad value for ibm_iam_endpoint \"%v\":"+
+                                " Must be of the form https://&lt;hostname&gt; or http://&lt;hostname&gt;", args.IBMIamEndpoint)
+                }</span>
+        }
+
+        // Check if value of kernel_cache parameter is boolean "true" or "false"
+        <span class="cov9" title="23">if args.KernelCache != "" </span><span class="cov1" title="1">{
+                if isBool := isBoolString(args.KernelCache); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of kernel_cache into boolean", zap.Any("kernel_cache", args.KernelCache))
+                        return fmt.Errorf("cannot convert value of kernel_cache into boolean: %v", args.KernelCache)
+                }</span>
+        }
+
+        // Check if value of max_background parameter can be converted to integer
+        <span class="cov9" title="22">if args.MaxBackground != "" </span><span class="cov1" title="1">{
+                _, err := strconv.Atoi(args.MaxBackground)
+                if err != nil </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of max_background into integer", zap.Error(err))
+                        return fmt.Errorf("cannot convert value of max_background into integer: %v", err)
+                }</span>
+        }
+
+        // Check if value of max_dirty_data parameter can be converted to integer
+        <span class="cov8" title="21">if args.MaxDirtyData != "" </span><span class="cov1" title="1">{
+                _, err := strconv.Atoi(args.MaxDirtyData)
+                if err != nil </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of max_dirty_data into integer", zap.Error(err))
+                        return fmt.Errorf("cannot convert value of max_dirty_data into integer: %v", err)
+                }</span>
+        }
+
+        // Check if value of max_stat_cache_size parameter can be converted to integer
+        <span class="cov8" title="20">if args.MaxStatCacheSize != "" </span><span class="cov1" title="1">{
+                _, err := strconv.Atoi(args.MaxStatCacheSize)
+                if err != nil </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of max_stat_cache_size into integer", zap.Error(err))
+                        return fmt.Errorf("cannot convert value of max_stat_cache_size into integer: %v", err)
+                }</span>
+        }
+
+        // Check if value of multipart_size parameter can be converted to integer
+        <span class="cov8" title="19">if args.MultiPartSize != "" </span><span class="cov1" title="1">{
+                _, err := strconv.Atoi(args.MultiPartSize)
+                if err != nil </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of multipart_size into integer", zap.Error(err))
+                        return fmt.Errorf("cannot convert value of multipart_size into integer: %v", err)
+                }</span>
+        }
+
+        // Check if value of multireq_max parameter can be converted to integer
+        <span class="cov8" title="18">if args.MultiReqMax != "" </span><span class="cov1" title="1">{
+                _, err := strconv.Atoi(args.MultiReqMax)
+                if err != nil </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of multireq_max into integer", zap.Error(err))
+                        return fmt.Errorf("cannot convert value of multireq_max into integer: %v", err)
+                }</span>
+        }
+
+        // Check if value of parallel_count parameter can be converted to integer
+        <span class="cov8" title="17">if args.ParallelCount != "" </span><span class="cov1" title="1">{
+                _, err := strconv.Atoi(args.ParallelCount)
+                if err != nil </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of parallel_count into integer", zap.Error(err))
+                        return fmt.Errorf("cannot convert value of parallel_count into integer: %v", err)
+                }</span>
+        }
+
+        // Check if .passwd file exists or not
+        <span class="cov8" title="16">if exists, err := FileExists(args.PasswdFilePath); err != nil </span><span class="cov1" title="1">{
+                logger.Error("error checking credential file existence")
+                return fmt.Errorf("error checking credential file existence")
+        }</span> else<span class="cov8" title="15"> if !exists </span><span class="cov1" title="1">{
+                logger.Error("credential file not found")
+                return fmt.Errorf("credential file not found")
+        }</span>
+
+        // Check if value of ro parameter is boolean "true" or "false"
+        <span class="cov7" title="14">if args.ReadOnly != "" </span><span class="cov1" title="1">{
+                if isBool := isBoolString(args.ReadOnly); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of ro into boolean", zap.Any("ro", args.ReadOnly))
+                        return fmt.Errorf("cannot convert value of roe into boolean: %v", args.ReadOnly)
+                }</span>
+        }
+
+        // Check if value of readwrite_timeout parameter can be converted to integer
+        <span class="cov7" title="13">if args.ReadwriteTimeoutSeconds != "" </span><span class="cov1" title="1">{
+                _, err := strconv.Atoi(args.ReadwriteTimeoutSeconds)
+                if err != nil </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of readwrite_timeout into integer", zap.Error(err))
+                        return fmt.Errorf("cannot convert value of readwrite_timeout into integer: %v", err)
+                }</span>
+        }
+
+        // Check if value of retries parameter can be converted to integer
+        <span class="cov7" title="12">if args.RetryCount != "" </span><span class="cov2" title="2">{
+                retryCount, err := strconv.Atoi(args.RetryCount)
+                if err != nil </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of retires into integer", zap.Error(err))
+                        return fmt.Errorf("cannot convert value of retires into integer: %v", err)
+                }</span>
+                <span class="cov1" title="1">if retryCount &lt; 1 </span><span class="cov1" title="1">{
+                        logger.Error("value of retires should be &gt;= 1")
+                        return fmt.Errorf("value of retires should be &gt;= 1")
+                }</span>
+        }
+
+        // Check if value of sigv2 parameter is boolean "true" or "false"
+        <span class="cov6" title="10">if args.SigV2 != "" </span><span class="cov1" title="1">{
+                if isBool := isBoolString(args.SigV2); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of sigv2 into boolean", zap.Any("sigv2", args.SigV2))
+                        return fmt.Errorf("cannot convert value of sigv2 into boolean: %v", args.SigV2)
+                }</span>
+        }
+
+        // Check if value of sigv4 parameter is boolean "true" or "false"
+        <span class="cov6" title="9">if args.SigV4 != "" </span><span class="cov1" title="1">{
+                if isBool := isBoolString(args.SigV4); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of sigv4 into boolean", zap.Any("sigv4", args.SigV4))
+                        return fmt.Errorf("cannot convert value of sigv4 into boolean: %v", args.SigV4)
+                }</span>
+        }
+
+        // Check if value of stat_cache_expire parameter can be converted to integer
+        <span class="cov6" title="8">if args.StatCacheExpireSeconds != "" </span><span class="cov2" title="2">{
+                cacheExpireSeconds, err := strconv.Atoi(args.StatCacheExpireSeconds)
+                if err != nil </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of stat_cache_expire into integer", zap.Error(err))
+                        return fmt.Errorf("cannot convert value of stat_cache_expire into integer: %v", err)
+                }</span> else<span class="cov1" title="1"> if cacheExpireSeconds &lt; 0 </span><span class="cov1" title="1">{
+                        logger.Error("value of stat_cache_expire should be &gt;= 0")
+                        return fmt.Errorf("value of stat_cache_expire should be &gt;= 0")
+                }</span>
+        }
+
+        // Check if value of uid parameter can be converted to integer
+        <span class="cov5" title="6">if args.UID != "" </span><span class="cov1" title="1">{
+                _, err := strconv.Atoi(args.UID)
+                if err != nil </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of uid into integer", zap.Error(err))
+                        return fmt.Errorf("cannot convert value of uid into integer: %v", err)
+                }</span>
+        }
+
+        // Check if value of use_path_request_style parameter is boolean "true" or "false"
+        <span class="cov5" title="5">if args.UsePathRequestStyle != "" </span><span class="cov1" title="1">{
+                if isBool := isBoolString(args.UsePathRequestStyle); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of use_path_request_style into boolean", zap.Any("use_path_request_style", args.UsePathRequestStyle))
+                        return fmt.Errorf("cannot convert value of use_path_request_style into boolean: %v", args.UsePathRequestStyle)
+                }</span>
+        }
+
+        // Check if value of use_xattr parameter is boolean "true" or "false"
+        <span class="cov4" title="4">if args.UseXattr != "" </span><span class="cov1" title="1">{
+                if isBool := isBoolString(args.UseXattr); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of use_xattr into boolean", zap.Any("use_xattr", args.UseXattr))
+                        return fmt.Errorf("cannot convert value of use_xattr into boolean: %v", args.UseXattr)
+                }</span>
+        }
+
+        <span class="cov3" title="3">if !strings.HasPrefix(args.URL, "https://") &amp;&amp; !strings.HasPrefix(args.URL, "http://") </span><span class="cov1" title="1">{
+                logger.Error("bad value for url: scheme is missing."+
+                        " Must be of the form http://&lt;hostname&gt; or https://&lt;hostname&gt;",
+                        zap.String("url", args.URL))
+                return fmt.Errorf("bad value for url \"%v\": scheme is missing."+
+                        " Must be of the form http://&lt;hostname&gt; or https://&lt;hostname&gt;", args.URL)
+        }</span>
+
+        <span class="cov2" title="2">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package main
+
+import (
+        "flag"
+        "fmt"
+        "net"
+        "net/http"
+        "os"
+        "os/signal"
+        "path/filepath"
+        "strings"
+        "syscall"
+        "time"
+
+        "github.com/IBM/ibm-object-csi-driver/pkg/constants"
+        mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
+        "github.com/gin-gonic/gin"
+        "go.uber.org/zap"
+        "go.uber.org/zap/zapcore"
+)
+
+var (
+        logger             *zap.Logger
+        MakeDir            = os.MkdirAll
+        RemoveFile         = os.Remove
+        UnixSocketListener = func(network, address string) (net.Listener, error) <span class="cov4" title="2">{
+                return net.Listen(network, address)
+        }</span>
+
+        Version   = "dev"
+        GitCommit = "none"
+)
+
+func init() <span class="cov1" title="1">{
+        _ = flag.Set("logtostderr", "true") // #nosec G104: Attempt to set flags for logging to stderr only on best-effort basis.Error cannot be usefully handled.
+        logger = setUpLogger()
+        defer func() </span><span class="cov1" title="1">{
+                if err := logger.Sync(); err != nil &amp;&amp; !isInvalidSync(err) </span><span class="cov0" title="0">{
+                        fmt.Fprintf(os.Stderr, "failed to sync logger: %v\n", err)
+                }</span>
+        }()
+}
+
+func setUpLogger() *zap.Logger <span class="cov1" title="1">{
+        // Prepare a new logger
+        atom := zap.NewAtomicLevel()
+        encoderCfg := zap.NewProductionEncoderConfig()
+        encoderCfg.TimeKey = "timestamp"
+        encoderCfg.EncodeTime = zapcore.ISO8601TimeEncoder
+
+        logger := zap.New(zapcore.NewCore(
+                zapcore.NewJSONEncoder(encoderCfg),
+                zapcore.Lock(os.Stdout),
+                atom,
+        ), zap.AddCaller()).With(zap.String("ServiceName", "cos-csi-mounter"))
+        atom.SetLevel(zap.InfoLevel)
+        return logger
+}</span>
+
+func isInvalidSync(err error) bool <span class="cov1" title="1">{
+        return strings.Contains(strings.ToLower(err.Error()), "invalid argument") ||
+                strings.Contains(strings.ToLower(err.Error()), "inappropriate ioctl") // catch edge cases on some platforms
+}</span>
+
+func setupSocket() (net.Listener, error) <span class="cov7" title="4">{
+        socketPath := filepath.Join(constants.SocketDir, constants.SocketFile)
+
+        // Ensure the socket directory exists
+        if err := MakeDir(constants.SocketDir, 0750); err != nil </span><span class="cov1" title="1">{
+                logger.Error("Failed to create socket directory", zap.String("dir", constants.SocketDir), zap.Error(err))
+                return nil, err
+        }</span>
+
+        // Check for socket file
+        <span class="cov6" title="3">if _, err := os.Stat(socketPath); err == nil </span><span class="cov1" title="1">{
+                if err := RemoveFile(socketPath); err != nil </span><span class="cov1" title="1">{
+                        logger.Warn("Failed to remove existing socket file", zap.String("path", socketPath), zap.Error(err))
+                }</span>
+        } else<span class="cov4" title="2"> if !os.IsNotExist(err) </span><span class="cov1" title="1">{
+                logger.Warn("Could not stat socket file", zap.String("path", socketPath), zap.Error(err))
+        }</span>
+
+        <span class="cov6" title="3">logger.Info("Creating unix socket listener...", zap.String("path", socketPath))
+        listener, err := UnixSocketListener("unix", socketPath)
+        if err != nil </span><span class="cov1" title="1">{
+                logger.Error("Failed to create unix socket listener", zap.String("path", socketPath), zap.Error(err))
+                return nil, err
+        }</span>
+        <span class="cov4" title="2">return listener, nil</span>
+}
+
+func handleSignals() <span class="cov0" title="0">{
+        // Handle SIGINT and SIGTERM signals to gracefully shut down the server
+        signals := make(chan os.Signal, 1)
+        signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+
+        go func() </span><span class="cov0" title="0">{
+                &lt;-signals
+                socketPath := filepath.Join(constants.SocketDir, constants.SocketFile)
+                if err := os.Remove(socketPath); err != nil </span><span class="cov0" title="0">{
+                        // Handle it properly: log it, retry, return, etc.
+                        logger.Warn("Failed to remove socket on exit", zap.String("path", socketPath), zap.Error(err))
+                }</span>
+                <span class="cov0" title="0">os.Exit(0)</span>
+        }()
+}
+
+func newRouter() *gin.Engine <span class="cov1" title="1">{
+        utils := &amp;mounterUtils.MounterOptsUtils{}
+        parser := &amp;DefaultMounterArgsParser{}
+
+        // Create gin router
+        router := gin.Default()
+        router.POST("/api/cos/mount", handleCosMount(utils, parser))
+        router.POST("/api/cos/unmount", handleCosUnmount(utils))
+        return router
+}</span>
+
+func startService(setupSocketFunc func() (net.Listener, error), router http.Handler, handleSignalsFunc func()) error <span class="cov4" title="2">{
+        listener, err := setupSocketFunc()
+        if err != nil </span><span class="cov1" title="1">{
+                logger.Error("Failed to create socket", zap.Error(err))
+                return err
+        }</span>
+        // Close the listener at the end
+        <span class="cov1" title="1">defer func() </span><span class="cov1" title="1">{
+                if err := listener.Close(); err != nil </span><span class="cov0" title="0">{
+                        fmt.Fprintf(os.Stderr, "failed to close listener: %v\n", err)
+                }</span>
+        }()
+
+        <span class="cov1" title="1">handleSignalsFunc()
+
+        logger.Info("Starting cos-csi-mounter service...")
+
+        // Serve HTTP requests over Unix socket
+        server := &amp;http.Server{
+                Handler:           router,
+                ReadHeaderTimeout: 3 * time.Second,
+        }
+        if err := server.Serve(listener); err != nil </span><span class="cov1" title="1">{
+                logger.Error("Error while serving HTTP requests:", zap.Error(err))
+                return err
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+func main() <span class="cov0" title="0">{
+        if len(os.Args) &gt; 1 &amp;&amp; os.Args[1] == "version" </span><span class="cov0" title="0">{
+                fmt.Printf("Version: %s\nGit Commit: %s\n", Version, GitCommit)
+                return
+        }</span>
+        <span class="cov0" title="0">err := startService(setupSocket, newRouter(), handleSignals)
+        if err != nil </span><span class="cov0" title="0">{
+                logger.Error("cos-csi-mounter exited with error", zap.Error(err))
+                os.Exit(1)
+        }</span>
+}
+
+func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser) gin.HandlerFunc <span class="cov10" title="7">{
+        return func(c *gin.Context) </span><span class="cov9" title="6">{
+                var request MountRequest
+
+                if err := c.BindJSON(&amp;request); err != nil </span><span class="cov1" title="1">{
+                        logger.Error("invalid request: ", zap.Error(err))
+                        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+                        return
+                }</span>
+
+                <span class="cov8" title="5">logger.Info("New mount request with values:", zap.String("Bucket", request.Bucket), zap.String("Path", request.Path), zap.String("Mounter", request.Mounter), zap.Any("Args", request.Args))
+
+                if request.Mounter != constants.S3FS &amp;&amp; request.Mounter != constants.RClone </span><span class="cov1" title="1">{
+                        logger.Error("invalid mounter", zap.Any("mounter", request.Mounter))
+                        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid mounter"})
+                        return
+                }</span>
+
+                <span class="cov7" title="4">if request.Bucket == "" </span><span class="cov1" title="1">{
+                        logger.Error("missing bucket in request")
+                        c.JSON(http.StatusBadRequest, gin.H{"error": "missing bucket"})
+                        return
+                }</span>
+
+                // validate mounter args
+                <span class="cov6" title="3">args, err := parser.Parse(request)
+                if err != nil </span><span class="cov1" title="1">{
+                        logger.Error("failed to parse mounter args", zap.Any("mounter", request.Mounter), zap.Error(err))
+
+                        c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid args for mounter: %v", err)})
+                        return
+                }</span>
+
+                <span class="cov4" title="2">err = mounter.FuseMount(request.Path, request.Mounter, args)
+                if err != nil </span><span class="cov1" title="1">{
+                        logger.Error("mount failed: ", zap.Error(err))
+                        c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("mount failed: %v", err)})
+                        return
+                }</span>
+
+                <span class="cov1" title="1">logger.Info("bucket mount is successful", zap.Any("bucket", request.Bucket), zap.Any("path", request.Path))
+                c.JSON(http.StatusOK, gin.H{"status": "success"})</span>
+        }
+}
+
+func handleCosUnmount(mounter mounterUtils.MounterUtils) gin.HandlerFunc <span class="cov7" title="4">{
+        return func(c *gin.Context) </span><span class="cov6" title="3">{
+                var request struct {
+                        Path string `json:"path"`
+                }
+
+                if err := c.BindJSON(&amp;request); err != nil </span><span class="cov1" title="1">{
+                        logger.Error("invalid request: ", zap.Error(err))
+                        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+                        return
+                }</span>
+
+                <span class="cov4" title="2">logger.Info("New unmount request with values: ", zap.String("Path", request.Path))
+
+                err := mounter.FuseUnmount(request.Path)
+                if err != nil </span><span class="cov1" title="1">{
+                        logger.Error("unmount failed: ", zap.Error(err))
+                        c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("unmount failed :%v", err)})
+                        return
+                }</span>
+
+                <span class="cov1" title="1">logger.Info("bucket unmount is successful", zap.Any("path", request.Path))
+                c.JSON(http.StatusOK, gin.H{"status": "success"})</span>
+        }
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package main
+
+import (
+        "bytes"
+        "encoding/json"
+        "fmt"
+        "os"
+        "path/filepath"
+        "strings"
+
+        "github.com/IBM/ibm-object-csi-driver/pkg/constants"
+)
+
+// MountRequest ...
+type MountRequest struct {
+        Path    string          `json:"path"`
+        Bucket  string          `json:"bucket"`
+        Mounter string          `json:"mounter"`
+        Args    json.RawMessage `json:"args"`
+}
+
+var (
+        // Directories where bucket can be mounted
+        safeMountDirs = []string{"/var/data/kubelet/pods", "/var/lib/kubelet/pods"}
+        // Directories where s3fs/rclone configuration files need to be present
+        safeMounterConfigDir = "/var/lib/coscsi-config"
+
+        FileExists      = fileExists
+        absPathResolver = filepath.Abs
+)
+
+// MounterArgs ...
+type MounterArgs interface {
+        Validate(path string) error
+        PopulateArgsSlice(bucket, path string) ([]string, error)
+}
+
+type MounterArgsParser interface {
+        Parse(request MountRequest) ([]string, error)
+}
+
+func strictDecodeForUnknownFields(data json.RawMessage, v interface{}) error <span class="cov5" title="6">{
+        dec := json.NewDecoder(bytes.NewReader(data))
+        dec.DisallowUnknownFields()
+        return dec.Decode(v)
+}</span>
+
+func pathValidator(targetPath string) error <span class="cov10" title="47">{
+        absPath, err := absPathResolver(targetPath)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to resolve absolute mount path: %v", err)
+        }</span>
+        <span class="cov10" title="47">if !strings.HasPrefix(absPath, safeMountDirs[0]) &amp;&amp; !strings.HasPrefix(absPath, safeMountDirs[1]) </span><span class="cov4" title="4">{
+                return fmt.Errorf("bad value for target path \"%v\"", targetPath)
+        }</span>
+        <span class="cov9" title="43">return nil</span>
+}
+
+// --- Parser for Mounter Arguments ---
+
+type DefaultMounterArgsParser struct{}
+
+func (p *DefaultMounterArgsParser) Parse(request MountRequest) ([]string, error) <span class="cov1" title="1">{
+        return request.ParseMounterArgs()
+}</span>
+
+func (req *MountRequest) ParseMounterArgs() ([]string, error) <span class="cov5" title="7">{
+        switch req.Mounter </span>{
+        case constants.S3FS:<span class="cov3" title="3">
+                var args S3FSArgs
+                if err := strictDecodeForUnknownFields(req.Args, &amp;args); err != nil </span><span class="cov1" title="1">{
+                        return nil, fmt.Errorf("invalid s3fs args decode error: %w", err)
+                }</span>
+                <span class="cov2" title="2">if err := args.Validate(req.Path); err != nil </span><span class="cov1" title="1">{
+                        return nil, fmt.Errorf("s3fs args validation failed: %w", err)
+                }</span>
+                <span class="cov1" title="1">return args.PopulateArgsSlice(req.Bucket, req.Path)</span>
+
+        case constants.RClone:<span class="cov3" title="3">
+                var args RCloneArgs
+                if err := strictDecodeForUnknownFields(req.Args, &amp;args); err != nil </span><span class="cov1" title="1">{
+                        return nil, fmt.Errorf("invalid rclone args decode error: %w", err)
+                }</span>
+                <span class="cov2" title="2">if err := args.Validate(req.Path); err != nil </span><span class="cov1" title="1">{
+                        return nil, fmt.Errorf("rclone args validation failed: %w", err)
+                }</span>
+                <span class="cov1" title="1">return args.PopulateArgsSlice(req.Bucket, req.Path)</span>
+
+        default:<span class="cov1" title="1">
+                return nil, fmt.Errorf("unknown mounter: %s", req.Mounter)</span>
+        }
+}
+
+// isBoolString checks if a string is "true" or "false" (case-insensitive)
+func isBoolString(s string) bool <span class="cov7" title="18">{
+        s = strings.TrimSpace(strings.ToLower(s))
+        return s == "true" || s == "false"
+}</span>
+
+// fileExists checks whether the given file path exists and is not a directory.
+func fileExists(path string) (bool, error) <span class="cov3" title="3">{
+        absPath, err := absPathResolver(path)
+        if err != nil </span><span class="cov1" title="1">{
+                return false, fmt.Errorf("failed to resolve absolute path: %v", err)
+        }</span>
+        <span class="cov2" title="2">if !strings.HasPrefix(absPath, safeMounterConfigDir) </span><span class="cov1" title="1">{
+                return false, fmt.Errorf("path %v is outside the safe directory", absPath)
+        }</span>
+        <span class="cov1" title="1">info, err := os.Stat(absPath)
+        if err != nil </span><span class="cov1" title="1">{
+                if os.IsNotExist(err) </span><span class="cov1" title="1">{
+                        return false, nil
+                }</span>
+                <span class="cov0" title="0">return false, err</span>
+        }
+        <span class="cov0" title="0">return !info.IsDir(), nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">/*******************************************************************************
+ * IBM Confidential
+ * OCO Source Materials
+ * IBM Cloud Kubernetes Service, 5737-D43
+ * (C) Copyright IBM Corp. 2023, 2025 All Rights Reserved.
+ * The source code for this program is not published or otherwise divested of
+ * its trade secrets, irrespective of what has been deposited with
+ * the U.S. Copyright Office.
+ ******************************************************************************/
+
+package driver
+
+import (
+        "crypto/sha256"
+        "encoding/hex"
+        "errors"
+        "fmt"
+        "io"
+        "strings"
+        "time"
+
+        "github.com/IBM/ibm-object-csi-driver/pkg/constants"
+        "github.com/IBM/ibm-object-csi-driver/pkg/s3client"
+        "github.com/IBM/ibm-object-csi-driver/pkg/utils"
+        "github.com/aws/smithy-go"
+        "github.com/container-storage-interface/spec/lib/go/csi"
+        "go.uber.org/zap"
+        "golang.org/x/net/context"
+        "google.golang.org/grpc/codes"
+        "google.golang.org/grpc/status"
+        v1 "k8s.io/api/core/v1"
+        "k8s.io/klog/v2"
+)
+
+// Implements Controller csi.ControllerServer
+type controllerServer struct {
+        *S3Driver
+        csi.UnimplementedControllerServer
+        Stats      utils.StatsUtils
+        cosSession s3client.ObjectStorageSessionFactory
+        Logger     *zap.Logger
+}
+
+func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) <span class="cov10" title="17">{
+        var (
+                bucketName         string
+                endPoint           string
+                locationConstraint string
+                kpRootKeyCrn       string
+                pvcName            string
+                pvcNamespace       string
+                bucketVersioning   string
+        )
+
+        modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
+        }</span>
+        <span class="cov10" title="17">klog.V(3).Infof("CSIControllerServer-CreateVolume: Request: %v", modifiedRequest.(*csi.CreateVolumeRequest))
+
+        volumeName, err := sanitizeVolumeID(req.GetName())
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in sanitizeVolumeID  %v", err))
+        }</span>
+        <span class="cov10" title="17">volumeID := volumeName
+        if len(volumeID) == 0 </span><span class="cov1" title="1">{
+                return nil, status.Error(codes.InvalidArgument, "Volume name missing in request")
+        }</span>
+        <span class="cov9" title="16">klog.Infof("Got a request to create volume: %s", volumeID)
+
+        caps := req.GetVolumeCapabilities()
+        if caps == nil </span><span class="cov1" title="1">{
+                return nil, status.Error(codes.InvalidArgument, "Volume Capabilities missing in request")
+        }</span>
+        <span class="cov9" title="15">for _, cap := range caps </span><span class="cov9" title="15">{
+                klog.Infof("Volume capability: %s", cap)
+                if cap.GetBlock() != nil </span><span class="cov1" title="1">{
+                        return nil, status.Error(codes.InvalidArgument, "Volume type block Volume not supported")
+                }</span>
+        }
+
+        <span class="cov9" title="14">params := req.GetParameters()
+        if params == nil </span><span class="cov4" title="3">{
+                params = make(map[string]string)
+        }</span>
+        <span class="cov9" title="14">klog.Info("CreateVolume Parameters:\n\t", params)
+
+        secretMap := req.GetSecrets()
+        klog.Info("req.GetSecrets() length:\t", len(secretMap))
+
+        var customSecretName string
+        if len(secretMap) == 0 </span><span class="cov6" title="6">{
+                klog.Info("Did not find the secret that matches pvc name. Fetching custom secret from PVC annotations")
+
+                pvcName = params[constants.PVCNameKey]
+                pvcNamespace = params[constants.PVCNamespaceKey]
+
+                if pvcName == "" </span><span class="cov1" title="1">{
+                        return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("pvcName not specified, could not fetch the secret %v", err))
+                }</span>
+
+                <span class="cov6" title="5">if pvcNamespace == "" </span><span class="cov4" title="3">{
+                        pvcNamespace = constants.DefaultNamespace
+                }</span>
+
+                <span class="cov6" title="5">pvcRes, err := cs.Stats.GetPVC(pvcName, pvcNamespace)
+                if err != nil </span><span class="cov1" title="1">{
+                        return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("PVC resource not found %v", err))
+                }</span>
+
+                <span class="cov5" title="4">klog.Info("pvc annotations:\n\t", pvcRes.Annotations)
+
+                pvcAnnotations := pvcRes.Annotations
+
+                customSecretName = pvcAnnotations[constants.SecretNameKey]
+                secretNamespace := pvcAnnotations[constants.SecretNamespaceKey]
+
+                if customSecretName == "" </span><span class="cov1" title="1">{
+                        return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("secretName annotation 'cos.csi.driver/secret' not specified in the PVC annotations, could not fetch the secret %v", err))
+                }</span>
+
+                <span class="cov4" title="3">if secretNamespace == "" </span><span class="cov1" title="1">{
+                        klog.Info("secretNamespace annotation 'cos.csi.driver/secret-namespace' not specified in PVC annotations:\t", pvcRes.Annotations, "\t trying to fetch the secret in default namespace")
+                        secretNamespace = constants.DefaultNamespace
+                }</span>
+
+                <span class="cov4" title="3">secret, err := cs.Stats.GetSecret(customSecretName, secretNamespace)
+                if err != nil </span><span class="cov1" title="1">{
+                        return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret resource not found %v", err))
+                }</span>
+
+                <span class="cov3" title="2">secretMapCustom := parseCustomSecret(secret)
+                klog.Info("custom secret parameters parsed successfully, length of custom secret: ", len(secretMapCustom))
+
+                if objectPath, exists := secretMapCustom["objectPath"]; exists </span><span class="cov3" title="2">{
+                        klog.Infof("volume_id:%q objectPath found in secret: %q", volumeID, objectPath)
+                        params["objectPath"] = objectPath
+                }</span> else<span class="cov0" title="0"> {
+                        klog.Infof("volume_id:%q no objectPath in secret (mounting bucket root)", volumeID)
+                }</span>
+
+                <span class="cov3" title="2">secretMap = secretMapCustom</span>
+        }
+
+        <span class="cov8" title="10">endPoint = secretMap["cosEndpoint"]
+        if endPoint == "" </span><span class="cov1" title="1">{
+                endPoint = params["cosEndpoint"]
+        }</span> else<span class="cov7" title="9"> {
+                params["cosEndpoint"] = endPoint
+        }</span>
+        <span class="cov8" title="10">if endPoint == "" </span><span class="cov1" title="1">{
+                return nil, status.Error(codes.InvalidArgument, "cosEndpoint unknown")
+        }</span>
+
+        <span class="cov7" title="9">locationConstraint = secretMap["locationConstraint"]
+        if locationConstraint == "" </span><span class="cov1" title="1">{
+                locationConstraint = params["locationConstraint"]
+        }</span> else<span class="cov7" title="8"> {
+                params["locationConstraint"] = locationConstraint
+        }</span>
+        <span class="cov7" title="9">if locationConstraint == "" </span><span class="cov1" title="1">{
+                return nil, status.Error(codes.InvalidArgument, "locationConstraint unknown")
+        }</span>
+
+        <span class="cov7" title="8">kpRootKeyCrn = secretMap["kpRootKeyCRN"]
+        if kpRootKeyCrn != "" </span><span class="cov7" title="7">{
+                klog.Infof("key protect root key crn provided for bucket creation")
+        }</span>
+
+        <span class="cov7" title="8">mounter := secretMap["mounter"]
+        if mounter == "" </span><span class="cov7" title="7">{
+                mounter = params["mounter"]
+        }</span> else<span class="cov1" title="1"> {
+                params["mounter"] = mounter
+        }</span>
+
+        <span class="cov7" title="8">bucketName = secretMap["bucketName"]
+
+        // Check for bucketVersioning parameter
+        if val, ok := secretMap[constants.BucketVersioning]; ok &amp;&amp; val != "" </span><span class="cov3" title="2">{
+                enable := strings.ToLower(strings.TrimSpace(val))
+                if enable != "true" &amp;&amp; enable != "false" </span><span class="cov1" title="1">{
+                        return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Invalid BucketVersioning value in secret: %s. Value set %s. Must be 'true' or 'false'", customSecretName, val))
+                }</span>
+                <span class="cov1" title="1">bucketVersioning = enable
+                klog.Infof("BucketVersioning value that will be set via secret: %s", bucketVersioning)</span>
+        } else<span class="cov6" title="6"> if val, ok := params[constants.BucketVersioning]; ok &amp;&amp; val != "" </span><span class="cov3" title="2">{
+                enable := strings.ToLower(strings.TrimSpace(val))
+                if enable != "true" &amp;&amp; enable != "false" </span><span class="cov1" title="1">{
+                        return nil, status.Error(codes.InvalidArgument,
+                                fmt.Sprintf("Invalid bucketVersioning value in storage class: %s. Must be 'true' or 'false'", val))
+                }</span>
+                <span class="cov1" title="1">bucketVersioning = enable
+                klog.Infof("BucketVersioning value that will be set via storage class params: %s", bucketVersioning)</span>
+        }
+
+        <span class="cov6" title="6">creds, err := getObjectStorageCredentialsFromSecret(secretMap, cs.iamEndpoint)
+        if err != nil </span><span class="cov1" title="1">{
+                return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
+        }</span>
+        <span class="cov6" title="5">klog.Infof("cosEndpoint and locationConstraint getting paased to ObjectStorageSession: %s, %s", endPoint, locationConstraint)
+        sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
+
+        params["userProvidedBucket"] = "true"
+        if bucketName != "" </span><span class="cov5" title="4">{
+                // User Provided bucket. Check its existence and create if not present
+                klog.Infof("Bucket name provided: %v", bucketName)
+                klog.Infof("Check if the provided bucket already exists: %v", bucketName)
+                if err := sess.CheckBucketAccess(bucketName); err != nil </span><span class="cov3" title="2">{
+                        klog.Infof("CreateVolume: bucket not accessible: %v, Creating new bucket with given name", err)
+                        err = createBucket(sess, bucketName, kpRootKeyCrn)
+                        if err != nil </span><span class="cov3" title="2">{
+                                return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", err, bucketName))
+                        }</span>
+                        <span class="cov0" title="0">params["userProvidedBucket"] = "false"
+                        klog.Infof("Created bucket: %s", bucketName)</span>
+                }
+
+                <span class="cov3" title="2">if bucketVersioning != "" </span><span class="cov1" title="1">{
+                        enable := strings.ToLower(strings.TrimSpace(bucketVersioning)) == "true"
+                        klog.Infof("Bucket versioning value evaluated to: %t", enable)
+
+                        err := sess.SetBucketVersioning(bucketName, enable)
+                        if err != nil </span><span class="cov0" title="0">{
+                                if params["userProvidedBucket"] == "false" </span><span class="cov0" title="0">{
+                                        err1 := sess.DeleteBucket(bucketName)
+                                        if err1 != nil </span><span class="cov0" title="0">{
+                                                return nil, status.Error(codes.Internal, fmt.Sprintf("cannot set versioning: %v and cannot delete bucket %s: %v", err, bucketName, err1))
+                                        }</span>
+                                }
+                                <span class="cov0" title="0">return nil, status.Error(codes.Internal, fmt.Sprintf("failed to set versioning %t for bucket %s: %v", enable, bucketName, err))</span>
+                        }
+                        <span class="cov1" title="1">klog.Infof("Bucket versioning set to %t for bucket %s", enable, bucketName)</span>
+                }
+
+                <span class="cov3" title="2">params["bucketName"] = bucketName</span>
+        } else<span class="cov1" title="1"> {
+                // Generate random temp bucket name based on volume id
+                klog.Infof("Bucket name not provided")
+                tempBucketName := getTempBucketName(mounter, volumeID)
+                if tempBucketName == "" </span><span class="cov0" title="0">{
+                        klog.Errorf("CreateVolume: Unable to generate the bucket name")
+                        return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to access the bucket: %v", tempBucketName))
+                }</span>
+                <span class="cov1" title="1">err = createBucket(sess, tempBucketName, kpRootKeyCrn)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", err, tempBucketName))
+                }</span>
+
+                <span class="cov1" title="1">if bucketVersioning != "" </span><span class="cov1" title="1">{
+                        enable := strings.ToLower(strings.TrimSpace(bucketVersioning)) == "true"
+                        klog.Infof("Temp bucket versioning value evaluated to: %t", enable)
+
+                        err := sess.SetBucketVersioning(tempBucketName, enable)
+                        if err != nil </span><span class="cov0" title="0">{
+                                err1 := sess.DeleteBucket(tempBucketName)
+                                if err1 != nil </span><span class="cov0" title="0">{
+                                        return nil, status.Error(codes.Internal, fmt.Sprintf("cannot set versioning: %v and cannot delete temp bucket %s: %v", err, tempBucketName, err1))
+                                }</span>
+                                <span class="cov0" title="0">return nil, status.Error(codes.Internal, fmt.Sprintf("failed to set versioning %t for temp bucket %s: %v", enable, tempBucketName, err))</span>
+                        }
+                        <span class="cov1" title="1">klog.Infof("Bucket versioning set to %t for temp bucket %s", enable, tempBucketName)</span>
+                }
+                <span class="cov1" title="1">klog.Infof("Created temp bucket: %s", tempBucketName)
+                params["userProvidedBucket"] = "false"
+                params["bucketName"] = tempBucketName</span>
+        }
+        <span class="cov4" title="3">klog.Infof("create volume: %v", volumeID)
+        //COS Endpoint, bucket, access keys will be stored in the csiProvisionerSecretName
+        //The other tunables will be SC Parameters like ibm.io/multireq-max and other
+
+        return &amp;csi.CreateVolumeResponse{
+                Volume: &amp;csi.Volume{
+                        VolumeId:      volumeID,
+                        CapacityBytes: req.GetCapacityRange().GetRequiredBytes(),
+                        VolumeContext: params,
+                },
+        }, nil</span>
+}
+
+func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) <span class="cov7" title="9">{
+        modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
+        }</span>
+        <span class="cov7" title="9">klog.V(3).Infof("CSIControllerServer-DeleteVolume: Request: %v", modifiedRequest.(*csi.DeleteVolumeRequest))
+
+        volumeID := req.GetVolumeId()
+        if len(volumeID) == 0 </span><span class="cov1" title="1">{
+                return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
+        }</span>
+        <span class="cov7" title="8">klog.Infof("Deleting volume %v", volumeID)
+        secretMap := req.GetSecrets()
+
+        endPoint := secretMap["cosEndpoint"]
+        locationConstraint := secretMap["locationConstraint"]
+
+        if len(secretMap) == 0 </span><span class="cov5" title="4">{
+                klog.Info("Did not find the secret that matches pvc name. Fetching custom secret from PVC annotations")
+
+                pv, err := cs.Stats.GetPV(volumeID)
+                if err != nil </span><span class="cov1" title="1">{
+                        return nil, err
+                }</span>
+
+                <span class="cov4" title="3">klog.Info("pv Resource details:\n\t", pv)
+
+                secretName := pv.Spec.CSI.NodePublishSecretRef.Name
+                secretNamespace := pv.Spec.CSI.NodePublishSecretRef.Namespace
+
+                if secretName == "" </span><span class="cov1" title="1">{
+                        return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret details not found, could not fetch the secret %v", err))
+                }</span>
+
+                <span class="cov3" title="2">if secretNamespace == "" </span><span class="cov1" title="1">{
+                        klog.Info("secret Namespace not found. trying to fetch the secret in default namespace")
+                        secretNamespace = constants.DefaultNamespace
+                }</span>
+
+                <span class="cov3" title="2">endPoint = pv.Spec.CSI.VolumeAttributes["cosEndpoint"]
+                locationConstraint = pv.Spec.CSI.VolumeAttributes["locationConstraint"]
+
+                klog.Info("secret details found. secret-name: ", secretName, "\tsecret-namespace: ", secretNamespace)
+
+                secret, err := cs.Stats.GetSecret(secretName, secretNamespace)
+                if err != nil </span><span class="cov1" title="1">{
+                        return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret resource not found %v", err))
+                }</span>
+
+                <span class="cov1" title="1">secretMapCustom := parseCustomSecret(secret)
+                klog.Info("custom secret parameters parsed successfully, length of custom secret: ", len(secretMapCustom))
+                secretMap = secretMapCustom</span>
+        }
+
+        <span class="cov6" title="5">creds, err := getObjectStorageCredentialsFromSecret(secretMap, cs.iamEndpoint)
+        if err != nil </span><span class="cov1" title="1">{
+                return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
+        }</span>
+
+        <span class="cov5" title="4">sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
+
+        bucketToDelete, err := cs.Stats.BucketToDelete(volumeID)
+        if err != nil </span><span class="cov1" title="1">{
+                return &amp;csi.DeleteVolumeResponse{}, nil
+        }</span>
+
+        <span class="cov4" title="3">if bucketToDelete != "" </span><span class="cov4" title="3">{
+                err = sess.DeleteBucket(bucketToDelete)
+                if err != nil </span><span class="cov1" title="1">{
+                        klog.V(3).Infof("Cannot delete temp bucket: %v; error msg: %v", bucketToDelete, err)
+                }</span>
+                <span class="cov4" title="3">klog.Infof("End of bucket delete for  %v", volumeID)</span>
+        }
+
+        <span class="cov4" title="3">return &amp;csi.DeleteVolumeResponse{}, nil</span>
+}
+
+func (cs *controllerServer) ControllerPublishVolume(_ context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) <span class="cov1" title="1">{
+        klog.V(3).Infof("CSIControllerServer-ControllerPublishVolume: Request: %+v", req)
+        return nil, status.Error(codes.Unimplemented, "ControllerPublishVolume")
+}</span>
+
+func (cs *controllerServer) ControllerUnpublishVolume(_ context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) <span class="cov1" title="1">{
+        klog.V(3).Infof("CSIControllerServer-ControllerUnPublishVolume: Request: %+v", req)
+        return nil, status.Error(codes.Unimplemented, "ControllerUnpublishVolume")
+}</span>
+
+func (cs *controllerServer) ValidateVolumeCapabilities(_ context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) <span class="cov5" title="4">{
+        klog.V(3).Infof("ValidateVolumeCapabilities: Request: %+v", req)
+
+        // Validate Arguments
+        volumeID := req.GetVolumeId()
+        if len(volumeID) == 0 </span><span class="cov1" title="1">{
+                return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
+        }</span>
+
+        <span class="cov4" title="3">volCaps := req.GetVolumeCapabilities()
+        if len(volCaps) == 0 </span><span class="cov1" title="1">{
+                return nil, status.Error(codes.InvalidArgument, "Volume capabilities missing in request")
+        }</span>
+
+        <span class="cov3" title="2">var confirmed *csi.ValidateVolumeCapabilitiesResponse_Confirmed
+        if isValidVolumeCapabilities(volCaps) </span><span class="cov1" title="1">{
+                confirmed = &amp;csi.ValidateVolumeCapabilitiesResponse_Confirmed{VolumeCapabilities: volCaps}
+        }</span>
+
+        <span class="cov3" title="2">return &amp;csi.ValidateVolumeCapabilitiesResponse{
+                Confirmed: confirmed,
+        }, nil</span>
+}
+
+func (cs *controllerServer) ListVolumes(_ context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) <span class="cov1" title="1">{
+        klog.V(3).Infof("ListVolumes: Request: %+v", req)
+        return nil, status.Error(codes.Unimplemented, "ListVolumes")
+}</span>
+
+func (cs *controllerServer) GetCapacity(_ context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) <span class="cov1" title="1">{
+        klog.V(3).Infof("GetCapacity: Request: %+v", req)
+        return nil, status.Error(codes.Unimplemented, "GetCapacity")
+}</span>
+
+func (cs *controllerServer) ControllerGetCapabilities(_ context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) <span class="cov1" title="1">{
+        klog.V(3).Infof("ControllerGetCapabilities: Request: %+v", req)
+        var caps []*csi.ControllerServiceCapability
+        for _, cap := range controllerCapabilities </span><span class="cov1" title="1">{
+                c := &amp;csi.ControllerServiceCapability{
+                        Type: &amp;csi.ControllerServiceCapability_Rpc{
+                                Rpc: &amp;csi.ControllerServiceCapability_RPC{
+                                        Type: cap,
+                                },
+                        },
+                }
+                caps = append(caps, c)
+        }</span>
+        <span class="cov1" title="1">return &amp;csi.ControllerGetCapabilitiesResponse{Capabilities: caps}, nil</span>
+}
+
+func (cs *controllerServer) CreateSnapshot(_ context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) <span class="cov1" title="1">{
+        klog.V(3).Infof("CreateSnapshot: Request: %+v", req)
+        return nil, status.Error(codes.Unimplemented, "CreateSnapshot")
+}</span>
+
+func (cs *controllerServer) DeleteSnapshot(_ context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) <span class="cov1" title="1">{
+        klog.V(3).Infof("DeleteSnapshot: called with args %+v", req)
+        return nil, status.Error(codes.Unimplemented, "DeleteSnapshot")
+}</span>
+
+func (cs *controllerServer) ListSnapshots(_ context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) <span class="cov1" title="1">{
+        klog.V(3).Infof("ListSnapshots: called with args %+v", req)
+        return nil, status.Error(codes.Unimplemented, "ListSnapshots")
+}</span>
+
+func (cs *controllerServer) ControllerExpandVolume(_ context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) <span class="cov1" title="1">{
+        klog.V(3).Infof("ControllerExpandVolume: called with args %+v", req)
+        return nil, status.Error(codes.Unimplemented, "ControllerExpandVolume")
+}</span>
+
+func (cs *controllerServer) ControllerGetVolume(_ context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) <span class="cov1" title="1">{
+        klog.V(3).Infof("ControllerGetVolume: called with args %+v", req)
+        return nil, status.Error(codes.Unimplemented, "ControllerGetVolume")
+}</span>
+
+func (cs *controllerServer) ControllerModifyVolume(_ context.Context, req *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) <span class="cov1" title="1">{
+        klog.V(3).Infof("ControllerModifyVolume: called with args %+v", req)
+        return nil, status.Error(codes.Unimplemented, "ControllerModifyVolume")
+}</span>
+
+func getObjectStorageCredentialsFromSecret(secretMap map[string]string, iamEP string) (*s3client.ObjectStorageCredentials, error) <span class="cov8" title="11">{
+        klog.Infof("- getObjectStorageCredentialsFromSecret-")
+        var (
+                accessKey         string
+                secretKey         string
+                apiKey            string
+                serviceInstanceID string
+                authType          string
+                iamEndpoint       string
+        )
+
+        if val, check := secretMap["iamEndpoint"]; check </span><span class="cov7" title="9">{
+                iamEndpoint = val
+        }</span>
+        <span class="cov8" title="11">if iamEndpoint == "" </span><span class="cov3" title="2">{
+                iamEndpoint = iamEP
+        }</span>
+
+        <span class="cov8" title="11">if val, check := secretMap["apiKey"]; check </span><span class="cov7" title="9">{
+                apiKey = val
+        }</span>
+
+        // Add In Docs APIKEY is require param in secret
+        <span class="cov8" title="11">authType = "iam"
+        serviceInstanceID = secretMap["serviceId"]
+        if serviceInstanceID == "" </span><span class="cov4" title="3">{
+                accessKey = secretMap["accessKey"]
+                secretKey = secretMap["secretKey"]
+                if accessKey == "" || secretKey == "" </span><span class="cov3" title="2">{
+                        return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| serviceId/accessKey/secretKey unknown")
+                }</span>
+                <span class="cov1" title="1">authType = "hmac"</span>
+        }
+
+        <span class="cov7" title="9">return &amp;s3client.ObjectStorageCredentials{
+                AuthType:          authType,
+                AccessKey:         accessKey,
+                SecretKey:         secretKey,
+                APIKey:            apiKey,
+                IAMEndpoint:       iamEndpoint,
+                ServiceInstanceID: serviceInstanceID,
+        }, nil</span>
+}
+
+func parseCustomSecret(secret *v1.Secret) map[string]string <span class="cov4" title="3">{
+        klog.Infof("-parseCustomSecret-")
+        secretMapCustom := make(map[string]string)
+
+        var (
+                accessKey          string
+                secretKey          string
+                apiKey             string
+                serviceInstanceID  string
+                kpRootKeyCrn       string
+                bucketName         string
+                iamEndpoint        string
+                cosEndpoint        string
+                locationConstraint string
+                bucketVersioning   string
+                objectPath         string
+        )
+
+        if bytesVal, ok := secret.Data["accessKey"]; ok </span><span class="cov4" title="3">{
+                accessKey = string(bytesVal)
+        }</span>
+
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data["secretKey"]; ok </span><span class="cov4" title="3">{
+                secretKey = string(bytesVal)
+        }</span>
+
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data["apiKey"]; ok </span><span class="cov4" title="3">{
+                apiKey = string(bytesVal)
+        }</span>
+
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data["kpRootKeyCRN"]; ok </span><span class="cov4" title="3">{
+                kpRootKeyCrn = string(bytesVal)
+        }</span>
+
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data["serviceId"]; ok </span><span class="cov4" title="3">{
+                serviceInstanceID = string(bytesVal)
+        }</span>
+
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data["bucketName"]; ok </span><span class="cov4" title="3">{
+                bucketName = string(bytesVal)
+        }</span>
+
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data["iamEndpoint"]; ok </span><span class="cov4" title="3">{
+                iamEndpoint = string(bytesVal)
+        }</span>
+
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data["cosEndpoint"]; ok </span><span class="cov4" title="3">{
+                cosEndpoint = string(bytesVal)
+        }</span>
+
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data["locationConstraint"]; ok </span><span class="cov4" title="3">{
+                locationConstraint = string(bytesVal)
+        }</span>
+
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data[constants.BucketVersioning]; ok </span><span class="cov0" title="0">{
+                bucketVersioning = string(bytesVal)
+        }</span>
+
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data["objectPath"]; ok </span><span class="cov4" title="3">{
+                objectPath = string(bytesVal)
+        }</span>
+
+        <span class="cov4" title="3">secretMapCustom["accessKey"] = accessKey
+        secretMapCustom["secretKey"] = secretKey
+        secretMapCustom["apiKey"] = apiKey
+        secretMapCustom["kpRootKeyCRN"] = kpRootKeyCrn
+        secretMapCustom["serviceId"] = serviceInstanceID
+        secretMapCustom["bucketName"] = bucketName
+        secretMapCustom["iamEndpoint"] = iamEndpoint
+        secretMapCustom["cosEndpoint"] = cosEndpoint
+        secretMapCustom["locationConstraint"] = locationConstraint
+        secretMapCustom[constants.BucketVersioning] = bucketVersioning
+        secretMapCustom["objectPath"] = objectPath
+
+        return secretMapCustom</span>
+}
+
+func getTempBucketName(mounterType, volumeID string) string <span class="cov1" title="1">{
+        klog.Infof("mounterType: %v", mounterType)
+        currentTime := time.Now()
+        timestamp := currentTime.Format("20060102150405")
+
+        name := fmt.Sprintf("%s%s-%s", mounterType, timestamp, volumeID)
+        return name
+}</span>
+
+func createBucket(sess s3client.ObjectStorageSession, bucketName, kpRootKeyCrn string) error <span class="cov4" title="3">{
+        msg, err := sess.CreateBucket(bucketName, kpRootKeyCrn)
+        if msg != "" </span><span class="cov0" title="0">{
+                klog.Infof("Info:Create Volume module with user provided Bucket name: %v", msg)
+        }</span>
+        <span class="cov4" title="3">if err != nil </span><span class="cov1" title="1">{
+                var apiErr smithy.APIError
+                if errors.As(err, &amp;apiErr) &amp;&amp; apiErr.ErrorCode() == "BucketAlreadyExists" </span><span class="cov0" title="0">{
+                        klog.Warning(fmt.Sprintf("bucket '%s' already exists", bucketName))
+                }</span> else<span class="cov1" title="1"> {
+                        klog.Errorf("CreateVolume: Unable to create the bucket: %v", err)
+                        return errors.New("unable to create the bucket")
+                }</span>
+        }
+        <span class="cov3" title="2">if err := sess.CheckBucketAccess(bucketName); err != nil </span><span class="cov1" title="1">{
+                klog.Errorf("CreateVolume: Unable to access the bucket: %v", err)
+                return errors.New("unable to access the bucket")
+        }</span>
+        <span class="cov1" title="1">return nil</span>
+}
+
+func sanitizeVolumeID(volumeID string) (string, error) <span class="cov10" title="17">{
+        var err error
+        volumeID = strings.ToLower(volumeID)
+        if len(volumeID) &gt; 63 </span><span class="cov1" title="1">{
+                h := sha256.New()
+                _, err = io.WriteString(h, volumeID)
+                volumeID = hex.EncodeToString(h.Sum(nil))
+        }</span>
+        <span class="cov10" title="17">return volumeID, err</span>
+}
+
+func isValidVolumeCapabilities(volCaps []*csi.VolumeCapability) bool <span class="cov3" title="2">{
+        hasSupport := func(capacity *csi.VolumeCapability) bool </span><span class="cov3" title="2">{
+                for _, c := range volumeCapabilities </span><span class="cov3" title="2">{
+                        volumeCap := csi.VolumeCapability_AccessMode{
+                                Mode: c,
+                        }
+                        if volumeCap.GetMode() == capacity.AccessMode.GetMode() </span><span class="cov1" title="1">{
+                                return true
+                        }</span>
+                }
+                <span class="cov1" title="1">return false</span>
+        }
+
+        <span class="cov3" title="2">foundAll := true
+        for _, c := range volCaps </span><span class="cov3" title="2">{
+                if !hasSupport(c) </span><span class="cov1" title="1">{
+                        foundAll = false
+                }</span>
+        }
+        <span class="cov3" title="2">return foundAll</span>
+}
+</pre>
+		
+		<pre class="file" id="file6" style="display: none">/*******************************************************************************
+ * IBM Confidential
+ * OCO Source Materials
+ * IBM Cloud Kubernetes Service, 5737-D43
+ * (C) Copyright IBM Corp. 2025 All Rights Reserved.
+ * The source code for this program is not published or otherwise divested of
+ * its trade secrets, irrespective of what has been deposited with
+ * the U.S. Copyright Office.
+ ******************************************************************************/
+
+package driver
+
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
+
+import (
+        "os"
+        "strconv"
+
+        "go.uber.org/zap"
+)
+
+const (
+        filePermission = 0660
+)
+
+//counterfeiter:generate . socketPermission
+
+// socketPermission represents file system operations
+type socketPermission interface {
+        Chown(name string, uid, gid int) error
+        Chmod(name string, mode os.FileMode) error
+}
+
+// realSocketPermission implements socketPermission
+type opsSocketPermission struct{}
+
+func (f *opsSocketPermission) Chown(name string, uid, gid int) error <span class="cov1" title="1">{
+        return os.Chown(name, uid, gid)
+}</span>
+
+func (f *opsSocketPermission) Chmod(name string, mode os.FileMode) error <span class="cov1" title="1">{
+        return os.Chmod(name, mode)
+}</span>
+
+// setupSidecar updates owner/group and permission of the file given(addr)
+func setupSidecar(addr string, ops socketPermission, logger *zap.Logger) error <span class="cov10" title="5">{
+        groupSt := os.Getenv("SIDECAR_GROUP_ID")
+
+        logger.Info("Setting owner and permissions of csi socket file. SIDECAR_GROUP_ID env must match the 'livenessprobe' sidecar container groupID for csi socket connection.")
+
+        // If env is not set, set default to 0
+        if groupSt == "" </span><span class="cov1" title="1">{
+                logger.Warn("Unable to fetch SIDECAR_GROUP_ID environment variable. Sidecar container(s) might fail...")
+                groupSt = "0"
+        }</span>
+
+        <span class="cov10" title="5">group, err := strconv.Atoi(groupSt)
+        if err != nil </span><span class="cov1" title="1">{
+                return err
+        }</span>
+
+        // Change group of csi socket to non-root user for enabling the csi sidecar
+        <span class="cov8" title="4">if err := ops.Chown(addr, -1, group); err != nil </span><span class="cov1" title="1">{
+                return err
+        }</span>
+
+        // Modify permissions of csi socket
+        // Only the users and the group owners will have read/write access to csi socket
+        <span class="cov7" title="3">if err := ops.Chmod(addr, filePermission); err != nil </span><span class="cov1" title="1">{
+                return err
+        }</span>
+
+        <span class="cov4" title="2">logger.Info("Successfully set owner and permissions of csi socket file.")
+
+        return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file7" style="display: none">/*******************************************************************************
+ * IBM Confidential
+ * OCO Source Materials
+ * IBM Cloud Kubernetes Service, 5737-D43
+ * (C) Copyright IBM Corp. 2023 All Rights Reserved.
+ * The source code for this program is not published or otherwise divested of
+ * its trade secrets, irrespective of what has been deposited with
+ * the U.S. Copyright Office.
+ ******************************************************************************/
+
+package driver
+
+import (
+        csi "github.com/container-storage-interface/spec/lib/go/csi"
+        "golang.org/x/net/context"
+        "google.golang.org/grpc/codes"
+        "google.golang.org/grpc/status"
+        "k8s.io/klog/v2"
+)
+
+// Implements Identity Sever csi.IdentityServe
+type identityServer struct {
+        *S3Driver
+        csi.UnimplementedIdentityServer
+}
+
+func (csiIdentity *identityServer) GetPluginInfo(_ context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) <span class="cov10" title="2">{
+        klog.V(3).Infof("identityServer-GetPluginInfo: Request: %+v", req)
+        if csiIdentity.S3Driver == nil </span><span class="cov1" title="1">{
+                return nil, status.Error(codes.InvalidArgument, "Driver not configured")
+        }</span>
+
+        <span class="cov1" title="1">return &amp;csi.GetPluginInfoResponse{
+                Name:          csiIdentity.name,
+                VendorVersion: csiIdentity.version,
+        }, nil</span>
+}
+
+func (csiIdentity *identityServer) GetPluginCapabilities(_ context.Context, req *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) <span class="cov1" title="1">{
+        klog.V(3).Infof("identityServer-GetPluginCapabilities: Request %+v", req)
+        return &amp;csi.GetPluginCapabilitiesResponse{
+                Capabilities: []*csi.PluginCapability{
+                        {
+                                Type: &amp;csi.PluginCapability_Service_{
+                                        Service: &amp;csi.PluginCapability_Service{
+                                                Type: csi.PluginCapability_Service_CONTROLLER_SERVICE,
+                                        },
+                                },
+                        },
+                        {
+                                Type: &amp;csi.PluginCapability_Service_{
+                                        Service: &amp;csi.PluginCapability_Service{
+                                                Type: csi.PluginCapability_Service_VOLUME_ACCESSIBILITY_CONSTRAINTS,
+                                        },
+                                },
+                        },
+                        /* TODO Add Volume Expansion {
+                                Type: &amp;csi.PluginCapability_Service_{
+                                        Service: &amp;csi.PluginCapability_Service{
+                                                Type: csi.PluginCapability_VolumeExpansion_ONLINE,
+                                        },
+                                },
+                        }, */
+                },
+        }, nil
+}</span>
+
+func (csiIdentity *identityServer) Probe(_ context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) <span class="cov1" title="1">{
+        klog.V(3).Infof("identityServer-Probe: Request %+v", req)
+        return &amp;csi.ProbeResponse{}, nil
+}</span>
+</pre>
+		
+		<pre class="file" id="file8" style="display: none">/*******************************************************************************
+ * IBM Confidential
+ * OCO Source Materials
+ * IBM Cloud Kubernetes Service, 5737-D43
+ * (C) Copyright IBM Corp. 2023 All Rights Reserved.
+ * The source code for this program is not published or otherwise divested of
+ * its trade secrets, irrespective of what has been deposited with
+ * the U.S. Copyright Office.
+ ******************************************************************************/
+
+package driver
+
+import (
+        "fmt"
+
+        "github.com/IBM/ibm-object-csi-driver/pkg/constants"
+        "github.com/IBM/ibm-object-csi-driver/pkg/mounter"
+        mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
+        "github.com/IBM/ibm-object-csi-driver/pkg/utils"
+        "github.com/container-storage-interface/spec/lib/go/csi"
+        "golang.org/x/net/context"
+        "google.golang.org/grpc/codes"
+        "google.golang.org/grpc/status"
+        "k8s.io/klog/v2"
+)
+
+// Implements Node Server csi.NodeServer
+type nodeServer struct {
+        *S3Driver
+        csi.UnimplementedNodeServer
+        Stats utils.StatsUtils
+        NodeServerConfig
+        Mounter      mounter.NewMounterFactory
+        MounterUtils mounterUtils.MounterUtils
+}
+
+type NodeServerConfig struct {
+        MaxVolumesPerNode int64
+        Region            string
+        Zone              string
+        NodeID            string
+        TLSCipherSuite    string
+}
+
+func (ns *nodeServer) NodeStageVolume(_ context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) <span class="cov3" title="3">{
+        klog.V(2).Infof("CSINodeServer-NodeStageVolume: Request %+v", req)
+
+        volumeID := req.GetVolumeId()
+        if len(volumeID) == 0 </span><span class="cov1" title="1">{
+                return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
+        }</span>
+
+        <span class="cov2" title="2">stagingTargetPath := req.GetStagingTargetPath()
+        if len(stagingTargetPath) == 0 </span><span class="cov1" title="1">{
+                return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
+        }</span>
+
+        <span class="cov1" title="1">return &amp;csi.NodeStageVolumeResponse{}, nil</span>
+}
+
+func (ns *nodeServer) NodeUnstageVolume(_ context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) <span class="cov3" title="3">{
+        klog.V(2).Infof("CSINodeServer-NodeUnstageVolume: Request %+v", req)
+
+        volumeID := req.GetVolumeId()
+        if len(volumeID) == 0 </span><span class="cov1" title="1">{
+                return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
+        }</span>
+
+        <span class="cov2" title="2">stagingTargetPath := req.GetStagingTargetPath()
+        if len(stagingTargetPath) == 0 </span><span class="cov1" title="1">{
+                return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
+        }</span>
+
+        <span class="cov1" title="1">return &amp;csi.NodeUnstageVolumeResponse{}, nil</span>
+}
+
+func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) <span class="cov6" title="9">{
+        modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
+        }</span>
+        <span class="cov6" title="9">klog.V(2).Infof("CSINodeServer-NodePublishVolume: Request %v", modifiedRequest.(*csi.NodePublishVolumeRequest))
+
+        volumeMountGroup := req.GetVolumeCapability().GetMount().GetVolumeMountGroup()
+        klog.V(2).Infof("CSINodeServer-NodePublishVolume-: volumeMountGroup: %v", volumeMountGroup)
+
+        volumeID := req.GetVolumeId()
+        if len(volumeID) == 0 </span><span class="cov1" title="1">{
+                return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
+        }</span>
+
+        <span class="cov6" title="8">targetPath := req.GetTargetPath()
+        if len(targetPath) == 0 </span><span class="cov1" title="1">{
+                return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
+        }</span>
+
+        <span class="cov6" title="7">if req.GetVolumeCapability() == nil </span><span class="cov1" title="1">{
+                return nil, status.Error(codes.InvalidArgument, "Volume capability missing in request")
+        }</span>
+
+        <span class="cov5" title="6">err = ns.Stats.CheckMount(targetPath)
+        if err != nil </span><span class="cov1" title="1">{
+                klog.Errorf("Can not validate target mount point: %s %v", targetPath, err)
+                return nil, status.Error(codes.Internal, err.Error())
+        }</span>
+
+        <span class="cov5" title="5">deviceID := ""
+        if req.GetPublishContext() != nil </span><span class="cov0" title="0">{
+                deviceID = req.GetPublishContext()[deviceID]
+        }</span>
+
+        <span class="cov5" title="5">readOnly := req.GetReadonly()
+        attrib := req.GetVolumeContext()
+        mountFlags := req.GetVolumeCapability().GetMount().GetMountFlags()
+        klog.V(2).Infof("-NodePublishVolume-: targetPath: %v\ndeviceID: %v\nreadonly: %v\nvolumeId: %v\nattributes: %v\nmountFlags: %v\n",
+                targetPath, deviceID, readOnly, volumeID, attrib, mountFlags)
+
+        secretMap := req.GetSecrets()
+        klog.V(2).Infof("-NodePublishVolume-: length of req.GetSecrets() length: %v", len(secretMap))
+        secretMapCopy := make(map[string]string)
+        for k, v := range secretMap </span><span class="cov10" title="29">{
+                if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" </span><span class="cov8" title="14">{
+                        secretMapCopy[k] = "xxxxxxx"
+                        continue</span>
+                }
+                <span class="cov8" title="15">secretMapCopy[k] = v</span>
+        }
+        <span class="cov5" title="5">klog.V(2).Infof("-NodePublishVolume-: secretMap: %v", secretMapCopy)
+        if volumeMountGroup != "" </span><span class="cov0" title="0">{
+                secretMap["gid"] = volumeMountGroup
+        }</span>
+
+        <span class="cov5" title="5">if len(secretMap["cosEndpoint"]) == 0 </span><span class="cov1" title="1">{
+                secretMap["cosEndpoint"] = attrib["cosEndpoint"]
+        }</span>
+
+        <span class="cov5" title="5">if len(secretMap["locationConstraint"]) == 0 </span><span class="cov1" title="1">{
+                secretMap["locationConstraint"] = attrib["locationConstraint"]
+        }</span>
+
+        <span class="cov5" title="5">if len(secretMap["cosEndpoint"]) == 0 </span><span class="cov1" title="1">{
+                return nil, status.Error(codes.InvalidArgument, "S3 Service endpoint not provided")
+        }</span>
+
+        <span class="cov4" title="4">if len(secretMap["iamEndpoint"]) == 0 </span><span class="cov3" title="3">{
+                secretMap["iamEndpoint"] = ns.iamEndpoint
+        }</span>
+
+        // If bucket name wasn't provided by user, we use temp bucket created for volume.
+        <span class="cov4" title="4">if secretMap["bucketName"] == "" </span><span class="cov3" title="3">{
+                tempBucketName, err := ns.Stats.GetBucketNameFromPV(volumeID)
+                if err != nil </span><span class="cov1" title="1">{
+                        klog.Errorf("Unable to fetch pv %v", err)
+                        return nil, status.Error(codes.Internal, err.Error())
+                }</span>
+
+                <span class="cov2" title="2">if tempBucketName == "" </span><span class="cov1" title="1">{
+                        klog.Errorf("Unable to fetch bucket name from pv")
+                        return nil, status.Error(codes.Internal, "unable to fetch bucket name from pv")
+                }</span>
+
+                <span class="cov1" title="1">secretMap["bucketName"] = tempBucketName</span>
+        }
+
+        <span class="cov2" title="2">var defaultParamsMap = map[string]string{
+                constants.CipherSuitesKey: ns.TLSCipherSuite,
+        }
+
+        mounterObj := ns.Mounter.NewMounter(attrib, secretMap, mountFlags, defaultParamsMap)
+
+        klog.Info("-NodePublishVolume-: Mount")
+        if err = mounterObj.Mount("", targetPath); err != nil </span><span class="cov1" title="1">{
+                klog.Info("-Mount-: Error: ", err)
+                return nil, err
+        }</span>
+
+        <span class="cov1" title="1">klog.Infof("s3: bucket %s successfully mounted to %s", secretMap["bucketName"], targetPath)
+        return &amp;csi.NodePublishVolumeResponse{}, nil</span>
+}
+
+func (ns *nodeServer) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) <span class="cov5" title="5">{
+        klog.V(2).Infof("CSINodeServer-NodeUnpublishVolume: Request: %+v", req)
+
+        volumeID := req.GetVolumeId()
+        if len(volumeID) == 0 </span><span class="cov1" title="1">{
+                return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
+        }</span>
+
+        <span class="cov4" title="4">targetPath := req.GetTargetPath()
+        if len(targetPath) == 0 </span><span class="cov1" title="1">{
+                return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
+        }</span>
+        <span class="cov3" title="3">klog.Infof("Unmounting target path %s", targetPath)
+
+        attrib, err := ns.Stats.GetPVAttributes(volumeID)
+        if err != nil </span><span class="cov1" title="1">{
+                return nil, status.Error(codes.NotFound, "Failed to get PV details")
+        }</span>
+
+        <span class="cov2" title="2">mounterObj := ns.Mounter.NewMounter(attrib, nil, nil, nil)
+
+        klog.Info("-NodeUnpublishVolume-: Unmount")
+        if err = mounterObj.Unmount(targetPath); err != nil </span><span class="cov1" title="1">{
+                //TODO: Need to handle the case with non existing mount separately - https://github.com/IBM/ibm-object-csi-driver/issues/46
+                klog.Infof("UNMOUNT ERROR: %v", err)
+                return nil, status.Error(codes.Internal, err.Error())
+        }</span>
+
+        <span class="cov1" title="1">klog.Infof("Successfully unmounted  target path %s", targetPath)
+        return &amp;csi.NodeUnpublishVolumeResponse{}, nil</span>
+}
+
+func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) <span class="cov5" title="6">{
+        klog.V(2).Infof("NodeGetVolumeStats: Request: %+v", req)
+
+        volumeID := req.GetVolumeId()
+        if len(volumeID) == 0 </span><span class="cov1" title="1">{
+                return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
+        }</span>
+
+        <span class="cov5" title="5">volumePath := req.VolumePath
+        if volumePath == "" </span><span class="cov1" title="1">{
+                return nil, status.Error(codes.InvalidArgument, "Path Doesn't exist")
+        }</span>
+
+        <span class="cov4" title="4">klog.V(2).Info("NodeGetVolumeStats: Start getting Stats")
+        //  Making direct call to fs library for the sake of simplicity. That way we don't need to initialize VolumeStatsUtils. If there is a need for VolumeStatsUtils to grow bigger then we can use it
+        _, capacity, _, inodes, inodesFree, inodesUsed, err := ns.Stats.FSInfo(volumePath)
+
+        if err != nil </span><span class="cov1" title="1">{
+                data := map[string]string{"VolumeId": volumeID, "Error": err.Error()}
+                klog.Error("NodeGetVolumeStats: error occurred while getting volume stats ", data)
+                return &amp;csi.NodeGetVolumeStatsResponse{
+                        VolumeCondition: &amp;csi.VolumeCondition{
+                                Abnormal: true,
+                                Message:  err.Error(),
+                        },
+                }, nil
+        }</span>
+
+        <span class="cov3" title="3">totalCap, err := ns.Stats.GetTotalCapacityFromPV(volumeID)
+        if err != nil </span><span class="cov1" title="1">{
+                return nil, err
+        }</span>
+
+        <span class="cov2" title="2">capAsInt64, converted := totalCap.AsInt64()
+        if !converted </span><span class="cov0" title="0">{
+                capAsInt64 = capacity
+        }</span>
+        <span class="cov2" title="2">klog.Info("NodeGetVolumeStats: Total Capacity of Volume: ", capAsInt64)
+
+        capUsed, err := ns.Stats.GetBucketUsage(volumeID)
+        if err != nil </span><span class="cov1" title="1">{
+                return nil, err
+        }</span>
+
+        // Since `capAvailable` can be negative and K8s will roundoff from int64 to uint64 resulting in misleading value
+        // capAvailable := capAsInt64 - capUsed
+
+        <span class="cov1" title="1">resp := &amp;csi.NodeGetVolumeStatsResponse{
+                Usage: []*csi.VolumeUsage{
+                        {
+                                // Available: capAvailable,
+                                Total: capAsInt64,
+                                Used:  capUsed,
+                                Unit:  csi.VolumeUsage_BYTES,
+                        },
+                        {
+                                Available: inodesFree,
+                                Total:     inodes,
+                                Used:      inodesUsed,
+                                Unit:      csi.VolumeUsage_INODES,
+                        },
+                },
+        }
+
+        klog.V(2).Info("NodeGetVolumeStats: Volume Stats ", resp)
+        return resp, nil</span>
+}
+
+func (ns *nodeServer) NodeExpandVolume(_ context.Context, _ *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) <span class="cov1" title="1">{
+        return &amp;csi.NodeExpandVolumeResponse{}, status.Error(codes.Unimplemented, "NodeExpandVolume is not implemented")
+}</span>
+
+func (ns *nodeServer) NodeGetCapabilities(_ context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) <span class="cov1" title="1">{
+        klog.V(2).Infof("NodeGetCapabilities: Request: %+v", req)
+        var caps []*csi.NodeServiceCapability
+        for _, cap := range nodeServerCapabilities </span><span class="cov3" title="3">{
+                c := &amp;csi.NodeServiceCapability{
+                        Type: &amp;csi.NodeServiceCapability_Rpc{
+                                Rpc: &amp;csi.NodeServiceCapability_RPC{
+                                        Type: cap,
+                                },
+                        },
+                }
+                caps = append(caps, c)
+        }</span>
+        <span class="cov1" title="1">return &amp;csi.NodeGetCapabilitiesResponse{Capabilities: caps}, nil</span>
+}
+
+func (ns *nodeServer) NodeGetInfo(_ context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) <span class="cov1" title="1">{
+        klog.V(3).Infof("NodeGetInfo: called with args %+v", req)
+
+        topology := &amp;csi.Topology{
+                Segments: map[string]string{
+                        constants.NodeRegionLabel: ns.Region,
+                        constants.NodeZoneLabel:   ns.Zone,
+                },
+        }
+        resp := &amp;csi.NodeGetInfoResponse{
+                NodeId:             ns.NodeID,
+                MaxVolumesPerNode:  ns.MaxVolumesPerNode,
+                AccessibleTopology: topology,
+        }
+        klog.V(2).Info("NodeGetInfo: ", resp)
+        return resp, nil
+}</span>
+</pre>
+		
+		<pre class="file" id="file9" style="display: none">/*******************************************************************************
+ * IBM Confidential
+ * OCO Source Materials
+ * IBM Cloud Kubernetes Service, 5737-D43
+ * (C) Copyright IBM Corp. 2023 All Rights Reserved.
+ * The source code for this program is not published or otherwise divested of
+ * its trade secrets, irrespective of what has been deposited with
+ * the U.S. Copyright Office.
+ ******************************************************************************/
+
+package driver
+
+import (
+        "fmt"
+        "os"
+        "strconv"
+        "strings"
+
+        "github.com/IBM/ibm-csi-common/pkg/utils"
+        "github.com/IBM/ibm-object-csi-driver/pkg/constants"
+        "github.com/IBM/ibm-object-csi-driver/pkg/mounter"
+        mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
+        "github.com/IBM/ibm-object-csi-driver/pkg/s3client"
+        pkgUtils "github.com/IBM/ibm-object-csi-driver/pkg/utils"
+        csi "github.com/container-storage-interface/spec/lib/go/csi"
+        "go.uber.org/zap"
+        "k8s.io/klog/v2"
+)
+
+var (
+        // volumeCapabilities represents how the volume could be accessed.
+        volumeCapabilities = []csi.VolumeCapability_AccessMode_Mode{
+                csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+        }
+
+        // controllerCapabilities represents the capability of controller service
+        controllerCapabilities = []csi.ControllerServiceCapability_RPC_Type{
+                csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
+        }
+
+        // nodeServerCapabilities represents the capability of node service.
+        nodeServerCapabilities = []csi.NodeServiceCapability_RPC_Type{
+                csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
+                csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
+                csi.NodeServiceCapability_RPC_VOLUME_MOUNT_GROUP,
+        }
+)
+
+type S3Driver struct {
+        name        string
+        version     string
+        mode        string
+        endpoint    string
+        iamEndpoint string
+
+        s3client s3client.ObjectStorageSession
+
+        ids *identityServer
+        ns  *nodeServer
+        cs  *controllerServer
+
+        logger *zap.Logger
+        vcap   []*csi.VolumeCapability_AccessMode
+        cscap  []*csi.ControllerServiceCapability
+        nscap  []*csi.NodeServiceCapability
+}
+
+// AddVolumeCapabilityAccessModes ...
+func (driver *S3Driver) AddVolumeCapabilityAccessModes(vc []csi.VolumeCapability_AccessMode_Mode) error <span class="cov6" title="4">{
+        driver.logger.Info("IBMCSIDriver-AddVolumeCapabilityAccessModes...", zap.Reflect("VolumeCapabilityAccessModes", vc))
+        var vca []*csi.VolumeCapability_AccessMode
+        for _, c := range vc </span><span class="cov6" title="4">{
+                driver.logger.Info("Enabling volume access mode", zap.Reflect("Mode", c.String()))
+                vca = append(vca, utils.NewVolumeCapabilityAccessMode(c))
+        }</span>
+        <span class="cov6" title="4">driver.vcap = vca
+        driver.logger.Info("Successfully enabled Volume Capability Access Modes")
+        return nil</span>
+}
+
+// AddControllerServiceCapabilities ...
+func (driver *S3Driver) AddControllerServiceCapabilities(cl []csi.ControllerServiceCapability_RPC_Type) error <span class="cov6" title="4">{
+        driver.logger.Info("IBMCSIDriver-AddControllerServiceCapabilities...", zap.Reflect("ControllerServiceCapabilities", cl))
+        var csc []*csi.ControllerServiceCapability
+        for _, c := range cl </span><span class="cov6" title="4">{
+                driver.logger.Info("Adding controller service capability", zap.Reflect("Capability", c.String()))
+                csc = append(csc, utils.NewControllerServiceCapability(c))
+        }</span>
+        <span class="cov6" title="4">driver.cscap = csc
+        driver.logger.Info("Successfully added Controller Service Capabilities")
+        return nil</span>
+}
+
+// AddNodeServiceCapabilities ...
+func (driver *S3Driver) AddNodeServiceCapabilities(nl []csi.NodeServiceCapability_RPC_Type) error <span class="cov6" title="4">{
+        driver.logger.Info("IBMCSIDriver-AddNodeServiceCapabilities...", zap.Reflect("NodeServiceCapabilities", nl))
+        var nsc []*csi.NodeServiceCapability
+        for _, n := range nl </span><span class="cov10" title="12">{
+                driver.logger.Info("Adding node service capability", zap.Reflect("NodeServiceCapabilities", n.String()))
+                nsc = append(nsc, utils.NewNodeServiceCapability(n))
+        }</span>
+        <span class="cov6" title="4">driver.nscap = nsc
+        driver.logger.Info("Successfully added Node Service Capabilities")
+        return nil</span>
+}
+
+func Setups3Driver(mode, name, version string, lgr *zap.Logger) (*S3Driver, error) <span class="cov8" title="7">{
+        csiDriver := &amp;S3Driver{}
+        csiDriver.logger = lgr
+        csiDriver.logger.Info("S3CSIDriver-SetupS3CSIDriver setting up S3 CSI Driver")
+        if name == "" </span><span class="cov1" title="1">{
+                return nil, fmt.Errorf("driver name missing")
+        }</span>
+        <span class="cov7" title="6">csiDriver.logger.Info("Driver Name", zap.String("name", name), zap.String("mode", mode))
+        csiDriver.name = name
+        csiDriver.version = version
+        csiDriver.mode = mode
+
+        csiDriver.logger.Info("successfully setup CSI driver")
+        return csiDriver, nil</span>
+}
+
+func newIdentityServer(d *S3Driver) *identityServer <span class="cov4" title="3">{
+        return &amp;identityServer{
+                S3Driver: d,
+        }
+}</span>
+
+func newControllerServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, s3cosSession s3client.ObjectStorageSessionFactory, logger *zap.Logger) *controllerServer <span class="cov3" title="2">{
+        return &amp;controllerServer{
+                S3Driver:   d,
+                Stats:      statsUtil,
+                cosSession: s3cosSession,
+                Logger:     logger,
+        }
+}</span>
+
+func newNodeServer(d *S3Driver, statsUtil pkgUtils.StatsUtils, nodeID string, mountObj mounter.NewMounterFactory, mounterUtil mounterUtils.MounterUtils) (*nodeServer, error) <span class="cov8" title="7">{
+        nodeName := os.Getenv(constants.KubeNodeName)
+        if nodeName == "" </span><span class="cov1" title="1">{
+                return nil, fmt.Errorf("KUBE_NODE_NAME env variable not set")
+        }</span>
+
+        <span class="cov7" title="6">data, err := statsUtil.GetClusterNodeData(nodeName)
+        if err != nil </span><span class="cov1" title="1">{
+                return nil, err
+        }</span>
+
+        <span class="cov6" title="5">var maxVolumesPerNode int64
+        maxVolumesPerNodeStr := os.Getenv(constants.MaxVolumesPerNodeEnv)
+        if maxVolumesPerNodeStr != "" </span><span class="cov6" title="4">{
+                maxVolumesPerNode, err = strconv.ParseInt(maxVolumesPerNodeStr, 10, 64)
+                if err != nil </span><span class="cov1" title="1">{
+                        return nil, err
+                }</span>
+        } else<span class="cov1" title="1"> {
+                d.logger.Warn("MAX_VOLUMES_PER_NODE env variable not set. Using default value")
+                maxVolumesPerNode = int64(constants.DefaultVolumesPerNode)
+        }</span>
+
+        <span class="cov6" title="4">ciphersuite := ""
+        if strings.Contains(strings.ToLower(data.OS), "ubuntu") </span><span class="cov1" title="1">{
+                ciphersuite = "AESGCM"
+        }</span>
+
+        <span class="cov6" title="4">return &amp;nodeServer{
+                S3Driver: d,
+                Stats:    statsUtil,
+                NodeServerConfig: NodeServerConfig{MaxVolumesPerNode: maxVolumesPerNode, Region: data.Region, Zone: data.Zone,
+                        NodeID: nodeID, TLSCipherSuite: ciphersuite},
+                Mounter:      mountObj,
+                MounterUtils: mounterUtil,
+        }, nil</span>
+}
+
+func (driver *S3Driver) NewS3CosDriver(nodeID string, endpoint string, s3cosSession s3client.ObjectStorageSessionFactory, mountObj mounter.NewMounterFactory, statsUtil pkgUtils.StatsUtils, mounterUtil mounterUtils.MounterUtils) (*S3Driver, error) <span class="cov6" title="4">{
+        s3client, err := s3client.NewS3Client(driver.logger)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov6" title="4">iamEP, _, err := statsUtil.GetEndpoints()
+        if err != nil </span><span class="cov1" title="1">{
+                return nil, err
+        }</span>
+        <span class="cov4" title="3">klog.Infof("iam endpoint: %v", iamEP)
+        driver.iamEndpoint = iamEP
+
+        driver.endpoint = endpoint
+        driver.s3client = s3client
+
+        _ = driver.AddVolumeCapabilityAccessModes(volumeCapabilities)       // #nosec G104: Attempt to AddVolumeCapabilityAccessModes only on best-effort basis.Error cannot be usefully handled.
+        _ = driver.AddControllerServiceCapabilities(controllerCapabilities) // #nosec G104: Attempt to AddControllerServiceCapabilities only on best-effort basis.Error cannot be usefully handled.
+        _ = driver.AddNodeServiceCapabilities(nodeServerCapabilities)       // #nosec G104: Attempt to AddNodeServiceCapabilities only on best-effort basis.Error cannot be usefully handled.
+
+        // Create GRPC servers
+        driver.ids = newIdentityServer(driver)
+        switch driver.mode </span>{
+        case "controller":<span class="cov1" title="1">
+                driver.cs = newControllerServer(driver, statsUtil, s3cosSession, driver.logger)</span>
+        case "node":<span class="cov1" title="1">
+                driver.ns, err = newNodeServer(driver, statsUtil, nodeID, mountObj, mounterUtil)</span>
+        case "controller-node":<span class="cov1" title="1">
+                driver.cs = newControllerServer(driver, statsUtil, s3cosSession, driver.logger)
+                driver.ns, err = newNodeServer(driver, statsUtil, nodeID, mountObj, mounterUtil)</span>
+        }
+
+        <span class="cov4" title="3">return driver, err</span>
+}
+
+func (driver *S3Driver) Run() <span class="cov0" title="0">{
+        driver.logger.Info("--S3CSIDriver Run--")
+        driver.logger.Info("Driver:", zap.Reflect("Driver Name", driver.name))
+        driver.logger.Info("Version:", zap.Reflect("Driver Version", driver.version))
+        // Initialize default library driver
+
+        grpcServer := NewNonBlockingGRPCServer(driver.mode, driver.logger)
+        grpcServer.Start(driver.endpoint, driver.ids, driver.cs, driver.ns)
+        grpcServer.Wait()
+}</span>
+</pre>
+		
+		<pre class="file" id="file10" style="display: none">/*******************************************************************************
+ * IBM Confidential
+ * OCO Source Materials
+ * IBM Cloud Kubernetes Service, 5737-D43
+ * (C) Copyright IBM Corp. 2023 All Rights Reserved.
+ * The source code for this program is not published or otherwise divested of
+ * its trade secrets, irrespective of what has been deposited with
+ * the U.S. Copyright Office.
+ ******************************************************************************/
+
+package driver
+
+import (
+        "errors"
+        "net"
+        "net/url"
+        "os"
+        "sync"
+
+        "github.com/IBM/ibm-object-csi-driver/pkg/constants"
+        "github.com/container-storage-interface/spec/lib/go/csi"
+        "go.uber.org/zap"
+        "golang.org/x/net/context"
+        "google.golang.org/grpc"
+        "k8s.io/klog/v2"
+)
+
+// NonBlockingGRPCServer Defines Non blocking GRPC server interfaces
+type NonBlockingGRPCServer interface {
+        // Start services at the endpoint
+        Start(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer)
+        // Waits for the service to stop
+        Wait()
+        // Stops the service gracefully
+        Stop()
+        // Stops the service forcefully
+        ForceStop()
+}
+
+// nonBlockingGRPCServer server
+type nonBlockingGRPCServer struct {
+        wg     sync.WaitGroup
+        server *grpc.Server
+        mode   string
+        logger *zap.Logger
+}
+
+// NewNonBlockingGRPCServer ...
+func NewNonBlockingGRPCServer(mode string, logger *zap.Logger) NonBlockingGRPCServer <span class="cov1" title="1">{
+        return &amp;nonBlockingGRPCServer{mode: mode, logger: logger}
+}</span>
+
+// Start ...
+func (s *nonBlockingGRPCServer) Start(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) <span class="cov0" title="0">{
+        s.wg.Add(1)
+
+        go s.serve(endpoint, ids, cs, ns)
+}</span>
+
+// Wait ...
+func (s *nonBlockingGRPCServer) Wait() <span class="cov1" title="1">{
+        s.wg.Wait()
+}</span>
+
+// Stop ...
+func (s *nonBlockingGRPCServer) Stop() <span class="cov1" title="1">{
+        s.server.GracefulStop()
+}</span>
+
+// ForceStop ...
+func (s *nonBlockingGRPCServer) ForceStop() <span class="cov1" title="1">{
+        s.server.Stop()
+}</span>
+
+// Setup ...
+func (s *nonBlockingGRPCServer) Setup(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) (net.Listener, error) <span class="cov10" title="6">{
+        s.logger.Info("nonBlockingGRPCServer-Setup", zap.Reflect("Endpoint", endpoint))
+
+        opts := []grpc.ServerOption{
+                grpc.UnaryInterceptor(logGRPC),
+        }
+
+        u, err := url.Parse(endpoint)
+
+        if err != nil </span><span class="cov1" title="1">{
+                msg := "failed to parse endpoint"
+                s.logger.Error(msg, zap.Error(err))
+                return nil, err
+        }</span>
+
+        <span class="cov9" title="5">var addr string
+        switch u.Scheme </span>{
+        case "unix":<span class="cov6" title="3">
+                addr = u.Path
+                if err := os.Remove(addr); err != nil &amp;&amp; !os.IsNotExist(err) </span><span class="cov0" title="0">{
+                        s.logger.Error("failed to remove", zap.Reflect("addr", addr), zap.Error(err))
+                        return nil, err
+                }</span>
+        case "tcp":<span class="cov1" title="1">
+                addr = u.Host</span>
+        default:<span class="cov1" title="1">
+                msg := "endpoint scheme not supported"
+                s.logger.Error(msg, zap.Reflect("Scheme", u.Scheme))
+                return nil, errors.New(msg)</span>
+        }
+
+        <span class="cov7" title="4">s.logger.Info("start listening GRPC server", zap.Reflect("Scheme", u.Scheme), zap.Reflect("Addr", addr))
+
+        listener, err := net.Listen(u.Scheme, addr)
+        if err != nil </span><span class="cov0" title="0">{
+                msg := "failed to listen GRPC server"
+                s.logger.Error(msg, zap.Reflect("Error", err))
+                return nil, errors.New(msg)
+        }</span>
+
+        // In case of nodeSerer container, setup desired csi socket permissions and user/group.
+        // This is required for running `livenessprobe` container as non-root user/group
+        <span class="cov7" title="4">if os.Getenv(constants.IsNodeServer) == "true" </span><span class="cov0" title="0">{
+                fileops := &amp;opsSocketPermission{}
+                if err := setupSidecar(addr, fileops, s.logger); err != nil </span><span class="cov0" title="0">{
+                        s.logger.Error("setupSidecar failed.", zap.Error(err))
+                        return nil, err
+                }</span>
+        }
+
+        <span class="cov7" title="4">server := grpc.NewServer(opts...)
+        s.server = server
+
+        csi.RegisterIdentityServer(s.server, ids)
+
+        switch s.mode </span>{
+        case "controller":<span class="cov4" title="2">
+                klog.V(3).Info("--Starting server in controller mode--")
+                csi.RegisterControllerServer(s.server, cs)</span>
+        case "node":<span class="cov1" title="1">
+                klog.V(3).Info("--Starting server in node server mode--")
+                csi.RegisterNodeServer(s.server, ns)</span>
+        case "controller-node":<span class="cov1" title="1">
+                klog.V(3).Info("--Starting node and controller server mode--")
+                csi.RegisterControllerServer(s.server, cs)
+                csi.RegisterNodeServer(s.server, ns)</span>
+        }
+
+        <span class="cov7" title="4">return listener, nil</span>
+}
+
+// serve ...
+func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) <span class="cov0" title="0">{
+        s.logger.Info("nonBlockingGRPCServer-server", zap.Reflect("Endpoint", endpoint))
+        //! Setup
+        listener, err := s.Setup(endpoint, ids, cs, ns)
+        if err != nil </span><span class="cov0" title="0">{
+                s.logger.Fatal("failed to setup GRPC Server", zap.Error(err))
+        }</span>
+        <span class="cov0" title="0">s.logger.Info("listening GRPC server for connections", zap.Reflect("Addr", listener.Addr().String()))
+        if err := s.server.Serve(listener); err != nil </span><span class="cov0" title="0">{
+                s.logger.Info("failed to serve", zap.Error(err))
+        }</span>
+}
+
+// logGRPC ...
+func logGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) <span class="cov4" title="2">{
+        klog.V(3).Infof("GRPC call: %s", info.FullMethod)
+        resp, err := handler(ctx, req)
+        if err != nil </span><span class="cov1" title="1">{
+                klog.Errorf("GRPC error: %v", err)
+        }</span> else<span class="cov1" title="1"> {
+                klog.V(5).Infof("GRPC response: %+v", resp)
+        }</span>
+        <span class="cov4" title="2">return resp, err</span>
+}
+</pre>
+		
+		<pre class="file" id="file11" style="display: none">/*******************************************************************************
+ * IBM Confidential
+ * OCO Source Materials
+ * IBM Cloud Kubernetes Service, 5737-D43
+ * (C) Copyright IBM Corp. 2023 All Rights Reserved.
+ * The source code for this program is not published or otherwise divested of
+ * its trade secrets, irrespective of what has been deposited with
+ * the U.S. Copyright Office.
+ ******************************************************************************/
+
+// Package mounter
+package mounter
+
+import (
+        "bufio"
+        "crypto/sha256"
+        "encoding/json"
+        "fmt"
+        "os"
+        "path"
+        "strings"
+        "time"
+
+        "github.com/IBM/ibm-object-csi-driver/pkg/constants"
+        "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
+        "k8s.io/klog/v2"
+)
+
+// Mounter interface defined in mounter.go
+// rcloneMounter Implements Mounter
+type RcloneMounter struct {
+        BucketName    string //From Secret in SC
+        ObjectPath    string //From Secret in SC
+        EndPoint      string //From Secret in SC
+        LocConstraint string //From Secret in SC
+        AuthType      string
+        AccessKeys    string
+        KpRootKeyCrn  string
+        UID           string
+        GID           string
+        MountOptions  []string
+        MounterUtils  utils.MounterUtils
+}
+
+const (
+        configFileName = "rclone.conf"
+        remote         = "ibmcos"
+        s3Type         = "s3"
+        cosProvider    = "IBMCOS"
+        envAuth        = "true"
+)
+
+var (
+        createConfigWrap = createConfig
+        removeConfigFile = removeRcloneConfigFile
+)
+
+func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter <span class="cov7" title="4">{
+        klog.Info("-newRcloneMounter-")
+
+        var (
+                val       string
+                check     bool
+                accessKey string
+                secretKey string
+                // apiKey    string
+                mounter *RcloneMounter
+        )
+
+        mounter = &amp;RcloneMounter{}
+
+        if val, check = secretMap["cosEndpoint"]; check </span><span class="cov7" title="4">{
+                mounter.EndPoint = val
+        }</span>
+        <span class="cov7" title="4">if val, check = secretMap["locationConstraint"]; check </span><span class="cov7" title="4">{
+                mounter.LocConstraint = val
+        }</span>
+        <span class="cov7" title="4">if val, check = secretMap["bucketName"]; check </span><span class="cov7" title="4">{
+                mounter.BucketName = val
+        }</span>
+        <span class="cov7" title="4">if val, check = secretMap["objectPath"]; check </span><span class="cov7" title="4">{
+                mounter.ObjectPath = val
+        }</span>
+        <span class="cov7" title="4">if val, check = secretMap["accessKey"]; check </span><span class="cov7" title="4">{
+                accessKey = val
+        }</span>
+        <span class="cov7" title="4">if val, check = secretMap["secretKey"]; check </span><span class="cov7" title="4">{
+                secretKey = val
+        }</span>
+        <span class="cov7" title="4">if val, check = secretMap["kpRootKeyCRN"]; check </span><span class="cov7" title="4">{
+                mounter.KpRootKeyCrn = val
+        }</span>
+
+        // Since IAM support for rClone is not there and api key is required param now, commented below piece of code
+        // Uncommnet when IAM support for rClone is available
+
+        // if val, check = secretMap["apiKey"]; check {
+        //         apiKey = val
+        // }
+
+        // if apiKey != "" {
+        //         mounter.AccessKeys = fmt.Sprintf(":%s", apiKey)
+        //         mounter.AuthType = "iam"
+        // } else {
+        <span class="cov7" title="4">mounter.AccessKeys = fmt.Sprintf("%s:%s", accessKey, secretKey)
+        mounter.AuthType = "hmac"
+        // }
+
+        if val, check = secretMap["gid"]; check </span><span class="cov7" title="4">{
+                mounter.GID = val
+        }</span>
+        <span class="cov7" title="4">if secretMap["gid"] != "" &amp;&amp; secretMap["uid"] == "" </span><span class="cov1" title="1">{
+                mounter.UID = secretMap["gid"]
+        }</span> else<span class="cov5" title="3"> if secretMap["uid"] != "" </span><span class="cov5" title="3">{
+                mounter.UID = secretMap["uid"]
+        }</span>
+
+        <span class="cov7" title="4">klog.Infof("newRcloneMounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
+                mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType)
+
+        updatedOptions := updateMountOptions(mountOptions, secretMap)
+        mounter.MountOptions = updatedOptions
+
+        mounter.MounterUtils = mounterUtils
+
+        return mounter</span>
+}
+
+func updateMountOptions(dafaultMountOptions []string, secretMap map[string]string) []string <span class="cov7" title="4">{
+        mountOptsMap := make(map[string]string)
+
+        // Create map out of array
+        for _, e := range dafaultMountOptions </span><span class="cov10" title="8">{
+                opts := strings.Split(e, "=")
+                if len(opts) == 2 </span><span class="cov10" title="8">{
+                        mountOptsMap[opts[0]] = opts[1]
+                }</span>
+        }
+
+        <span class="cov7" title="4">stringData, ok := secretMap["mountOptions"]
+
+        if !ok </span><span class="cov5" title="3">{
+                klog.Infof("No new mountOptions found. Using default mountOptions: %v", dafaultMountOptions)
+                return dafaultMountOptions
+        }</span>
+
+        <span class="cov1" title="1">lines := strings.Split(stringData, "\n")
+
+        // Update map
+        for _, line := range lines </span><span class="cov5" title="3">{
+                if strings.TrimSpace(line) == "" </span><span class="cov1" title="1">{
+                        continue</span>
+                }
+                <span class="cov4" title="2">opts := strings.Split(line, "=")
+                if len(opts) != 2 </span><span class="cov1" title="1">{
+                        klog.Infof("Invalid mount option: %s\n", line)
+                        continue</span>
+                }
+                <span class="cov1" title="1">mountOptsMap[strings.TrimSpace(opts[0])] = strings.TrimSpace(opts[1])</span>
+        }
+
+        // Create array out of map
+        <span class="cov1" title="1">updatedOptions := []string{}
+        for k, v := range mountOptsMap </span><span class="cov5" title="3">{
+                option := fmt.Sprintf("%s=%s", k, v)
+                updatedOptions = append(updatedOptions, option)
+        }</span>
+
+        <span class="cov1" title="1">klog.Infof("Updated rclone Options: %v", updatedOptions)
+
+        return updatedOptions</span>
+}
+
+func (rclone *RcloneMounter) Mount(source string, target string) error <span class="cov7" title="4">{
+        klog.Info("-RcloneMounter Mount-")
+        klog.Infof("Mount args:\n\tsource: &lt;%s&gt;\n\ttarget: &lt;%s&gt;", source, target)
+
+        var bucketName string
+        var err error
+
+        var configPath string
+        if mountWorker </span><span class="cov4" title="2">{
+                configPath = constants.MounterConfigPathOnHost
+        }</span> else<span class="cov4" title="2"> {
+                configPath = constants.MounterConfigPathOnPodRclone
+        }</span>
+
+        <span class="cov7" title="4">configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
+        if err = createConfigWrap(configPathWithVolID, rclone); err != nil </span><span class="cov1" title="1">{
+                klog.Errorf("RcloneMounter Mount: Cannot create rclone config file %v", err)
+                return err
+        }</span>
+
+        <span class="cov5" title="3">if rclone.ObjectPath != "" </span><span class="cov4" title="2">{
+                trimmedPath := strings.TrimPrefix(rclone.ObjectPath, "/")
+                bucketName = fmt.Sprintf("%s:%s/%s", remote, rclone.BucketName, trimmedPath)
+        }</span> else<span class="cov1" title="1"> {
+                bucketName = fmt.Sprintf("%s:%s", remote, rclone.BucketName)
+        }</span>
+
+        <span class="cov5" title="3">args, wnOp := rclone.formulateMountOptions(bucketName, target, configPathWithVolID)
+
+        if mountWorker </span><span class="cov4" title="2">{
+                klog.Info("Mount on Worker started...")
+
+                jsonData, err := json.Marshal(wnOp)
+                if err != nil </span><span class="cov0" title="0">{
+                        klog.Fatalf("Error marshalling data: %v", err)
+                        return err
+                }</span>
+
+                <span class="cov4" title="2">payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.RClone, jsonData)
+
+                err = mounterRequest(payload, "http://unix/api/cos/mount")
+                if err != nil </span><span class="cov1" title="1">{
+                        klog.Error("failed to mount on  worker...", err)
+                        return err
+                }</span>
+                <span class="cov1" title="1">return nil</span>
+        }
+        <span class="cov1" title="1">klog.Info("NodeServer Mounting...")
+        return rclone.MounterUtils.FuseMount(target, constants.RClone, args)</span>
+}
+
+func (rclone *RcloneMounter) Unmount(target string) error <span class="cov7" title="4">{
+        klog.Info("-RcloneMounter Unmount-")
+
+        if mountWorker </span><span class="cov4" title="2">{
+                klog.Info("Unmount on Worker started...")
+
+                payload := fmt.Sprintf(`{"path":"%s"}`, target)
+
+                err := mounterRequest(payload, "http://unix/api/cos/unmount")
+                if err != nil </span><span class="cov1" title="1">{
+                        klog.Error("failed to unmount on  worker...", err)
+                        return err
+                }</span>
+
+                <span class="cov1" title="1">removeConfigFile(constants.MounterConfigPathOnHost, target)
+                return nil</span>
+        }
+        <span class="cov4" title="2">klog.Info("NodeServer Unmounting...")
+
+        err := rclone.MounterUtils.FuseUnmount(target)
+        if err != nil </span><span class="cov1" title="1">{
+                return err
+        }</span>
+
+        <span class="cov1" title="1">removeConfigFile(constants.MounterConfigPathOnPodRclone, target)
+        return nil</span>
+}
+
+func createConfig(configPathWithVolID string, rclone *RcloneMounter) error <span class="cov7" title="4">{
+        var accessKey, secretKey string
+        keys := strings.Split(rclone.AccessKeys, ":")
+        if len(keys) == 2 </span><span class="cov1" title="1">{
+                accessKey = keys[0]
+                secretKey = keys[1]
+        }</span>
+        <span class="cov7" title="4">configParams := []string{
+                "[" + remote + "]",
+                "type = " + s3Type,
+                "endpoint = " + rclone.EndPoint,
+                "provider = " + cosProvider,
+                "env_auth = " + envAuth,
+                "access_key_id = " + accessKey,
+                "secret_access_key = " + secretKey,
+        }
+
+        if rclone.LocConstraint != "" </span><span class="cov1" title="1">{
+                configParams = append(configParams, "location_constraint = "+rclone.LocConstraint)
+        }</span>
+
+        <span class="cov7" title="4">configParams = append(configParams, rclone.MountOptions...)
+
+        if err := MakeDir(configPathWithVolID, 0755); // #nosec G301: used for rclone
+        err != nil </span><span class="cov1" title="1">{
+                klog.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", configPathWithVolID, err)
+                return err
+        }</span>
+
+        <span class="cov5" title="3">configFile := path.Join(configPathWithVolID, configFileName)
+        file, err := CreateFile(configFile) // #nosec G304 used for rclone
+        if err != nil </span><span class="cov1" title="1">{
+                klog.Errorf("RcloneMounter Mount: Cannot create file %s: %v", configFileName, err)
+                return err
+        }</span>
+        <span class="cov4" title="2">defer func() </span><span class="cov4" title="2">{
+                if err = file.Close(); err != nil </span><span class="cov0" title="0">{
+                        klog.Errorf("RcloneMounter Mount: Cannot close file %s: %v", configFileName, err)
+                }</span>
+        }()
+
+        <span class="cov4" title="2">err = Chmod(configFile, 0644) // #nosec G302: used for rclone
+        if err != nil </span><span class="cov1" title="1">{
+                klog.Errorf("RcloneMounter Mount: Cannot change permissions on file  %s: %v", configFileName, err)
+                return err
+        }</span>
+
+        <span class="cov1" title="1">klog.Info("-Rclone writing to config-")
+        datawriter := bufio.NewWriter(file)
+        for _, line := range configParams </span><span class="cov10" title="8">{
+                _, err = datawriter.WriteString(line + "\n")
+                if err != nil </span><span class="cov0" title="0">{
+                        klog.Errorf("RcloneMounter Mount: Could not write to config file: %v", err)
+                        return err
+                }</span>
+        }
+        <span class="cov1" title="1">err = datawriter.Flush()
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov1" title="1">klog.Info("-Rclone created rclone config file-")
+        return nil</span>
+}
+
+func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWithVolID string) (nodeServerOp []string, workerNodeOp map[string]string) <span class="cov5" title="3">{
+        nodeServerOp = []string{
+                "mount",
+                bucket,
+                target,
+                "--allow-other",
+                "--daemon",
+                "--config=" + configPathWithVolID + "/" + configFileName,
+                "--log-file=/var/log/rclone.log",
+                "--vfs-cache-mode=writes",
+        }
+
+        workerNodeOp = map[string]string{
+                "allow-other":    "true",
+                "daemon":         "true",
+                "config":         configPathWithVolID + "/" + configFileName,
+                "log-file":       "/var/log/rclone.log",
+                "vfs-cache-mode": "writes",
+        }
+
+        if rclone.GID != "" </span><span class="cov5" title="3">{
+                gidOpt := "--gid=" + rclone.GID
+                nodeServerOp = append(nodeServerOp, gidOpt)
+
+                workerNodeOp["gid"] = rclone.GID
+        }</span>
+        <span class="cov5" title="3">if rclone.UID != "" </span><span class="cov5" title="3">{
+                uidOpt := "--uid=" + rclone.UID
+                nodeServerOp = append(nodeServerOp, uidOpt)
+
+                workerNodeOp["uid"] = rclone.UID
+        }</span>
+        <span class="cov5" title="3">return</span>
+}
+
+func removeRcloneConfigFile(configPath, target string) <span class="cov7" title="4">{
+        configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
+
+        for retry := 1; retry &lt;= maxRetries; retry++ </span><span class="cov10" title="8">{
+                _, err := Stat(configPathWithVolID)
+                if err != nil </span><span class="cov4" title="2">{
+                        if os.IsNotExist(err) </span><span class="cov1" title="1">{
+                                klog.Infof("removeRcloneConfigFile: Config file directory does not exist: %s", configPathWithVolID)
+                                return
+                        }</span>
+                        <span class="cov1" title="1">klog.Errorf("removeRcloneConfigFile: Attempt %d - Failed to stat path %s: %v", retry, configPathWithVolID, err)
+                        time.Sleep(constants.Interval)
+                        continue</span>
+                }
+                <span class="cov8" title="6">err = RemoveAll(configPathWithVolID)
+                if err != nil </span><span class="cov7" title="4">{
+                        klog.Errorf("removeRcloneConfigFile: Attempt %d - Failed to remove config file path %s: %v", retry, configPathWithVolID, err)
+                        time.Sleep(constants.Interval)
+                        continue</span>
+                }
+                <span class="cov4" title="2">klog.Infof("removeRcloneConfigFile: Successfully removed config file path: %s", configPathWithVolID)
+                return</span>
+        }
+        <span class="cov1" title="1">klog.Errorf("removeRcloneConfigFile: Failed to remove config file path after %d attempts", maxRetries)</span>
+}
+</pre>
+		
+		<pre class="file" id="file12" style="display: none">/*******************************************************************************
+ * IBM Confidential
+ * OCO Source Materials
+ * IBM Cloud Kubernetes Service, 5737-D43
+ * (C) Copyright IBM Corp. 2023 All Rights Reserved.
+ * The source code for this program is not published or otherwise divested of
+ * its trade secrets, irrespective of what has been deposited with
+ * the U.S. Copyright Office.
+ ******************************************************************************/
+
+// Package mounter
+package mounter
+
+import (
+        "crypto/sha256"
+        "encoding/json"
+        "fmt"
+        "os"
+        "path"
+        "strings"
+        "time"
+
+        "github.com/IBM/ibm-object-csi-driver/pkg/constants"
+        "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
+        "k8s.io/klog/v2"
+)
+
+// Mounter interface defined in mounter.go
+// s3fsMounter Implements Mounter
+type S3fsMounter struct {
+        BucketName    string //From Secret in SC
+        ObjectPath    string //From Secret in SC
+        EndPoint      string //From Secret in SC
+        LocConstraint string //From Secret in SC
+        AuthType      string
+        AccessKeys    string
+        IAMEndpoint   string
+        KpRootKeyCrn  string
+        MountOptions  []string
+        MounterUtils  utils.MounterUtils
+}
+
+const (
+        passFile   = ".passwd-s3fs" // #nosec G101: not password
+        maxRetries = 3
+)
+
+var (
+        writePassWrap = writePass
+        removeFile    = removeS3FSCredFile
+)
+
+func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils, defaultParams map[string]string) Mounter <span class="cov5" title="4">{
+        klog.Info("-newS3fsMounter-")
+
+        var (
+                val       string
+                check     bool
+                accessKey string
+                secretKey string
+                apiKey    string
+                mounter   *S3fsMounter
+        )
+
+        mounter = &amp;S3fsMounter{}
+
+        if val, check = secretMap["cosEndpoint"]; check </span><span class="cov5" title="4">{
+                mounter.EndPoint = val
+        }</span>
+        <span class="cov5" title="4">if val, check = secretMap["locationConstraint"]; check </span><span class="cov5" title="4">{
+                mounter.LocConstraint = val
+        }</span>
+        <span class="cov5" title="4">if val, check = secretMap["bucketName"]; check </span><span class="cov5" title="4">{
+                mounter.BucketName = val
+        }</span>
+        <span class="cov5" title="4">if val, check = secretMap["objectPath"]; check </span><span class="cov5" title="4">{
+                mounter.ObjectPath = val
+        }</span>
+        <span class="cov5" title="4">if val, check = secretMap["accessKey"]; check </span><span class="cov5" title="4">{
+                accessKey = val
+        }</span>
+        <span class="cov5" title="4">if val, check = secretMap["secretKey"]; check </span><span class="cov5" title="4">{
+                secretKey = val
+        }</span>
+        <span class="cov5" title="4">if val, check = secretMap["apiKey"]; check </span><span class="cov3" title="2">{
+                apiKey = val
+        }</span>
+        <span class="cov5" title="4">if val, check = secretMap["kpRootKeyCRN"]; check </span><span class="cov5" title="4">{
+                mounter.KpRootKeyCrn = val
+        }</span>
+        <span class="cov5" title="4">if val, check = secretMap["iamEndpoint"]; check </span><span class="cov1" title="1">{
+                mounter.IAMEndpoint = val
+        }</span>
+
+        <span class="cov5" title="4">if apiKey != "" </span><span class="cov3" title="2">{
+                mounter.AccessKeys = fmt.Sprintf(":%s", apiKey)
+                mounter.AuthType = "iam"
+        }</span> else<span class="cov3" title="2"> {
+                mounter.AccessKeys = fmt.Sprintf("%s:%s", accessKey, secretKey)
+                mounter.AuthType = "hmac"
+        }</span>
+
+        <span class="cov5" title="4">klog.Infof("newS3fsMounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]\n\tkpRootKeyCrn: [%s]",
+                mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType, mounter.KpRootKeyCrn)
+
+        updatedOptions := updateS3FSMountOptions(mountOptions, secretMap, defaultParams)
+        mounter.MountOptions = updatedOptions
+
+        mounter.MounterUtils = mounterUtils
+
+        return mounter</span>
+}
+
+func (s3fs *S3fsMounter) Mount(source string, target string) error <span class="cov6" title="5">{
+        klog.Info("-S3FSMounter Mount-")
+        klog.Infof("Mount args:\n\tsource: &lt;%s&gt;\n\ttarget: &lt;%s&gt;", source, target)
+
+        var s3fsCredDir string
+        if mountWorker </span><span class="cov5" title="4">{
+                s3fsCredDir = constants.MounterConfigPathOnHost
+        }</span> else<span class="cov1" title="1"> {
+                s3fsCredDir = constants.MounterConfigPathOnPodS3fs
+        }</span>
+
+        <span class="cov6" title="5">var bucketName string
+        var pathExist bool
+        var err error
+
+        metaPath := path.Join(s3fsCredDir, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
+
+        if pathExist, err = checkPath(metaPath); err != nil </span><span class="cov0" title="0">{
+                klog.Errorf("S3FSMounter Mount: Cannot stat directory %s: %v", metaPath, err)
+                return fmt.Errorf("S3FSMounter Mount: Cannot stat directory %s: %v", metaPath, err)
+        }</span>
+
+        <span class="cov6" title="5">if !pathExist </span><span class="cov6" title="5">{
+                if err = MakeDir(metaPath, 0755); // #nosec G301: used for s3fs
+                err != nil </span><span class="cov1" title="1">{
+                        klog.Errorf("S3FSMounter Mount: Cannot create directory %s: %v", metaPath, err)
+                        return fmt.Errorf("S3FSMounter Mount: Cannot create directory %s: %v", metaPath, err)
+                }</span>
+        }
+
+        <span class="cov5" title="4">passwdFile := path.Join(metaPath, passFile)
+        if err = writePassWrap(passwdFile, s3fs.AccessKeys); err != nil </span><span class="cov1" title="1">{
+                klog.Errorf("S3FSMounter Mount: Cannot create file %s: %v", passwdFile, err)
+                return fmt.Errorf("S3FSMounter Mount: Cannot create file %s: %v", passwdFile, err)
+        }</span>
+
+        <span class="cov4" title="3">if s3fs.ObjectPath != "" </span><span class="cov1" title="1">{
+                if strings.HasPrefix(s3fs.ObjectPath, "/") </span><span class="cov0" title="0">{
+                        bucketName = fmt.Sprintf("%s:%s", s3fs.BucketName, s3fs.ObjectPath)
+                }</span> else<span class="cov1" title="1"> {
+                        bucketName = fmt.Sprintf("%s:/%s", s3fs.BucketName, s3fs.ObjectPath)
+                }</span>
+        } else<span class="cov3" title="2"> {
+                bucketName = s3fs.BucketName
+        }</span>
+
+        <span class="cov4" title="3">args, wnOp := s3fs.formulateMountOptions(bucketName, target, passwdFile)
+
+        if mountWorker </span><span class="cov3" title="2">{
+                klog.Info(" Mount on Worker started...")
+
+                jsonData, err := json.Marshal(wnOp)
+                if err != nil </span><span class="cov0" title="0">{
+                        klog.Fatalf("Error marshalling data: %v", err)
+                        return err
+                }</span>
+
+                <span class="cov3" title="2">payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.S3FS, jsonData)
+
+                klog.Info("Worker Mounting Payload...", payload)
+
+                err = mounterRequest(payload, "http://unix/api/cos/mount")
+                if err != nil </span><span class="cov1" title="1">{
+                        klog.Error("failed to mount on  worker...", err)
+                        return err
+                }</span>
+                <span class="cov1" title="1">return nil</span>
+        }
+        <span class="cov1" title="1">klog.Info("NodeServer Mounting...")
+        return s3fs.MounterUtils.FuseMount(target, constants.S3FS, args)</span>
+}
+
+func (s3fs *S3fsMounter) Unmount(target string) error <span class="cov5" title="4">{
+        klog.Info("-S3FSMounter Unmount-")
+        klog.Infof("Unmount args:\n\ttarget: &lt;%s&gt;", target)
+
+        if mountWorker </span><span class="cov3" title="2">{
+                klog.Info("Unmount on Worker started...")
+
+                payload := fmt.Sprintf(`{"path":"%s"}`, target)
+
+                err := mounterRequest(payload, "http://unix/api/cos/unmount")
+                if err != nil </span><span class="cov1" title="1">{
+                        klog.Error("failed to unmount on  worker...", err)
+                        return err
+                }</span>
+
+                <span class="cov1" title="1">removeFile(constants.MounterConfigPathOnHost, target)
+                return nil</span>
+        }
+        <span class="cov3" title="2">klog.Info("NodeServer Unmounting...")
+
+        err := s3fs.MounterUtils.FuseUnmount(target)
+        if err != nil </span><span class="cov1" title="1">{
+                return err
+        }</span>
+
+        <span class="cov1" title="1">removeFile(constants.MounterConfigPathOnPodS3fs, target)
+        return nil</span>
+}
+
+func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string, defaultParams map[string]string) []string <span class="cov5" title="4">{
+        mountOptsMap := make(map[string]string)
+
+        // Create map out of array
+        for _, val := range defaultMountOp </span><span class="cov8" title="10">{
+                if strings.TrimSpace(val) == "" </span><span class="cov1" title="1">{
+                        continue</span>
+                }
+                <span class="cov8" title="9">opts := strings.Split(val, "=")
+                if len(opts) == 2 </span><span class="cov7" title="7">{
+                        mountOptsMap[opts[0]] = opts[1]
+                }</span> else<span class="cov3" title="2"> if len(opts) == 1 </span><span class="cov3" title="2">{
+                        mountOptsMap[opts[0]] = opts[0]
+                }</span>
+        }
+
+        <span class="cov5" title="4">if val, check := secretMap["tmpdir"]; check </span><span class="cov1" title="1">{
+                mountOptsMap["tmpdir"] = val
+        }</span>
+
+        <span class="cov5" title="4">if val, check := secretMap["use_cache"]; check </span><span class="cov1" title="1">{
+                mountOptsMap["use_cache"] = val
+        }</span>
+
+        <span class="cov5" title="4">if val, check := secretMap["gid"]; check </span><span class="cov1" title="1">{
+                mountOptsMap["gid"] = val
+        }</span>
+
+        <span class="cov5" title="4">if secretMap["gid"] != "" &amp;&amp; secretMap["uid"] == "" </span><span class="cov1" title="1">{
+                mountOptsMap["uid"] = secretMap["gid"]
+        }</span> else<span class="cov4" title="3"> if secretMap["uid"] != "" </span><span class="cov1" title="1">{
+                mountOptsMap["uid"] = secretMap["uid"]
+        }</span>
+
+        <span class="cov5" title="4">stringData, ok := secretMap["mountOptions"]
+        if !ok </span><span class="cov4" title="3">{
+                klog.Infof("No new mountOptions found. Using default mountOptions: %v", mountOptsMap)
+        }</span> else<span class="cov1" title="1"> {
+                lines := strings.Split(stringData, "\n")
+                // Update map
+                for _, line := range lines </span><span class="cov5" title="4">{
+                        if strings.TrimSpace(line) == "" </span><span class="cov1" title="1">{
+                                continue</span>
+                        }
+                        <span class="cov4" title="3">opts := strings.Split(line, "=")
+                        if len(opts) == 2 </span><span class="cov1" title="1">{
+                                mountOptsMap[strings.TrimSpace(opts[0])] = strings.TrimSpace(opts[1])
+                        }</span> else<span class="cov3" title="2"> if len(opts) == 1 </span><span class="cov1" title="1">{
+                                mountOptsMap[strings.TrimSpace(opts[0])] = strings.TrimSpace(opts[0])
+                        }</span> else<span class="cov1" title="1"> {
+                                klog.Infof("Invalid mount option: %s\n", line)
+                        }</span>
+                }
+        }
+
+        // Create array out of map
+        <span class="cov5" title="4">updatedOptions := []string{}
+        for key, val := range mountOptsMap </span><span class="cov10" title="16">{
+                option := fmt.Sprintf("%s=%s", key, val)
+                isKeyValuePair := true
+
+                if key == val </span><span class="cov4" title="3">{
+                        isKeyValuePair = false
+                        option = val
+                }</span>
+
+                <span class="cov10" title="16">if newVal, check := secretMap[key]; check </span><span class="cov5" title="4">{
+                        if isKeyValuePair </span><span class="cov5" title="4">{
+                                option = fmt.Sprintf("%s=%s", key, newVal)
+                        }</span> else<span class="cov0" title="0"> {
+                                option = newVal
+                        }</span>
+                }
+
+                <span class="cov10" title="16">updatedOptions = append(updatedOptions, option)</span>
+        }
+
+        // Mount options which are not present in secret mountOptions and need to be set by nodeserver
+        <span class="cov5" title="4">for key, value := range defaultParams </span><span class="cov1" title="1">{
+                if value != "" </span><span class="cov1" title="1">{
+                        if _, ok := mountOptsMap[key]; !ok </span><span class="cov1" title="1">{
+                                option := fmt.Sprintf("%s=%s", key, value)
+                                updatedOptions = append(updatedOptions, option)
+                        }</span>
+                }
+        }
+
+        <span class="cov5" title="4">klog.Infof("updated S3fsMounter Options: %v", updatedOptions)
+        return updatedOptions</span>
+}
+
+func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string) (nodeServerOp []string, workerNodeOp map[string]string) <span class="cov4" title="3">{
+        nodeServerOp = []string{
+                bucket,
+                target,
+                "-o", "sigv2",
+                "-o", "use_path_request_style",
+                "-o", fmt.Sprintf("passwd_file=%s", passwdFile),
+                "-o", fmt.Sprintf("url=%s", s3fs.EndPoint),
+                "-o", "allow_other",
+                "-o", "mp_umask=002",
+        }
+
+        workerNodeOp = map[string]string{
+                "sigv2":                  "true",
+                "use_path_request_style": "true",
+                "passwd_file":            passwdFile,
+                "url":                    s3fs.EndPoint,
+                "allow_other":            "true",
+                "mp_umask":               "002",
+        }
+
+        if s3fs.LocConstraint != "" </span><span class="cov1" title="1">{
+                nodeServerOp = append(nodeServerOp, "-o", fmt.Sprintf("endpoint=%s", s3fs.LocConstraint))
+                workerNodeOp["endpoint"] = s3fs.LocConstraint
+        }</span>
+
+        <span class="cov4" title="3">for _, val := range s3fs.MountOptions </span><span class="cov4" title="3">{
+                nodeServerOp = append(nodeServerOp, "-o")
+                nodeServerOp = append(nodeServerOp, val)
+
+                splitVal := strings.Split(val, "=")
+                if len(splitVal) == 1 </span><span class="cov1" title="1">{
+                        workerNodeOp[splitVal[0]] = "true"
+                }</span> else<span class="cov3" title="2"> {
+                        workerNodeOp[splitVal[0]] = splitVal[1]
+                }</span>
+        }
+
+        <span class="cov4" title="3">if s3fs.AuthType != "hmac" </span><span class="cov3" title="2">{
+                nodeServerOp = append(nodeServerOp, "-o", "ibm_iam_auth")
+                nodeServerOp = append(nodeServerOp, "-o", "ibm_iam_endpoint="+s3fs.IAMEndpoint)
+
+                workerNodeOp["ibm_iam_auth"] = "true"
+                workerNodeOp["ibm_iam_endpoint"] = s3fs.IAMEndpoint
+        }</span> else<span class="cov1" title="1"> {
+                nodeServerOp = append(nodeServerOp, "-o", "default_acl=private")
+                workerNodeOp["default_acl"] = "private"
+        }</span>
+        <span class="cov4" title="3">return</span>
+}
+
+func removeS3FSCredFile(credDir, target string) <span class="cov5" title="4">{
+        metaPath := path.Join(credDir, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
+
+        for retry := 1; retry &lt;= maxRetries; retry++ </span><span class="cov7" title="8">{
+                _, err := Stat(metaPath)
+                if err != nil </span><span class="cov3" title="2">{
+                        if os.IsNotExist(err) </span><span class="cov1" title="1">{
+                                klog.Infof("removeS3FSCredFile: Password file directory does not exist: %s", metaPath)
+                                return
+                        }</span>
+                        <span class="cov1" title="1">klog.Errorf("removeS3FSCredFile: Attempt %d - Failed to stat path %s: %v", retry, metaPath, err)
+                        time.Sleep(constants.Interval)
+                        continue</span>
+                }
+                <span class="cov6" title="6">err = RemoveAll(metaPath)
+                if err != nil </span><span class="cov5" title="4">{
+                        klog.Errorf("removeS3FSCredFile: Attempt %d - Failed to remove password file path %s: %v", retry, metaPath, err)
+                        time.Sleep(constants.Interval)
+                        continue</span>
+                }
+                <span class="cov3" title="2">klog.Infof("removeS3FSCredFile: Successfully removed password file path: %s", metaPath)
+                return</span>
+        }
+        <span class="cov1" title="1">klog.Errorf("removeS3FSCredFile: Failed to remove password file after %d attempts", maxRetries)</span>
+}
+</pre>
+		
+		<pre class="file" id="file13" style="display: none">package mounter
+
+import (
+        "context"
+        "encoding/json"
+        "errors"
+        "io"
+        "net"
+        "net/http"
+        "os"
+        "strings"
+        "syscall"
+        "time"
+
+        "github.com/IBM/ibm-object-csi-driver/pkg/constants"
+        mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
+        "google.golang.org/grpc/codes"
+        "google.golang.org/grpc/status"
+        "k8s.io/klog/v2"
+)
+
+var (
+        mountWorker    = true
+        mounterRequest = createCOSCSIMounterRequest
+
+        MakeDir    = os.MkdirAll
+        CreateFile = os.Create
+        Chmod      = os.Chmod
+        Stat       = os.Stat
+        RemoveAll  = os.RemoveAll
+)
+
+type Mounter interface {
+        Mount(source string, target string) error
+        Unmount(target string) error
+}
+
+type CSIMounterFactory struct{}
+
+type NewMounterFactory interface {
+        NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string, defaultMOMap map[string]string) Mounter
+}
+
+func NewCSIMounterFactory() *CSIMounterFactory <span class="cov0" title="0">{
+        return &amp;CSIMounterFactory{}
+}</span>
+
+func (s *CSIMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string, defaultMOMap map[string]string) Mounter <span class="cov7" title="3">{
+        klog.Info("-NewMounter-")
+        var mounter, val string
+        var check bool
+
+        if secretMap == nil </span><span class="cov0" title="0">{
+                secretMap = map[string]string{}
+        }</span>
+        <span class="cov7" title="3">if mountFlags == nil </span><span class="cov0" title="0">{
+                mountFlags = []string{}
+        }</span>
+
+        // Select mounter as per storage class
+        <span class="cov7" title="3">if val, check = attrib["mounter"]; check </span><span class="cov4" title="2">{
+                mounter = val
+        }</span> else<span class="cov1" title="1"> {
+                // if mounter not set in storage class
+                if val, check = secretMap["mounter"]; check </span><span class="cov0" title="0">{
+                        mounter = val
+                }</span>
+        }
+
+        <span class="cov7" title="3">mounterUtils := &amp;(mounterUtils.MounterOptsUtils{})
+
+        switch mounter </span>{
+        case constants.S3FS:<span class="cov1" title="1">
+                return NewS3fsMounter(secretMap, mountFlags, mounterUtils, defaultMOMap)</span>
+        case constants.RClone:<span class="cov1" title="1">
+                return NewRcloneMounter(secretMap, mountFlags, mounterUtils)</span>
+        default:<span class="cov1" title="1">
+                // default to s3fs
+                return NewS3fsMounter(secretMap, mountFlags, mounterUtils, defaultMOMap)</span>
+        }
+}
+
+func checkPath(path string) (bool, error) <span class="cov10" title="5">{
+        if path == "" </span><span class="cov0" title="0">{
+                return false, errors.New("undefined path")
+        }</span>
+        <span class="cov10" title="5">_, err := Stat(path)
+        if err == nil </span><span class="cov0" title="0">{
+                return true, nil
+        }</span> else<span class="cov10" title="5"> if os.IsNotExist(err) </span><span class="cov10" title="5">{
+                return false, nil
+        }</span> else<span class="cov0" title="0"> if isCorruptedMnt(err) </span><span class="cov0" title="0">{
+                return true, err
+        }</span>
+        <span class="cov0" title="0">return false, err</span>
+}
+
+func isCorruptedMnt(err error) bool <span class="cov0" title="0">{
+        if err == nil </span><span class="cov0" title="0">{
+                return false
+        }</span>
+        <span class="cov0" title="0">var underlyingError error
+        switch pe := err.(type) </span>{
+        case *os.PathError:<span class="cov0" title="0">
+                underlyingError = pe.Err</span>
+        case *os.LinkError:<span class="cov0" title="0">
+                underlyingError = pe.Err</span>
+        case *os.SyscallError:<span class="cov0" title="0">
+                underlyingError = pe.Err</span>
+        }
+        <span class="cov0" title="0">return underlyingError == syscall.ENOTCONN || underlyingError == syscall.ESTALE</span>
+}
+
+func writePass(pwFileName string, pwFileContent string) error <span class="cov0" title="0">{
+        pwFile, err := os.OpenFile(pwFileName, os.O_RDWR|os.O_CREATE, 0600) // #nosec G304: Value is dynamic
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov0" title="0">_, err = pwFile.WriteString(pwFileContent)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov0" title="0">err = pwFile.Close() // #nosec G304: Value is dynamic
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+func createCOSCSIMounterRequest(payload string, url string) error <span class="cov0" title="0">{
+        // Get socket path
+        socketPath := os.Getenv(constants.COSCSIMounterSocketPathEnv)
+        if socketPath == "" </span><span class="cov0" title="0">{
+                socketPath = constants.COSCSIMounterSocketPath
+        }</span>
+        <span class="cov0" title="0">klog.Infof("COS CSI Mounter Socket Path: %s", socketPath)
+
+        err := isGRPCServerAvailable(socketPath)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        // Create a custom dialer function for Unix socket connection
+        <span class="cov0" title="0">dialer := func(_ context.Context, _, _ string) (net.Conn, error) </span><span class="cov0" title="0">{
+                return net.Dial("unix", socketPath)
+        }</span>
+
+        // Create an HTTP client with the Unix socket transport
+        <span class="cov0" title="0">client := &amp;http.Client{
+                Transport: &amp;http.Transport{
+                        DialContext: dialer,
+                },
+                Timeout: constants.Timeout,
+        }
+
+        // Create POST request
+        req, err := http.NewRequest("POST", url, strings.NewReader(payload))
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov0" title="0">req.Header.Set("Content-Type", "application/json")
+        response, err := client.Do(req)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">defer func() </span><span class="cov0" title="0">{
+                if err := response.Body.Close(); err != nil </span><span class="cov0" title="0">{
+                        klog.Errorf("failed to close response body: %v", err)
+                }</span>
+        }()
+
+        <span class="cov0" title="0">body, err := io.ReadAll(response.Body)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">responseBody := string(body)
+        klog.Infof("response from cos-csi-mounter -&gt; Response body: %s, Response code: %v", responseBody, response.StatusCode)
+
+        if response.StatusCode != http.StatusOK </span><span class="cov0" title="0">{
+                return parseGRPCResponse(response.StatusCode, responseBody)
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+// parseGRPCResponse takes both response body and error code and frames error message
+func parseGRPCResponse(code int, response string) error <span class="cov0" title="0">{
+        errMsg := parseErrFromResponse(response)
+        switch code </span>{
+        case http.StatusBadRequest:<span class="cov0" title="0">
+                return status.Error(codes.InvalidArgument, errMsg)</span>
+        case http.StatusNotFound:<span class="cov0" title="0">
+                return status.Error(codes.NotFound, errMsg)</span>
+        case http.StatusConflict:<span class="cov0" title="0">
+                return status.Error(codes.AlreadyExists, errMsg)</span>
+        case http.StatusForbidden:<span class="cov0" title="0">
+                return status.Error(codes.PermissionDenied, errMsg)</span>
+        case http.StatusTooManyRequests:<span class="cov0" title="0">
+                return status.Error(codes.ResourceExhausted, errMsg)</span>
+        case http.StatusNotImplemented:<span class="cov0" title="0">
+                return status.Error(codes.Unimplemented, errMsg)</span>
+        case http.StatusInternalServerError:<span class="cov0" title="0">
+                return status.Error(codes.Internal, errMsg)</span>
+        case http.StatusServiceUnavailable:<span class="cov0" title="0">
+                return status.Error(codes.Unavailable, errMsg)</span>
+        case http.StatusUnauthorized:<span class="cov0" title="0">
+                return status.Error(codes.Unauthenticated, errMsg)</span>
+        default:<span class="cov0" title="0">
+                return status.Error(codes.Unknown, errMsg)</span>
+        }
+}
+
+// isGRPCServerAvailable tries to connect to the UNIX socket to see if it's up
+func isGRPCServerAvailable(socketPath string) error <span class="cov0" title="0">{
+        conn, err := net.DialTimeout("unix", socketPath, 500*time.Millisecond)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov0" title="0">err = conn.Close()
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+// parseErrFromResponse fetches error from responseBody
+// e.g. ResponseBody: {"error":"invalid args for mounter: invalid s3fs args decode error: json: unknown field \"unknownkey\""}
+// parseErrFromResponse returns "invalid args for mounter: invalid s3fs args decode error: json: unknown field \"unknownkey\"
+func parseErrFromResponse(response string) string <span class="cov0" title="0">{
+        var errFromResp map[string]string
+        err := json.Unmarshal([]byte(response), &amp;errFromResp)
+        if err != nil </span><span class="cov0" title="0">{
+                klog.Warning("failed to unmarshal response from server", err)
+                return response
+        }</span>
+        <span class="cov0" title="0">val, exists := errFromResp["error"]
+        if !exists </span><span class="cov0" title="0">{
+                return response
+        }</span>
+        <span class="cov0" title="0">return val</span>
+}
+</pre>
+		
+		<pre class="file" id="file14" style="display: none">/**
+ * Copyright 2021 IBM Corp.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package s3client
+
+import (
+        "fmt"
+        "strings"
+
+        "github.com/IBM/ibm-cos-sdk-go/aws"
+        "github.com/IBM/ibm-cos-sdk-go/aws/awserr"
+        "github.com/IBM/ibm-cos-sdk-go/aws/credentials"
+        "github.com/IBM/ibm-cos-sdk-go/aws/credentials/ibmiam"
+        "github.com/IBM/ibm-cos-sdk-go/aws/session"
+        "github.com/IBM/ibm-cos-sdk-go/service/s3"
+        "github.com/IBM/ibm-object-csi-driver/pkg/constants"
+        "go.uber.org/zap"
+)
+
+// ObjectStorageCredentials holds credentials for accessing an object storage service
+type ObjectStorageCredentials struct {
+        //AuthType
+        AuthType string
+        // AccessKey is the account identifier in AWS authentication
+        AccessKey string
+        // SecretKey is the "password" in AWS authentication
+        SecretKey string
+        // APIKey is the "password" in IBM IAM authentication
+        APIKey string
+        // ServiceInstanceID is the account identifier in IBM IAM authentication
+        ServiceInstanceID string
+        // KpRootKeyCrn
+        KpRootKeyCRN string
+        //IAMEndpoint ...
+        IAMEndpoint string
+}
+
+// ObjectStorageSession is an interface of an object store session
+type ObjectStorageSession interface {
+        // CheckBucketAccess method check that a bucket can be accessed
+        CheckBucketAccess(bucket string) error
+
+        // CheckObjectPathExistence method checks that object-path exists inside bucket
+        CheckObjectPathExistence(bucket, objectpath string) (bool, error)
+
+        // CreateBucket methods creates a new bucket
+        CreateBucket(bucket, kpRootKeyCrn string) (string, error)
+
+        // DeleteBucket methods deletes a bucket (with all of its objects)
+        DeleteBucket(bucket string) error
+
+        SetBucketVersioning(bucket string, enable bool) error
+}
+
+// COSSessionFactory represents a COS (S3) session factory
+type COSSessionFactory struct{}
+
+// ObjectStorageSessionFactory is an interface of an object store session factory
+type ObjectStorageSessionFactory interface {
+        // NewObjectStorageBackend method creates a new object store session
+        NewObjectStorageSession(endpoint, locationConstraint string, creds *ObjectStorageCredentials, lgr *zap.Logger) ObjectStorageSession
+}
+
+var _ ObjectStorageSessionFactory = &amp;COSSessionFactory{}
+
+// COSSession represents a COS (S3) session
+type COSSession struct {
+        logger *zap.Logger
+        svc    s3API
+}
+
+func NewObjectStorageSessionFactory() *COSSessionFactory <span class="cov0" title="0">{
+        return &amp;COSSessionFactory{}
+}</span>
+
+type s3API interface {
+        HeadBucket(input *s3.HeadBucketInput) (*s3.HeadBucketOutput, error)
+        CreateBucket(input *s3.CreateBucketInput) (*s3.CreateBucketOutput, error)
+        ListObjects(input *s3.ListObjectsInput) (*s3.ListObjectsOutput, error)
+        ListObjectsV2(input *s3.ListObjectsV2Input) (*s3.ListObjectsV2Output, error)
+        DeleteObject(input *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error)
+        DeleteBucket(input *s3.DeleteBucketInput) (*s3.DeleteBucketOutput, error)
+        PutBucketVersioning(input *s3.PutBucketVersioningInput) (*s3.PutBucketVersioningOutput, error)
+}
+
+func (s *COSSession) CheckBucketAccess(bucket string) error <span class="cov4" title="2">{
+        _, err := s.svc.HeadBucket(&amp;s3.HeadBucketInput{
+                Bucket: aws.String(bucket),
+        })
+        return err
+}</span>
+
+func (s *COSSession) CheckObjectPathExistence(bucket string, objectpath string) (bool, error) <span class="cov8" title="4">{
+        s.logger.Info("CheckObjectPathExistence args", zap.String("bucket", bucket), zap.String("objectpath", objectpath))
+        objectpath = strings.TrimPrefix(objectpath, "/")
+        if !strings.HasSuffix(objectpath, "/") </span><span class="cov8" title="4">{
+                objectpath = objectpath + "/"
+        }</span>
+        <span class="cov8" title="4">resp, err := s.svc.ListObjectsV2(&amp;s3.ListObjectsV2Input{
+                Bucket:  aws.String(bucket),
+                MaxKeys: aws.Int64(1),
+                Prefix:  aws.String(objectpath),
+        })
+        if err != nil </span><span class="cov1" title="1">{
+                s.logger.Error("cannot list bucket", zap.String("bucket", bucket))
+                return false, fmt.Errorf("cannot list bucket '%s': %v", bucket, err)
+        }</span>
+        <span class="cov7" title="3">if len(resp.Contents) == 1 </span><span class="cov7" title="3">{
+                object := *(resp.Contents[0].Key)
+                if (object == objectpath) || (strings.TrimSuffix(object, "/") == objectpath) </span><span class="cov1" title="1">{
+                        return true, nil
+                }</span>
+        }
+        <span class="cov4" title="2">return false, nil</span>
+}
+
+func (s *COSSession) CreateBucket(bucket, kpRootKeyCrn string) (res string, err error) <span class="cov7" title="3">{
+        if kpRootKeyCrn != "" </span><span class="cov7" title="3">{
+                _, err = s.svc.CreateBucket(&amp;s3.CreateBucketInput{
+                        Bucket:                      aws.String(bucket),
+                        IBMSSEKPCustomerRootKeyCrn:  aws.String(kpRootKeyCrn),
+                        IBMSSEKPEncryptionAlgorithm: aws.String(constants.KPEncryptionAlgorithm),
+                })
+        }</span> else<span class="cov0" title="0"> {
+                _, err = s.svc.CreateBucket(&amp;s3.CreateBucketInput{
+                        Bucket: aws.String(bucket),
+                })
+        }</span>
+
+        <span class="cov7" title="3">if err != nil </span><span class="cov4" title="2">{
+                // TODO
+                // CreateVolume: Unable to create the bucket: %BucketAlreadyExists:
+                // The requested bucket name is not available. The bucket namespace is shared by all users of the system.
+                // Please select a different name and try again.
+
+                if aerr, ok := err.(awserr.Error); ok &amp;&amp; aerr.Code() == "BucketAlreadyOwnedByYou" </span><span class="cov1" title="1">{
+                        s.logger.Warn("bucket already exists", zap.String("bucket", bucket))
+                        return fmt.Sprintf("bucket '%s' already exists", bucket), nil
+                }</span>
+                <span class="cov1" title="1">return "", err</span>
+        }
+
+        <span class="cov1" title="1">return "", nil</span>
+}
+
+func (s *COSSession) DeleteBucket(bucket string) error <span class="cov10" title="5">{
+        resp, err := s.svc.ListObjects(&amp;s3.ListObjectsInput{
+                Bucket: aws.String(bucket),
+        })
+
+        if err != nil </span><span class="cov4" title="2">{
+                if aerr, ok := err.(awserr.Error); ok &amp;&amp; aerr.Code() == "NoSuchBucket" </span><span class="cov1" title="1">{
+                        s.logger.Warn("bucket already deleted", zap.String("bucket", bucket))
+                        return nil
+                }</span>
+
+                <span class="cov1" title="1">return fmt.Errorf("cannot list bucket '%s': %v", bucket, err)</span>
+        }
+
+        <span class="cov7" title="3">for _, key := range resp.Contents </span><span class="cov7" title="3">{
+                _, err = s.svc.DeleteObject(&amp;s3.DeleteObjectInput{
+                        Bucket: aws.String(bucket),
+                        Key:    key.Key,
+                })
+
+                if err != nil </span><span class="cov1" title="1">{
+                        return fmt.Errorf("cannot delete object %s/%s: %v", bucket, *key.Key, err)
+                }</span>
+        }
+
+        <span class="cov4" title="2">_, err = s.svc.DeleteBucket(&amp;s3.DeleteBucketInput{
+                Bucket: aws.String(bucket),
+        })
+
+        return err</span>
+}
+
+func (s *COSSession) SetBucketVersioning(bucket string, enable bool) error <span class="cov7" title="3">{
+        status := s3.BucketVersioningStatusSuspended
+        if enable </span><span class="cov4" title="2">{
+                status = s3.BucketVersioningStatusEnabled
+        }</span>
+        <span class="cov7" title="3">s.logger.Info("Setting versioning for bucket", zap.String("bucket", bucket), zap.Bool("enable", enable))
+        _, err := s.svc.PutBucketVersioning(&amp;s3.PutBucketVersioningInput{
+                Bucket: aws.String(bucket),
+                VersioningConfiguration: &amp;s3.VersioningConfiguration{
+                        Status: aws.String(status),
+                },
+        })
+        if err != nil </span><span class="cov1" title="1">{
+                s.logger.Error("Failed to set versioning", zap.String("bucket", bucket), zap.Bool("enable", enable), zap.Error(err))
+                return fmt.Errorf("failed to set versioning to %v for bucket '%s': %v", enable, bucket, err)
+        }</span>
+        <span class="cov4" title="2">s.logger.Info("Versioning set successfully for bucket", zap.String("bucket", bucket), zap.Bool("enable", enable))
+        return nil</span>
+}
+
+func NewS3Client(lgr *zap.Logger) (ObjectStorageSession, error) <span class="cov0" title="0">{
+        cosSession := new(COSSession)
+        cosSession.logger = lgr
+        lgr.Info("--NewS3Client--")
+        return cosSession, nil
+}</span>
+
+// NewObjectStorageSession method creates a new object store session
+func (s *COSSessionFactory) NewObjectStorageSession(endpoint, locationConstraint string, creds *ObjectStorageCredentials, lgr *zap.Logger) ObjectStorageSession <span class="cov4" title="2">{
+        var sdkCreds *credentials.Credentials
+        if creds.AuthType == "iam" </span><span class="cov0" title="0">{
+                sdkCreds = ibmiam.NewStaticCredentials(aws.NewConfig(), creds.IAMEndpoint+"/identity/token", creds.APIKey, creds.ServiceInstanceID)
+        }</span> else<span class="cov4" title="2"> {
+                sdkCreds = credentials.NewStaticCredentials(creds.AccessKey, creds.SecretKey, "")
+        }</span>
+        <span class="cov4" title="2">sess := session.Must(session.NewSession(&amp;aws.Config{
+                S3ForcePathStyle: aws.Bool(true),
+                Endpoint:         aws.String(endpoint),
+                Credentials:      sdkCreds,
+                Region:           aws.String(locationConstraint),
+        }))
+
+        return &amp;COSSession{
+                svc:    s3.New(sess),
+                logger: lgr,
+        }</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
