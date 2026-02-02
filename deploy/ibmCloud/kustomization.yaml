@@ -22,7 +22,7 @@ images:
   newName: icr.io/ibm/ibm-object-csi-driver
   newTag: v0.1.16
 - name: driver-registrar-image
-  newName: k8s.gcr.io/sig-storage/csi-node-driver-registrar
+  newName: registry.k8s.io/sig-storage/csi-node-driver-registrar
   newTag: v2.12.0
 - newName: registry.k8s.io/sig-storage/livenessprobe
   newTag: v2.16.0
