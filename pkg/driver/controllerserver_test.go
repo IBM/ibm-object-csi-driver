@@ -591,12 +591,17 @@ func TestCreateVolume(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
+		stats := tc.driverStatsUtils
+		if stats == nil {
+			stats = utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{})
+		}
+
 		controllerServer := &controllerServer{
 			S3Driver: &S3Driver{
 				iamEndpoint: constants.PublicIAMEndpoint,
 			},
 			cosSession: tc.cosSession,
-			Stats:      tc.driverStatsUtils,
+			Stats:      stats,
 		}
 		actualResp, actualErr := controllerServer.CreateVolume(ctx, tc.req)
 		if tc.expectedErr != nil {
@@ -630,7 +635,11 @@ func TestCreateVolume(t *testing.T) {
 			}
 		}
 
-		if !reflect.DeepEqual(tc.expectedResp, actualResp) {
+		if tc.expectedResp == nil && actualResp != nil {
+			t.Errorf("Expected nil response but got: %+v", actualResp)
+		} else if tc.expectedResp != nil && actualResp == nil {
+			t.Errorf("Expected response:\n%+v\nGot nil", tc.expectedResp)
+		} else if tc.expectedResp != nil && actualResp != nil && !reflect.DeepEqual(tc.expectedResp, actualResp) {
 			t.Errorf("Expected response:\n%+v\nGot:\n%+v", tc.expectedResp, actualResp)
 		}
 	}
