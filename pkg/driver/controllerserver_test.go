@@ -596,7 +596,7 @@ func TestCreateVolume(t *testing.T) {
 		}
 		actualResp, actualErr := controllerServer.CreateVolume(ctx, tc.req)
 		if tc.expectedErr != nil {
-			assert.Error(t, actualErr, "expected error but got nil")
+			assert.Error(t, actualErr)
 			if strings.Contains(tc.expectedErr.Error(), "requires res-conf-apikey") {
 				assert.Contains(t, actualErr.Error(), "requires res-conf-apikey")
 			} else if strings.Contains(tc.expectedErr.Error(), "failed to set bucket quota") {
@@ -609,7 +609,7 @@ func TestCreateVolume(t *testing.T) {
 				assert.Contains(t, actualErr.Error(), tc.expectedErr.Error())
 			}
 		} else {
-			assert.NoError(t, actualErr, "unexpected error")
+			assert.NoError(t, actualErr)
 		}
 
 		if actualResp != nil {
@@ -618,9 +618,9 @@ func TestCreateVolume(t *testing.T) {
 			}
 			if tc.expectedResp != nil && tc.expectedResp.Volume != nil &&
 				actualResp.Volume != nil && actualResp.Volume.VolumeContext != nil {
-				if bucketName, ok := actualResp.Volume.VolumeContext["bucketName"]; ok {
-					if strings.Contains(bucketName, actualResp.Volume.VolumeId) {
-						tc.expectedResp.Volume.VolumeContext["bucketName"] = bucketName
+				if bucketNameVal, ok := actualResp.Volume.VolumeContext["bucketName"]; ok {
+					if strings.Contains(bucketNameVal, actualResp.Volume.VolumeId) {
+						tc.expectedResp.Volume.VolumeContext["bucketName"] = bucketNameVal
 					}
 				}
 			}
