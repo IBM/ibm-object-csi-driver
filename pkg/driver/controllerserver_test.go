@@ -83,7 +83,6 @@ func secretWithQuota(quotaValue, resConfApiKeyValue string) map[string]string {
 }
 
 func TestCreateVolume(t *testing.T) {
-
 	testCases := []struct {
 		testCaseName     string
 		req              *csi.CreateVolumeRequest
@@ -259,7 +258,6 @@ func TestCreateVolume(t *testing.T) {
 						},
 					},
 				},
-
 				Secrets: map[string]string{
 					"iamEndpoint":        "testIAMEndpoint",
 					"apiKey":             "testAPIKey",
@@ -526,7 +524,21 @@ func TestCreateVolume(t *testing.T) {
 			expectedResp: nil,
 			expectedErr:  errors.New("Invalid bucketVersioning value in storage class"),
 		},
-
+		// QUOTA TEST CASES
+		{
+			testCaseName: "Positive: quotaLimit=true with res-conf-apikey present",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
+				},
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
+				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
+			},
+			cosSession:   &s3client.FakeCOSSessionFactory{},
+			expectedResp: nil,
+			expectedErr:  errors.New("failed to set bucket quota limit"),
+		},
 		{
 			testCaseName: "Negative: quotaLimit=true missing res-conf-apikey",
 			req: &csi.CreateVolumeRequest{
@@ -537,10 +549,9 @@ func TestCreateVolume(t *testing.T) {
 				CapacityRange: &csi.CapacityRange{RequiredBytes: 524288000},
 				Secrets:       secretWithQuota("true", ""),
 			},
-			cosSession:       &s3client.FakeCOSSessionFactory{},
-			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
-			expectedResp:     nil,
-			expectedErr:      status.Error(codes.InvalidArgument, "quotaLimit=true requires res-conf-apikey in secret"),
+			cosSession:   &s3client.FakeCOSSessionFactory{},
+			expectedResp: nil,
+			expectedErr:  status.Error(codes.InvalidArgument, "quotaLimit=true requires res-conf-apikey in secret"),
 		},
 		{
 			testCaseName: "Negative: quotaLimit=true but zero capacity",
@@ -552,10 +563,9 @@ func TestCreateVolume(t *testing.T) {
 				CapacityRange: &csi.CapacityRange{RequiredBytes: 0},
 				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
 			},
-			cosSession:       &s3client.FakeCOSSessionFactory{},
-			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
-			expectedResp:     nil,
-			expectedErr:      errors.New("quotaLimit enabled but no positive storage size requested in PVC"),
+			cosSession:   &s3client.FakeCOSSessionFactory{},
+			expectedResp: nil,
+			expectedErr:  errors.New("quotaLimit enabled but no positive storage size requested in PVC"),
 		},
 		{
 			testCaseName: "Negative: quotaLimit has invalid value (early failure)",
@@ -567,28 +577,23 @@ func TestCreateVolume(t *testing.T) {
 				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
 				Secrets:       secretWithQuota("yes", "fake-res-conf-key"),
 			},
-			cosSession:       &s3client.FakeCOSSessionFactory{},
-			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
-			expectedResp:     nil,
-			expectedErr:      status.Error(codes.InvalidArgument, "invalid quotaLimit value"),
+			cosSession:   &s3client.FakeCOSSessionFactory{},
+			expectedResp: nil,
+			expectedErr:  status.Error(codes.InvalidArgument, "invalid quotaLimit value"),
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
-		stats := tc.driverStatsUtils
-		if stats == nil {
-			stats = utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{})
-		}
-
 		controllerServer := &controllerServer{
 			S3Driver: &S3Driver{
 				iamEndpoint: constants.PublicIAMEndpoint,
 			},
 			cosSession: tc.cosSession,
-			Stats:      stats,
+			Stats:      tc.driverStatsUtils,
 		}
 		actualResp, actualErr := controllerServer.CreateVolume(ctx, tc.req)
+
 		if tc.expectedErr != nil {
 			assert.Error(t, actualErr)
 			if strings.Contains(tc.expectedErr.Error(), "requires res-conf-apikey") {
@@ -620,11 +625,7 @@ func TestCreateVolume(t *testing.T) {
 			}
 		}
 
-		if tc.expectedResp == nil && actualResp != nil {
-			t.Errorf("Expected nil response but got: %+v", actualResp)
-		} else if tc.expectedResp != nil && actualResp == nil {
-			t.Errorf("Expected response:\n%+v\nGot nil", tc.expectedResp)
-		} else if tc.expectedResp != nil && actualResp != nil && !reflect.DeepEqual(tc.expectedResp, actualResp) {
+		if !reflect.DeepEqual(tc.expectedResp, actualResp) {
 			t.Errorf("Expected response:\n%+v\nGot:\n%+v", tc.expectedResp, actualResp)
 		}
 	}
