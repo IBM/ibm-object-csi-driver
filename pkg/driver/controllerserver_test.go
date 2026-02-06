@@ -537,10 +537,9 @@ func TestCreateVolume(t *testing.T) {
 				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
 				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
 			},
-			cosSession:       &s3client.FakeCOSSessionFactory{},
-			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
-			expectedResp:     nil,
-			expectedErr:      errors.New("failed to set bucket quota limit"),
+			cosSession:   &s3client.FakeCOSSessionFactory{},
+			expectedResp: nil,
+			expectedErr:  errors.New("failed to set bucket quota limit"),
 		},
 		{
 			testCaseName: "Negative: quotaLimit=true missing res-conf-apikey",
