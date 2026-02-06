@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 
@@ -50,6 +51,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		pvcName            string
 		pvcNamespace       string
 		bucketVersioning   string
+		quotaLimitEnabled  bool
 	)
 
 	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
@@ -141,27 +143,19 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 
 		secretMap = secretMapCustom
 
-		if quotaVal, ok := secretMap[constants.QuotaLimitKey]; ok && quotaVal != "" {
-			klog.Infof("quotaLimit from secretMap: %q", quotaVal)
-		}
-
-		quotaLimitStr := secretMap[constants.QuotaLimitKey]
-
-		if quotaLimitStr != "" {
-			normalized := strings.TrimSpace(strings.ToLower(quotaLimitStr))
-			if normalized != "true" && normalized != "false" {
+		if quotaLimitStr, ok := secretMap[constants.QuotaLimitKey]; ok && quotaLimitStr != "" {
+			klog.Infof("quotaLimit from secretMap: %q", quotaLimitStr)
+			enabled, err := strconv.ParseBool(quotaLimitStr)
+			if err != nil {
 				return nil, status.Error(codes.InvalidArgument,
-					fmt.Sprintf("invalid quotaLimit value %q: must be 'true' or 'false' (case-insensitive)", quotaLimitStr))
+					fmt.Sprintf("invalid quotaLimit value %q: must be 'true' or 'false'", quotaLimitStr))
 			}
+			quotaLimitEnabled = enabled
 
-			if normalized == "true" {
-				apiKey := secretMap[constants.ResConfApiKey]
-				if apiKey == "" {
-					apiKey = secretMap["apiKey"]
-				}
-				if apiKey == "" {
+			if enabled {
+				if secretMap[constants.ResConfApiKey] == "" {
 					return nil, status.Error(codes.InvalidArgument,
-						"quotaLimit=true requires res-conf-apikey or apiKey in secret")
+						"quotaLimit=true requires res-conf-apikey in secret")
 				}
 			}
 		}
@@ -241,30 +235,19 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			klog.Infof("Created bucket: %s", bucketName)
 		}
 
-		quotaLimitStr, quotaRequested := secretMap[constants.QuotaLimitKey]
-		if quotaRequested && strings.ToLower(strings.TrimSpace(quotaLimitStr)) == "true" {
+		if quotaLimitEnabled {
 			quotaBytes := req.GetCapacityRange().GetRequiredBytes()
 			if quotaBytes <= 0 {
 				if params["userProvidedBucket"] == "false" {
-					_ = sess.DeleteBucket(bucketName) // #nosec G104 -- intentional: best-effort cleanup in error path, don't mask original error
+					_ = sess.DeleteBucket(bucketName) // #nosec G104 -- intentional: best-effort cleanup
 				}
 				return nil, status.Error(codes.InvalidArgument, "quotaLimit enabled but no positive storage size requested in PVC")
 			}
 
-			apiKey := secretMap[constants.ResConfApiKey]
-			if apiKey == "" {
-				apiKey = creds.APIKey
-			}
-			if apiKey == "" {
-				if params["userProvidedBucket"] == "false" {
-					_ = sess.DeleteBucket(bucketName) // #nosec G104 -- intentional: best-effort cleanup in error path, don't mask original error
-				}
-				return nil, status.Error(codes.InvalidArgument, "quotaLimit=true requires res-conf-apikey or apiKey (IAM) in secret")
-			}
+			resConfApikey := secretMap[constants.ResConfApiKey]
 
 			klog.Infof("Applying hard quota of %d bytes to bucket %s", quotaBytes, bucketName)
-
-			err = s3client.UpdateQuotaLimit(quotaBytes, apiKey, bucketName, endPoint, creds.IAMEndpoint)
+			err = s3client.UpdateQuotaLimit(quotaBytes, resConfApikey, bucketName, endPoint, creds.IAMEndpoint)
 			if err != nil {
 				klog.Errorf("Failed to set quota limit on bucket %s: %v", bucketName, err)
 				if params["userProvidedBucket"] == "false" {
@@ -306,26 +289,17 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", err, tempBucketName))
 		}
 
-		quotaLimitStr, quotaRequested := secretMap[constants.QuotaLimitKey]
-		if quotaRequested && strings.ToLower(strings.TrimSpace(quotaLimitStr)) == "true" {
+		if quotaLimitEnabled {
 			quotaBytes := req.GetCapacityRange().GetRequiredBytes()
 			if quotaBytes <= 0 {
 				_ = sess.DeleteBucket(tempBucketName) // #nosec G104 -- intentional: best-effort cleanup in error path, don't mask original error
 				return nil, status.Error(codes.InvalidArgument, "quotaLimit enabled but no positive storage size requested")
 			}
 
-			apiKey := secretMap[constants.ResConfApiKey]
-			if apiKey == "" {
-				apiKey = creds.APIKey
-			}
-			if apiKey == "" {
-				_ = sess.DeleteBucket(tempBucketName) // #nosec G104 -- intentional: best-effort cleanup in error path, don't mask original error
-				return nil, status.Error(codes.InvalidArgument, "quotaLimit=true requires res-conf-apikey or apiKey (IAM) in secret")
-			}
+			resConfApikey := secretMap[constants.ResConfApiKey]
 
 			klog.Infof("Applying hard quota of %d bytes to temp bucket %s", quotaBytes, tempBucketName)
-
-			err = s3client.UpdateQuotaLimit(quotaBytes, apiKey, tempBucketName, endPoint, creds.IAMEndpoint)
+			err = s3client.UpdateQuotaLimit(quotaBytes, resConfApikey, tempBucketName, endPoint, creds.IAMEndpoint)
 			if err != nil {
 				klog.Errorf("Failed to set quota limit on temp bucket %s: %v", tempBucketName, err)
 				_ = sess.DeleteBucket(tempBucketName) // #nosec G104 -- intentional: best-effort cleanup in error path, don't mask original error
@@ -643,10 +617,7 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 	if bytesVal, ok := secret.Data[constants.ResConfApiKey]; ok {
 		resConfApiKey = string(bytesVal)
 	}
-
-	if val, ok := secret.StringData[constants.QuotaLimitKey]; ok {
-		quotaLimit = val
-	} else if bytesVal, ok := secret.Data[constants.QuotaLimitKey]; ok {
+	if bytesVal, ok := secret.Data[constants.QuotaLimitKey]; ok {
 		quotaLimit = string(bytesVal)
 	}
 
