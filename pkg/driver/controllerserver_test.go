@@ -524,7 +524,6 @@ func TestCreateVolume(t *testing.T) {
 			expectedResp: nil,
 			expectedErr:  errors.New("Invalid bucketVersioning value in storage class"),
 		},
-		// QUOTA TEST CASES
 		{
 			testCaseName: "Positive: quotaLimit=true with res-conf-apikey present",
 			req: &csi.CreateVolumeRequest{
@@ -535,9 +534,24 @@ func TestCreateVolume(t *testing.T) {
 				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
 				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
 			},
-			cosSession:   &s3client.FakeCOSSessionFactory{},
-			expectedResp: nil,
-			expectedErr:  errors.New("failed to set bucket quota limit"),
+			cosSession:       &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			expectedResp: &csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					VolumeId:      testVolumeName,
+					CapacityBytes: 1073741824,
+					VolumeContext: map[string]string{
+						"bucketName":            bucketName,
+						"userProvidedBucket":    "true",
+						"locationConstraint":    "test-region",
+						"cosEndpoint":           "test-endpoint",
+						"objectPath":            "test/object/path",
+						constants.QuotaLimitKey: "true",
+						constants.ResConfApiKey: "fake-res-conf-key",
+					},
+				},
+			},
+			expectedErr: nil,
 		},
 		{
 			testCaseName: "Negative: quotaLimit=true missing res-conf-apikey",
@@ -549,9 +563,10 @@ func TestCreateVolume(t *testing.T) {
 				CapacityRange: &csi.CapacityRange{RequiredBytes: 524288000},
 				Secrets:       secretWithQuota("true", ""),
 			},
-			cosSession:   &s3client.FakeCOSSessionFactory{},
-			expectedResp: nil,
-			expectedErr:  status.Error(codes.InvalidArgument, "quotaLimit=true requires res-conf-apikey in secret"),
+			cosSession:       &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			expectedResp:     nil,
+			expectedErr:      status.Error(codes.InvalidArgument, "quotaLimit=true requires res-conf-apikey in secret"),
 		},
 		{
 			testCaseName: "Negative: quotaLimit=true but zero capacity",
@@ -563,9 +578,10 @@ func TestCreateVolume(t *testing.T) {
 				CapacityRange: &csi.CapacityRange{RequiredBytes: 0},
 				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
 			},
-			cosSession:   &s3client.FakeCOSSessionFactory{},
-			expectedResp: nil,
-			expectedErr:  errors.New("quotaLimit enabled but no positive storage size requested in PVC"),
+			cosSession:       &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			expectedResp:     nil,
+			expectedErr:      errors.New("quotaLimit enabled but no positive storage size requested in PVC"),
 		},
 		{
 			testCaseName: "Negative: quotaLimit has invalid value (early failure)",
@@ -577,9 +593,10 @@ func TestCreateVolume(t *testing.T) {
 				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
 				Secrets:       secretWithQuota("yes", "fake-res-conf-key"),
 			},
-			cosSession:   &s3client.FakeCOSSessionFactory{},
-			expectedResp: nil,
-			expectedErr:  status.Error(codes.InvalidArgument, "invalid quotaLimit value"),
+			cosSession:       &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			expectedResp:     nil,
+			expectedErr:      status.Error(codes.InvalidArgument, "invalid quotaLimit value"),
 		},
 	}
 
