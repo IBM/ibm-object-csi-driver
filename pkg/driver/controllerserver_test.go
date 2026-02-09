@@ -562,8 +562,19 @@ func TestCreateVolume(t *testing.T) {
 			},
 			cosSession:       &s3client.FakeCOSSessionFactory{},
 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
-			expectedResp:     nil,
-			expectedErr:      status.Error(codes.InvalidArgument, "quotaLimit=true requires res-conf-apikey in secret"),
+			expectedResp: &csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					VolumeId:      testVolumeName,
+					CapacityBytes: 524288000,
+					VolumeContext: map[string]string{
+						"bucketName":         bucketName,
+						"userProvidedBucket": "true",
+						"locationConstraint": "test-region",
+						"cosEndpoint":        "test-endpoint",
+					},
+				},
+			},
+			expectedErr: nil,
 		},
 		{
 			testCaseName: "Negative: quotaLimit=true but zero capacity",
