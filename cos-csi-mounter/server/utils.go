@@ -85,6 +85,16 @@ func (req *MountRequest) ParseMounterArgs() ([]string, error) {
 			return nil, fmt.Errorf("rclone args validation failed: %w", err)
 		}
 		return args.PopulateArgsSlice(req.Bucket, req.Path)
+	
+	case constants.S3MOUNTER:
+		var args s3MounterArgs
+		if err := strictDecodeForUnknownFields(req.Args, &args); err != nil {
+			return nil, fmt.Errorf("invalid rclone args decode error: %w", err)
+		}
+		if err := args.Validate(req.Path); err != nil {
+			return nil, fmt.Errorf("s3Mounter args validation failed: %w", err)
+		}
+		return args.PopulateArgsSlice(req.Bucket, req.Path)
 
 	default:
 		return nil, fmt.Errorf("unknown mounter: %s", req.Mounter)

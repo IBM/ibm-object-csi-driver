@@ -104,6 +104,8 @@ func (s *CSIMounterFactory) NewMounter(params MounterParams) Mounter {
 			Gid:          params.Gid,
 			ReadOnly:     params.ReadOnly,
 		})
+	case constants.S3MOUNTER:
+		return NewMountpointS3Mounter(secretMap, mountFlags, mounterUtils)
 	default:
 		// default to s3fs
 		return NewS3fsMounter(S3fsMounterParams{
