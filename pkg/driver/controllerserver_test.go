@@ -618,12 +618,12 @@ func TestCreateVolume(t *testing.T) {
 			assert.NoError(t, actualErr, "unexpected error")
 		}
 
-		if actualResp != nil {
+		if actualResp != nil && actualResp.Volume != nil {
 			if len(tc.req.Name) > 63 && tc.expectedResp != nil && tc.expectedResp.Volume != nil {
 				tc.expectedResp.Volume.VolumeId = actualResp.Volume.VolumeId
 			}
 			if tc.expectedResp != nil && tc.expectedResp.Volume != nil &&
-				actualResp.Volume != nil && actualResp.Volume.VolumeContext != nil {
+				actualResp.Volume.VolumeContext != nil {
 				if bucketNameVal, ok := actualResp.Volume.VolumeContext["bucketName"]; ok {
 					if strings.Contains(bucketNameVal, actualResp.Volume.VolumeId) {
 						tc.expectedResp.Volume.VolumeContext["bucketName"] = bucketNameVal
