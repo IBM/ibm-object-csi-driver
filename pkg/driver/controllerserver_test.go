@@ -622,8 +622,7 @@ func TestCreateVolume(t *testing.T) {
 			if len(tc.req.Name) > 63 && tc.expectedResp != nil && tc.expectedResp.Volume != nil {
 				tc.expectedResp.Volume.VolumeId = actualResp.Volume.VolumeId
 			}
-			if tc.expectedResp != nil && tc.expectedResp.Volume != nil &&
-				actualResp.Volume.VolumeContext != nil {
+			if tc.expectedResp != nil && tc.expectedResp.Volume != nil && actualResp.Volume.VolumeContext != nil {
 				if bucketNameVal, ok := actualResp.Volume.VolumeContext["bucketName"]; ok {
 					if strings.Contains(bucketNameVal, actualResp.Volume.VolumeId) {
 						tc.expectedResp.Volume.VolumeContext["bucketName"] = bucketNameVal
