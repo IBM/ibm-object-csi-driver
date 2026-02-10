@@ -562,19 +562,9 @@ func TestCreateVolume(t *testing.T) {
 			},
 			cosSession:       &s3client.FakeCOSSessionFactory{},
 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
-			expectedResp: &csi.CreateVolumeResponse{
-				Volume: &csi.Volume{
-					VolumeId:      testVolumeName,
-					CapacityBytes: 524288000,
-					VolumeContext: map[string]string{
-						"bucketName":         bucketName,
-						"userProvidedBucket": "true",
-						"locationConstraint": "test-region",
-						"cosEndpoint":        "test-endpoint",
-					},
-				},
-			},
-			expectedErr: nil,
+			expectedResp:     nil,
+			expectedErr: status.Error(codes.InvalidArgument,
+				"res-conf-apikey missing in secret, cannot set quota limit for bucket"),
 		},
 		{
 			testCaseName: "Negative: quotaLimit=true but zero capacity",
@@ -588,19 +578,9 @@ func TestCreateVolume(t *testing.T) {
 			},
 			cosSession:       &s3client.FakeCOSSessionFactory{},
 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
-			expectedResp: &csi.CreateVolumeResponse{
-				Volume: &csi.Volume{
-					VolumeId:      testVolumeName,
-					CapacityBytes: 0,
-					VolumeContext: map[string]string{
-						"bucketName":         bucketName,
-						"userProvidedBucket": "true",
-						"locationConstraint": "test-region",
-						"cosEndpoint":        "test-endpoint",
-					},
-				},
-			},
-			expectedErr: nil,
+			expectedResp:     nil,
+			expectedErr: status.Error(codes.InvalidArgument,
+				"quotaLimit enabled but no positive storage size requested in PVC"),
 		},
 		{
 			testCaseName: "Negative: quotaLimit has invalid value (early failure)",
@@ -614,19 +594,9 @@ func TestCreateVolume(t *testing.T) {
 			},
 			cosSession:       &s3client.FakeCOSSessionFactory{},
 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
-			expectedResp: &csi.CreateVolumeResponse{
-				Volume: &csi.Volume{
-					VolumeId:      testVolumeName,
-					CapacityBytes: 1073741824,
-					VolumeContext: map[string]string{
-						"bucketName":         bucketName,
-						"userProvidedBucket": "true",
-						"locationConstraint": "test-region",
-						"cosEndpoint":        "test-endpoint",
-					},
-				},
-			},
-			expectedErr: nil,
+			expectedResp:     nil,
+			expectedErr: status.Error(codes.InvalidArgument,
+				"invalid quotaLimit value"),
 		},
 	}
 
@@ -642,20 +612,10 @@ func TestCreateVolume(t *testing.T) {
 		actualResp, actualErr := controllerServer.CreateVolume(ctx, tc.req)
 
 		if tc.expectedErr != nil {
-			assert.Error(t, actualErr)
-			if strings.Contains(tc.expectedErr.Error(), "requires res-conf-apikey") {
-				assert.Contains(t, actualErr.Error(), "requires res-conf-apikey")
-			} else if strings.Contains(tc.expectedErr.Error(), "failed to set bucket quota") {
-				assert.Contains(t, actualErr.Error(), "failed to set bucket quota")
-			} else if strings.Contains(tc.expectedErr.Error(), "no positive storage") {
-				assert.Contains(t, actualErr.Error(), "no positive storage")
-			} else if strings.Contains(tc.expectedErr.Error(), "invalid quotaLimit value") {
-				assert.Contains(t, actualErr.Error(), "invalid quotaLimit value")
-			} else {
-				assert.Contains(t, actualErr.Error(), tc.expectedErr.Error())
-			}
+			assert.Error(t, actualErr, "expected error but got nil")
+			assert.Contains(t, actualErr.Error(), tc.expectedErr.Error(), "error message mismatch")
 		} else {
-			assert.NoError(t, actualErr)
+			assert.NoError(t, actualErr, "unexpected error")
 		}
 
 		if actualResp != nil {
