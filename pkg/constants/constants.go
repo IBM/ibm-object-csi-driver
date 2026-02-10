@@ -16,6 +16,8 @@ const (
 
 	S3FS             = "s3fs"
 	RClone           = "rclone"
+	S3MOUNTER     = "s3mounter"
+
 	DefaultNamespace = "default"
 
 	IAMEP                   = "https://private.iam.cloud.ibm.com/identity/token"
