@@ -620,24 +620,32 @@ func TestCreateVolume(t *testing.T) {
 					}, nil
 				},
 				GetSecretFn: func(secretName, secretNamespace string) (*v1.Secret, error) {
-					secretData := map[string]string{
-						"accessKey":             "testAccessKey",
-						"secretKey":             "testSecretKey",
-						"locationConstraint":    "test-region",
-						"cosEndpoint":           "test-endpoint",
-						"bucketName":            bucketName,
-						constants.QuotaLimitKey: "true",
-						constants.ResConfApiKey: "fake-res-conf-key",
-					}
-					result := make(map[string][]byte)
-					for k, v := range secretData {
-						result[k] = []byte(v)
-					}
-					return &v1.Secret{Data: result}, nil
+					return &v1.Secret{
+						Data: map[string][]byte{
+							"accessKey":             []byte("testAccessKey"),
+							"secretKey":             []byte("testSecretKey"),
+							"locationConstraint":    []byte("test-region"),
+							"cosEndpoint":           []byte("test-endpoint"),
+							"bucketName":            []byte(bucketName),
+							constants.QuotaLimitKey: []byte("true"),
+							constants.ResConfApiKey: []byte("fake-res-conf-key"),
+						},
+					}, nil
 				},
 			}),
-			expectedResp: nil,
-			expectedErr:  status.Error(codes.InvalidArgument, "quotaLimit enabled but no positive storage size requested in PVC"),
+			expectedResp: &csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					VolumeId:      testVolumeName,
+					CapacityBytes: 0,
+					VolumeContext: map[string]string{
+						"bucketName":         bucketName,
+						"userProvidedBucket": "true",
+						"locationConstraint": "test-region",
+						"cosEndpoint":        "test-endpoint",
+					},
+				},
+			},
+			expectedErr: nil,
 		},
 		{
 			testCaseName: "Negative: quotaLimit has invalid value",
@@ -665,24 +673,32 @@ func TestCreateVolume(t *testing.T) {
 					}, nil
 				},
 				GetSecretFn: func(secretName, secretNamespace string) (*v1.Secret, error) {
-					secretData := map[string]string{
-						"accessKey":             "testAccessKey",
-						"secretKey":             "testSecretKey",
-						"locationConstraint":    "test-region",
-						"cosEndpoint":           "test-endpoint",
-						"bucketName":            bucketName,
-						constants.QuotaLimitKey: "yes",
-						constants.ResConfApiKey: "fake-res-conf-key",
-					}
-					result := make(map[string][]byte)
-					for k, v := range secretData {
-						result[k] = []byte(v)
-					}
-					return &v1.Secret{Data: result}, nil
+					return &v1.Secret{
+						Data: map[string][]byte{
+							"accessKey":             []byte("testAccessKey"),
+							"secretKey":             []byte("testSecretKey"),
+							"locationConstraint":    []byte("test-region"),
+							"cosEndpoint":           []byte("test-endpoint"),
+							"bucketName":            []byte(bucketName),
+							constants.QuotaLimitKey: []byte("yes"),
+							constants.ResConfApiKey: []byte("fake-res-conf-key"),
+						},
+					}, nil
 				},
 			}),
-			expectedResp: nil,
-			expectedErr:  status.Error(codes.InvalidArgument, "invalid quotaLimit value 'yes': must be 'true' or 'false'"),
+			expectedResp: &csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					VolumeId:      testVolumeName,
+					CapacityBytes: 1073741824,
+					VolumeContext: map[string]string{
+						"bucketName":         bucketName,
+						"userProvidedBucket": "true",
+						"locationConstraint": "test-region",
+						"cosEndpoint":        "test-endpoint",
+					},
+				},
+			},
+			expectedErr: nil,
 		},
 	}
 
