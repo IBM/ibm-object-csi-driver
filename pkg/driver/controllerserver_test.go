@@ -545,7 +545,6 @@ func TestCreateVolume(t *testing.T) {
 						"userProvidedBucket": "true",
 						"locationConstraint": "test-region",
 						"cosEndpoint":        "test-endpoint",
-						"objectPath":         "",
 					},
 				},
 			},
@@ -592,22 +591,8 @@ func TestCreateVolume(t *testing.T) {
 					return &v1.Secret{Data: result}, nil
 				},
 			}),
-			expectedResp: &csi.CreateVolumeResponse{
-				Volume: &csi.Volume{
-					VolumeId:      testVolumeName,
-					CapacityBytes: 524288000,
-					VolumeContext: map[string]string{
-						"bucketName":                       bucketName,
-						"userProvidedBucket":               "true",
-						"locationConstraint":               "test-region",
-						"cosEndpoint":                      "test-endpoint",
-						"csi.storage.k8s.io/pvc/name":      testPVCName,
-						"csi.storage.k8s.io/pvc/namespace": testPVCNs,
-						"objectPath":                       "",
-					},
-				},
-			},
-			expectedErr: nil,
+			expectedResp: nil,
+			expectedErr:  status.Error(codes.InvalidArgument, "res-conf-apikey missing in secret, cannot set quota limit for bucket"),
 		},
 		{
 			testCaseName: "Negative: quotaLimit=true but zero capacity",
