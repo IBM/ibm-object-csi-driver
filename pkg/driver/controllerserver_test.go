@@ -545,6 +545,7 @@ func TestCreateVolume(t *testing.T) {
 						"userProvidedBucket": "true",
 						"locationConstraint": "test-region",
 						"cosEndpoint":        "test-endpoint",
+						"objectPath":         "",
 					},
 				},
 			},
@@ -591,8 +592,22 @@ func TestCreateVolume(t *testing.T) {
 					return &v1.Secret{Data: result}, nil
 				},
 			}),
-			expectedResp: nil,
-			expectedErr:  status.Error(codes.InvalidArgument, "res-conf-apikey missing in secret, cannot set quota limit for bucket"),
+			expectedResp: &csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					VolumeId:      testVolumeName,
+					CapacityBytes: 524288000,
+					VolumeContext: map[string]string{
+						"bucketName":                       bucketName,
+						"userProvidedBucket":               "true",
+						"locationConstraint":               "test-region",
+						"cosEndpoint":                      "test-endpoint",
+						"csi.storage.k8s.io/pvc/name":      testPVCName,
+						"csi.storage.k8s.io/pvc/namespace": testPVCNs,
+						"objectPath":                       "",
+					},
+				},
+			},
+			expectedErr: nil,
 		},
 		{
 			testCaseName: "Negative: quotaLimit=true but zero capacity",
@@ -638,10 +653,13 @@ func TestCreateVolume(t *testing.T) {
 					VolumeId:      testVolumeName,
 					CapacityBytes: 0,
 					VolumeContext: map[string]string{
-						"bucketName":         bucketName,
-						"userProvidedBucket": "true",
-						"locationConstraint": "test-region",
-						"cosEndpoint":        "test-endpoint",
+						"bucketName":                       bucketName,
+						"userProvidedBucket":               "true",
+						"locationConstraint":               "test-region",
+						"cosEndpoint":                      "test-endpoint",
+						"csi.storage.k8s.io/pvc/name":      testPVCName,
+						"csi.storage.k8s.io/pvc/namespace": testPVCNs,
+						"objectPath":                       "",
 					},
 				},
 			},
@@ -686,22 +704,10 @@ func TestCreateVolume(t *testing.T) {
 					}, nil
 				},
 			}),
-			expectedResp: &csi.CreateVolumeResponse{
-				Volume: &csi.Volume{
-					VolumeId:      testVolumeName,
-					CapacityBytes: 1073741824,
-					VolumeContext: map[string]string{
-						"bucketName":         bucketName,
-						"userProvidedBucket": "true",
-						"locationConstraint": "test-region",
-						"cosEndpoint":        "test-endpoint",
-					},
-				},
-			},
-			expectedErr: nil,
+			expectedResp: nil,
+			expectedErr:  status.Error(codes.InvalidArgument, `invalid quotaLimit value "yes": must be 'true' or 'false'`),
 		},
 	}
-
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 		controllerServer := &controllerServer{
