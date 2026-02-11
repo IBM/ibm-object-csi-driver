@@ -44,6 +44,8 @@ const (
 	SecretNamespaceKey = "cos.csi.driver/secret-namespace" // #nosec G101 -- false positive, this is not a credential
 
 	BucketVersioning = "bucketVersioning"
+	QuotaLimitKey    = "quotaLimit"
+	ResConfApiKey    = "res-conf-apikey" // #nosec G101 -- this is just a map key name, not a real credential
 
 	IsNodeServer         = "IS_NODE_SERVER"
 	KubeNodeName         = "KUBE_NODE_NAME"
