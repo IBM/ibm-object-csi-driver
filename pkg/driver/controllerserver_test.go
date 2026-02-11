@@ -551,51 +551,60 @@ func TestCreateVolume(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			testCaseName: "Negative: quotaLimit=true missing res-conf-apikey",
+			testCaseName: "Positive: quotaLimit=false with res-conf-apikey (validates but passes)",
 			req: &csi.CreateVolumeRequest{
 				Name: testVolumeName,
 				VolumeCapabilities: []*csi.VolumeCapability{
 					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
 				},
-				CapacityRange: &csi.CapacityRange{RequiredBytes: 524288000},
-				Parameters: map[string]string{
-					constants.PVCNameKey:      testPVCName,
-					constants.PVCNamespaceKey: testPVCNs,
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
+				Secrets:       secretWithQuota("false", "fake-res-conf-key"),
+			},
+			cosSession:       &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			expectedResp: &csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					VolumeId:      testVolumeName,
+					CapacityBytes: 1073741824,
+					VolumeContext: map[string]string{
+						"bucketName":         bucketName,
+						"userProvidedBucket": "true",
+						"locationConstraint": "test-region",
+						"cosEndpoint":        "test-endpoint",
+					},
 				},
 			},
-			cosSession: &s3client.FakeCOSSessionFactory{},
-			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
-				GetPVCFn: func(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error) {
-					return &v1.PersistentVolumeClaim{
-						ObjectMeta: metav1.ObjectMeta{
-							Annotations: map[string]string{
-								constants.SecretNameKey:      testSecretName,
-								constants.SecretNamespaceKey: testSecretNs,
-							},
-						},
-					}, nil
+			expectedErr: nil,
+		},
+
+		{
+			testCaseName: "Positive: quotaLimit=true with res-conf-apikey and capacity > 0",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
 				},
-				GetSecretFn: func(secretName, secretNamespace string) (*v1.Secret, error) {
-					secretData := map[string]string{
-						"accessKey":             "testAccessKey",
-						"secretKey":             "testSecretKey",
-						"locationConstraint":    "test-region",
-						"cosEndpoint":           "test-endpoint",
-						"bucketName":            bucketName,
-						constants.QuotaLimitKey: "true",
-					}
-					result := make(map[string][]byte)
-					for k, v := range secretData {
-						result[k] = []byte(v)
-					}
-					return &v1.Secret{Data: result}, nil
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824}, // Capacity > 0
+				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
+			},
+			cosSession:       &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			expectedResp: &csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					VolumeId:      testVolumeName,
+					CapacityBytes: 1073741824,
+					VolumeContext: map[string]string{
+						"bucketName":         bucketName,
+						"userProvidedBucket": "true",
+						"locationConstraint": "test-region",
+						"cosEndpoint":        "test-endpoint",
+					},
 				},
-			}),
-			expectedResp: nil,
-			expectedErr:  status.Error(codes.InvalidArgument, "res-conf-apikey missing in secret, cannot set quota limit for bucket"),
+			},
+			expectedErr: nil,
 		},
 		{
-			testCaseName: "Negative: quotaLimit=true but zero capacity",
+			testCaseName: "Positive: quotaLimit=true but zero capacity",
 			req: &csi.CreateVolumeRequest{
 				Name: testVolumeName,
 				VolumeCapabilities: []*csi.VolumeCapability{
@@ -649,6 +658,50 @@ func TestCreateVolume(t *testing.T) {
 				},
 			},
 			expectedErr: nil,
+		},
+		{
+			testCaseName: "Negative: quotaLimit=true missing res-conf-apikey",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
+				},
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 524288000},
+				Parameters: map[string]string{
+					constants.PVCNameKey:      testPVCName,
+					constants.PVCNamespaceKey: testPVCNs,
+				},
+			},
+			cosSession: &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetPVCFn: func(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error) {
+					return &v1.PersistentVolumeClaim{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								constants.SecretNameKey:      testSecretName,
+								constants.SecretNamespaceKey: testSecretNs,
+							},
+						},
+					}, nil
+				},
+				GetSecretFn: func(secretName, secretNamespace string) (*v1.Secret, error) {
+					secretData := map[string]string{
+						"accessKey":             "testAccessKey",
+						"secretKey":             "testSecretKey",
+						"locationConstraint":    "test-region",
+						"cosEndpoint":           "test-endpoint",
+						"bucketName":            bucketName,
+						constants.QuotaLimitKey: "true",
+					}
+					result := make(map[string][]byte)
+					for k, v := range secretData {
+						result[k] = []byte(v)
+					}
+					return &v1.Secret{Data: result}, nil
+				},
+			}),
+			expectedResp: nil,
+			expectedErr:  status.Error(codes.InvalidArgument, "res-conf-apikey missing in secret, cannot set quota limit for bucket"),
 		},
 		{
 			testCaseName: "Negative: quotaLimit has invalid value",
