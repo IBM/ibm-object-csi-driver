@@ -3,10 +3,10 @@ name: CI & Release
 on:
   push:
     branches:
-      - main
+      - aws-s3mounter
   pull_request:
     branches:
-      - main
+      - aws-s3mounter
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
