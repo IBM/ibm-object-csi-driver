@@ -142,20 +142,19 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		}
 
 		secretMap = secretMapCustom
+	}
+	if quotaLimitStr, ok := secretMap[constants.QuotaLimitKey]; ok && quotaLimitStr != "" {
+		klog.Infof("quotaLimit from secretMap: %q", quotaLimitStr)
+		quotaLimitEnabled, err = strconv.ParseBool(quotaLimitStr)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument,
+				fmt.Sprintf("invalid quotaLimit value %q: must be 'true' or 'false'", quotaLimitStr))
+		}
 
-		if quotaLimitStr, ok := secretMap[constants.QuotaLimitKey]; ok && quotaLimitStr != "" {
-			klog.Infof("quotaLimit from secretMap: %q", quotaLimitStr)
-			quotaLimitEnabled, err := strconv.ParseBool(quotaLimitStr)
-			if err != nil {
+		if quotaLimitEnabled {
+			if secretMap[constants.ResConfApiKey] == "" {
 				return nil, status.Error(codes.InvalidArgument,
-					fmt.Sprintf("invalid quotaLimit value %q: must be 'true' or 'false'", quotaLimitStr))
-			}
-
-			if quotaLimitEnabled {
-				if secretMap[constants.ResConfApiKey] == "" {
-					return nil, status.Error(codes.InvalidArgument,
-						"res-conf-apikey missing in secret, cannot set quota limit for bucket")
-				}
+					"res-conf-apikey missing in secret, cannot set quota limit for bucket")
 			}
 		}
 	}
