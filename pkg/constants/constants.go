@@ -36,6 +36,11 @@ const (
 	COSCSIMounterSocketPathEnv   = "COS_CSI_MOUNTER_SOCKET"
 	MounterConfigPathOnHost      = "/var/lib/coscsi-config"
 	MounterConfigPathOnPodS3fs   = "/var/lib/ibmc-s3fs"
+	MountpointS3            = "mount-s3"
+    MountpointS3BinaryPath  = "/usr/bin/mount-s3"
+
+    // Config paths for mountpoint-s3 (same pattern as rclone)
+    MounterConfigPathOnPodS3Mount  = "/var/lib/coscsi-config/s3mount"
 	MounterConfigPathOnPodRclone = "/root/.config/rclone"
 	// Interval to wait till next loop
 	Interval = 500 * time.Millisecond
