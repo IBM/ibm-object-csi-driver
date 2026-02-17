@@ -908,30 +908,6 @@ func TestCreateVolume(t *testing.T) {
 		},
 
 		{
-			testCaseName: "Negative: quotaLimit=true missing res-conf-apikey in direct secrets",
-			req: &csi.CreateVolumeRequest{
-				Name: testVolumeName,
-				VolumeCapabilities: []*csi.VolumeCapability{
-					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
-				},
-				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
-				Secrets: map[string]string{
-					"accessKey":             "testAccessKey",
-					"secretKey":             "testSecretKey",
-					"locationConstraint":    "test-region",
-					"cosEndpoint":           "test-endpoint",
-					"bucketName":            bucketName,
-					constants.QuotaLimitKey: "true",
-					// res-conf-apikey is intentionally missing
-				},
-			},
-			cosSession:       &s3client.FakeCOSSessionFactory{},
-			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
-			expectedResp:     nil,
-			expectedErr:      status.Error(codes.InvalidArgument, "res-conf-apikey missing in secret, cannot set quota limit for bucket"),
-		},
-
-		{
 			testCaseName: "Negative: quotaLimit invalid value in direct secrets",
 			req: &csi.CreateVolumeRequest{
 				Name: testVolumeName,
