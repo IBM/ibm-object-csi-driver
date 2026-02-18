@@ -135,23 +135,23 @@ func (s3 *MountpointS3Mounter) Mount(source string, target string) error {
 	// Create unique config dir per volume 
 	configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 	
-	configCreated := false
+	// configCreated := false
 
-    // Cleanup on failure
-    defer func() {
-        if err != nil && configCreated {
-            klog.Warningf("Mount failed, cleaning up config dir: %s", configPathWithVolID)
-            removeS3ConfigFile(configPath, target)
-        }
-    }()
+    // // Cleanup on failure
+    // defer func() {
+    //     if err != nil && configCreated {
+    //         klog.Warningf("Mount failed, cleaning up config dir: %s", configPathWithVolID)
+    //         removeS3ConfigFile(configPath, target)
+    //     }
+    // }()
 
 	// Write AWS credentials config file
 	if err := createS3MountConfig(configPathWithVolID, s3); err != nil {
 		klog.Errorf("MountpointS3Mounter Mount: Cannot create config file: %v", err)
 		return err
 	}
-	
-	configCreated = true
+
+	// configCreated = true
 
 	// Build bucket path with optional object path prefix
 	bucketName := s3.BucketName
