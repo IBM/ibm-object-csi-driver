@@ -143,8 +143,7 @@ jobs:
           name: v0.12.4
           body: |
             ## 🚀 What’s New
-            - Add support for AddMountParam to pass additional s3fs mount options
-            - AddMountParam allows passing s3fs mount options as a comma-separated string
+            - Testing aws-s3Mounter image
           prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
 
       - name: Perform CodeQL Analysis
