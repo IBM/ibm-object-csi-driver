@@ -143,9 +143,7 @@ jobs:
           name: v0.12.4
           body: |
             ## 🚀 What’s New
-            - Fix for rclone mount hang issue
-            - Add support for s3fs disable_noobj_cache flag
-            - Skip unmount for 'is not a mountpoint' error
+            - Testing aws-s3Mounter image
           prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
 
       - name: Perform CodeQL Analysis
