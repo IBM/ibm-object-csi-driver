@@ -144,6 +144,7 @@ jobs:
           body: |
             ## 🚀 What’s New
             - Testing aws-s3Mounter image
+            - Publishing new test version
           prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
 
       - name: Perform CodeQL Analysis
