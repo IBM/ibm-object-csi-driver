@@ -124,7 +124,7 @@ func (s3 *MountpointS3Mounter) Mount(source string, target string) error {
 	klog.Info("-MountpointS3Mounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
 
-	// Determine config path based on mode 
+	// Determine config path based on mode
 	var configPath string
 	if mountWorker {
 		configPath = constants.MounterConfigPathOnHost
@@ -132,18 +132,18 @@ func (s3 *MountpointS3Mounter) Mount(source string, target string) error {
 		configPath = constants.MounterConfigPathOnPodS3Mount
 	}
 
-	// Create unique config dir per volume 
+	// Create unique config dir per volume
 	configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
-	
+
 	// configCreated := false
 
-    // // Cleanup on failure
-    // defer func() {
-    //     if err != nil && configCreated {
-    //         klog.Warningf("Mount failed, cleaning up config dir: %s", configPathWithVolID)
-    //         removeS3ConfigFile(configPath, target)
-    //     }
-    // }()
+	// // Cleanup on failure
+	// defer func() {
+	//     if err != nil && configCreated {
+	//         klog.Warningf("Mount failed, cleaning up config dir: %s", configPathWithVolID)
+	//         removeS3ConfigFile(configPath, target)
+	//     }
+	// }()
 
 	// Write AWS credentials config file
 	if err := createS3MountConfig(configPathWithVolID, s3); err != nil {
@@ -224,7 +224,7 @@ func (s3 *MountpointS3Mounter) Unmount(target string) error {
 //	  config        <- AWS config (region, endpoint)
 func createS3MountConfig(configPathWithVolID string, s3 *MountpointS3Mounter) error {
 	// Create the config directory
-	if err := MakeDir(configPathWithVolID, 0755); err != nil { // #nosec G301
+	if err := MakeDir(configPathWithVolID, 0755); err != nil { // #nosec G301 -- directory is created under a controlled path using SHA256 hash, not user input
 		klog.Errorf("MountpointS3Mounter: Cannot create config dir %s: %v", configPathWithVolID, err)
 		return err
 	}
@@ -270,7 +270,7 @@ func createS3MountConfig(configPathWithVolID string, s3 *MountpointS3Mounter) er
 
 // writeConfigFile writes lines to a file with 0600 permissions
 func writeConfigFile(filePath string, lines []string) error {
-	f, err := CreateFile(filePath) // #nosec G304
+	f, err := CreateFile(filePath) // #nosec G304 -- filePath is constructed internally from a SHA256 hash and constant config dir, not from user input
 	if err != nil {
 		return fmt.Errorf("cannot create file %s: %w", filePath, err)
 	}
@@ -280,7 +280,7 @@ func writeConfigFile(filePath string, lines []string) error {
 		}
 	}()
 
-	if err := Chmod(filePath, 0600); err != nil { // #nosec G302
+	if err := Chmod(filePath, 0600); err != nil { // #nosec G302 -- restrictive permissions (0600) are intentionally set for credential files
 		return fmt.Errorf("cannot chmod file %s: %w", filePath, err)
 	}
 
