@@ -822,7 +822,7 @@ func TestCreateVolume(t *testing.T) {
 		{
 			testCaseName: "Negative: quotaLimit has invalid value",
 			req: &csi.CreateVolumeRequest{
-				Name: testVolumeName,
+				Name: testVolumeName, // ← THIS WAS MISSING
 				VolumeCapabilities: []*csi.VolumeCapability{
 					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
 				},
