@@ -171,7 +171,7 @@ func (s *fakeObjectStorageSession) DeleteBucket(bucket string) error {
 	return nil
 }
 
-func (s *fakeObjectStorageSession) UpdateQuotaLimit(quota int64, apiKey, bucketName, osEndpoint, iamEndpoint string) error {
+func (s *fakeObjectStorageSession) UpdateQuotaLimit(quota int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error {
 	s.logger.Info(fmt.Sprintf("Fake UpdateQuotaLimit called for bucket %s with quota %d", bucketName, quota))
 	return nil
 }

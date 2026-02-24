@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/IBM/go-sdk-core/v5/core"
-	resourceconfigurationv1 "github.com/IBM/ibm-cos-sdk-go-config/resourceconfigurationv1"
+	rc "github.com/IBM/ibm-cos-sdk-go-config/v2/resourceconfigurationv1"
 	"github.com/IBM/ibm-cos-sdk-go/aws"
 	"github.com/IBM/ibm-cos-sdk-go/aws/awserr"
 	"github.com/IBM/ibm-cos-sdk-go/aws/credentials"
@@ -66,7 +66,7 @@ type ObjectStorageSession interface {
 
 	SetBucketVersioning(bucket string, enable bool) error
 
-	UpdateQuotaLimit(quota int64, apiKey, bucketName, osEndpoint, iamEndpoint string) error
+	UpdateQuotaLimit(quota int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error
 }
 
 // COSSessionFactory represents a COS (S3) session factory
@@ -240,13 +240,13 @@ func (s *COSSessionFactory) NewObjectStorageSession(endpoint, locationConstraint
 	}
 }
 
-func (s *COSSession) UpdateQuotaLimit(quota int64, apiKey, bucketName, osEndpoint, iamEndpoint string) error {
-	return UpdateQuotaLimit(quota, apiKey, bucketName, osEndpoint, iamEndpoint)
+func (s *COSSession) UpdateQuotaLimit(quota int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error {
+	return UpdateQuotaLimit(quota, apiKey, bucketName, cosEndpoint, iamEndpoint)
 }
 
-func UpdateQuotaLimit(quotaBytes int64, apiKey, bucketName, osEndpoint, iamEndpoint string) error {
+func UpdateQuotaLimit(quota int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error {
 	var configEndpoint string
-	if strings.Contains(strings.ToLower(osEndpoint), "private") {
+	if strings.Contains(strings.ToLower(cosEndpoint), "private") {
 		configEndpoint = constants.ResourceConfigEPPrivate
 	} else {
 		configEndpoint = constants.ResourceConfigEPDirect
@@ -257,7 +257,7 @@ func UpdateQuotaLimit(quotaBytes int64, apiKey, bucketName, osEndpoint, iamEndpo
 		URL:    iamEndpoint,
 	}
 
-	service, err := resourceconfigurationv1.NewResourceConfigurationV1(&resourceconfigurationv1.ResourceConfigurationV1Options{
+	service, err := rc.NewResourceConfigurationV1(&rc.ResourceConfigurationV1Options{
 		Authenticator: authenticator,
 		URL:           configEndpoint,
 	})
@@ -265,14 +265,16 @@ func UpdateQuotaLimit(quotaBytes int64, apiKey, bucketName, osEndpoint, iamEndpo
 		return fmt.Errorf("failed to create resource configuration service: %w", err)
 	}
 
-	options := &resourceconfigurationv1.UpdateBucketConfigOptions{
-		Bucket:    core.StringPtr(bucketName),
-		HardQuota: core.Int64Ptr(quotaBytes),
+	options := &rc.UpdateBucketConfigOptions{
+		Bucket: core.StringPtr(bucketName),
+		BucketPatch: map[string]interface{}{
+			"hard_quota": quota,
+		},
 	}
 
 	_, err = service.UpdateBucketConfig(options)
 	if err != nil {
-		return fmt.Errorf("failed to update quota for bucket %s to %d bytes: %w", bucketName, quotaBytes, err)
+		return fmt.Errorf("failed to update quota for bucket %s to %d bytes: %w", bucketName, quota, err)
 	}
 
 	return nil

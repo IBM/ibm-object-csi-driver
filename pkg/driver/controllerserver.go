@@ -154,7 +154,8 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		if quotaLimitEnabled {
 			if secretMap[constants.ResConfApiKey] == "" {
 				return nil, status.Error(codes.InvalidArgument,
-					"res-conf-apikey missing in secret, cannot set quota limit for bucket")
+					fmt.Sprintf("res-conf-apikey missing in secret for bucket %q, cannot set quota limit",
+						params["bucketName"]))
 			}
 		}
 	}
