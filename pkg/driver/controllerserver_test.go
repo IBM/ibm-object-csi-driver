@@ -641,7 +641,72 @@ func TestCreateVolume(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
-
+		{
+			testCaseName: "Positive: quotaLimit=true with res-conf-apikey and existing bucket",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
+				},
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
+				Secrets: map[string]string{
+					"accessKey":             "testAccessKey",
+					"secretKey":             "testSecretKey",
+					"locationConstraint":    "test-region",
+					"cosEndpoint":           "test-endpoint",
+					"bucketName":            bucketName,
+					constants.QuotaLimitKey: "true",
+					constants.ResConfApiKey: "valid-api-key",
+				},
+			},
+			cosSession:       &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			expectedResp: &csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					VolumeId:      testVolumeName,
+					CapacityBytes: 1073741824,
+					VolumeContext: map[string]string{
+						"bucketName":         bucketName,
+						"userProvidedBucket": "true",
+						"locationConstraint": "test-region",
+						"cosEndpoint":        "test-endpoint",
+					},
+				},
+			},
+			expectedErr: nil,
+		},
+		{
+			testCaseName: "Positive: quotaLimit=true with res-conf-apikey and temp bucket",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
+				},
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
+				Secrets: map[string]string{
+					"accessKey":             "testAccessKey",
+					"secretKey":             "testSecretKey",
+					"locationConstraint":    "test-region",
+					"cosEndpoint":           "test-endpoint",
+					constants.QuotaLimitKey: "true",
+					constants.ResConfApiKey: "valid-api-key",
+				},
+			},
+			cosSession:       &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			expectedResp: &csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					VolumeId:      testVolumeName,
+					CapacityBytes: 1073741824,
+					VolumeContext: map[string]string{
+						"userProvidedBucket": "false",
+						"locationConstraint": "test-region",
+						"cosEndpoint":        "test-endpoint",
+					},
+				},
+			},
+			expectedErr: nil,
+		},
 		{
 			testCaseName: "Negative: quotaLimit=true but zero capacity (PVC annotations)",
 			req: &csi.CreateVolumeRequest{
