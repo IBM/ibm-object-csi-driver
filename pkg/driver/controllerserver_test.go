@@ -642,8 +642,6 @@ func TestCreateVolume(t *testing.T) {
 			expectedErr: nil,
 		},
 
-		// ============= NEGATIVE TEST CASES =============
-
 		{
 			testCaseName: "Negative: quotaLimit=true but zero capacity (PVC annotations)",
 			req: &csi.CreateVolumeRequest{
@@ -720,7 +718,6 @@ func TestCreateVolume(t *testing.T) {
 						"cosEndpoint":           "test-endpoint",
 						"bucketName":            bucketName,
 						constants.QuotaLimitKey: "true",
-						// res-conf-apikey is missing
 					}
 					result := make(map[string][]byte)
 					for k, v := range secretData {
@@ -730,9 +727,9 @@ func TestCreateVolume(t *testing.T) {
 				},
 			}),
 			expectedResp: nil,
-			expectedErr:  status.Error(codes.InvalidArgument, "res-conf-apikey missing in secret, cannot set quota limit for bucket"),
+			expectedErr: status.Error(codes.InvalidArgument,
+				`res-conf-apikey missing in secret for bucket "", cannot set quota limit`),
 		},
-
 		{
 			testCaseName: "Negative: quotaLimit=true missing res-conf-apikey in direct secrets",
 			req: &csi.CreateVolumeRequest{
@@ -748,13 +745,13 @@ func TestCreateVolume(t *testing.T) {
 					"cosEndpoint":           "test-endpoint",
 					"bucketName":            bucketName,
 					constants.QuotaLimitKey: "true",
-					// res-conf-apikey is missing
 				},
 			},
 			cosSession:       &s3client.FakeCOSSessionFactory{},
 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
 			expectedResp:     nil,
-			expectedErr:      status.Error(codes.InvalidArgument, "res-conf-apikey missing in secret, cannot set quota limit for bucket"),
+			expectedErr: status.Error(codes.InvalidArgument,
+				`res-conf-apikey missing in secret for bucket "", cannot set quota limit`),
 		},
 
 		{
