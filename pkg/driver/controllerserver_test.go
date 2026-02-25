@@ -822,7 +822,7 @@ func TestCreateVolume(t *testing.T) {
 		{
 			testCaseName: "Negative: quotaLimit has invalid value",
 			req: &csi.CreateVolumeRequest{
-				Name: testVolumeName, // ← THIS WAS MISSING
+				Name: testVolumeName,
 				VolumeCapabilities: []*csi.VolumeCapability{
 					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
 				},
@@ -859,7 +859,7 @@ func TestCreateVolume(t *testing.T) {
 				},
 			}),
 			expectedResp: nil,
-			expectedErr:  status.Error(codes.InvalidArgument, `invalid quotaLimit value "yes": must be 'true' or 'false'`),
+			expectedErr:  status.Error(codes.InvalidArgument, "invalid quotaLimit value \"yes\": must be 'true' or 'false'"),
 		},
 	}
 	for _, tc := range testCases {
