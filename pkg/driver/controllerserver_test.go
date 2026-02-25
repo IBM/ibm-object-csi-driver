@@ -873,6 +873,10 @@ func TestCreateVolume(t *testing.T) {
 		}
 		actualResp, actualErr := controllerServer.CreateVolume(ctx, tc.req)
 
+		if actualErr != nil {
+			t.Logf("Error for test %s: %v", tc.testCaseName, actualErr)
+		}
+
 		if tc.expectedErr != nil {
 			assert.Error(t, actualErr, "expected error but got nil")
 			assert.Contains(t, actualErr.Error(), tc.expectedErr.Error(), "error message mismatch")
