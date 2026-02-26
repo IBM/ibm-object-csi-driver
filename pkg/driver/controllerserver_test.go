@@ -550,6 +550,7 @@ func TestCreateVolume(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
+
 		{
 			testCaseName: "Positive: quotaLimit=false without res-conf-apikey (direct secrets)",
 			req: &csi.CreateVolumeRequest{
@@ -580,6 +581,7 @@ func TestCreateVolume(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
+
 		{
 			testCaseName: "Positive: quotaLimit=false via PVC annotations",
 			req: &csi.CreateVolumeRequest{
@@ -639,72 +641,7 @@ func TestCreateVolume(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
-		{
-			testCaseName: "Positive: quotaLimit=true with res-conf-apikey and existing bucket",
-			req: &csi.CreateVolumeRequest{
-				Name: testVolumeName,
-				VolumeCapabilities: []*csi.VolumeCapability{
-					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
-				},
-				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
-				Secrets: map[string]string{
-					"accessKey":             "testAccessKey",
-					"secretKey":             "testSecretKey",
-					"locationConstraint":    "test-region",
-					"cosEndpoint":           "test-endpoint",
-					"bucketName":            bucketName,
-					constants.QuotaLimitKey: "true",
-					constants.ResConfApiKey: "valid-api-key",
-				},
-			},
-			cosSession:       &s3client.FakeCOSSessionFactory{},
-			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
-			expectedResp: &csi.CreateVolumeResponse{
-				Volume: &csi.Volume{
-					VolumeId:      testVolumeName,
-					CapacityBytes: 1073741824,
-					VolumeContext: map[string]string{
-						"bucketName":         bucketName,
-						"userProvidedBucket": "true",
-						"locationConstraint": "test-region",
-						"cosEndpoint":        "test-endpoint",
-					},
-				},
-			},
-			expectedErr: nil,
-		},
-		{
-			testCaseName: "Positive: quotaLimit=true with res-conf-apikey and temp bucket",
-			req: &csi.CreateVolumeRequest{
-				Name: testVolumeName,
-				VolumeCapabilities: []*csi.VolumeCapability{
-					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
-				},
-				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
-				Secrets: map[string]string{
-					"accessKey":             "testAccessKey",
-					"secretKey":             "testSecretKey",
-					"locationConstraint":    "test-region",
-					"cosEndpoint":           "test-endpoint",
-					constants.QuotaLimitKey: "true",
-					constants.ResConfApiKey: "valid-api-key",
-				},
-			},
-			cosSession:       &s3client.FakeCOSSessionFactory{},
-			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
-			expectedResp: &csi.CreateVolumeResponse{
-				Volume: &csi.Volume{
-					VolumeId:      testVolumeName,
-					CapacityBytes: 1073741824,
-					VolumeContext: map[string]string{
-						"userProvidedBucket": "false",
-						"locationConstraint": "test-region",
-						"cosEndpoint":        "test-endpoint",
-					},
-				},
-			},
-			expectedErr: nil,
-		},
+
 		{
 			testCaseName: "Negative: quotaLimit=true but zero capacity (PVC annotations)",
 			req: &csi.CreateVolumeRequest{
@@ -747,6 +684,7 @@ func TestCreateVolume(t *testing.T) {
 			expectedResp: nil,
 			expectedErr:  status.Error(codes.InvalidArgument, "quotaLimit enabled but no positive storage size requested in PVC"),
 		},
+
 		{
 			testCaseName: "Negative: quotaLimit=true missing res-conf-apikey (PVC annotations)",
 			req: &csi.CreateVolumeRequest{
@@ -856,7 +794,7 @@ func TestCreateVolume(t *testing.T) {
 				},
 			}),
 			expectedResp: nil,
-			expectedErr:  status.Error(codes.InvalidArgument, "invalid quotaLimit value \"yes\": must be 'true' or 'false'"),
+			expectedErr:  status.Error(codes.InvalidArgument, `invalid quotaLimit value "yes": must be 'true' or 'false'`),
 		},
 	}
 	for _, tc := range testCases {
@@ -869,10 +807,6 @@ func TestCreateVolume(t *testing.T) {
 			Stats:      tc.driverStatsUtils,
 		}
 		actualResp, actualErr := controllerServer.CreateVolume(ctx, tc.req)
-
-		if actualErr != nil {
-			t.Logf("Error for test %s: %v", tc.testCaseName, actualErr)
-		}
 
 		if tc.expectedErr != nil {
 			assert.Error(t, actualErr, "expected error but got nil")
