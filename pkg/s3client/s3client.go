@@ -240,9 +240,13 @@ func (s *COSSessionFactory) NewObjectStorageSession(endpoint, locationConstraint
 	}
 }
 
-func (s *COSSession) UpdateQuotaLimit(quota int64, apiKey, bucketName, osEndpoint, iamEndpoint string) error {
+func (s *COSSession) UpdateQuotaLimit(quota int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error {
+	return UpdateQuotaLimit(quota, apiKey, bucketName, cosEndpoint, iamEndpoint)
+}
+
+func UpdateQuotaLimit(quotaBytes int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error {
 	var configEndpoint string
-	if strings.Contains(strings.ToLower(osEndpoint), "private") {
+	if strings.Contains(strings.ToLower(cosEndpoint), "private") {
 		configEndpoint = constants.ResourceConfigEPPrivate
 	} else {
 		configEndpoint = constants.ResourceConfigEPDirect
@@ -261,16 +265,17 @@ func (s *COSSession) UpdateQuotaLimit(quota int64, apiKey, bucketName, osEndpoin
 		return fmt.Errorf("failed to create resource configuration service: %w", err)
 	}
 
+	quota := 0
 	options := &rc.UpdateBucketConfigOptions{
 		Bucket: core.StringPtr(bucketName),
 		BucketPatch: map[string]interface{}{
-			"hard_quota": quota,
+			"quota": quota,
 		},
 	}
 
 	_, err = service.UpdateBucketConfig(options)
 	if err != nil {
-		return fmt.Errorf("failed to update quota for bucket %s to %d bytes: %w", bucketName, quota, err)
+		return fmt.Errorf("failed to update quota for bucket %s to %d bytes: %w", bucketName, quotaBytes, err)
 	}
 
 	return nil
