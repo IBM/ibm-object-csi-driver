@@ -154,9 +154,15 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		if quotaLimitEnabled {
 			if secretMap[constants.ResConfApiKey] == "" {
 				return nil, status.Error(codes.InvalidArgument,
-					fmt.Sprintf("res-conf-apikey missing in secret for bucket %q, cannot set quota limit",
-						params["bucketName"]))
+					"res-conf-apikey missing in secret, cannot set quota limit for bucket")
 			}
+
+			quotaBytes := req.GetCapacityRange().GetRequiredBytes()
+			if quotaBytes <= 0 {
+				return nil, status.Error(codes.InvalidArgument,
+					"quotaLimit enabled but no positive storage size requested in PVC")
+			}
+			klog.Infof("Quota limit enabled with %d bytes", quotaBytes)
 		}
 	}
 
@@ -236,13 +242,6 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 
 		if quotaLimitEnabled {
 			quotaBytes := req.GetCapacityRange().GetRequiredBytes()
-			if quotaBytes <= 0 {
-				if params["userProvidedBucket"] == "false" {
-					_ = sess.DeleteBucket(bucketName) // #nosec G104 -- intentional: best-effort cleanup in error path, don't mask original error
-				}
-				return nil, status.Error(codes.InvalidArgument, "quotaLimit enabled but no positive storage size requested in PVC")
-			}
-
 			resConfApikey := secretMap[constants.ResConfApiKey]
 
 			klog.Infof("Applying hard quota of %d bytes to bucket %s", quotaBytes, bucketName)
@@ -290,11 +289,6 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 
 		if quotaLimitEnabled {
 			quotaBytes := req.GetCapacityRange().GetRequiredBytes()
-			if quotaBytes <= 0 {
-				_ = sess.DeleteBucket(tempBucketName) // #nosec G104 -- intentional: best-effort cleanup in error path, don't mask original error
-				return nil, status.Error(codes.InvalidArgument, "quotaLimit enabled but no positive storage size requested")
-			}
-
 			resConfApikey := secretMap[constants.ResConfApiKey]
 
 			klog.Infof("Applying hard quota of %d bytes to temp bucket %s", quotaBytes, tempBucketName)
