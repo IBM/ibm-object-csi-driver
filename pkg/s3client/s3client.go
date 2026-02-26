@@ -240,13 +240,9 @@ func (s *COSSessionFactory) NewObjectStorageSession(endpoint, locationConstraint
 	}
 }
 
-func (s *COSSession) UpdateQuotaLimit(quota int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error {
-	return UpdateQuotaLimit(quota, apiKey, bucketName, cosEndpoint, iamEndpoint)
-}
-
-func UpdateQuotaLimit(quota int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error {
+func (s *COSSession) UpdateQuotaLimit(quota int64, apiKey, bucketName, osEndpoint, iamEndpoint string) error {
 	var configEndpoint string
-	if strings.Contains(strings.ToLower(cosEndpoint), "private") {
+	if strings.Contains(strings.ToLower(osEndpoint), "private") {
 		configEndpoint = constants.ResourceConfigEPPrivate
 	} else {
 		configEndpoint = constants.ResourceConfigEPDirect
