@@ -682,7 +682,7 @@ func TestCreateVolume(t *testing.T) {
 				},
 			}),
 			expectedResp: nil,
-			expectedErr:  status.Error(codes.InvalidArgument, "quotaLimit enabled but no positive storage size requested in PVC"),
+			expectedErr:  status.Error(codes.InvalidArgument, "enable quotaLimit requested but no positive storage size requested in PVC"),
 		},
 
 		{
@@ -807,25 +807,25 @@ func TestCreateVolume(t *testing.T) {
 				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
 			},
 			cosSession:       &s3client.FakeCOSSessionFactory{},
-			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
-			expectedResp:     nil,
-			expectedErr:      status.Error(codes.InvalidArgument, "quotaLimit enabled but no positive storage size requested in PVC"),
-		},
-		{
-			testCaseName: "Negative: quotaLimit=true with negative capacity (direct secrets)",
-			req: &csi.CreateVolumeRequest{
-				Name: testVolumeName,
-				VolumeCapabilities: []*csi.VolumeCapability{
-					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
-				},
-				CapacityRange: &csi.CapacityRange{RequiredBytes: -100},
-				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
+				driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+				expectedResp:     nil,
+				expectedErr:      status.Error(codes.InvalidArgument, "enable quotaLimit requested but no positive storage size requested in PVC"),
 			},
-			cosSession:       &s3client.FakeCOSSessionFactory{},
-			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
-			expectedResp:     nil,
-			expectedErr:      status.Error(codes.InvalidArgument, "quotaLimit enabled but no positive storage size requested in PVC"),
-		},
+			{
+				testCaseName: "Negative: quotaLimit=true with negative capacity (direct secrets)",
+				req: &csi.CreateVolumeRequest{
+					Name: testVolumeName,
+					VolumeCapabilities: []*csi.VolumeCapability{
+						{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
+					},
+					CapacityRange: &csi.CapacityRange{RequiredBytes: -100},
+					Secrets:       secretWithQuota("true", "fake-res-conf-key"),
+				},
+				cosSession:       &s3client.FakeCOSSessionFactory{},
+				driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+				expectedResp:     nil,
+				expectedErr:      status.Error(codes.InvalidArgument, "enable quotaLimit requested but no positive storage size requested in PVC"),
+			},
 	}
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))

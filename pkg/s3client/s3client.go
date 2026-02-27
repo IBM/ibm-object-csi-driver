@@ -265,11 +265,10 @@ func UpdateQuotaLimit(quotaBytes int64, apiKey, bucketName, cosEndpoint, iamEndp
 		return fmt.Errorf("failed to create resource configuration service: %w", err)
 	}
 
-	quota := 0
 	options := &rc.UpdateBucketConfigOptions{
 		Bucket: core.StringPtr(bucketName),
 		BucketPatch: map[string]interface{}{
-			"quota": quota,
+			"quota": quotaBytes,
 		},
 	}
 

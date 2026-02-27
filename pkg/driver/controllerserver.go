@@ -160,9 +160,9 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			quotaBytes := req.GetCapacityRange().GetRequiredBytes()
 			if quotaBytes <= 0 {
 				return nil, status.Error(codes.InvalidArgument,
-					"quotaLimit enabled but no positive storage size requested in PVC")
+					"enable quotaLimit requested but no positive storage size requested in PVC")
 			}
-			klog.Infof("Quota limit enabled with %d bytes", quotaBytes)
+			klog.Infof("enable quota limit requested with %d bytes", quotaBytes)
 		}
 	}
 
