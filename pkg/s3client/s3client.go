@@ -241,10 +241,6 @@ func (s *COSSessionFactory) NewObjectStorageSession(endpoint, locationConstraint
 }
 
 func (s *COSSession) UpdateQuotaLimit(quota int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error {
-	return UpdateQuotaLimit(quota, apiKey, bucketName, cosEndpoint, iamEndpoint)
-}
-
-func UpdateQuotaLimit(quotaBytes int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error {
 	var configEndpoint string
 	if strings.Contains(strings.ToLower(cosEndpoint), "private") {
 		configEndpoint = constants.ResourceConfigEPPrivate
@@ -252,9 +248,11 @@ func UpdateQuotaLimit(quotaBytes int64, apiKey, bucketName, cosEndpoint, iamEndp
 		configEndpoint = constants.ResourceConfigEPDirect
 	}
 
+	iamTokenURL := iamEndpoint + "/identity/token"
+
 	authenticator := &core.IamAuthenticator{
 		ApiKey: apiKey,
-		URL:    iamEndpoint,
+		URL:    iamTokenURL,
 	}
 
 	service, err := rc.NewResourceConfigurationV1(&rc.ResourceConfigurationV1Options{
@@ -265,16 +263,17 @@ func UpdateQuotaLimit(quotaBytes int64, apiKey, bucketName, cosEndpoint, iamEndp
 		return fmt.Errorf("failed to create resource configuration service: %w", err)
 	}
 
+	bucketPatch := make(map[string]interface{})
+	bucketPatch["hard_quota"] = core.Int64Ptr(quota)
+
 	options := &rc.UpdateBucketConfigOptions{
-		Bucket: core.StringPtr(bucketName),
-		BucketPatch: map[string]interface{}{
-			"quota": quotaBytes,
-		},
+		Bucket:      core.StringPtr(bucketName),
+		BucketPatch: bucketPatch,
 	}
 
 	_, err = service.UpdateBucketConfig(options)
 	if err != nil {
-		return fmt.Errorf("failed to update quota for bucket %s to %d bytes: %w", bucketName, quotaBytes, err)
+		return fmt.Errorf("failed to update quota for bucket %s to %d bytes: %w", bucketName, quota, err)
 	}
 
 	return nil

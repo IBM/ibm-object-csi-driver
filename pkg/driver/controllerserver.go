@@ -245,7 +245,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			resConfApikey := secretMap[constants.ResConfApiKey]
 
 			klog.Infof("Applying hard quota of %d bytes to bucket %s", quotaBytes, bucketName)
-			err = s3client.UpdateQuotaLimit(quotaBytes, resConfApikey, bucketName, endPoint, creds.IAMEndpoint)
+			err = sess.UpdateQuotaLimit(quotaBytes, resConfApikey, bucketName, endPoint, creds.IAMEndpoint)
 			if err != nil {
 				klog.Errorf("Failed to set quota limit on bucket %s: %v", bucketName, err)
 				if params["userProvidedBucket"] == "false" {
@@ -292,7 +292,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			resConfApikey := secretMap[constants.ResConfApiKey]
 
 			klog.Infof("Applying hard quota of %d bytes to temp bucket %s", quotaBytes, tempBucketName)
-			err = s3client.UpdateQuotaLimit(quotaBytes, resConfApikey, tempBucketName, endPoint, creds.IAMEndpoint)
+			err = sess.UpdateQuotaLimit(quotaBytes, resConfApikey, tempBucketName, endPoint, creds.IAMEndpoint)
 			if err != nil {
 				klog.Errorf("Failed to set quota limit on temp bucket %s: %v", tempBucketName, err)
 				_ = sess.DeleteBucket(tempBucketName)

@@ -12,6 +12,7 @@ type FakeCOSSessionFactory struct {
 	FailCreateBucket      bool
 	FailDeleteBucket      bool
 	FailBucketVersioning  bool
+	FailUpdateQuotaLimit  bool
 }
 
 type fakeCOSSession struct {
@@ -58,5 +59,8 @@ func (s *fakeCOSSession) DeleteBucket(bucket string) error {
 }
 
 func (s *fakeCOSSession) UpdateQuotaLimit(quota int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error {
+	if s.factory.FailUpdateQuotaLimit {
+		return errors.New("failed to update quota limit")
+	}
 	return nil
 }
