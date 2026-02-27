@@ -230,6 +230,13 @@ func Test_COSSession_UpdateQuotaLimit(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to update quota for bucket")
 }
 
+func Test_UpdateQuotaLimit_PrivateEndpoint(t *testing.T) {
+	privateEndpoint := "https://s3.private.us-south.cloud-object-storage.appdomain.cloud"
+	err := UpdateQuotaLimit(2147483648, testAPIKey, testBucket, privateEndpoint, testIAMEndpoint)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to update quota for bucket")
+}
+
 func Test_UpdateQuotaLimit_ZeroQuota(t *testing.T) {
 	err := UpdateQuotaLimit(0, testAPIKey, testBucket, testEndpoint, testIAMEndpoint)
 	assert.Error(t, err)
