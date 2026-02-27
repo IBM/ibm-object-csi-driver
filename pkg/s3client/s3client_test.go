@@ -220,18 +220,18 @@ func Test_DeleteBucket_Positive(t *testing.T) {
 func Test_UpdateQuotaLimit_Positive(t *testing.T) {
 	err := UpdateQuotaLimit(1073741824, testAPIKey, testBucket, testEndpoint, testIAMEndpoint)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to")
+	assert.Contains(t, err.Error(), "failed to update quota for bucket")
 }
 
 func Test_COSSession_UpdateQuotaLimit(t *testing.T) {
 	sess := getSession(&fakeS3API{})
 	err := sess.UpdateQuotaLimit(1073741824, testAPIKey, testBucket, testEndpoint, testIAMEndpoint)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to")
+	assert.Contains(t, err.Error(), "failed to update quota for bucket")
 }
 
 func Test_UpdateQuotaLimit_ZeroQuota(t *testing.T) {
 	err := UpdateQuotaLimit(0, testAPIKey, testBucket, testEndpoint, testIAMEndpoint)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to")
+	assert.Contains(t, err.Error(), "failed to update quota for bucket")
 }
