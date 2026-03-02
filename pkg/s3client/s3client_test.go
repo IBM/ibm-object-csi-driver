@@ -216,3 +216,52 @@ func Test_DeleteBucket_Positive(t *testing.T) {
 	err := sess.DeleteBucket(testBucket)
 	assert.NoError(t, err)
 }
+
+func Test_UpdateQuotaLimit_Positive(t *testing.T) {
+	sess := &fakeCOSSession{factory: &FakeCOSSessionFactory{}}
+	err := sess.UpdateQuotaLimit(1073741824, testAPIKey, testBucket, testEndpoint, testIAMEndpoint)
+	assert.NoError(t, err)
+}
+
+func Test_UpdateQuotaLimit_WithPrivateEndpoint_Positive(t *testing.T) {
+	sess := &fakeCOSSession{factory: &FakeCOSSessionFactory{}}
+	privateEndpoint := "https://s3.private.us-south.cloud-object-storage.appdomain.cloud"
+	err := sess.UpdateQuotaLimit(2147483648, testAPIKey, testBucket, privateEndpoint, testIAMEndpoint)
+	assert.NoError(t, err)
+}
+
+func Test_UpdateQuotaLimit_Negative(t *testing.T) {
+	sess := &fakeCOSSession{factory: &FakeCOSSessionFactory{FailUpdateQuotaLimit: true}}
+	err := sess.UpdateQuotaLimit(1073741824, testAPIKey, testBucket, testEndpoint, testIAMEndpoint)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to update quota limit")
+}
+
+func Test_UpdateQuotaLimit_DirectEndpoint_Negative(t *testing.T) {
+	sess := getSession(&fakeS3API{})
+	err := sess.UpdateQuotaLimit(1073741824, testAPIKey, testBucket, testEndpoint, testIAMEndpoint)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to update quota for bucket")
+}
+
+func Test_UpdateQuotaLimit_PrivateEndpoint_Negative(t *testing.T) {
+	sess := getSession(&fakeS3API{})
+	privateEndpoint := "https://s3.private.us-south.cloud-object-storage.appdomain.cloud"
+	err := sess.UpdateQuotaLimit(2147483648, testAPIKey, testBucket, privateEndpoint, testIAMEndpoint)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to update quota for bucket")
+}
+
+func Test_UpdateQuotaLimit_ZeroQuota_Negative(t *testing.T) {
+	sess := getSession(&fakeS3API{})
+	err := sess.UpdateQuotaLimit(0, testAPIKey, testBucket, testEndpoint, testIAMEndpoint)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to update quota for bucket")
+}
+
+func Test_UpdateQuotaLimit_EmptyAPIKey_Negative(t *testing.T) {
+	sess := getSession(&fakeS3API{})
+	err := sess.UpdateQuotaLimit(1073741824, "", testBucket, testEndpoint, testIAMEndpoint)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create resource configuration service")
+}

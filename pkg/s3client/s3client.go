@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/IBM/go-sdk-core/v5/core"
+	rc "github.com/IBM/ibm-cos-sdk-go-config/v2/resourceconfigurationv1"
 	"github.com/IBM/ibm-cos-sdk-go/aws"
 	"github.com/IBM/ibm-cos-sdk-go/aws/awserr"
 	"github.com/IBM/ibm-cos-sdk-go/aws/credentials"
@@ -63,6 +65,8 @@ type ObjectStorageSession interface {
 	DeleteBucket(bucket string) error
 
 	SetBucketVersioning(bucket string, enable bool) error
+
+	UpdateQuotaLimit(quota int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error
 }
 
 // COSSessionFactory represents a COS (S3) session factory
@@ -234,4 +238,43 @@ func (s *COSSessionFactory) NewObjectStorageSession(endpoint, locationConstraint
 		svc:    s3.New(sess),
 		logger: lgr,
 	}
+}
+
+func (s *COSSession) UpdateQuotaLimit(quota int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error {
+	var configEndpoint string
+	if strings.Contains(strings.ToLower(cosEndpoint), "private") {
+		configEndpoint = constants.ResourceConfigEPPrivate
+	} else {
+		configEndpoint = constants.ResourceConfigEPDirect
+	}
+
+	iamTokenURL := iamEndpoint + "/identity/token"
+
+	authenticator := &core.IamAuthenticator{
+		ApiKey: apiKey,
+		URL:    iamTokenURL,
+	}
+
+	service, err := rc.NewResourceConfigurationV1(&rc.ResourceConfigurationV1Options{
+		Authenticator: authenticator,
+		URL:           configEndpoint,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create resource configuration service: %w", err)
+	}
+
+	bucketPatch := make(map[string]interface{})
+	bucketPatch["hard_quota"] = core.Int64Ptr(quota)
+
+	options := &rc.UpdateBucketConfigOptions{
+		Bucket:      core.StringPtr(bucketName),
+		BucketPatch: bucketPatch,
+	}
+
+	_, err = service.UpdateBucketConfig(options)
+	if err != nil {
+		return fmt.Errorf("failed to update quota for bucket %s to %d bytes: %w", bucketName, quota, err)
+	}
+
+	return nil
 }
