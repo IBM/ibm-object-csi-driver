@@ -659,6 +659,122 @@ func TestCreateVolume(t *testing.T) {
 			expectedResp:     nil,
 			expectedErr:      status.Error(codes.InvalidArgument, "enable quotaLimit requested but no positive storage size requested in PVC"),
 		},
+		{
+			testCaseName: "Positive: quotaLimit=true with positive capacity (direct secrets)",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
+				},
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
+				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
+			},
+			cosSession:       &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			expectedResp: &csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					VolumeId:      testVolumeName,
+					CapacityBytes: 1073741824,
+					VolumeContext: map[string]string{
+						"bucketName":         bucketName,
+						"userProvidedBucket": "true",
+						"locationConstraint": "test-region",
+						"cosEndpoint":        "test-endpoint",
+					},
+				},
+			},
+			expectedErr: nil,
+		},
+		{
+			testCaseName: "Negative: quotaLimit=true UpdateQuotaLimit fails (direct secrets)",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
+				},
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
+				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
+			},
+			cosSession:       &s3client.FakeCOSSessionFactory{FailUpdateQuotaLimit: true},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			expectedResp:     nil,
+			expectedErr:      errors.New("failed to set bucket quota limit"),
+		},
+		{
+			testCaseName: "Negative: quotaLimit=true UpdateQuotaLimit fails on temp bucket",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
+				},
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
+				Secrets: map[string]string{
+					"accessKey":             "testAccessKey",
+					"secretKey":             "testSecretKey",
+					"locationConstraint":    "test-region",
+					"cosEndpoint":           "test-endpoint",
+					"mounter":               "s3fs",
+					constants.QuotaLimitKey: "true",
+					constants.ResConfApiKey: "fake-res-conf-key",
+				},
+			},
+			cosSession:       &s3client.FakeCOSSessionFactory{FailUpdateQuotaLimit: true},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			expectedResp:     nil,
+			expectedErr:      errors.New("failed to set bucket quota limit"),
+		},
+		{
+			testCaseName: "Positive: quotaLimit=true with positive capacity on temp bucket",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
+				},
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
+				Secrets: map[string]string{
+					"accessKey":             "testAccessKey",
+					"secretKey":             "testSecretKey",
+					"locationConstraint":    "test-region",
+					"cosEndpoint":           "test-endpoint",
+					"mounter":               "s3fs",
+					constants.QuotaLimitKey: "true",
+					constants.ResConfApiKey: "fake-res-conf-key",
+				},
+			},
+			cosSession:       &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			expectedResp: &csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					VolumeId:      testVolumeName,
+					CapacityBytes: 1073741824,
+					VolumeContext: map[string]string{
+						"userProvidedBucket": "false",
+						"locationConstraint": "test-region",
+						"cosEndpoint":        "test-endpoint",
+						"mounter":            "s3fs",
+					},
+				},
+			},
+			expectedErr: nil,
+		},
+		{
+			testCaseName: "Negative: quotaLimit=true UpdateQuotaLimit fails on new user-provided bucket (deleted on failure)",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
+				},
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
+				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
+			},
+			cosSession: &s3client.FakeCOSSessionFactory{
+				FailCheckBucketAccess: true,
+				FailUpdateQuotaLimit:  true,
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			expectedResp:     nil,
+			expectedErr:      errors.New("failed to set bucket quota limit"),
+		},
 	}
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
