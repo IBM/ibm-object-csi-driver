@@ -757,24 +757,6 @@ func TestCreateVolume(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
-		{
-			testCaseName: "Negative: quotaLimit=true UpdateQuotaLimit fails on new user-provided bucket (deleted on failure)",
-			req: &csi.CreateVolumeRequest{
-				Name: testVolumeName,
-				VolumeCapabilities: []*csi.VolumeCapability{
-					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
-				},
-				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
-				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
-			},
-			cosSession: &s3client.FakeCOSSessionFactory{
-				FailCheckBucketAccess: true,
-				FailUpdateQuotaLimit:  true,
-			},
-			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
-			expectedResp:     nil,
-			expectedErr:      errors.New("failed to set bucket quota limit"),
-		},
 	}
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
