@@ -172,7 +172,7 @@ func (s3 *MountpointS3Mounter) Mount(source string, target string) error {
 		}
 
 		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`,
-			target, bucketName, constants.MountpointS3, jsonData)
+			target, bucketName, constants.AMAZONS3MOUNTER, jsonData)
 
 		err = mounterRequest(payload, "http://unix/api/cos/mount")
 		if err != nil {
