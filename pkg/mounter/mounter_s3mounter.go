@@ -250,7 +250,7 @@ func createS3MountConfig(configPathWithVolID string, s3 *MountpointS3Mounter) er
 	// [default]
 	// region = <region>
 	// endpoint_url = <endpoint>   (for IBM COS compatibility)
-	region := convertLocationConstraintToRegion(s3.LocConstraint)
+	region := s3.LocConstraint
 	configParams := []string{
 		"[" + s3MountAwsProfile + "]",
 		"region = " + region,
@@ -314,15 +314,6 @@ func (s3 *MountpointS3Mounter) formulateMountOptions(bucket, target, configPathW
 		nodeServerOp = append(nodeServerOp, "--endpoint-url="+s3.EndPoint)
 		workerNodeOp.EndpointURL = s3.EndPoint
 	}
-
-	// Region from location constraint
-	// Not rquired because already passed in config file, There is no issue in passing it with CLI but may create an issue if the regions are differnet..
-	// if s3.LocConstraint != "" {
-	// 	region := convertLocationConstraintToRegion(s3.LocConstraint)
-	// 	nodeServerOp = append(nodeServerOp, "--region="+region)
-	// 	workerNodeOp.Region = region
-	// }
-
 	// UID
 	if s3.UID != "" {
 		nodeServerOp = append(nodeServerOp, "--uid="+s3.UID)
@@ -388,36 +379,4 @@ func removeS3MountConfigFile(configPath, target string) {
 		return
 	}
 	klog.Errorf("removeS3MountConfigFile: Failed to remove config dir after %d attempts", maxRetries)
-}
-
-// convertLocationConstraintToRegion converts IBM COS location constraints
-// to AWS-style region strings that mountpoint-s3 understands
-// e.g. "us-east-standard" -> "us-east-1"
-func convertLocationConstraintToRegion(locationConstraint string) string {
-	tiers := []string{"-standard", "-smart", "-cold", "-flex", "-vault"}
-	region := locationConstraint
-	for _, tier := range tiers {
-		region = strings.TrimSuffix(region, tier)
-	}
-
-	regionMap := map[string]string{
-		"us-east":  "us-east-1",
-		"us-south": "us-south",
-		"eu-de":    "eu-de",
-		"eu-gb":    "eu-gb",
-		"ap-north": "ap-north",
-		"ap-south": "ap-south",
-		"jp-tok":   "jp-tok",
-		"au-syd":   "au-syd",
-		"ca-tor":   "ca-tor",
-		"br-sao":   "br-sao",
-		"global":   "global",
-	}
-
-	if mapped, ok := regionMap[region]; ok {
-		return mapped
-	}
-
-	klog.Warningf("No region mapping found for location constraint: %s, using as-is: %s", locationConstraint, region)
-	return region
 }
