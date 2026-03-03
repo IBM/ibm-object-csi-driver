@@ -86,7 +86,7 @@ func (req *MountRequest) ParseMounterArgs() ([]string, error) {
 		}
 		return args.PopulateArgsSlice(req.Bucket, req.Path)
 	
-	case constants.S3MOUNTER:
+	case constants.AMAZONS3MOUNTER:
 		var args s3MounterArgs
 		if err := strictDecodeForUnknownFields(req.Args, &args); err != nil {
 			return nil, fmt.Errorf("invalid rclone args decode error: %w", err)
