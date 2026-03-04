@@ -84,7 +84,6 @@ var _ ObjectStorageSessionFactory = &COSSessionFactory{}
 type COSSession struct {
 	logger          *zap.Logger
 	svc             s3API
-	rcService       rcAPI
 	rcClientFactory rcClientFactory
 }
 
@@ -258,33 +257,26 @@ func (s *COSSessionFactory) NewObjectStorageSession(endpoint, locationConstraint
 }
 
 func (s *COSSession) UpdateQuotaLimit(quota int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error {
-	var service rcAPI
-	var err error
-
-	if s.rcService != nil {
-		service = s.rcService
+	var configEndpoint string
+	if strings.Contains(strings.ToLower(cosEndpoint), "private") {
+		configEndpoint = constants.ResourceConfigEPPrivate
 	} else {
-		var configEndpoint string
-		if strings.Contains(strings.ToLower(cosEndpoint), "private") {
-			configEndpoint = constants.ResourceConfigEPPrivate
-		} else {
-			configEndpoint = constants.ResourceConfigEPDirect
-		}
+		configEndpoint = constants.ResourceConfigEPDirect
+	}
 
-		iamTokenURL := iamEndpoint + "/identity/token"
+	iamTokenURL := iamEndpoint + "/identity/token"
 
-		authenticator := &core.IamAuthenticator{
-			ApiKey: apiKey,
-			URL:    iamTokenURL,
-		}
+	authenticator := &core.IamAuthenticator{
+		ApiKey: apiKey,
+		URL:    iamTokenURL,
+	}
 
-		service, err = s.rcClientFactory.NewResourceConfigurationV1(&rc.ResourceConfigurationV1Options{
-			Authenticator: authenticator,
-			URL:           configEndpoint,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to create resource configuration service: %w", err)
-		}
+	service, err := s.rcClientFactory.NewResourceConfigurationV1(&rc.ResourceConfigurationV1Options{
+		Authenticator: authenticator,
+		URL:           configEndpoint,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create resource configuration service: %w", err)
 	}
 
 	bucketPatch := make(map[string]interface{})
