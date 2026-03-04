@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/IBM/go-sdk-core/v5/core"
+	rc "github.com/IBM/ibm-cos-sdk-go-config/v2/resourceconfigurationv1"
 	"github.com/IBM/ibm-cos-sdk-go/aws/awserr"
 	"github.com/IBM/ibm-cos-sdk-go/service/s3"
 	"github.com/stretchr/testify/assert"
@@ -20,6 +22,26 @@ type fakeS3API struct {
 	ErrDeleteBucket        error
 	ObjectPath             string
 	ErrPutBucketVersioning error
+}
+
+type fakeRCAPI struct {
+	ErrUpdateBucketConfig error
+}
+
+func (f *fakeRCAPI) UpdateBucketConfig(options *rc.UpdateBucketConfigOptions) (*core.DetailedResponse, error) {
+	return &core.DetailedResponse{}, f.ErrUpdateBucketConfig
+}
+
+type fakeRCClientFactory struct {
+	ErrNewClient error
+	ReturnClient rcAPI
+}
+
+func (f *fakeRCClientFactory) NewResourceConfigurationV1(options *rc.ResourceConfigurationV1Options) (rcAPI, error) {
+	if f.ErrNewClient != nil {
+		return nil, f.ErrNewClient
+	}
+	return f.ReturnClient, nil
 }
 
 const (
@@ -78,6 +100,14 @@ func getSession(svc s3API) ObjectStorageSession {
 	return &COSSession{
 		logger: zap.NewNop(),
 		svc:    svc,
+	}
+}
+
+func getSessionWithRCFactory(svc s3API, factory rcClientFactory) ObjectStorageSession {
+	return &COSSession{
+		logger:          zap.NewNop(),
+		svc:             svc,
+		rcClientFactory: factory,
 	}
 }
 
@@ -214,5 +244,45 @@ func Test_DeleteBucket_Error(t *testing.T) {
 func Test_DeleteBucket_Positive(t *testing.T) {
 	sess := getSession(&fakeS3API{})
 	err := sess.DeleteBucket(testBucket)
+	assert.NoError(t, err)
+}
+
+func Test_UpdateQuotaLimit_Positive(t *testing.T) {
+	factory := &fakeRCClientFactory{
+		ReturnClient: &fakeRCAPI{},
+	}
+	sess := getSessionWithRCFactory(&fakeS3API{}, factory)
+	err := sess.UpdateQuotaLimit(1073741824, testAPIKey, testBucket, testEndpoint, testIAMEndpoint)
+	assert.NoError(t, err)
+}
+
+func Test_UpdateQuotaLimit_ClientCreationError(t *testing.T) {
+	factory := &fakeRCClientFactory{
+		ErrNewClient: errFoo,
+	}
+	sess := getSessionWithRCFactory(&fakeS3API{}, factory)
+	err := sess.UpdateQuotaLimit(1073741824, testAPIKey, testBucket, testEndpoint, testIAMEndpoint)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "failed to create resource configuration service")
+	}
+}
+
+func Test_UpdateQuotaLimit_UpdateError(t *testing.T) {
+	factory := &fakeRCClientFactory{
+		ReturnClient: &fakeRCAPI{ErrUpdateBucketConfig: errFoo},
+	}
+	sess := getSessionWithRCFactory(&fakeS3API{}, factory)
+	err := sess.UpdateQuotaLimit(1073741824, testAPIKey, testBucket, testEndpoint, testIAMEndpoint)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "failed to update quota for bucket")
+	}
+}
+
+func Test_UpdateQuotaLimit_PrivateEndpoint(t *testing.T) {
+	factory := &fakeRCClientFactory{
+		ReturnClient: &fakeRCAPI{},
+	}
+	sess := getSessionWithRCFactory(&fakeS3API{}, factory)
+	err := sess.UpdateQuotaLimit(1073741824, testAPIKey, testBucket, "https://s3.private.us-south.cloud-object-storage.appdomain.cloud", testIAMEndpoint)
 	assert.NoError(t, err)
 }
