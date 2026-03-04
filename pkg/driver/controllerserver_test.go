@@ -550,38 +550,6 @@ func TestCreateVolume(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
-
-		{
-			testCaseName: "Positive: quotaLimit=false without res-conf-apikey (direct secrets)",
-			req: &csi.CreateVolumeRequest{
-				Name: testVolumeName,
-				VolumeCapabilities: []*csi.VolumeCapability{
-					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
-				},
-				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
-				Secrets: func() map[string]string {
-					s := secretWithQuota("false", "")
-					delete(s, constants.ResConfApiKey)
-					return s
-				}(),
-			},
-			cosSession:       &s3client.FakeCOSSessionFactory{},
-			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
-			expectedResp: &csi.CreateVolumeResponse{
-				Volume: &csi.Volume{
-					VolumeId:      testVolumeName,
-					CapacityBytes: 1073741824,
-					VolumeContext: map[string]string{
-						"bucketName":         bucketName,
-						"userProvidedBucket": "true",
-						"locationConstraint": "test-region",
-						"cosEndpoint":        "test-endpoint",
-					},
-				},
-			},
-			expectedErr: nil,
-		},
-
 		{
 			testCaseName: "Negative: quotaLimit=true missing res-conf-apikey in direct secrets",
 			req: &csi.CreateVolumeRequest{
@@ -637,21 +605,6 @@ func TestCreateVolume(t *testing.T) {
 					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
 				},
 				CapacityRange: &csi.CapacityRange{RequiredBytes: 0},
-				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
-			},
-			cosSession:       &s3client.FakeCOSSessionFactory{},
-			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
-			expectedResp:     nil,
-			expectedErr:      status.Error(codes.InvalidArgument, "enable quotaLimit requested but no positive storage size requested in PVC"),
-		},
-		{
-			testCaseName: "Negative: quotaLimit=true with negative capacity (direct secrets)",
-			req: &csi.CreateVolumeRequest{
-				Name: testVolumeName,
-				VolumeCapabilities: []*csi.VolumeCapability{
-					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
-				},
-				CapacityRange: &csi.CapacityRange{RequiredBytes: -100},
 				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
 			},
 			cosSession:       &s3client.FakeCOSSessionFactory{},

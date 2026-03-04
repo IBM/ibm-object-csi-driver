@@ -82,8 +82,10 @@ var _ ObjectStorageSessionFactory = &COSSessionFactory{}
 
 // COSSession represents a COS (S3) session
 type COSSession struct {
-	logger *zap.Logger
-	svc    s3API
+	logger          *zap.Logger
+	svc             s3API
+	rcService       rcAPI
+	rcClientFactory rcClientFactory
 }
 
 func NewObjectStorageSessionFactory() *COSSessionFactory {
@@ -98,6 +100,20 @@ type s3API interface {
 	DeleteObject(input *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error)
 	DeleteBucket(input *s3.DeleteBucketInput) (*s3.DeleteBucketOutput, error)
 	PutBucketVersioning(input *s3.PutBucketVersioningInput) (*s3.PutBucketVersioningOutput, error)
+}
+
+type rcAPI interface {
+	UpdateBucketConfig(options *rc.UpdateBucketConfigOptions) (*core.DetailedResponse, error)
+}
+
+type rcClientFactory interface {
+	NewResourceConfigurationV1(options *rc.ResourceConfigurationV1Options) (rcAPI, error)
+}
+
+type defaultRCClientFactory struct{}
+
+func (f *defaultRCClientFactory) NewResourceConfigurationV1(options *rc.ResourceConfigurationV1Options) (rcAPI, error) {
+	return rc.NewResourceConfigurationV1(options)
 }
 
 func (s *COSSession) CheckBucketAccess(bucket string) error {
@@ -235,32 +251,40 @@ func (s *COSSessionFactory) NewObjectStorageSession(endpoint, locationConstraint
 	}))
 
 	return &COSSession{
-		svc:    s3.New(sess),
-		logger: lgr,
+		svc:             s3.New(sess),
+		logger:          lgr,
+		rcClientFactory: &defaultRCClientFactory{},
 	}
 }
 
 func (s *COSSession) UpdateQuotaLimit(quota int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error {
-	var configEndpoint string
-	if strings.Contains(strings.ToLower(cosEndpoint), "private") {
-		configEndpoint = constants.ResourceConfigEPPrivate
+	var service rcAPI
+	var err error
+
+	if s.rcService != nil {
+		service = s.rcService
 	} else {
-		configEndpoint = constants.ResourceConfigEPDirect
-	}
+		var configEndpoint string
+		if strings.Contains(strings.ToLower(cosEndpoint), "private") {
+			configEndpoint = constants.ResourceConfigEPPrivate
+		} else {
+			configEndpoint = constants.ResourceConfigEPDirect
+		}
 
-	iamTokenURL := iamEndpoint + "/identity/token"
+		iamTokenURL := iamEndpoint + "/identity/token"
 
-	authenticator := &core.IamAuthenticator{
-		ApiKey: apiKey,
-		URL:    iamTokenURL,
-	}
+		authenticator := &core.IamAuthenticator{
+			ApiKey: apiKey,
+			URL:    iamTokenURL,
+		}
 
-	service, err := rc.NewResourceConfigurationV1(&rc.ResourceConfigurationV1Options{
-		Authenticator: authenticator,
-		URL:           configEndpoint,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create resource configuration service: %w", err)
+		service, err = s.rcClientFactory.NewResourceConfigurationV1(&rc.ResourceConfigurationV1Options{
+			Authenticator: authenticator,
+			URL:           configEndpoint,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create resource configuration service: %w", err)
+		}
 	}
 
 	bucketPatch := make(map[string]interface{})
