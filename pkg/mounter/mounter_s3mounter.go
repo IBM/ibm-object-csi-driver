@@ -228,6 +228,7 @@ func createS3MountConfig(configPathWithVolID string, s3 *MountpointS3Mounter) er
 		return err
 	}
 
+	// --- Write credentials file ---
 	// Format matches AWS credentials file:
 	// [default]
 	// aws_access_key_id = <key>
