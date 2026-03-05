@@ -8,12 +8,15 @@ import (
 )
 
 type s3MounterArgs struct {
-	ReadOnly   string `json:"read-only,omitempty"`
-	AllowOther string `json:"allow-other,omitempty"`
-	UID        string `json:"uid,omitempty"`
-	GID        string `json:"gid,omitempty"`
-	UMask      string `json:"umask,omitempty"`
-	LogLevel   string `json:"log-level,omitempty"`
+	ReadOnly     string `json:"read-only,omitempty"`
+	AllowOther   string `json:"allow-other,omitempty"`
+	UID          string `json:"uid,omitempty"`
+	GID          string `json:"gid,omitempty"`
+	UMask        string `json:"umask,omitempty"`
+	LogLevel     string `json:"log-level,omitempty"`
+	AwsConfigDir string `json:"aws-config-dir,omitempty"`
+	EndpointURL  string `json:"endpoint-url,omitempty"`
+	Region       string `json:"region,omitempty"`
 }
 
 func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, error) {
@@ -30,7 +33,7 @@ func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string
 	}
 
 	// Convert to key=value slice
-	result := []string{"mount", bucket, targetPath}
+	result := []string{bucket, targetPath}
 	for k, v := range m {
 		result = append(result, fmt.Sprintf("--%s=%v", k, v)) // --key=value
 	}
@@ -51,6 +54,25 @@ func (args s3MounterArgs) Validate(targetPath string) error {
 		}
 	}
 
+	if args.AwsConfigDir == "" {
+		logger.Error("aws-config-dir is required for mount-s3")
+		return fmt.Errorf("aws-config-dir is required for mount-s3")
+	}
+
+	if args.AllowOther != "" {
+		if isBool := isBoolString(args.AllowOther); !isBool {
+			logger.Error("cannot convert value of allow-other into boolean", zap.Any("allow-other", args.AllowOther))
+			return fmt.Errorf("cannot convert value of allow-other into boolean: %v", args.AllowOther)
+		}
+	}
+
+	if args.ReadOnly != "" {
+		if isBool := isBoolString(args.ReadOnly); !isBool {
+			logger.Error("cannot convert value of read-only into boolean", zap.Any("read-only", args.ReadOnly))
+			return fmt.Errorf("cannot convert value of read-only into boolean: %v", args.ReadOnly)
+		}
+	}
+
 	// // Check if rclone config file exists or not
 	// if exists, err := FileExists(args.ConfigPath); err != nil {
 	// 	logger.Error("error checking rclone config file existence")
@@ -59,7 +81,6 @@ func (args s3MounterArgs) Validate(targetPath string) error {
 	// 	logger.Error("rclone config file not found")
 	// 	return fmt.Errorf("rclone config file not found")
 	// }
-
 
 	// Check if value of read-only parameter is boolean "true" or "false"
 	if args.ReadOnly != "" {
