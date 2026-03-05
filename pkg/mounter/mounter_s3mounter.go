@@ -45,7 +45,6 @@ type s3MounterArgs struct {
 	// Config file path for AWS credentials
 	AwsConfigDir string `json:"aws-config-dir,omitempty"`
 	EndpointURL  string `json:"endpoint-url,omitempty"`
-	Region       string `json:"region,omitempty"`
 }
 
 const (
@@ -229,7 +228,6 @@ func createS3MountConfig(configPathWithVolID string, s3 *MountpointS3Mounter) er
 		return err
 	}
 
-	// --- Write credentials file ---
 	// Format matches AWS credentials file:
 	// [default]
 	// aws_access_key_id = <key>
