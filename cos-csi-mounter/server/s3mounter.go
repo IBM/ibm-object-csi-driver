@@ -59,29 +59,6 @@ func (args s3MounterArgs) Validate(targetPath string) error {
 		return fmt.Errorf("aws-config-dir is required for mount-s3")
 	}
 
-	if args.AllowOther != "" {
-		if isBool := isBoolString(args.AllowOther); !isBool {
-			logger.Error("cannot convert value of allow-other into boolean", zap.Any("allow-other", args.AllowOther))
-			return fmt.Errorf("cannot convert value of allow-other into boolean: %v", args.AllowOther)
-		}
-	}
-
-	if args.ReadOnly != "" {
-		if isBool := isBoolString(args.ReadOnly); !isBool {
-			logger.Error("cannot convert value of read-only into boolean", zap.Any("read-only", args.ReadOnly))
-			return fmt.Errorf("cannot convert value of read-only into boolean: %v", args.ReadOnly)
-		}
-	}
-
-	// // Check if rclone config file exists or not
-	// if exists, err := FileExists(args.ConfigPath); err != nil {
-	// 	logger.Error("error checking rclone config file existence")
-	// 	return fmt.Errorf("error checking rclone config file existence")
-	// } else if !exists {
-	// 	logger.Error("rclone config file not found")
-	// 	return fmt.Errorf("rclone config file not found")
-	// }
-
 	// Check if value of read-only parameter is boolean "true" or "false"
 	if args.ReadOnly != "" {
 		if isBool := isBoolString(args.ReadOnly); !isBool {
