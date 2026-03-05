@@ -85,11 +85,11 @@ func (req *MountRequest) ParseMounterArgs() ([]string, error) {
 			return nil, fmt.Errorf("rclone args validation failed: %w", err)
 		}
 		return args.PopulateArgsSlice(req.Bucket, req.Path)
-	
+
 	case constants.AMAZONS3MOUNTER:
 		var args s3MounterArgs
 		if err := strictDecodeForUnknownFields(req.Args, &args); err != nil {
-			return nil, fmt.Errorf("invalid rclone args decode error: %w", err)
+			return nil, fmt.Errorf("invalid mount-s3 args decode error: %w", err) // ← fix: was saying rclone
 		}
 		if err := args.Validate(req.Path); err != nil {
 			return nil, fmt.Errorf("s3Mounter args validation failed: %w", err)
