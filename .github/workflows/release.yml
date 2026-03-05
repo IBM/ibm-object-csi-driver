@@ -113,7 +113,7 @@ jobs:
 
     env:
       IS_LATEST_RELEASE: 'true'
-      APP_VERSION: 0.12.10
+      APP_VERSION: 0.12.11
 
     steps:
       - name: Checkout Code
