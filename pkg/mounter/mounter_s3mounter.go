@@ -27,8 +27,8 @@ type MountpointS3Mounter struct {
 	SecretKey     string
 	UID           string
 	GID           string
-	UMask         string
-	LogLevel      string
+	UMask         string // kept for API compatibility; mount-s3 has no --umask, use --dir-mode/--file-mode via MountOptions
+	LogLevel      string // valid values: "debug", "debug-crt", "no-log"; mount-s3 has no --log-level flag
 	ReadOnly      bool
 	MountOptions  []string
 	MounterUtils  utils.MounterUtils
@@ -40,11 +40,15 @@ type s3MounterArgs struct {
 	AllowOther string `json:"allow-other,omitempty"`
 	UID        string `json:"uid,omitempty"`
 	GID        string `json:"gid,omitempty"`
-	UMask      string `json:"umask,omitempty"`
-	LogLevel   string `json:"log-level,omitempty"`
-	// Config file path for AWS credentials
-	AwsConfigDir string `json:"aws-config-dir,omitempty"`
-	EndpointURL  string `json:"endpoint-url,omitempty"`
+	// Removed: UMask        — mount-s3 has no --umask flag
+	// Removed: AwsConfigDir — mount-s3 has no --aws-config-dir flag
+	LogLevel    string `json:"log-level,omitempty"` // valid: "debug", "debug-crt", "no-log"
+	EndpointURL string `json:"endpoint-url,omitempty"`
+	// AWS credential file paths — NOT CLI flags.
+	// Worker sets these as AWS_SHARED_CREDENTIALS_FILE / AWS_CONFIG_FILE env vars
+	// on the mount-s3 subprocess before invoking it.
+	AwsCredentialsFile string `json:"aws-credentials-file,omitempty"`
+	AwsConfigFile      string `json:"aws-config-file,omitempty"`
 }
 
 const (
@@ -56,6 +60,13 @@ const (
 var (
 	removeS3ConfigFile = removeS3MountConfigFile
 )
+
+// envMounter is a local interface for type assertion — allows calling
+// FuseMountWithEnv on the concrete MounterOptsUtils without changing the
+// MounterUtils interface, so other mounters (rclone etc.) are unaffected.
+type envMounter interface {
+	FuseMountWithEnv(path string, comm string, args []string, envVars []string) error
+}
 
 // NewMountpointS3Mounter creates a new MountpointS3Mounter from secretMap
 func NewMountpointS3Mounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
@@ -134,23 +145,11 @@ func (s3 *MountpointS3Mounter) Mount(source string, target string) error {
 	// Create unique config dir per volume
 	configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 
-	// configCreated := false
-
-	// // Cleanup on failure
-	// defer func() {
-	//     if err != nil && configCreated {
-	//         klog.Warningf("Mount failed, cleaning up config dir: %s", configPathWithVolID)
-	//         removeS3ConfigFile(configPath, target)
-	//     }
-	// }()
-
-	// Write AWS credentials config file
+	// Write AWS credentials and config files
 	if err := createS3MountConfig(configPathWithVolID, s3); err != nil {
 		klog.Errorf("MountpointS3Mounter Mount: Cannot create config file: %v", err)
 		return err
 	}
-
-	// configCreated = true
 
 	// Build bucket path with optional object path prefix
 	bucketName := s3.BucketName
@@ -159,7 +158,7 @@ func (s3 *MountpointS3Mounter) Mount(source string, target string) error {
 		bucketName = fmt.Sprintf("%s/%s", s3.BucketName, trimmedPath)
 	}
 
-	args, wnOp := s3.formulateMountOptions(bucketName, target, configPathWithVolID)
+	args, envVars, wnOp := s3.formulateMountOptions(bucketName, target, configPathWithVolID)
 
 	if mountWorker {
 		klog.Info("Mount on Worker started...")
@@ -182,6 +181,16 @@ func (s3 *MountpointS3Mounter) Mount(source string, target string) error {
 	}
 
 	klog.Info("NodeServer Mounting...")
+
+	// Use FuseMountWithEnv if available on the concrete type (race-safe, per-subprocess env).
+	// Falls back to FuseMount if running under a mock or different implementation — the
+	// fallback will still work but credentials must be available via system env in that case.
+	if m, ok := s3.MounterUtils.(envMounter); ok {
+		return m.FuseMountWithEnv(target, constants.MountpointS3BinaryPath, args, envVars)
+	}
+
+	klog.Warning("MounterUtils does not implement FuseMountWithEnv, falling back to FuseMount. " +
+		"Ensure AWS_SHARED_CREDENTIALS_FILE and AWS_CONFIG_FILE are set in the process environment.")
 	return s3.MounterUtils.FuseMount(target, constants.MountpointS3BinaryPath, args)
 }
 
@@ -214,13 +223,14 @@ func (s3 *MountpointS3Mounter) Unmount(target string) error {
 	return nil
 }
 
-// createS3MountConfig creates the AWS credentials and config files
-// that mount-s3 reads via --aws-config-dir flag.
+// createS3MountConfig creates the AWS credentials and config files.
+// mount-s3 locates these via AWS_SHARED_CREDENTIALS_FILE and AWS_CONFIG_FILE env vars.
+//
 // Directory structure:
 //
 //	<configPathWithVolID>/
 //	  credentials   <- AWS credentials (access/secret key)
-//	  config        <- AWS config (region, endpoint)
+//	  config        <- AWS config (region, endpoint_url)
 func createS3MountConfig(configPathWithVolID string, s3 *MountpointS3Mounter) error {
 	// Create the config directory
 	if err := MakeDir(configPathWithVolID, 0755); err != nil { // #nosec G301 -- directory is created under a controlled path using SHA256 hash, not user input
@@ -292,20 +302,33 @@ func writeConfigFile(filePath string, lines []string) error {
 	return w.Flush()
 }
 
-// formulateMountOptions builds CLI args for mount-s3 and the worker payload
-func (s3 *MountpointS3Mounter) formulateMountOptions(bucket, target, configPathWithVolID string) (nodeServerOp []string, workerNodeOp s3MounterArgs) {
+// formulateMountOptions builds CLI args, env vars, and the worker payload for mount-s3.
+//
+// Removed flags (do not exist in mount-s3):
+//   - --aws-config-dir  → replaced by AWS_SHARED_CREDENTIALS_FILE / AWS_CONFIG_FILE env vars
+//   - --log-level       → mapped to --debug / --debug-crt / --no-log
+//   - --umask           → use --dir-mode / --file-mode via MountOptions in StorageClass
+func (s3 *MountpointS3Mounter) formulateMountOptions(bucket, target, configPathWithVolID string) (nodeServerOp []string, envVars []string, workerNodeOp s3MounterArgs) {
 	// mount-s3 syntax: mount-s3 <bucket> <mountpoint> [flags]
 	nodeServerOp = []string{
 		bucket,
 		target,
 		"--allow-other",
-		// Point mount-s3 to our config directory for credentials & config
-		"--aws-config-dir=" + configPathWithVolID,
+	}
+
+	// AWS credentials via env vars — mount-s3 and the underlying AWS SDK reads these
+	// to locate the credentials and config files written by createS3MountConfig.
+	credFilePath := path.Join(configPathWithVolID, s3MountCredentialsFile)
+	cfgFilePath := path.Join(configPathWithVolID, s3MountConfigFile)
+	envVars = []string{
+		"AWS_SHARED_CREDENTIALS_FILE=" + credFilePath,
+		"AWS_CONFIG_FILE=" + cfgFilePath,
 	}
 
 	workerNodeOp = s3MounterArgs{
-		AllowOther:   "true",
-		AwsConfigDir: configPathWithVolID,
+		AllowOther:         "true",
+		AwsCredentialsFile: credFilePath,
+		AwsConfigFile:      cfgFilePath,
 	}
 
 	// Endpoint (IBM COS endpoint)
@@ -313,6 +336,7 @@ func (s3 *MountpointS3Mounter) formulateMountOptions(bucket, target, configPathW
 		nodeServerOp = append(nodeServerOp, "--endpoint-url="+s3.EndPoint)
 		workerNodeOp.EndpointURL = s3.EndPoint
 	}
+
 	// UID
 	if s3.UID != "" {
 		nodeServerOp = append(nodeServerOp, "--uid="+s3.UID)
@@ -325,19 +349,32 @@ func (s3 *MountpointS3Mounter) formulateMountOptions(bucket, target, configPathW
 		workerNodeOp.GID = s3.GID
 	}
 
-	// UMask
+	// UMask: mount-s3 has no --umask flag.
+	// Use --dir-mode / --file-mode via MountOptions in the StorageClass instead.
 	if s3.UMask != "" {
-		nodeServerOp = append(nodeServerOp, "--umask="+s3.UMask)
-		workerNodeOp.UMask = s3.UMask
+		klog.Warningf("MountpointS3Mounter: 'umask=%s' is set but mount-s3 does not support --umask. "+
+			"Use --dir-mode / --file-mode via mountOptions in the StorageClass instead.", s3.UMask)
 	}
 
-	// Log level
-	logLevel := s3.LogLevel
-	if logLevel == "" {
-		logLevel = "warn"
+	// Log level: mount-s3 has no --log-level flag.
+	// Valid mappings: "debug" → --debug, "debug-crt" → --debug-crt, "no-log" → --no-log
+	// Anything else (e.g. "warn", "info") is ignored — mount-s3 default logging applies.
+	switch s3.LogLevel {
+	case "debug":
+		nodeServerOp = append(nodeServerOp, "--debug")
+		workerNodeOp.LogLevel = "debug"
+	case "debug-crt":
+		nodeServerOp = append(nodeServerOp, "--debug-crt")
+		workerNodeOp.LogLevel = "debug-crt"
+	case "no-log":
+		nodeServerOp = append(nodeServerOp, "--no-log")
+		workerNodeOp.LogLevel = "no-log"
+	default:
+		if s3.LogLevel != "" {
+			klog.Warningf("MountpointS3Mounter: unsupported log level '%s' for mount-s3. "+
+				"Supported values: 'debug', 'debug-crt', 'no-log'. Ignoring.", s3.LogLevel)
+		}
 	}
-	nodeServerOp = append(nodeServerOp, "--log-level="+logLevel)
-	workerNodeOp.LogLevel = logLevel
 
 	// Read-only
 	if s3.ReadOnly {
@@ -345,13 +382,13 @@ func (s3 *MountpointS3Mounter) formulateMountOptions(bucket, target, configPathW
 		workerNodeOp.ReadOnly = "true"
 	}
 
-	// Extra mount options from StorageClass
+	// Extra mount options from StorageClass (e.g. --dir-mode=0755, --file-mode=0644)
 	nodeServerOp = append(nodeServerOp, s3.MountOptions...)
 
 	klog.Infof("MountpointS3 nodeServerOp: %v", nodeServerOp)
 	klog.Infof("MountpointS3 workerNodeOp: %+v", workerNodeOp)
 
-	return nodeServerOp, workerNodeOp
+	return nodeServerOp, envVars, workerNodeOp
 }
 
 // removeS3MountConfigFile removes the config directory for the volume (same pattern as rclone)
