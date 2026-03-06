@@ -59,7 +59,6 @@ func (su *MounterOptsUtils) fuseMountInternal(path string, comm string, args []s
 
 	// If env vars provided, merge them with the inherited process env.
 	if len(envVars) > 0 {
-		// Build set of keys we are overriding
 		overrides := make(map[string]bool, len(envVars))
 		for _, e := range envVars {
 			key := strings.SplitN(e, "=", 2)[0]
