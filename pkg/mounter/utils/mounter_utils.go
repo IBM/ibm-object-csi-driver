@@ -32,7 +32,18 @@ type MounterUtils interface {
 type MounterOptsUtils struct {
 }
 
+// FuseMount — signature unchanged, delegates to fuseMountInternal with no extra env vars.
 func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) error {
+	return su.fuseMountInternal(path, comm, args, nil)
+}
+
+// FuseMountWithEnv — on the concrete struct only, NOT on the interface.
+// envVars are per-subprocess env vars (e.g. AWS_SHARED_CREDENTIALS_FILE)
+func (su *MounterOptsUtils) FuseMountWithEnv(path string, comm string, args []string, envVars []string) error {
+	return su.fuseMountInternal(path, comm, args, envVars)
+}
+
+func (su *MounterOptsUtils) fuseMountInternal(path string, comm string, args []string, envVars []string) error {
 	klog.Info("-FuseMount-")
 	klog.Infof("FuseMount: params:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%v>", path, comm, args)
 
@@ -45,6 +56,27 @@ func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) e
 	}()
 
 	cmd := commandWithCtx(ctx, comm, args...)
+
+	// If env vars provided, merge them with the inherited process env.
+	if len(envVars) > 0 {
+		// Build set of keys we are overriding
+		overrides := make(map[string]bool, len(envVars))
+		for _, e := range envVars {
+			key := strings.SplitN(e, "=", 2)[0]
+			overrides[key] = true
+		}
+		// Inherit all system env except keys we are overriding
+		baseEnv := os.Environ()
+		filteredEnv := make([]string, 0, len(baseEnv)+len(envVars))
+		for _, e := range baseEnv {
+			key := strings.SplitN(e, "=", 2)[0]
+			if !overrides[key] {
+				filteredEnv = append(filteredEnv, e)
+			}
+		}
+		cmd.Env = append(filteredEnv, envVars...)
+	}
+
 	err := cmd.Start()
 	if err != nil {
 		klog.Errorf("FuseMount: command start failed: mounter=%s, args=%v, error=%v", comm, args, err)
