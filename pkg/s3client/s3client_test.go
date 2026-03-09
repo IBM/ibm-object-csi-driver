@@ -127,9 +127,8 @@ func Test_NewObjectStorageIAMSession_Positive(t *testing.T) {
 func Test_CheckBucketAccess_Error(t *testing.T) {
 	sess := getSession(&fakeS3API{ErrHeadBucket: errFoo})
 	err := sess.CheckBucketAccess(testBucket)
-	if assert.Error(t, err) {
-		assert.EqualError(t, err, errFooMsg)
-	}
+	assert.Error(t, err)
+	assert.EqualError(t, err, errFooMsg)
 }
 
 func Test_CheckBucketAccess_Positive(t *testing.T) {
@@ -262,9 +261,8 @@ func Test_UpdateQuotaLimit_ClientCreationError(t *testing.T) {
 	}
 	sess := getSessionWithRCFactory(&fakeS3API{}, factory)
 	err := sess.UpdateQuotaLimit(1073741824, testAPIKey, testBucket, testEndpoint, testIAMEndpoint)
-	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "failed to create resource configuration service")
-	}
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create resource configuration service")
 }
 
 func Test_UpdateQuotaLimit_UpdateError(t *testing.T) {
@@ -273,12 +271,11 @@ func Test_UpdateQuotaLimit_UpdateError(t *testing.T) {
 	}
 	sess := getSessionWithRCFactory(&fakeS3API{}, factory)
 	err := sess.UpdateQuotaLimit(1073741824, testAPIKey, testBucket, testEndpoint, testIAMEndpoint)
-	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "failed to update quota for bucket")
-	}
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to update quota for bucket")
 }
 
-func Test_UpdateQuotaLimit_PrivateEndpoint(t *testing.T) {
+func Test_UpdateQuotaLimit_PrivateEndpoint_Positive(t *testing.T) {
 	factory := &fakeRCClientFactory{
 		ReturnClient: &fakeRCAPI{},
 	}

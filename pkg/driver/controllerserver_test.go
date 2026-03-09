@@ -68,20 +68,6 @@ var (
 	testEndpoint = flag.String("endpoint", "unix:/tmp/testcsi.sock", "Test CSI endpoint")
 )
 
-func secretWithQuota(quotaValue, resConfApiKeyValue string) map[string]string {
-	s := make(map[string]string)
-	for k, v := range testSecret {
-		s[k] = v
-	}
-	if quotaValue != "" {
-		s[constants.QuotaLimitKey] = quotaValue
-	}
-	if resConfApiKeyValue != "" {
-		s[constants.ResConfApiKey] = resConfApiKeyValue
-	}
-	return s
-}
-
 func TestCreateVolume(t *testing.T) {
 	testCases := []struct {
 		testCaseName     string
@@ -532,7 +518,20 @@ func TestCreateVolume(t *testing.T) {
 					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
 				},
 				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
-				Secrets:       secretWithQuota("false", "fake-res-conf-key"),
+				Secrets: map[string]string{
+					"accessKey":             "testAccessKey",
+					"secretKey":             "testSecretKey",
+					"apiKey":                "testApiKey",
+					"serviceId":             "testServiceId",
+					"kpRootKeyCRN":          "testKpRootKeyCRN",
+					"locationConstraint":    "test-region",
+					"cosEndpoint":           "test-endpoint",
+					"iamEndpoint":           "https://testIamEndpoint",
+					"bucketName":            bucketName,
+					"objectPath":            "test/object/path",
+					constants.QuotaLimitKey: "false",
+					constants.ResConfApiKey: "fake-res-conf-key",
+				},
 			},
 			cosSession:       &s3client.FakeCOSSessionFactory{},
 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
@@ -605,7 +604,20 @@ func TestCreateVolume(t *testing.T) {
 					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
 				},
 				CapacityRange: &csi.CapacityRange{RequiredBytes: 0},
-				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
+				Secrets: map[string]string{
+					"accessKey":             "testAccessKey",
+					"secretKey":             "testSecretKey",
+					"apiKey":                "testApiKey",
+					"serviceId":             "testServiceId",
+					"kpRootKeyCRN":          "testKpRootKeyCRN",
+					"locationConstraint":    "test-region",
+					"cosEndpoint":           "test-endpoint",
+					"iamEndpoint":           "https://testIamEndpoint",
+					"bucketName":            bucketName,
+					"objectPath":            "test/object/path",
+					constants.QuotaLimitKey: "true",
+					constants.ResConfApiKey: "fake-res-conf-key",
+				},
 			},
 			cosSession:       &s3client.FakeCOSSessionFactory{},
 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
@@ -620,7 +632,20 @@ func TestCreateVolume(t *testing.T) {
 					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
 				},
 				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
-				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
+				Secrets: map[string]string{
+					"accessKey":             "testAccessKey",
+					"secretKey":             "testSecretKey",
+					"apiKey":                "testApiKey",
+					"serviceId":             "testServiceId",
+					"kpRootKeyCRN":          "testKpRootKeyCRN",
+					"locationConstraint":    "test-region",
+					"cosEndpoint":           "test-endpoint",
+					"iamEndpoint":           "https://testIamEndpoint",
+					"bucketName":            bucketName,
+					"objectPath":            "test/object/path",
+					constants.QuotaLimitKey: "true",
+					constants.ResConfApiKey: "fake-res-conf-key",
+				},
 			},
 			cosSession:       &s3client.FakeCOSSessionFactory{},
 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
@@ -646,7 +671,20 @@ func TestCreateVolume(t *testing.T) {
 					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
 				},
 				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
-				Secrets:       secretWithQuota("true", "fake-res-conf-key"),
+				Secrets: map[string]string{
+					"accessKey":             "testAccessKey",
+					"secretKey":             "testSecretKey",
+					"apiKey":                "testApiKey",
+					"serviceId":             "testServiceId",
+					"kpRootKeyCRN":          "testKpRootKeyCRN",
+					"locationConstraint":    "test-region",
+					"cosEndpoint":           "test-endpoint",
+					"iamEndpoint":           "https://testIamEndpoint",
+					"bucketName":            bucketName,
+					"objectPath":            "test/object/path",
+					constants.QuotaLimitKey: "true",
+					constants.ResConfApiKey: "fake-res-conf-key",
+				},
 			},
 			cosSession:       &s3client.FakeCOSSessionFactory{FailUpdateQuotaLimit: true},
 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
