@@ -1,5 +1,5 @@
 NAME := cos-csi-mounter
-APP_VERSION := 0.12.12
+APP_VERSION := 0.12.13
 BUILD_DIR := $(NAME)-$(APP_VERSION)
 BIN_DIR := bin
 
