@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"net"
@@ -30,6 +31,13 @@ var (
 	Version   = "dev"
 	GitCommit = "none"
 )
+
+// envMounter is a local interface for type assertion — allows calling
+// FuseMountWithEnv on the concrete MounterOptsUtils without changing the
+// MounterUtils interface, so other mounters (rclone, s3fs) are unaffected.
+type envMounter interface {
+	FuseMountWithEnv(path string, comm string, args []string, envVars []string) error
+}
 
 func init() {
 	_ = flag.Set("logtostderr", "true") // #nosec G104: Attempt to set flags for logging to stderr only on best-effort basis.Error cannot be usefully handled.
@@ -167,7 +175,12 @@ func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser)
 			return
 		}
 
-		logger.Info("New mount request with values:", zap.String("Bucket", request.Bucket), zap.String("Path", request.Path), zap.String("Mounter", request.Mounter), zap.Any("Args", request.Args))
+		logger.Info("New mount request with values:",
+			zap.String("Bucket", request.Bucket),
+			zap.String("Path", request.Path),
+			zap.String("Mounter", request.Mounter),
+			zap.Any("Args", request.Args),
+		)
 
 		if request.Mounter != constants.S3FS && request.Mounter != constants.RClone && request.Mounter != constants.AMAZONS3MOUNTER {
 			logger.Error("invalid mounter", zap.Any("mounter", request.Mounter))
@@ -185,12 +198,18 @@ func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser)
 		args, err := parser.Parse(request)
 		if err != nil {
 			logger.Error("failed to parse mounter args", zap.Any("mounter", request.Mounter), zap.Error(err))
-
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid args for mounter: %v", err)})
 			return
 		}
 
-		err = mounter.FuseMount(request.Path, request.Mounter, args)
+		// For mount-s3: pass AWS credential paths as env vars on the subprocess.
+		// FuseMountWithEnv is on the concrete MounterOptsUtils struct only (not the interface),
+		// so we type-assert — other mounters (rclone, s3fs) fall through to plain FuseMount.
+		if em, ok := mounter.(envMounter); ok && request.Mounter == constants.AMAZONS3MOUNTER {
+			err = em.FuseMountWithEnv(request.Path, request.Mounter, args, buildS3EnvVars(request.Args))
+		} else {
+			err = mounter.FuseMount(request.Path, request.Mounter, args)
+		}
 		if err != nil {
 			logger.Error("mount failed: ", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("mount failed: %v", err)})
@@ -200,6 +219,24 @@ func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser)
 		logger.Info("bucket mount is successful", zap.Any("bucket", request.Bucket), zap.Any("path", request.Path))
 		c.JSON(http.StatusOK, gin.H{"status": "success"})
 	}
+}
+
+// buildS3EnvVars extracts AWS credential file paths from the request args map
+// and returns them as env var strings for the mount-s3 subprocess.
+// mount-s3 uses the AWS SDK which reads these standard env vars to locate credentials.
+func buildS3EnvVars(args json.RawMessage) []string {
+	var argsMap map[string]string
+	if err := json.Unmarshal(args, &argsMap); err != nil {
+		return nil
+	}
+	var envVars []string
+	if v, ok := argsMap["aws-credentials-file"]; ok && v != "" {
+		envVars = append(envVars, "AWS_SHARED_CREDENTIALS_FILE="+v)
+	}
+	if v, ok := argsMap["aws-config-file"]; ok && v != "" {
+		envVars = append(envVars, "AWS_CONFIG_FILE="+v)
+	}
+	return envVars
 }
 
 func handleCosUnmount(mounter mounterUtils.MounterUtils) gin.HandlerFunc {
