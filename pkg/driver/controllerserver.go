@@ -152,9 +152,9 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		}
 
 		if quotaLimitEnabled {
-			if secretMap[constants.ResConfApiKey] == "" {
+			if secretMap[constants.ResourceConfigApiKey] == "" {
 				return nil, status.Error(codes.InvalidArgument,
-					"res-conf-apikey missing in secret, cannot set quota limit for bucket")
+					"resourceConfigApiKey missing in secret, cannot set quota limit for bucket")
 			}
 
 			quotaBytes := req.GetCapacityRange().GetRequiredBytes()
@@ -242,7 +242,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 
 		if quotaLimitEnabled {
 			quotaBytes := req.GetCapacityRange().GetRequiredBytes()
-			resConfApikey := secretMap[constants.ResConfApiKey]
+			resConfApikey := secretMap[constants.ResourceConfigApiKey]
 
 			klog.Infof("Applying hard quota of %d bytes to bucket %s", quotaBytes, bucketName)
 			err = sess.UpdateQuotaLimit(quotaBytes, resConfApikey, bucketName, endPoint, creds.IAMEndpoint)
@@ -289,7 +289,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 
 		if quotaLimitEnabled {
 			quotaBytes := req.GetCapacityRange().GetRequiredBytes()
-			resConfApikey := secretMap[constants.ResConfApiKey]
+			resConfApikey := secretMap[constants.ResourceConfigApiKey]
 
 			klog.Infof("Applying hard quota of %d bytes to temp bucket %s", quotaBytes, tempBucketName)
 			err = sess.UpdateQuotaLimit(quotaBytes, resConfApikey, tempBucketName, endPoint, creds.IAMEndpoint)
@@ -607,7 +607,7 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 		objectPath = string(bytesVal)
 	}
 
-	if bytesVal, ok := secret.Data[constants.ResConfApiKey]; ok {
+	if bytesVal, ok := secret.Data[constants.ResourceConfigApiKey]; ok {
 		resConfApiKey = string(bytesVal)
 	}
 	if bytesVal, ok := secret.Data[constants.QuotaLimitKey]; ok {
@@ -625,7 +625,7 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 	secretMapCustom["locationConstraint"] = locationConstraint
 	secretMapCustom[constants.BucketVersioning] = bucketVersioning
 	secretMapCustom["objectPath"] = objectPath
-	secretMapCustom[constants.ResConfApiKey] = resConfApiKey
+	secretMapCustom[constants.ResourceConfigApiKey] = resConfApiKey
 	secretMapCustom[constants.QuotaLimitKey] = quotaLimit
 
 	return secretMapCustom

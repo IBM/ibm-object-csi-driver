@@ -544,7 +544,7 @@ func TestCreateVolume(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			testCaseName: "Negative: quotaLimit=true missing res-conf-apikey in direct secrets",
+			testCaseName: "Negative: quotaLimit=true missing resourceConfigApiKey in direct secrets",
 			req: &csi.CreateVolumeRequest{
 				Name: testVolumeName,
 				VolumeCapabilities: []*csi.VolumeCapability{
@@ -564,7 +564,7 @@ func TestCreateVolume(t *testing.T) {
 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
 			expectedResp:     nil,
 			expectedErr: status.Error(codes.InvalidArgument,
-				"res-conf-apikey missing in secret, cannot set quota limit for bucket"),
+				"resourceConfigApiKey missing in secret, cannot set quota limit for bucket"),
 		},
 
 		{
@@ -604,7 +604,7 @@ func TestCreateVolume(t *testing.T) {
 					"cosEndpoint":           "test-endpoint",
 					"bucketName":            bucketName,
 					constants.QuotaLimitKey: "true",
-					constants.ResConfApiKey: "fake-res-conf-key",
+					constants.ResourceConfigApiKey: "fake-res-conf-key",
 				},
 			},
 			cosSession:       &s3client.FakeCOSSessionFactory{},
@@ -627,7 +627,7 @@ func TestCreateVolume(t *testing.T) {
 					"cosEndpoint":           "test-endpoint",
 					"bucketName":            bucketName,
 					constants.QuotaLimitKey: "true",
-					constants.ResConfApiKey: "fake-res-conf-key",
+					constants.ResourceConfigApiKey: "fake-res-conf-key",
 				},
 			},
 			cosSession:       &s3client.FakeCOSSessionFactory{},
@@ -661,7 +661,7 @@ func TestCreateVolume(t *testing.T) {
 					"cosEndpoint":           "test-endpoint",
 					"bucketName":            bucketName,
 					constants.QuotaLimitKey: "true",
-					constants.ResConfApiKey: "fake-res-conf-key",
+					constants.ResourceConfigApiKey: "fake-res-conf-key",
 				},
 			},
 			cosSession:       &s3client.FakeCOSSessionFactory{FailUpdateQuotaLimit: true},
@@ -684,7 +684,7 @@ func TestCreateVolume(t *testing.T) {
 					"cosEndpoint":           "test-endpoint",
 					"mounter":               "s3fs",
 					constants.QuotaLimitKey: "true",
-					constants.ResConfApiKey: "fake-res-conf-key",
+					constants.ResourceConfigApiKey: "fake-res-conf-key",
 				},
 			},
 			cosSession:       &s3client.FakeCOSSessionFactory{FailUpdateQuotaLimit: true},
@@ -707,7 +707,7 @@ func TestCreateVolume(t *testing.T) {
 					"cosEndpoint":           "test-endpoint",
 					"mounter":               "s3fs",
 					constants.QuotaLimitKey: "true",
-					constants.ResConfApiKey: "fake-res-conf-key",
+					constants.ResourceConfigApiKey: "fake-res-conf-key",
 				},
 			},
 			cosSession:       &s3client.FakeCOSSessionFactory{},
