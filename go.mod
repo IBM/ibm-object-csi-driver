@@ -4,7 +4,7 @@ go 1.24.5
 
 require (
 	github.com/IBM/go-sdk-core/v5 v5.21.0
-	github.com/IBM/ibm-cos-sdk-go v1.12.2
+	github.com/IBM/ibm-cos-sdk-go v1.12.3
 	github.com/IBM/ibm-cos-sdk-go-config/v2 v2.3.0
 	github.com/IBM/ibm-csi-common v1.1.21
 	github.com/IBM/ibmcloud-volume-interface v1.2.20
