@@ -14,7 +14,7 @@ var (
 		"cosEndpoint":        "test-endpoint",
 		"locationConstraint": "test-loc-constraint",
 		"bucketName":         "test-bucket-name",
-		"objPath":            "test-obj-path",
+		"objectPath":         "test-obj-path",
 		"accessKey":          "test-access-key",
 		"secretKey":          "test-secret-key",
 		"apiKey":             "test-api-key",
@@ -35,7 +35,7 @@ func TestNewRcloneMounter_Success(t *testing.T) {
 	assert.True(t, ok)
 
 	assert.Equal(t, rCloneMounter.BucketName, secretMapRClone["bucketName"])
-	assert.Equal(t, rCloneMounter.ObjPath, secretMapRClone["objPath"])
+	assert.Equal(t, rCloneMounter.ObjectPath, secretMapRClone["objectPath"])
 	assert.Equal(t, rCloneMounter.EndPoint, secretMapRClone["cosEndpoint"])
 	assert.Equal(t, rCloneMounter.LocConstraint, secretMapRClone["locationConstraint"])
 	assert.Equal(t, rCloneMounter.UID, secretMapRClone["uid"])
@@ -47,7 +47,7 @@ func TestNewRcloneMounter_Only_GID(t *testing.T) {
 		"cosEndpoint":        "test-endpoint",
 		"locationConstraint": "test-loc-constraint",
 		"bucketName":         "test-bucket-name",
-		"objPath":            "test-obj-path",
+		"objectPath":         "test-obj-path",
 		"accessKey":          "test-access-key",
 		"secretKey":          "test-secret-key",
 		"apiKey":             "test-api-key",
@@ -60,7 +60,7 @@ func TestNewRcloneMounter_Only_GID(t *testing.T) {
 	assert.True(t, ok)
 
 	assert.Equal(t, rCloneMounter.BucketName, secretMap["bucketName"])
-	assert.Equal(t, rCloneMounter.ObjPath, secretMap["objPath"])
+	assert.Equal(t, rCloneMounter.ObjectPath, secretMap["objectPath"])
 	assert.Equal(t, rCloneMounter.EndPoint, secretMap["cosEndpoint"])
 	assert.Equal(t, rCloneMounter.LocConstraint, secretMap["locationConstraint"])
 	assert.Equal(t, rCloneMounter.GID, secretMap["gid"])
@@ -71,7 +71,7 @@ func TestNewRcloneMounter_MountOptsInSecret(t *testing.T) {
 		"cosEndpoint":        "test-endpoint",
 		"locationConstraint": "test-loc-constraint",
 		"bucketName":         "test-bucket-name",
-		"objPath":            "test-obj-path",
+		"objectPath":         "test-obj-path",
 		"accessKey":          "test-access-key",
 		"secretKey":          "test-secret-key",
 		"apiKey":             "test-api-key",
@@ -86,7 +86,7 @@ func TestNewRcloneMounter_MountOptsInSecret(t *testing.T) {
 	assert.True(t, ok)
 
 	assert.Equal(t, rCloneMounter.BucketName, secretMap["bucketName"])
-	assert.Equal(t, rCloneMounter.ObjPath, secretMap["objPath"])
+	assert.Equal(t, rCloneMounter.ObjectPath, secretMap["objectPath"])
 	assert.Equal(t, rCloneMounter.EndPoint, secretMap["cosEndpoint"])
 	assert.Equal(t, rCloneMounter.LocConstraint, secretMap["locationConstraint"])
 	assert.Equal(t, rCloneMounter.UID, secretMap["uid"])
@@ -138,7 +138,7 @@ func TestRcloneMount_WorkerNode_Positive(t *testing.T) {
 		EndPoint:   "testEndpoint",
 		GID:        "testGID",
 		UID:        "testUID",
-		ObjPath:    "testObjPath",
+		ObjectPath: "testObjectPath",
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path, comm string, args []string) error {
 				return nil
@@ -166,7 +166,7 @@ func TestRcloneMount_WorkerNode_Negative(t *testing.T) {
 		EndPoint:   "testEndpoint",
 		GID:        "testGID",
 		UID:        "testUID",
-		ObjPath:    "testObjPath",
+		ObjectPath: "testObjectPath",
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path, comm string, args []string) error {
 				return nil
