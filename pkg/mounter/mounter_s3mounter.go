@@ -32,6 +32,17 @@ type MountpointS3Mounter struct {
 	ReadOnly      bool
 	MountOptions  []string
 	MounterUtils  utils.MounterUtils
+
+	MaxThreads          string // --max-threads <N>, default: 16
+	ReadPartSize        string // --read-part-size <bytes>, default: 8388608 (8 MiB).
+	WritePartSize       string // --write-part-size <bytes>, default: 8388608 (8 MiB). Same rules as ReadPartSize.
+	MaxThroughputGbps   string // --maximum-throughput-gbps <N>, default: auto-detect on EC2, 10 Gbps elsewhere
+	UploadChecksums     string // --upload-checksums <crc32c|off>, default: crc32c
+	CacheDir            string // --cache <dir>, enables local disk read cache, default: disabled
+	MaxCacheSize        string // --max-cache-size <MiB>, only effective if CacheDir is set, default: preserve 5% of available space
+	MetadataTTL         string // --metadata-ttl <seconds|indefinite|minimal>, default: minimal (or 60s if --cache is set)
+	NegativeMetadataTTL string // --negative-metadata-ttl <seconds|indefinite|minimal>, default: same as MetadataTTL
+	LogMetrics          bool   // --log-metrics, enables summarized performance metrics in logs, default: false
 }
 
 // s3MounterArgs holds the args passed to the worker for mount-s3
@@ -44,11 +55,24 @@ type s3MounterArgs struct {
 	// Removed: AwsConfigDir — mount-s3 has no --aws-config-dir flag
 	LogLevel    string `json:"log-level,omitempty"` // valid: "debug", "debug-crt", "no-log"
 	EndpointURL string `json:"endpoint-url,omitempty"`
-	// AWS credential file paths — NOT CLI flags.
-	// Worker sets these as AWS_SHARED_CREDENTIALS_FILE / AWS_CONFIG_FILE env vars
-	// on the mount-s3 subprocess before invoking it.
+	// Region is passed explicitly as --region CLI flag in addition to being written
+	// in the AWS config file, to ensure it is always set even if AWS_CONFIG_FILE
+	// env var is not propagated correctly to the mount-s3 subprocess.
+	Region             string `json:"region,omitempty"`
 	AwsCredentialsFile string `json:"aws-credentials-file,omitempty"`
 	AwsConfigFile      string `json:"aws-config-file,omitempty"`
+
+	// Performance tuning fields — all optional, mirrors MountpointS3Mounter fields.
+	MaxThreads          string `json:"max-threads,omitempty"`
+	ReadPartSize        string `json:"read-part-size,omitempty"`
+	WritePartSize       string `json:"write-part-size,omitempty"`
+	MaxThroughputGbps   string `json:"maximum-throughput-gbps,omitempty"`
+	UploadChecksums     string `json:"upload-checksums,omitempty"`
+	CacheDir            string `json:"cache,omitempty"`
+	MaxCacheSize        string `json:"max-cache-size,omitempty"`
+	MetadataTTL         string `json:"metadata-ttl,omitempty"`
+	NegativeMetadataTTL string `json:"negative-metadata-ttl,omitempty"`
+	LogMetrics          bool   `json:"log-metrics,omitempty"`
 }
 
 const (
@@ -116,6 +140,40 @@ func NewMountpointS3Mounter(secretMap map[string]string, mountOptions []string, 
 	}
 	if val, check = secretMap["readOnly"]; check {
 		mounter.ReadOnly = val == "true"
+	}
+
+	// Performance tuning — all optional.
+	// If not set here, mount-s3 built-in defaults apply.
+	// StorageClass mountOptions override these if the same flag appears there.
+	if val, check = secretMap["maxThreads"]; check {
+		mounter.MaxThreads = val
+	}
+	if val, check = secretMap["readPartSize"]; check {
+		mounter.ReadPartSize = val
+	}
+	if val, check = secretMap["writePartSize"]; check {
+		mounter.WritePartSize = val
+	}
+	if val, check = secretMap["maximumThroughputGbps"]; check {
+		mounter.MaxThroughputGbps = val
+	}
+	if val, check = secretMap["uploadChecksums"]; check {
+		mounter.UploadChecksums = val
+	}
+	if val, check = secretMap["cacheDir"]; check {
+		mounter.CacheDir = val
+	}
+	if val, check = secretMap["maxCacheSize"]; check {
+		mounter.MaxCacheSize = val
+	}
+	if val, check = secretMap["metadataTTL"]; check {
+		mounter.MetadataTTL = val
+	}
+	if val, check = secretMap["negativeMetadataTTL"]; check {
+		mounter.NegativeMetadataTTL = val
+	}
+	if val, check = secretMap["logMetrics"]; check {
+		mounter.LogMetrics = val == "true"
 	}
 
 	mounter.AuthType = "hmac"
@@ -337,6 +395,12 @@ func (s3 *MountpointS3Mounter) formulateMountOptions(bucket, target, configPathW
 		workerNodeOp.EndpointURL = s3.EndPoint
 	}
 
+	// Region — passed as CLI flag AND written to config file for redundancy.
+	if s3.LocConstraint != "" {
+		nodeServerOp = append(nodeServerOp, "--region="+s3.LocConstraint)
+		workerNodeOp.Region = s3.LocConstraint
+	}
+
 	// UID
 	if s3.UID != "" {
 		nodeServerOp = append(nodeServerOp, "--uid="+s3.UID)
@@ -382,7 +446,72 @@ func (s3 *MountpointS3Mounter) formulateMountOptions(bucket, target, configPathW
 		workerNodeOp.ReadOnly = "true"
 	}
 
-	// Extra mount options from StorageClass (e.g. --dir-mode=0755, --file-mode=0644)
+	// --- Performance tuning options ---
+	if s3.ReadPartSize != "" {
+		nodeServerOp = append(nodeServerOp, "--read-part-size="+s3.ReadPartSize)
+		workerNodeOp.ReadPartSize = s3.ReadPartSize
+	}
+
+	// --write-part-size (default: 8388608 = 8 MiB). Same rules as read-part-size.
+	if s3.WritePartSize != "" {
+		nodeServerOp = append(nodeServerOp, "--write-part-size="+s3.WritePartSize)
+		workerNodeOp.WritePartSize = s3.WritePartSize
+	}
+
+	// --max-threads (default: 16)
+	// Increase for workloads with many concurrent file operations.
+	if s3.MaxThreads != "" {
+		nodeServerOp = append(nodeServerOp, "--max-threads="+s3.MaxThreads)
+		workerNodeOp.MaxThreads = s3.MaxThreads
+	}
+
+	// --maximum-throughput-gbps (default: auto-detect on EC2, 10 Gbps elsewhere)
+	// Not on EC2 so won't auto-detect correctly — set explicitly if you know your node bandwidth.
+	if s3.MaxThroughputGbps != "" {
+		nodeServerOp = append(nodeServerOp, "--maximum-throughput-gbps="+s3.MaxThroughputGbps)
+		workerNodeOp.MaxThroughputGbps = s3.MaxThroughputGbps
+	}
+
+	// --upload-checksums (default: crc32c)
+	// Set to "off" to reduce CPU overhead on write-heavy workloads at the cost of integrity checks.
+	if s3.UploadChecksums != "" {
+		nodeServerOp = append(nodeServerOp, "--upload-checksums="+s3.UploadChecksums)
+		workerNodeOp.UploadChecksums = s3.UploadChecksums
+	}
+
+	// --cache + --max-cache-size (default: disabled)
+	// Enables local disk read cache — improves repeated read performance.
+	// When cache is set, metadata-ttl defaults to 60s automatically.
+	if s3.CacheDir != "" {
+		nodeServerOp = append(nodeServerOp, "--cache="+s3.CacheDir)
+		workerNodeOp.CacheDir = s3.CacheDir
+		if s3.MaxCacheSize != "" {
+			nodeServerOp = append(nodeServerOp, "--max-cache-size="+s3.MaxCacheSize)
+			workerNodeOp.MaxCacheSize = s3.MaxCacheSize
+		}
+	}
+
+	// --metadata-ttl (default: minimal, or 60s if --cache is set)
+	// Set higher to reduce ListObjects API calls on stable buckets.
+	if s3.MetadataTTL != "" {
+		nodeServerOp = append(nodeServerOp, "--metadata-ttl="+s3.MetadataTTL)
+		workerNodeOp.MetadataTTL = s3.MetadataTTL
+	}
+
+	// --negative-metadata-ttl (default: same as metadata-ttl)
+	if s3.NegativeMetadataTTL != "" {
+		nodeServerOp = append(nodeServerOp, "--negative-metadata-ttl="+s3.NegativeMetadataTTL)
+		workerNodeOp.NegativeMetadataTTL = s3.NegativeMetadataTTL
+	}
+
+	// --log-metrics (default: false)
+	// Logs summarized throughput metrics — zero performance cost, useful for monitoring.
+	if s3.LogMetrics {
+		nodeServerOp = append(nodeServerOp, "--log-metrics")
+		workerNodeOp.LogMetrics = true
+	}
+
+	// StorageClass mountOptions are appended LAST — always take final precedence over everything above.
 	nodeServerOp = append(nodeServerOp, s3.MountOptions...)
 
 	klog.Infof("MountpointS3 nodeServerOp: %v", nodeServerOp)
