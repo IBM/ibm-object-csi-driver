@@ -257,34 +257,44 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 
 func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
 	var accessKey, secretKey, apiKey, envAuth, v2Auth, iamEndpoint string
+	var configParams []string
+
 	if rclone.AuthType == "hmac" {
 		keys := strings.Split(rclone.AccessKeys, ":")
 		accessKey = keys[0]
 		secretKey = keys[1]
 		envAuth = "true"
 		v2Auth = "false"
+
+		configParams = []string{
+			"[" + remote + "]",
+			"type = " + s3Type,
+			"endpoint = " + rclone.EndPoint,
+			"provider = " + cosProvider,
+			"env_auth = " + envAuth,
+			"v2_auth = " + v2Auth,
+			"access_key_id = " + accessKey,
+			"secret_access_key = " + secretKey,
+		}
 	} else {
 		apiKey = rclone.AccessKeys
 		v2Auth = "true"
 		envAuth = "false"
+
+		configParams = []string{
+			"[" + remote + "]",
+			"type = " + s3Type,
+			"endpoint = " + rclone.EndPoint,
+			"provider = " + cosProvider,
+			"env_auth = " + envAuth,
+			"v2_auth = " + v2Auth,
+			"ibm_api_key = " + apiKey,
+			"ibm_resource_instance_id = " + rclone.serviceInstanceID,
+		}
 	}
 
 	if rclone.IAMEndpoint != "" {
-		iamEndpoint = rclone.IAMEndpoint
-	}
-
-	configParams := []string{
-		"[" + remote + "]",
-		"type = " + s3Type,
-		"endpoint = " + rclone.EndPoint,
-		"provider = " + cosProvider,
-		"env_auth = " + envAuth,
-		"v2_auth = " + v2Auth,
-		"access_key_id = " + accessKey,
-		"secret_access_key = " + secretKey,
-		"ibm_api_key = " + apiKey,
-		"ibm_resource_instance_id = " + rclone.serviceInstanceID,
-		"ibm_iam_endpoint = " + iamEndpoint,
+		configParams = append(configParams, "ibm_iam_endpoint = "+rclone.IAMEndpoint)
 	}
 
 	if rclone.LocConstraint != "" {

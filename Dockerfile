@@ -26,8 +26,8 @@ RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && cd s3fs-fuse && \
     ./autogen.sh && ./configure --prefix=/usr/local --with-openssl && make && make install && \
     rm -rf /var/lib/apt/lists/*
 
-FROM  registry.access.redhat.com/ubi8/ubi AS rclone-builder
-RUN   yum install wget git gcc -y
+FROM registry.access.redhat.com/ubi8/ubi AS rclone-builder
+RUN yum install wget git gcc -y
 
 ENV ARCH=amd64
 ENV GO_VERSION=1.25.0
