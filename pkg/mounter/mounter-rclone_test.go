@@ -51,7 +51,6 @@ func TestNewRcloneMounter_Only_GID(t *testing.T) {
 		"objectPath":         "test-obj-path",
 		"accessKey":          "test-access-key",
 		"secretKey":          "test-secret-key",
-		"apiKey":             "test-api-key",
 		"kpRootKeyCRN":       "test-kp-root-key-crn",
 		"gid":                "1001",
 	}
@@ -75,7 +74,6 @@ func TestNewRcloneMounter_MountOptsInSecret_HMAC(t *testing.T) {
 		"objectPath":         "test-obj-path",
 		"accessKey":          "test-access-key",
 		"secretKey":          "test-secret-key",
-		"apiKey":             "test-api-key",
 		"kpRootKeyCRN":       "test-kp-root-key-crn",
 		"gid":                "1001",
 		"uid":                "1001",
@@ -92,6 +90,7 @@ func TestNewRcloneMounter_MountOptsInSecret_HMAC(t *testing.T) {
 	assert.Equal(t, rCloneMounter.LocConstraint, secretMap["locationConstraint"])
 	assert.Equal(t, rCloneMounter.UID, secretMap["uid"])
 	assert.Equal(t, rCloneMounter.GID, secretMap["gid"])
+	assert.Equal(t, rCloneMounter.AuthType, "hmac")
 }
 
 func TestNewRcloneMounter_MountOptsInSecret_IAM(t *testing.T) {
@@ -106,6 +105,7 @@ func TestNewRcloneMounter_MountOptsInSecret_IAM(t *testing.T) {
 		"gid":                "1001",
 		"uid":                "1001",
 		"mountOptions":       "\nupload_concurrency\nkey=value",
+		"iamEndpoint":        "test-iam-endpoint",
 	}
 	mounter := NewRcloneMounter(secretMap, mountOptionsRClone, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
 
@@ -118,6 +118,8 @@ func TestNewRcloneMounter_MountOptsInSecret_IAM(t *testing.T) {
 	assert.Equal(t, rCloneMounter.LocConstraint, secretMap["locationConstraint"])
 	assert.Equal(t, rCloneMounter.UID, secretMap["uid"])
 	assert.Equal(t, rCloneMounter.GID, secretMap["gid"])
+	assert.Equal(t, rCloneMounter.AuthType, "iam")
+
 }
 
 func TestRcloneMount_NodeServer_Positive(t *testing.T) {
@@ -281,14 +283,77 @@ func TestRcloneUnmount_NodeServer_Negative(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to unmount")
 }
 
-func TestCreateConfig_Success(t *testing.T) {
+func TestCreateConfig_Success_HMAC(t *testing.T) {
 	rclone := &RcloneMounter{
-		AccessKeys:    "accessKey:secretKey",
+		AccessKeys:    "testAccessKey:testSecretKey",
+		EndPoint:      "test-endpoint",
 		LocConstraint: "us-south",
+		AuthType:      "hmac",
+		MountOptions:  []string{"upload_concurrency=16"},
 	}
 
-	err := createConfig("/tmp/testconfig", rclone)
-	assert.Nil(t, err)
+	// Create a temporary directory for the test
+	tmpDir := t.TempDir()
+
+	err := createConfig(tmpDir, rclone)
+	assert.NoError(t, err)
+
+	// Read the generated config file and verify HMAC parameters
+	configFilePath := tmpDir + "/rclone.conf"
+	content, err := os.ReadFile(configFilePath)
+	assert.NoError(t, err)
+
+	configStr := string(content)
+
+	// Verify HMAC-specific configuration parameters
+	assert.Contains(t, configStr, "[ibmcos]")
+	assert.Contains(t, configStr, "type = s3")
+	assert.Contains(t, configStr, "endpoint = test-endpoint")
+	assert.Contains(t, configStr, "provider = IBMCOS")
+	assert.Contains(t, configStr, "env_auth = true")
+	assert.Contains(t, configStr, "v2_auth = false")
+	assert.Contains(t, configStr, "access_key_id = testAccessKey")
+	assert.Contains(t, configStr, "secret_access_key = testSecretKey")
+	assert.Contains(t, configStr, "location_constraint = us-south")
+	assert.Contains(t, configStr, "upload_concurrency=16")
+}
+
+func TestCreateConfig_Success_IAM(t *testing.T) {
+	rclone := &RcloneMounter{
+		AccessKeys:        "testApiKey",
+		serviceInstanceID: "test-service-instance-id",
+		EndPoint:          "test-endpoint",
+		LocConstraint:     "us-south",
+		IAMEndpoint:       "test-iam-endpoint",
+		AuthType:          "iam",
+		MountOptions:      []string{"vfs-cache-mode=writes"},
+	}
+
+	// Create a temporary directory for the test
+	tmpDir := t.TempDir()
+
+	err := createConfig(tmpDir, rclone)
+	assert.NoError(t, err)
+
+	// Read the generated config file and verify IAM parameters
+	configFilePath := tmpDir + "/rclone.conf"
+	content, err := os.ReadFile(configFilePath)
+	assert.NoError(t, err)
+
+	configStr := string(content)
+
+	// Verify IAM-specific configuration parameters
+	assert.Contains(t, configStr, "[ibmcos]")
+	assert.Contains(t, configStr, "type = s3")
+	assert.Contains(t, configStr, "endpoint = test-endpoint")
+	assert.Contains(t, configStr, "provider = IBMCOS")
+	assert.Contains(t, configStr, "env_auth = false")
+	assert.Contains(t, configStr, "v2_auth = true")
+	assert.Contains(t, configStr, "ibm_api_key = testApiKey")
+	assert.Contains(t, configStr, "ibm_resource_instance_id = test-service-instance-id")
+	assert.Contains(t, configStr, "ibm_iam_endpoint = test-iam-endpoint")
+	assert.Contains(t, configStr, "location_constraint = us-south")
+	assert.Contains(t, configStr, "vfs-cache-mode=writes")
 }
 
 func TestCreateConfig_MakeDirFails(t *testing.T) {
