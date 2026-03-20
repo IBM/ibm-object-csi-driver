@@ -256,7 +256,7 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 }
 
 func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
-	var accessKey, secretKey, apiKey, envAuth, v2Auth, iamEndpoint string
+	var accessKey, secretKey, apiKey, envAuth, v2Auth string
 	var configParams []string
 
 	if rclone.AuthType == "hmac" {

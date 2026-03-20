@@ -19,6 +19,7 @@ var (
 		"secretKey":          "test-secret-key",
 		"apiKey":             "test-api-key",
 		"kpRootKeyCRN":       "test-kp-root-key-crn",
+		"serviceId":          "test-service-id",
 		"gid":                "fake-gid",
 		"uid":                "fake-uid",
 	}
@@ -66,7 +67,7 @@ func TestNewRcloneMounter_Only_GID(t *testing.T) {
 	assert.Equal(t, rCloneMounter.GID, secretMap["gid"])
 }
 
-func TestNewRcloneMounter_MountOptsInSecret(t *testing.T) {
+func TestNewRcloneMounter_MountOptsInSecret_HMAC(t *testing.T) {
 	secretMap := map[string]string{
 		"cosEndpoint":        "test-endpoint",
 		"locationConstraint": "test-loc-constraint",
@@ -75,6 +76,32 @@ func TestNewRcloneMounter_MountOptsInSecret(t *testing.T) {
 		"accessKey":          "test-access-key",
 		"secretKey":          "test-secret-key",
 		"apiKey":             "test-api-key",
+		"kpRootKeyCRN":       "test-kp-root-key-crn",
+		"gid":                "1001",
+		"uid":                "1001",
+		"mountOptions":       "\nupload_concurrency\nkey=value",
+	}
+	mounter := NewRcloneMounter(secretMap, mountOptionsRClone, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
+
+	rCloneMounter, ok := mounter.(*RcloneMounter)
+	assert.True(t, ok)
+
+	assert.Equal(t, rCloneMounter.BucketName, secretMap["bucketName"])
+	assert.Equal(t, rCloneMounter.ObjectPath, secretMap["objectPath"])
+	assert.Equal(t, rCloneMounter.EndPoint, secretMap["cosEndpoint"])
+	assert.Equal(t, rCloneMounter.LocConstraint, secretMap["locationConstraint"])
+	assert.Equal(t, rCloneMounter.UID, secretMap["uid"])
+	assert.Equal(t, rCloneMounter.GID, secretMap["gid"])
+}
+
+func TestNewRcloneMounter_MountOptsInSecret_IAM(t *testing.T) {
+	secretMap := map[string]string{
+		"cosEndpoint":        "test-endpoint",
+		"locationConstraint": "test-loc-constraint",
+		"bucketName":         "test-bucket-name",
+		"objectPath":         "test-obj-path",
+		"apiKey":             "test-api-key",
+		"serviceId":          "test-service-id",
 		"kpRootKeyCRN":       "test-kp-root-key-crn",
 		"gid":                "1001",
 		"uid":                "1001",
