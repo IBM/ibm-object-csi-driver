@@ -249,7 +249,9 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			if err != nil {
 				klog.Errorf("Failed to set quota limit on bucket %s: %v", bucketName, err)
 				if params["userProvidedBucket"] == "false" {
-					_ = sess.DeleteBucket(bucketName)
+					if delErr := sess.DeleteBucket(bucketName); delErr != nil {
+						klog.Errorf("Failed to delete bucket %s after quota limit failure: %v", bucketName, delErr)
+					}
 				}
 				return nil, status.Error(codes.Internal, fmt.Sprintf("failed to set bucket quota limit: %v", err))
 			}
@@ -295,7 +297,9 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			err = sess.UpdateQuotaLimit(quotaBytes, resConfApikey, tempBucketName, endPoint, creds.IAMEndpoint)
 			if err != nil {
 				klog.Errorf("Failed to set quota limit on temp bucket %s: %v", tempBucketName, err)
-				_ = sess.DeleteBucket(tempBucketName)
+				if delErr := sess.DeleteBucket(tempBucketName); delErr != nil {
+					klog.Errorf("Failed to delete temp bucket %s after quota limit failure: %v", tempBucketName, delErr)
+				}
 				return nil, status.Error(codes.Internal, fmt.Sprintf("failed to set bucket quota limit: %v", err))
 			}
 			klog.Infof("Successfully applied hard quota %d bytes to temp bucket %s", quotaBytes, tempBucketName)
