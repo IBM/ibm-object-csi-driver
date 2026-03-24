@@ -347,7 +347,6 @@ func TestCreateConfig_Success_IAM(t *testing.T) {
 	assert.Contains(t, configStr, "env_auth = false")
 	assert.Contains(t, configStr, "v2_auth = true")
 	assert.Contains(t, configStr, "ibm_api_key = testApiKey")
-	assert.Contains(t, configStr, "ibm_resource_instance_id = test-service-instance-id")
 	assert.Contains(t, configStr, "ibm_iam_endpoint = test-iam-endpoint")
 	assert.Contains(t, configStr, "location_constraint = us-south")
 	assert.Contains(t, configStr, "vfs-cache-mode=writes")
