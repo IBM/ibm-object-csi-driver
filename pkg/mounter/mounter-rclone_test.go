@@ -19,7 +19,6 @@ var (
 		"secretKey":          "test-secret-key",
 		"apiKey":             "test-api-key",
 		"kpRootKeyCRN":       "test-kp-root-key-crn",
-		"serviceId":          "test-service-id",
 		"gid":                "fake-gid",
 		"uid":                "fake-uid",
 	}
@@ -100,7 +99,6 @@ func TestNewRcloneMounter_MountOptsInSecret_IAM(t *testing.T) {
 		"bucketName":         "test-bucket-name",
 		"objectPath":         "test-obj-path",
 		"apiKey":             "test-api-key",
-		"serviceId":          "test-service-id",
 		"kpRootKeyCRN":       "test-kp-root-key-crn",
 		"gid":                "1001",
 		"uid":                "1001",
@@ -320,13 +318,12 @@ func TestCreateConfig_Success_HMAC(t *testing.T) {
 
 func TestCreateConfig_Success_IAM(t *testing.T) {
 	rclone := &RcloneMounter{
-		AccessKeys:        "testApiKey",
-		serviceInstanceID: "test-service-instance-id",
-		EndPoint:          "test-endpoint",
-		LocConstraint:     "us-south",
-		IAMEndpoint:       "test-iam-endpoint",
-		AuthType:          "iam",
-		MountOptions:      []string{"vfs-cache-mode=writes"},
+		AccessKeys:    "testApiKey",
+		EndPoint:      "test-endpoint",
+		LocConstraint: "us-south",
+		IAMEndpoint:   "test-iam-endpoint",
+		AuthType:      "iam",
+		MountOptions:  []string{"vfs-cache-mode=writes"},
 	}
 
 	// Create a temporary directory for the test

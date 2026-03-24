@@ -29,19 +29,18 @@ import (
 // Mounter interface defined in mounter.go
 // rcloneMounter Implements Mounter
 type RcloneMounter struct {
-	BucketName        string //From Secret in SC
-	ObjectPath        string //From Secret in SC
-	EndPoint          string //From Secret in SC
-	LocConstraint     string //From Secret in SC
-	AuthType          string
-	AccessKeys        string
-	serviceInstanceID string
-	KpRootKeyCrn      string
-	IAMEndpoint       string
-	UID               string
-	GID               string
-	MountOptions      []string
-	MounterUtils      utils.MounterUtils
+	BucketName    string //From Secret in SC
+	ObjectPath    string //From Secret in SC
+	EndPoint      string //From Secret in SC
+	LocConstraint string //From Secret in SC
+	AuthType      string
+	AccessKeys    string
+	KpRootKeyCrn  string
+	IAMEndpoint   string
+	UID           string
+	GID           string
+	MountOptions  []string
+	MounterUtils  utils.MounterUtils
 }
 
 const (
@@ -65,7 +64,6 @@ func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounte
 		accessKey string
 		secretKey string
 		apiKey    string
-		serviceId string
 		mounter   *RcloneMounter
 	)
 
@@ -98,13 +96,9 @@ func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounte
 	if val, check = secretMap["apiKey"]; check {
 		apiKey = val
 	}
-	if val, check = secretMap["serviceId"]; check {
-		serviceId = val
-	}
 
-	if apiKey != "" && serviceId != "" {
+	if apiKey != "" {
 		mounter.AccessKeys = apiKey
-		mounter.serviceInstanceID = serviceId
 		mounter.AuthType = "iam"
 	} else {
 		mounter.AccessKeys = fmt.Sprintf("%s:%s", accessKey, secretKey)
@@ -257,7 +251,13 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 
 func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
 	var accessKey, secretKey, apiKey, envAuth, v2Auth string
-	var configParams []string
+
+	configParams := []string{
+		"[" + remote + "]",
+		"type = " + s3Type,
+		"endpoint = " + rclone.EndPoint,
+		"provider = " + cosProvider,
+	}
 
 	if rclone.AuthType == "hmac" {
 		keys := strings.Split(rclone.AccessKeys, ":")
@@ -266,32 +266,18 @@ func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
 		envAuth = "true"
 		v2Auth = "false"
 
-		configParams = []string{
-			"[" + remote + "]",
-			"type = " + s3Type,
-			"endpoint = " + rclone.EndPoint,
-			"provider = " + cosProvider,
-			"env_auth = " + envAuth,
-			"v2_auth = " + v2Auth,
-			"access_key_id = " + accessKey,
-			"secret_access_key = " + secretKey,
-		}
+		configParams = append(configParams, "access_key_id = "+accessKey)
+		configParams = append(configParams, "secret_access_key = "+secretKey)
 	} else {
 		apiKey = rclone.AccessKeys
 		v2Auth = "true"
 		envAuth = "false"
 
-		configParams = []string{
-			"[" + remote + "]",
-			"type = " + s3Type,
-			"endpoint = " + rclone.EndPoint,
-			"provider = " + cosProvider,
-			"env_auth = " + envAuth,
-			"v2_auth = " + v2Auth,
-			"ibm_api_key = " + apiKey,
-			"ibm_resource_instance_id = " + rclone.serviceInstanceID,
-		}
+		configParams = append(configParams, "ibm_api_key = "+apiKey)
 	}
+
+	configParams = append(configParams, "env_auth = "+envAuth)
+	configParams = append(configParams, "v2_auth = "+v2Auth)
 
 	if rclone.IAMEndpoint != "" {
 		configParams = append(configParams, "ibm_iam_endpoint = "+rclone.IAMEndpoint)
