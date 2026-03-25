@@ -146,7 +146,6 @@ func startService(setupSocketFunc func() (net.Listener, error), router http.Hand
 	return nil
 }
 
-// performHealthCheck checks if the service is healthy
 func performHealthCheck() error {
 	socketPath := filepath.Join(constants.SocketDir, constants.SocketFile)
 
@@ -165,6 +164,17 @@ func performHealthCheck() error {
 	}()
 
 	return nil
+}
+
+func notifySystemd(notification string) {
+	sent, err := daemon.SdNotify(false, notification)
+	if err != nil {
+		logger.Error("Failed to send systemd notification", zap.String("notification", notification), zap.Error(err))
+	} else if sent {
+		logger.Info("Systemd notification sent", zap.String("notification", notification))
+	} else {
+		logger.Info("Systemd notifications not supported (not running under systemd)")
+	}
 }
 
 // watchdogLoop sends periodic keepalive signals to systemd
@@ -187,43 +197,44 @@ func watchdogLoop() {
 			continue
 		}
 
-		sent, err := daemon.SdNotify(false, daemon.SdNotifyWatchdog)
-		if err != nil {
-			logger.Error("Failed to send watchdog notification", zap.Error(err))
-		} else if sent {
-			logger.Debug("Watchdog keepalive sent successfully")
-		}
+		notifySystemd(daemon.SdNotifyWatchdog)
+		logger.Debug("Watchdog keepalive sent")
 	}
 }
 
 func main() {
+	startTime := time.Now()
+
 	if len(os.Args) > 1 && os.Args[1] == "version" {
 		fmt.Printf("Version: %s\nGit Commit: %s\n", Version, GitCommit)
 		return
 	}
+
+	logger.Info("Starting cos-csi-mounter", zap.Time("start_time", startTime))
 
 	serviceDone := make(chan error, 1)
 	go func() {
 		serviceDone <- startService(setupSocket, newRouter(), handleSignals)
 	}()
 
-	time.Sleep(100 * time.Millisecond)
+	logger.Info("Waiting for service initialization", zap.Duration("elapsed", time.Since(startTime)))
+	time.Sleep(2 * time.Second)
 
-	// Notify systemd that service is ready
-	sent, err := daemon.SdNotify(false, daemon.SdNotifyReady)
-	if err != nil {
-		logger.Error("Failed to notify systemd of service readiness", zap.Error(err))
-	} else if sent {
-		logger.Info("Systemd notification sent: service ready")
-	} else {
-		logger.Info("Systemd notifications not supported (not running under systemd)")
+	logger.Info("Performing health check", zap.Duration("elapsed", time.Since(startTime)))
+	if err := performHealthCheck(); err != nil {
+		logger.Error("Service failed to start", zap.Error(err), zap.Duration("elapsed", time.Since(startTime)))
+		os.Exit(1)
 	}
+	logger.Info("Service is healthy and ready", zap.Duration("elapsed", time.Since(startTime)))
+
+	notifySystemd(daemon.SdNotifyReady)
+	logger.Info("READY notification sent", zap.Duration("elapsed", time.Since(startTime)))
 
 	go watchdogLoop()
 
-	err = <-serviceDone
+	err := <-serviceDone
 	if err != nil {
-		logger.Error("cos-csi-mounter exited with error", zap.Error(err))
+		logger.Error("cos-csi-mounter exited with error", zap.Error(err), zap.Duration("elapsed", time.Since(startTime)))
 		os.Exit(1)
 	}
 }
