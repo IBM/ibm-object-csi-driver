@@ -19,6 +19,7 @@ var (
 		"secretKey":          "test-secret-key",
 		"apiKey":             "test-api-key",
 		"kpRootKeyCRN":       "test-kp-root-key-crn",
+		"serviceId":          "test-service-id",
 		"gid":                "fake-gid",
 		"uid":                "fake-uid",
 	}
@@ -99,6 +100,7 @@ func TestNewRcloneMounter_MountOptsInSecret_IAM(t *testing.T) {
 		"bucketName":         "test-bucket-name",
 		"objectPath":         "test-obj-path",
 		"apiKey":             "test-api-key",
+		"serviceId":          "test-service-id",
 		"kpRootKeyCRN":       "test-kp-root-key-crn",
 		"gid":                "1001",
 		"uid":                "1001",
@@ -318,12 +320,13 @@ func TestCreateConfig_Success_HMAC(t *testing.T) {
 
 func TestCreateConfig_Success_IAM(t *testing.T) {
 	rclone := &RcloneMounter{
-		AccessKeys:    "testApiKey",
-		EndPoint:      "test-endpoint",
-		LocConstraint: "us-south",
-		IAMEndpoint:   "test-iam-endpoint",
-		AuthType:      "iam",
-		MountOptions:  []string{"vfs-cache-mode=writes"},
+		AccessKeys:        "testApiKey",
+		serviceInstanceID: "test-service-instance-id",
+		EndPoint:          "test-endpoint",
+		LocConstraint:     "us-south",
+		IAMEndpoint:       "test-iam-endpoint",
+		AuthType:          "iam",
+		MountOptions:      []string{"vfs-cache-mode=writes"},
 	}
 
 	// Create a temporary directory for the test
@@ -347,6 +350,7 @@ func TestCreateConfig_Success_IAM(t *testing.T) {
 	assert.Contains(t, configStr, "env_auth = false")
 	assert.Contains(t, configStr, "v2_auth = true")
 	assert.Contains(t, configStr, "ibm_api_key = testApiKey")
+	assert.Contains(t, configStr, "ibm_resource_instance_id = test-service-instance-id")
 	assert.Contains(t, configStr, "ibm_iam_endpoint = test-iam-endpoint")
 	assert.Contains(t, configStr, "location_constraint = us-south")
 	assert.Contains(t, configStr, "vfs-cache-mode=writes")
