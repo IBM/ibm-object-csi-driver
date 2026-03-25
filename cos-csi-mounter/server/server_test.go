@@ -347,15 +347,15 @@ func TestPerformHealthCheck_Success(t *testing.T) {
 	constants.SocketFile = "test-health-success.sock"
 	socketPath := filepath.Join(tmpDir, constants.SocketFile)
 
-	os.Remove(socketPath)
-	defer os.Remove(socketPath)
+	_ = os.Remove(socketPath)
+	defer func() { _ = os.Remove(socketPath) }()
 
 	listener, err := net.Listen("unix", socketPath)
 	if err != nil {
 		t.Skipf("Cannot create Unix socket on this platform: %v", err)
 		return
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 
 	go func() {
 		for {
@@ -363,7 +363,7 @@ func TestPerformHealthCheck_Success(t *testing.T) {
 			if err != nil {
 				return
 			}
-			conn.Close()
+			_ = conn.Close()
 		}
 	}()
 
@@ -388,25 +388,24 @@ func TestPerformHealthCheck_SocketNotConnectable(t *testing.T) {
 	constants.SocketFile = "test-unconnectable.sock"
 	socketPath := filepath.Join(tmpDir, constants.SocketFile)
 
-	os.Remove(socketPath)
-	defer os.Remove(socketPath)
+	_ = os.Remove(socketPath)
+	defer func() { _ = os.Remove(socketPath) }()
 
 	file, err := os.Create(socketPath)
 	assert.NoError(t, err)
-	file.Close()
+	_ = file.Close()
 
 	err = performHealthCheck()
 	assert.Error(t, err, "health check should fail when socket is not connectable")
 	assert.Contains(t, err.Error(), "failed to connect to socket")
 }
 
-
 func TestWatchdogLoop_NotEnabled(t *testing.T) {
 	originalWatchdog := os.Getenv("WATCHDOG_USEC")
-	os.Unsetenv("WATCHDOG_USEC")
+	_ = os.Unsetenv("WATCHDOG_USEC")
 	defer func() {
 		if originalWatchdog != "" {
-			os.Setenv("WATCHDOG_USEC", originalWatchdog)
+			_ = os.Setenv("WATCHDOG_USEC", originalWatchdog)
 		}
 	}()
 
@@ -423,30 +422,30 @@ func TestWatchdogLoop_NotEnabled(t *testing.T) {
 }
 
 func TestWatchdogLoop_Enabled(t *testing.T) {
-	os.Setenv("WATCHDOG_USEC", "30000000")
-	defer os.Unsetenv("WATCHDOG_USEC")
+	_ = os.Setenv("WATCHDOG_USEC", "30000000")
+	defer func() { _ = os.Unsetenv("WATCHDOG_USEC") }()
 
 	tmpDir := "/tmp"
 	constants.SocketDir = tmpDir
 	constants.SocketFile = "test-watchdog.sock"
 	socketPath := filepath.Join(tmpDir, constants.SocketFile)
 
-	os.Remove(socketPath)
-	defer os.Remove(socketPath)
+	_ = os.Remove(socketPath)
+	defer func() { _ = os.Remove(socketPath) }()
 
 	listener, err := net.Listen("unix", socketPath)
 	if err != nil {
 		t.Skipf("Cannot create Unix socket on this platform: %v", err)
 		return
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 	go func() {
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
 				return
 			}
-			conn.Close()
+			_ = conn.Close()
 		}
 	}()
 
@@ -463,12 +462,12 @@ func TestWatchdogLoop_Enabled(t *testing.T) {
 	case <-time.After(200 * time.Millisecond):
 	}
 
-	listener.Close()
+	_ = listener.Close()
 }
 
 func TestWatchdogLoop_HealthCheckFails(t *testing.T) {
-	os.Setenv("WATCHDOG_USEC", "1000000")
-	defer os.Unsetenv("WATCHDOG_USEC")
+	_ = os.Setenv("WATCHDOG_USEC", "1000000")
+	defer func() { _ = os.Unsetenv("WATCHDOG_USEC") }()
 
 	tmpDir := t.TempDir()
 	constants.SocketDir = tmpDir
@@ -495,15 +494,15 @@ func TestPerformHealthCheck_ConcurrentCalls(t *testing.T) {
 	constants.SocketFile = "test-concurrent.sock"
 	socketPath := filepath.Join(tmpDir, constants.SocketFile)
 
-	os.Remove(socketPath)
-	defer os.Remove(socketPath)
+	_ = os.Remove(socketPath)
+	defer func() { _ = os.Remove(socketPath) }()
 
 	listener, err := net.Listen("unix", socketPath)
 	if err != nil {
 		t.Skipf("Cannot create Unix socket on this platform: %v", err)
 		return
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 
 	go func() {
 		for {
@@ -511,7 +510,7 @@ func TestPerformHealthCheck_ConcurrentCalls(t *testing.T) {
 			if err != nil {
 				return
 			}
-			conn.Close()
+			_ = conn.Close()
 		}
 	}()
 
