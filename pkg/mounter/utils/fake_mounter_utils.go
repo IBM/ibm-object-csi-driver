@@ -6,8 +6,6 @@ type FakeMounterUtilsFuncStruct struct {
 }
 
 type FakeMounterUtilsFuncStructImpl struct {
-	MounterOptsUtils
-
 	FuncStruct FakeMounterUtilsFuncStruct
 }
 
