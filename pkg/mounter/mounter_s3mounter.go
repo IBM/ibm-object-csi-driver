@@ -16,26 +16,28 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// MountpointS3Mounter implements Mounter for AWS Mountpoint S3
+// MountpointS3Mounter implements Mounter for AWS Mountpoint S3.
 type MountpointS3Mounter struct {
-	BucketName    string
-	ObjectPath    string
-	EndPoint      string
-	LocConstraint string
-	AuthType      string
-	AccessKey     string
-	SecretKey     string
-	UID           string
-	GID           string
-	UMask         string // kept for API compatibility; mount-s3 has no --umask, use --dir-mode/--file-mode via MountOptions
-	LogLevel      string // valid values: "debug", "debug-crt", "no-log"; mount-s3 has no --log-level flag
-	ReadOnly      bool
-	MountOptions  []string
-	MounterUtils  utils.MounterUtils
+	BucketName     string
+	ObjectPath     string
+	EndPoint       string
+	LocConstraint  string
+	AuthType       string
+	AccessKey      string
+	SecretKey      string
+	UID            string
+	GID            string
+	LogLevel       string // valid values: "debug", "debug-crt", "no-log"; mount-s3 has no --log-level flag
+	LogDirectory   string // --log-directory <dir>, write logs to directory instead of syslog
+	ReadOnly       bool
+	AllowDelete    bool // --allow-delete, enable delete operations
+	AllowOverwrite bool // --allow-overwrite, enable overwrite operations
+	MountOptions   []string
+	MounterUtils   utils.MounterUtils
 
 	MaxThreads          string // --max-threads <N>, default: 16
-	ReadPartSize        string // --read-part-size <bytes>, default: 8388608 (8 MiB).
-	WritePartSize       string // --write-part-size <bytes>, default: 8388608 (8 MiB). Same rules as ReadPartSize.
+	ReadPartSize        string // --read-part-size <bytes>, default: 8388608 (8 MiB)
+	WritePartSize       string // --write-part-size <bytes>, default: 8388608 (8 MiB)
 	MaxThroughputGbps   string // --maximum-throughput-gbps <N>, default: auto-detect on EC2, 10 Gbps elsewhere
 	UploadChecksums     string // --upload-checksums <crc32c|off>, default: crc32c
 	CacheDir            string // --cache <dir>, enables local disk read cache, default: disabled
@@ -45,16 +47,19 @@ type MountpointS3Mounter struct {
 	LogMetrics          bool   // --log-metrics, enables summarized performance metrics in logs, default: false
 }
 
-// s3MounterArgs holds the args passed to the worker for mount-s3
+// s3MounterArgs holds the args passed to the worker for mount-s3.
 type s3MounterArgs struct {
 	ReadOnly   string `json:"read-only,omitempty"`
 	AllowOther string `json:"allow-other,omitempty"`
 	UID        string `json:"uid,omitempty"`
 	GID        string `json:"gid,omitempty"`
-	// Removed: UMask        — mount-s3 has no --umask flag
+	// Removed: UMask        — mount-s3 has no --umask flag; use --dir-mode/--file-mode via MountOptions
 	// Removed: AwsConfigDir — mount-s3 has no --aws-config-dir flag
-	LogLevel    string `json:"log-level,omitempty"` // valid: "debug", "debug-crt", "no-log"
-	EndpointURL string `json:"endpoint-url,omitempty"`
+	LogLevel       string `json:"log-level,omitempty"` // valid: "debug", "debug-crt", "no-log"
+	EndpointURL    string `json:"endpoint-url,omitempty"`
+	AllowDelete    string `json:"allow-delete,omitempty"`    // --allow-delete flag
+	AllowOverwrite string `json:"allow-overwrite,omitempty"` // --allow-overwrite flag
+	LogDirectory   string `json:"log-directory,omitempty"`   // --log-directory flag
 	// Region is passed explicitly as --region CLI flag in addition to being written
 	// in the AWS config file, to ensure it is always set even if AWS_CONFIG_FILE
 	// env var is not propagated correctly to the mount-s3 subprocess.
@@ -92,107 +97,215 @@ type envMounter interface {
 	FuseMountWithEnv(path string, comm string, args []string, envVars []string) error
 }
 
-// NewMountpointS3Mounter creates a new MountpointS3Mounter from secretMap
+// NewMountpointS3Mounter creates a new MountpointS3Mounter from the unified
+// secret format.
+//
+// Source mapping:
+//
+//	secretMap — credentials and bucket identity only:
+//	            accessKey, secretKey (data, base64-decoded by k8s)
+//	            bucketName, objectPath, cosEndpoint, locationConstraint,
+//	            uid, gid (stringData)
+//
+//	mountOptions — all mount-s3 behavioral and performance flags,
+//	               sourced from the secret's `mountOptions` field
+//	               and/or the StorageClass mountOptions.
+//	               Known flags are consumed into struct fields;
+//	               unrecognised flags pass through to mount-s3 as-is.
+//	               mountOptions uid/gid override secretMap uid/gid.
 func NewMountpointS3Mounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
 	klog.Info("-newMountpointS3Mounter-")
 
-	var (
-		val     string
-		check   bool
-		mounter = &MountpointS3Mounter{}
-	)
+	mounter := &MountpointS3Mounter{}
 
-	if val, check = secretMap["cosEndpoint"]; check {
-		mounter.EndPoint = val
-	}
-	if val, check = secretMap["locationConstraint"]; check {
-		mounter.LocConstraint = val
-	}
-	if val, check = secretMap["bucketName"]; check {
-		mounter.BucketName = val
-	}
-	if val, check = secretMap["objectPath"]; check {
-		mounter.ObjectPath = val
-	}
-	if val, check = secretMap["accessKey"]; check {
+	// --- Credentials (unified secret `data` fields, base64-decoded by k8s) ---
+	if val, ok := secretMap["accessKey"]; ok {
 		mounter.AccessKey = val
 	}
-	if val, check = secretMap["secretKey"]; check {
+	if val, ok := secretMap["secretKey"]; ok {
 		mounter.SecretKey = val
 	}
-	if val, check = secretMap["uid"]; check {
-		mounter.UID = val
+
+	// --- Bucket / endpoint identity (`stringData` fields) ---
+	if val, ok := secretMap["bucketName"]; ok {
+		mounter.BucketName = val
 	}
-	// If gid set but uid not, use gid for uid (same as rclone behavior)
-	if secretMap["gid"] != "" && secretMap["uid"] == "" {
-		mounter.UID = secretMap["gid"]
-	} else if secretMap["uid"] != "" {
-		mounter.UID = secretMap["uid"]
+	if val, ok := secretMap["objectPath"]; ok {
+		mounter.ObjectPath = val
 	}
-	if val, check = secretMap["gid"]; check {
-		mounter.GID = val
+	// cosEndpoint and locationConstraint are IBM COS-specific.
+	// They are not part of the upstream unified secret schema but remain
+	// supported as secretMap keys for IBM COS compatibility.
+	if val, ok := secretMap["cosEndpoint"]; ok {
+		mounter.EndPoint = val
 	}
-	if val, check = secretMap["umask"]; check {
-		mounter.UMask = val
-	}
-	if val, check = secretMap["logLevel"]; check {
-		mounter.LogLevel = val
-	}
-	if val, check = secretMap["readOnly"]; check {
-		mounter.ReadOnly = val == "true"
+	if val, ok := secretMap["locationConstraint"]; ok {
+		mounter.LocConstraint = val
 	}
 
-	// Performance tuning — all optional.
-	// If not set here, mount-s3 built-in defaults apply.
-	// StorageClass mountOptions override these if the same flag appears there.
-	if val, check = secretMap["maxThreads"]; check {
-		mounter.MaxThreads = val
+	// --- UID / GID from secretMap ---
+	// If gid is set but uid is not, mirror gid → uid (matches rclone behavior).
+	// mountOptions values (parsed below) override these if also present there.
+	if secretMap["gid"] != "" && secretMap["uid"] == "" {
+		mounter.UID = secretMap["gid"]
+	} else if val := secretMap["uid"]; val != "" {
+		mounter.UID = val
 	}
-	if val, check = secretMap["readPartSize"]; check {
-		mounter.ReadPartSize = val
-	}
-	if val, check = secretMap["writePartSize"]; check {
-		mounter.WritePartSize = val
-	}
-	if val, check = secretMap["maximumThroughputGbps"]; check {
-		mounter.MaxThroughputGbps = val
-	}
-	if val, check = secretMap["uploadChecksums"]; check {
-		mounter.UploadChecksums = val
-	}
-	if val, check = secretMap["cacheDir"]; check {
-		mounter.CacheDir = val
-	}
-	if val, check = secretMap["maxCacheSize"]; check {
-		mounter.MaxCacheSize = val
-	}
-	if val, check = secretMap["metadataTTL"]; check {
-		mounter.MetadataTTL = val
-	}
-	if val, check = secretMap["negativeMetadataTTL"]; check {
-		mounter.NegativeMetadataTTL = val
-	}
-	if val, check = secretMap["logMetrics"]; check {
-		mounter.LogMetrics = val == "true"
+	if val := secretMap["gid"]; val != "" {
+		mounter.GID = val
 	}
 
 	mounter.AuthType = "hmac"
 
-	klog.Infof("newMountpointS3Mounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
-		mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType)
-
-	mounter.MountOptions = mountOptions
+	// --- Parse mountOptions into struct fields ---
+	// Known mount-s3 flags are consumed; unrecognised flags are kept in
+	// MountOptions for pass-through. This runs last so that mountOptions
+	// values win over secretMap values for overlapping fields (uid, gid).
+	mounter.MountOptions = parseMountpointS3Options(mounter, mountOptions)
 	mounter.MounterUtils = mounterUtils
+
+	klog.Infof("newMountpointS3Mounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s] \n\tmountOptions: [%s]",
+		mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType, mounter.MountOptions)
 
 	return mounter
 }
 
-// Mount mounts the S3 bucket using mountpoint-s3
+// parseMountpointS3Options parses mount-s3 options from the provided slice and
+// populates recognised flags into the mounter struct.
+//
+// Rules:
+//   - Flags may be provided with or without a leading "--" prefix (both accepted).
+//   - Boolean flags (--read-only, --allow-delete, etc.) need no value.
+//   - Value flags must be in "flag=value" or "--flag=value" form.
+//   - "allow-other" is silently consumed — formulateMountOptions always adds it.
+//   - "umask" is consumed with a warning — mount-s3 has no --umask flag.
+//   - Unrecognised flags are returned unchanged for pass-through to mount-s3.
+//   - mountOptions uid/gid override secretMap uid/gid (caller sets secretMap
+//     values first; this function runs second).
+func parseMountpointS3Options(mounter *MountpointS3Mounter, opts []string) []string {
+	var remaining []string
+
+	for _, opt := range opts {
+		// Normalise: strip optional leading "--" so comparisons are uniform.
+		trimmed := strings.TrimPrefix(opt, "--")
+
+		key, value, hasValue := strings.Cut(trimmed, "=")
+
+		switch key {
+
+		// ------------------------------------------------------------------
+		// Always emitted by formulateMountOptions — consume to avoid duplicates.
+		// ------------------------------------------------------------------
+		case "allow-other":
+			// formulateMountOptions unconditionally adds --allow-other; drop here.
+
+		// ------------------------------------------------------------------
+		// Unsupported by mount-s3 — warn and drop so mount-s3 doesn't fail.
+		// ------------------------------------------------------------------
+		case "umask":
+			klog.Warningf("parseMountpointS3Options: 'umask' is not supported by mount-s3. " +
+				"Use --dir-mode / --file-mode via mountOptions in the StorageClass instead. Ignoring.")
+
+		// ------------------------------------------------------------------
+		// Boolean mount flags — presence means enabled, no value needed.
+		// ------------------------------------------------------------------
+		case "read-only":
+			mounter.ReadOnly = true
+		case "allow-delete":
+			mounter.AllowDelete = true
+		case "allow-overwrite":
+			mounter.AllowOverwrite = true
+		case "log-metrics":
+			mounter.LogMetrics = true
+
+		// ------------------------------------------------------------------
+		// Identity — mountOptions values override secretMap values.
+		// ------------------------------------------------------------------
+		case "uid":
+			if hasValue {
+				mounter.UID = value
+			}
+		case "gid":
+			if hasValue {
+				mounter.GID = value
+			}
+
+		// ------------------------------------------------------------------
+		// Logging
+		// ------------------------------------------------------------------
+		case "log-level":
+			// mount-s3 has no --log-level flag.
+			// formulateMountOptions maps: "debug" → --debug,
+			// "debug-crt" → --debug-crt, "no-log" → --no-log.
+			if hasValue {
+				mounter.LogLevel = value
+			}
+		case "log-directory":
+			if hasValue {
+				mounter.LogDirectory = value
+			}
+
+		// ------------------------------------------------------------------
+		// Performance tuning
+		// ------------------------------------------------------------------
+		case "max-threads":
+			if hasValue {
+				mounter.MaxThreads = value
+			}
+		case "read-part-size":
+			if hasValue {
+				mounter.ReadPartSize = value
+			}
+		case "write-part-size":
+			if hasValue {
+				mounter.WritePartSize = value
+			}
+		case "maximum-throughput-gbps":
+			if hasValue {
+				mounter.MaxThroughputGbps = value
+			}
+		case "upload-checksums":
+			if hasValue {
+				mounter.UploadChecksums = value
+			}
+
+		// ------------------------------------------------------------------
+		// Caching
+		// ------------------------------------------------------------------
+		case "cache":
+			if hasValue {
+				mounter.CacheDir = value
+			}
+		case "max-cache-size":
+			if hasValue {
+				mounter.MaxCacheSize = value
+			}
+		case "metadata-ttl":
+			if hasValue {
+				mounter.MetadataTTL = value
+			}
+		case "negative-metadata-ttl":
+			if hasValue {
+				mounter.NegativeMetadataTTL = value
+			}
+
+		// ------------------------------------------------------------------
+		// Unrecognised — pass through to mount-s3 unchanged.
+		// ------------------------------------------------------------------
+		default:
+			remaining = append(remaining, opt)
+		}
+	}
+
+	return remaining
+}
+
+// Mount mounts the S3 bucket using mountpoint-s3.
 func (s3 *MountpointS3Mounter) Mount(source string, target string) error {
 	klog.Info("-MountpointS3Mounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
 
-	// Determine config path based on mode
+	// Determine config path based on mode.
 	var configPath string
 	if mountWorker {
 		configPath = constants.MounterConfigPathOnHost
@@ -200,16 +313,16 @@ func (s3 *MountpointS3Mounter) Mount(source string, target string) error {
 		configPath = constants.MounterConfigPathOnPodS3Mount
 	}
 
-	// Create unique config dir per volume
+	// Create unique config dir per volume.
 	configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 
-	// Write AWS credentials and config files
+	// Write AWS credentials and config files.
 	if err := createS3MountConfig(configPathWithVolID, s3); err != nil {
 		klog.Errorf("MountpointS3Mounter Mount: Cannot create config file: %v", err)
 		return err
 	}
 
-	// Build bucket path with optional object path prefix
+	// Build bucket path with optional object path prefix.
 	bucketName := s3.BucketName
 	if s3.ObjectPath != "" {
 		trimmedPath := strings.TrimPrefix(s3.ObjectPath, "/")
@@ -252,7 +365,7 @@ func (s3 *MountpointS3Mounter) Mount(source string, target string) error {
 	return s3.MounterUtils.FuseMount(target, constants.MountpointS3BinaryPath, args)
 }
 
-// Unmount unmounts the S3 bucket
+// Unmount unmounts the S3 bucket.
 func (s3 *MountpointS3Mounter) Unmount(target string) error {
 	klog.Info("-MountpointS3Mounter Unmount-")
 
@@ -290,7 +403,7 @@ func (s3 *MountpointS3Mounter) Unmount(target string) error {
 //	  credentials   <- AWS credentials (access/secret key)
 //	  config        <- AWS config (region, endpoint_url)
 func createS3MountConfig(configPathWithVolID string, s3 *MountpointS3Mounter) error {
-	// Create the config directory
+	// Create the config directory.
 	if err := MakeDir(configPathWithVolID, 0755); err != nil { // #nosec G301 -- directory is created under a controlled path using SHA256 hash, not user input
 		klog.Errorf("MountpointS3Mounter: Cannot create config dir %s: %v", configPathWithVolID, err)
 		return err
@@ -335,7 +448,7 @@ func createS3MountConfig(configPathWithVolID string, s3 *MountpointS3Mounter) er
 	return nil
 }
 
-// writeConfigFile writes lines to a file with 0600 permissions
+// writeConfigFile writes lines to a file with 0600 permissions.
 func writeConfigFile(filePath string, lines []string) error {
 	f, err := CreateFile(filePath) // #nosec G304 -- filePath is constructed internally from a SHA256 hash and constant config dir, not from user input
 	if err != nil {
@@ -389,7 +502,7 @@ func (s3 *MountpointS3Mounter) formulateMountOptions(bucket, target, configPathW
 		AwsConfigFile:      cfgFilePath,
 	}
 
-	// Endpoint (IBM COS endpoint)
+	// Endpoint (IBM COS endpoint).
 	if s3.EndPoint != "" {
 		nodeServerOp = append(nodeServerOp, "--endpoint-url="+s3.EndPoint)
 		workerNodeOp.EndpointURL = s3.EndPoint
@@ -401,27 +514,20 @@ func (s3 *MountpointS3Mounter) formulateMountOptions(bucket, target, configPathW
 		workerNodeOp.Region = s3.LocConstraint
 	}
 
-	// UID
+	// UID.
 	if s3.UID != "" {
 		nodeServerOp = append(nodeServerOp, "--uid="+s3.UID)
 		workerNodeOp.UID = s3.UID
 	}
 
-	// GID
+	// GID.
 	if s3.GID != "" {
 		nodeServerOp = append(nodeServerOp, "--gid="+s3.GID)
 		workerNodeOp.GID = s3.GID
 	}
 
-	// UMask: mount-s3 has no --umask flag.
-	// Use --dir-mode / --file-mode via MountOptions in the StorageClass instead.
-	if s3.UMask != "" {
-		klog.Warningf("MountpointS3Mounter: 'umask=%s' is set but mount-s3 does not support --umask. "+
-			"Use --dir-mode / --file-mode via mountOptions in the StorageClass instead.", s3.UMask)
-	}
-
 	// Log level: mount-s3 has no --log-level flag.
-	// Valid mappings: "debug" → --debug, "debug-crt" → --debug-crt, "no-log" → --no-log
+	// Valid mappings: "debug" → --debug, "debug-crt" → --debug-crt, "no-log" → --no-log.
 	// Anything else (e.g. "warn", "info") is ignored — mount-s3 default logging applies.
 	switch s3.LogLevel {
 	case "debug":
@@ -440,46 +546,65 @@ func (s3 *MountpointS3Mounter) formulateMountOptions(bucket, target, configPathW
 		}
 	}
 
-	// Read-only
+	// Read-only.
 	if s3.ReadOnly {
 		nodeServerOp = append(nodeServerOp, "--read-only")
 		workerNodeOp.ReadOnly = "true"
 	}
 
+	// Allow delete.
+	if s3.AllowDelete {
+		nodeServerOp = append(nodeServerOp, "--allow-delete")
+		workerNodeOp.AllowDelete = "true"
+	}
+
+	// Allow overwrite.
+	if s3.AllowOverwrite {
+		nodeServerOp = append(nodeServerOp, "--allow-overwrite")
+		workerNodeOp.AllowOverwrite = "true"
+	}
+
+	// Log directory.
+	if s3.LogDirectory != "" {
+		nodeServerOp = append(nodeServerOp, "--log-directory="+s3.LogDirectory)
+		workerNodeOp.LogDirectory = s3.LogDirectory
+	}
+
 	// --- Performance tuning options ---
+
+	// --read-part-size (default: 8 MiB).
 	if s3.ReadPartSize != "" {
 		nodeServerOp = append(nodeServerOp, "--read-part-size="+s3.ReadPartSize)
 		workerNodeOp.ReadPartSize = s3.ReadPartSize
 	}
 
-	// --write-part-size (default: 8388608 = 8 MiB). Same rules as read-part-size.
+	// --write-part-size (default: 8 MiB).
 	if s3.WritePartSize != "" {
 		nodeServerOp = append(nodeServerOp, "--write-part-size="+s3.WritePartSize)
 		workerNodeOp.WritePartSize = s3.WritePartSize
 	}
 
-	// --max-threads (default: 16)
-	// Increase for workloads with many concurrent file operations.
+	// --max-threads (default: 16).
 	if s3.MaxThreads != "" {
 		nodeServerOp = append(nodeServerOp, "--max-threads="+s3.MaxThreads)
 		workerNodeOp.MaxThreads = s3.MaxThreads
 	}
 
-	// --maximum-throughput-gbps (default: auto-detect on EC2, 10 Gbps elsewhere)
+	// --maximum-throughput-gbps (default: auto-detect on EC2, 10 Gbps elsewhere).
 	// Not on EC2 so won't auto-detect correctly — set explicitly if you know your node bandwidth.
 	if s3.MaxThroughputGbps != "" {
 		nodeServerOp = append(nodeServerOp, "--maximum-throughput-gbps="+s3.MaxThroughputGbps)
 		workerNodeOp.MaxThroughputGbps = s3.MaxThroughputGbps
 	}
 
-	// --upload-checksums (default: crc32c)
+	// --upload-checksums (default: crc32c).
 	// Set to "off" to reduce CPU overhead on write-heavy workloads at the cost of integrity checks.
 	if s3.UploadChecksums != "" {
 		nodeServerOp = append(nodeServerOp, "--upload-checksums="+s3.UploadChecksums)
 		workerNodeOp.UploadChecksums = s3.UploadChecksums
 	}
 
-	// --cache + --max-cache-size (default: disabled)
+	// --cache + --max-cache-size (default: disabled).
 	// Enables local disk read cache — improves repeated read performance.
 	// When cache is set, metadata-ttl defaults to 60s automatically.
 	if s3.CacheDir != "" {
@@ -491,20 +616,20 @@ func (s3 *MountpointS3Mounter) formulateMountOptions(bucket, target, configPathW
 		}
 	}
 
-	// --metadata-ttl (default: minimal, or 60s if --cache is set)
+	// --metadata-ttl (default: minimal, or 60s if --cache is set).
 	// Set higher to reduce ListObjects API calls on stable buckets.
 	if s3.MetadataTTL != "" {
 		nodeServerOp = append(nodeServerOp, "--metadata-ttl="+s3.MetadataTTL)
 		workerNodeOp.MetadataTTL = s3.MetadataTTL
 	}
 
-	// --negative-metadata-ttl (default: same as metadata-ttl)
+	// --negative-metadata-ttl (default: same as metadata-ttl).
 	if s3.NegativeMetadataTTL != "" {
 		nodeServerOp = append(nodeServerOp, "--negative-metadata-ttl="+s3.NegativeMetadataTTL)
 		workerNodeOp.NegativeMetadataTTL = s3.NegativeMetadataTTL
 	}
 
-	// --log-metrics (default: false)
+	// --log-metrics (default: false).
 	// Logs summarized throughput metrics — zero performance cost, useful for monitoring.
 	if s3.LogMetrics {
 		nodeServerOp = append(nodeServerOp, "--log-metrics")
@@ -520,7 +645,7 @@ func (s3 *MountpointS3Mounter) formulateMountOptions(bucket, target, configPathW
 	return nodeServerOp, envVars, workerNodeOp
 }
 
-// removeS3MountConfigFile removes the config directory for the volume (same pattern as rclone)
+// removeS3MountConfigFile removes the config directory for the volume (same pattern as rclone).
 func removeS3MountConfigFile(configPath, target string) {
 	configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 
