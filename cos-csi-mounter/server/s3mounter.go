@@ -7,14 +7,17 @@ import (
 )
 
 type s3MounterArgs struct {
-	ReadOnly   string `json:"read-only,omitempty"`
-	AllowOther string `json:"allow-other,omitempty"`
-	UID        string `json:"uid,omitempty"`
-	GID        string `json:"gid,omitempty"`
+	ReadOnly       string `json:"read-only,omitempty"`
+	AllowOther     string `json:"allow-other,omitempty"`
+	AllowDelete    string `json:"allow-delete,omitempty"`
+	AllowOverwrite string `json:"allow-overwrite,omitempty"`
+	UID            string `json:"uid,omitempty"`
+	GID            string `json:"gid,omitempty"`
 	// Removed: UMask        — mount-s3 has no --umask flag; use --dir-mode/--file-mode via MountOptions
 	// Removed: AwsConfigDir — mount-s3 has no --aws-config-dir flag
-	LogLevel    string `json:"log-level,omitempty"` // valid: "debug", "debug-crt", "no-log"
-	EndpointURL string `json:"endpoint-url,omitempty"`
+	LogLevel     string `json:"log-level,omitempty"` // valid: "debug", "debug-crt", "no-log"
+	LogDirectory string `json:"log-directory,omitempty"`
+	EndpointURL  string `json:"endpoint-url,omitempty"`
 	// Region is passed explicitly as --region CLI flag in addition to being written
 	// in the AWS config file, to ensure it is always set even if AWS_CONFIG_FILE
 	// env var is not propagated correctly to the mount-s3 subprocess.
@@ -57,6 +60,16 @@ func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string
 		result = append(result, "--read-only")
 	}
 
+	// --allow-delete: boolean flag, no value
+	if args.AllowDelete == "true" {
+		result = append(result, "--allow-delete")
+	}
+
+	// --allow-overwrite: boolean flag, no value
+	if args.AllowOverwrite == "true" {
+		result = append(result, "--allow-overwrite")
+	}
+
 	// --uid
 	if args.UID != "" {
 		result = append(result, "--uid="+args.UID)
@@ -93,6 +106,11 @@ func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string
 				zap.String("supported", "debug, debug-crt, no-log"),
 			)
 		}
+	}
+
+	// --log-directory
+	if args.LogDirectory != "" {
+		result = append(result, "--log-directory="+args.LogDirectory)
 	}
 
 	// --- Performance tuning options ---
@@ -196,11 +214,43 @@ func (args s3MounterArgs) Validate(targetPath string) error {
 		}
 	}
 
+	// allow-delete must be a boolean string if set
+	if args.AllowDelete != "" {
+		if isBool := isBoolString(args.AllowDelete); !isBool {
+			logger.Error("cannot convert value of allow-delete into boolean", zap.Any("allow-delete", args.AllowDelete))
+			return fmt.Errorf("cannot convert value of allow-delete into boolean: %v", args.AllowDelete)
+		}
+	}
+
+	// allow-overwrite must be a boolean string if set
+	if args.AllowOverwrite != "" {
+		if isBool := isBoolString(args.AllowOverwrite); !isBool {
+			logger.Error("cannot convert value of allow-overwrite into boolean", zap.Any("allow-overwrite", args.AllowOverwrite))
+			return fmt.Errorf("cannot convert value of allow-overwrite into boolean: %v", args.AllowOverwrite)
+		}
+	}
+
 	// upload-checksums must be a valid value if set.
 	// Validated early here so users get a clear error rather than a cryptic mount-s3 failure.
 	if args.UploadChecksums != "" && args.UploadChecksums != "crc32c" && args.UploadChecksums != "off" {
 		logger.Error("invalid upload-checksums value", zap.String("value", args.UploadChecksums))
 		return fmt.Errorf("invalid upload-checksums value '%s': must be 'crc32c' or 'off'", args.UploadChecksums)
+	}
+
+	// Ensure cache directory exists if specified
+	if args.CacheDir != "" {
+		if err := ensureDir(args.CacheDir); err != nil {
+			logger.Error("failed to create cache directory", zap.String("cache-dir", args.CacheDir), zap.Error(err))
+			return fmt.Errorf("failed to create cache directory '%s': %w", args.CacheDir, err)
+		}
+	}
+
+	// Ensure log directory exists if specified
+	if args.LogDirectory != "" {
+		if err := ensureDir(args.LogDirectory); err != nil {
+			logger.Error("failed to create log directory", zap.String("log-dir", args.LogDirectory), zap.Error(err))
+			return fmt.Errorf("failed to create log directory '%s': %w", args.LogDirectory, err)
+		}
 	}
 
 	return nil
