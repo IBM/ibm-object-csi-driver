@@ -145,7 +145,7 @@ func ensureDir(path string) error {
 	}
 
 	// Directory doesn't exist, create it with parent directories
-	if err := os.MkdirAll(path, 0755); err != nil {
+	if err := os.MkdirAll(path, 0750); err != nil { // #nosec G301 -- cache directory permissions set to 0750 for security
 		return fmt.Errorf("failed to create cache directory: %w", err)
 	}
 
