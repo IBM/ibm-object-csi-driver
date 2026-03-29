@@ -100,19 +100,17 @@ type envMounter interface {
 // NewMountpointS3Mounter creates a new MountpointS3Mounter from the unified
 // secret format.
 //
-// Source mapping:
+// Source mapping and precedence (lowest → highest):
 //
-//	secretMap — credentials and bucket identity only:
-//	            accessKey, secretKey (data, base64-decoded by k8s)
-//	            bucketName, objectPath, cosEndpoint, locationConstraint,
-//	            uid, gid (stringData)
+//  1. secretMap identity keys — accessKey, secretKey, bucketName, objectPath,
+//     cosEndpoint, locationConstraint, uid, gid
+//  2. StorageClass mountOptions (mountOptions []string arg) — parsed first
+//  3. Secret mountOptions (secretMap["mountOptions"] multiline string) — parsed
+//     second and therefore wins over StorageClass on any overlapping flag
 //
-//	mountOptions — all mount-s3 behavioral and performance flags,
-//	               sourced from the secret's `mountOptions` field
-//	               and/or the StorageClass mountOptions.
-//	               Known flags are consumed into struct fields;
-//	               unrecognised flags pass through to mount-s3 as-is.
-//	               mountOptions uid/gid override secretMap uid/gid.
+// For passthrough flags (unrecognised by the parser), the same precedence
+// applies: secret passthroughs are appended after SC passthroughs, so
+// mount-s3 sees the secret value last (last-value-wins semantics).
 func NewMountpointS3Mounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
 	klog.Info("-newMountpointS3Mounter-")
 
@@ -143,9 +141,9 @@ func NewMountpointS3Mounter(secretMap map[string]string, mountOptions []string, 
 		mounter.LocConstraint = val
 	}
 
-	// --- UID / GID from secretMap ---
+	// --- UID / GID from secretMap (lowest precedence for these fields) ---
 	// If gid is set but uid is not, mirror gid → uid (matches rclone behavior).
-	// mountOptions values (parsed below) override these if also present there.
+	// Both can be overridden by mountOptions below.
 	if secretMap["gid"] != "" && secretMap["uid"] == "" {
 		mounter.UID = secretMap["gid"]
 	} else if val := secretMap["uid"]; val != "" {
@@ -157,17 +155,53 @@ func NewMountpointS3Mounter(secretMap map[string]string, mountOptions []string, 
 
 	mounter.AuthType = "hmac"
 
-	// --- Parse mountOptions into struct fields ---
-	// Known mount-s3 flags are consumed; unrecognised flags are kept in
-	// MountOptions for pass-through. This runs last so that mountOptions
-	// values win over secretMap values for overlapping fields (uid, gid).
-	mounter.MountOptions = parseMountpointS3Options(mounter, mountOptions)
+	// --- Merge and parse mountOptions ---
+	//
+	// Step 1: Parse StorageClass mountOptions (the []string arg).
+	//         These come in already split by the kubelet.
+	scRemainder := parseMountpointS3Options(mounter, mountOptions)
+
+	// Step 2: Parse the secret's mountOptions multiline string.
+	//         splitSecretMountOptions handles blank lines and # comments.
+	//         Secret options are parsed AFTER SC options so they win on overlap.
+	secretOpts := splitSecretMountOptions(secretMap["mountOptions"])
+	secretRemainder := parseMountpointS3Options(mounter, secretOpts)
+
+	// Step 3: Build the final passthrough slice.
+	//         SC passthroughs come first; secret passthroughs come last so
+	//         mount-s3 sees the secret value last (last-value-wins).
+	mounter.MountOptions = append(scRemainder, secretRemainder...)
 	mounter.MounterUtils = mounterUtils
 
-	klog.Infof("newMountpointS3Mounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s] \n\tmountOptions: [%s]",
-		mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType, mounter.MountOptions)
+	klog.Infof("newMountpointS3Mounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
+		mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType)
+	klog.Infof("newMountpointS3Mounter: SC mountOptions=%v secretMountOptions=%v passthrough=%v",
+		mountOptions, secretOpts, mounter.MountOptions)
 
 	return mounter
+}
+
+// splitSecretMountOptions splits the multiline mountOptions string from the
+// secret into a []string suitable for parseMountpointS3Options.
+//
+// Rules:
+//   - Each non-empty line is one flag (same as StorageClass mountOptions).
+//   - Lines beginning with '#' (after trimming) are comments — skipped.
+//   - Leading/trailing whitespace on each line is trimmed.
+//   - Blank lines are skipped.
+func splitSecretMountOptions(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	var opts []string
+	for _, line := range strings.Split(raw, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		opts = append(opts, line)
+	}
+	return opts
 }
 
 // parseMountpointS3Options parses mount-s3 options from the provided slice and
