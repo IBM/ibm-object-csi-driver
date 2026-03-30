@@ -11,6 +11,7 @@
 package driver
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -26,7 +27,6 @@ import (
 	"github.com/aws/smithy-go"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"go.uber.org/zap"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	v1 "k8s.io/api/core/v1"

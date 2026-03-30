@@ -11,6 +11,7 @@
 package driver
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
@@ -18,7 +19,6 @@ import (
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
