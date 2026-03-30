@@ -10,26 +10,26 @@ import (
 
 var (
 	s3MounterSecretMap = map[string]string{
-		"cosEndpoint":            "https://s3.us-east.cloud-object-storage.appdomain.cloud",
-		"locationConstraint":     "us-east",
-		"bucketName":             "test-bucket",
-		"objectPath":             "test-path",
-		"accessKey":              "test-access-key",
-		"secretKey":              "test-secret-key",
-		"uid":                    "1000",
-		"gid":                    "1000",
-		"logLevel":               "debug",
-		"readOnly":               "true",
-		"maxThreads":             "32",
-		"readPartSize":           "16777216",
-		"writePartSize":          "16777216",
-		"maximumThroughputGbps":  "20",
-		"uploadChecksums":        "crc32c",
-		"cacheDir":               "/tmp/cache",
-		"maxCacheSize":           "1024",
-		"metadataTTL":            "60",
-		"negativeMetadataTTL":    "30",
-		"logMetrics":             "true",
+		"cosEndpoint":        "https://s3.us-east.cloud-object-storage.appdomain.cloud",
+		"locationConstraint": "us-east",
+		"bucketName":         "test-bucket",
+		"objectPath":         "test-path",
+		"accessKey":          "test-access-key",
+		"secretKey":          "test-secret-key",
+		"uid":                "1000",
+		"gid":                "1000",
+		"mountOptions": `log-level=debug
+read-only
+max-threads=32
+read-part-size=16777216
+write-part-size=16777216
+maximum-throughput-gbps=20
+upload-checksums=crc32c
+cache=/tmp/cache
+max-cache-size=1024
+metadata-ttl=60
+negative-metadata-ttl=30
+log-metrics`,
 	}
 
 	s3MounterMountOptions = []string{"--dir-mode=0755", "--file-mode=0644"}
