@@ -49,7 +49,7 @@ func TestNewMountpointS3Mounter_Success(t *testing.T) {
 	assert.Equal(t, s3MounterSecretMap["secretKey"], s3Mounter.SecretKey)
 	assert.Equal(t, s3MounterSecretMap["uid"], s3Mounter.UID)
 	assert.Equal(t, s3MounterSecretMap["gid"], s3Mounter.GID)
-	assert.Equal(t, s3MounterSecretMap["logLevel"], s3Mounter.LogLevel)
+	assert.Equal(t, "debug", s3Mounter.LogLevel)
 	assert.True(t, s3Mounter.ReadOnly)
 	assert.Equal(t, "hmac", s3Mounter.AuthType)
 }
@@ -60,15 +60,15 @@ func TestNewMountpointS3Mounter_PerformanceTuning(t *testing.T) {
 	s3Mounter, ok := mounter.(*MountpointS3Mounter)
 	assert.True(t, ok)
 
-	assert.Equal(t, s3MounterSecretMap["maxThreads"], s3Mounter.MaxThreads)
-	assert.Equal(t, s3MounterSecretMap["readPartSize"], s3Mounter.ReadPartSize)
-	assert.Equal(t, s3MounterSecretMap["writePartSize"], s3Mounter.WritePartSize)
-	assert.Equal(t, s3MounterSecretMap["maximumThroughputGbps"], s3Mounter.MaxThroughputGbps)
-	assert.Equal(t, s3MounterSecretMap["uploadChecksums"], s3Mounter.UploadChecksums)
-	assert.Equal(t, s3MounterSecretMap["cacheDir"], s3Mounter.CacheDir)
-	assert.Equal(t, s3MounterSecretMap["maxCacheSize"], s3Mounter.MaxCacheSize)
-	assert.Equal(t, s3MounterSecretMap["metadataTTL"], s3Mounter.MetadataTTL)
-	assert.Equal(t, s3MounterSecretMap["negativeMetadataTTL"], s3Mounter.NegativeMetadataTTL)
+	assert.Equal(t, "32", s3Mounter.MaxThreads)
+	assert.Equal(t, "16777216", s3Mounter.ReadPartSize)
+	assert.Equal(t, "16777216", s3Mounter.WritePartSize)
+	assert.Equal(t, "20", s3Mounter.MaxThroughputGbps)
+	assert.Equal(t, "crc32c", s3Mounter.UploadChecksums)
+	assert.Equal(t, "/tmp/cache", s3Mounter.CacheDir)
+	assert.Equal(t, "1024", s3Mounter.MaxCacheSize)
+	assert.Equal(t, "60", s3Mounter.MetadataTTL)
+	assert.Equal(t, "30", s3Mounter.NegativeMetadataTTL)
 	assert.True(t, s3Mounter.LogMetrics)
 }
 
@@ -112,12 +112,17 @@ func TestMountpointS3Mount_NodeServer_Positive(t *testing.T) {
 		return nil
 	}
 
-	s3Mounter := &MountpointS3Mounter{
+	// Create a mock that implements envMounter interface
+	mockUtils := &mockEnvMounter{
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path, comm string, args []string) error {
 				return nil
 			},
 		}),
+	}
+
+	s3Mounter := &MountpointS3Mounter{
+		MounterUtils:  mockUtils,
 		BucketName:    "test-bucket",
 		ObjectPath:    "test-path",
 		EndPoint:      "https://s3.us-east.cloud-object-storage.appdomain.cloud",
@@ -211,7 +216,7 @@ func TestMountpointS3Mount_CreateDirFails_Negative(t *testing.T) {
 
 	err := s3Mounter.Mount(source, target)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Cannot create config dir")
+	assert.Contains(t, err.Error(), "failed to create directory")
 }
 
 func TestMountpointS3Mount_CreateCredFileFails_Negative(t *testing.T) {
@@ -552,7 +557,7 @@ func TestCreateS3MountConfig_MakeDirFails(t *testing.T) {
 
 	err := createS3MountConfig("/config/path", s3Mounter)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Cannot create config dir")
+	assert.Contains(t, err.Error(), "failed to create directory")
 }
 
 func TestCreateS3MountConfig_CreateFileFails(t *testing.T) {
@@ -570,7 +575,7 @@ func TestCreateS3MountConfig_CreateFileFails(t *testing.T) {
 
 	err := createS3MountConfig("/config/path", s3Mounter)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Cannot write credentials file")
+	assert.Contains(t, err.Error(), "failed to create file")
 }
 
 func TestCreateS3MountConfig_ChmodFails(t *testing.T) {
@@ -591,7 +596,7 @@ func TestCreateS3MountConfig_ChmodFails(t *testing.T) {
 
 	err := createS3MountConfig("/config/path", s3Mounter)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Cannot write credentials file")
+	assert.Contains(t, err.Error(), "failed to chmod")
 }
 
 // mockEnvMounter implements the envMounter interface for testing
