@@ -4,8 +4,6 @@ import (
 	"errors"
 	"os"
 	"testing"
-
-	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/stretchr/testify/assert"
 )
@@ -20,7 +18,6 @@ var (
 		"secretKey":              "test-secret-key",
 		"uid":                    "1000",
 		"gid":                    "1000",
-		"umask":                  "0022",
 		"logLevel":               "debug",
 		"readOnly":               "true",
 		"maxThreads":             "32",
@@ -36,8 +33,6 @@ var (
 	}
 
 	s3MounterMountOptions = []string{"--dir-mode=0755", "--file-mode=0644"}
-	source                = "test-source"
-	target                = "/mnt/test-target"
 )
 
 func TestNewMountpointS3Mounter_Success(t *testing.T) {
@@ -54,7 +49,6 @@ func TestNewMountpointS3Mounter_Success(t *testing.T) {
 	assert.Equal(t, s3MounterSecretMap["secretKey"], s3Mounter.SecretKey)
 	assert.Equal(t, s3MounterSecretMap["uid"], s3Mounter.UID)
 	assert.Equal(t, s3MounterSecretMap["gid"], s3Mounter.GID)
-	assert.Equal(t, s3MounterSecretMap["umask"], s3Mounter.UMask)
 	assert.Equal(t, s3MounterSecretMap["logLevel"], s3Mounter.LogLevel)
 	assert.True(t, s3Mounter.ReadOnly)
 	assert.Equal(t, "hmac", s3Mounter.AuthType)
@@ -405,7 +399,6 @@ func TestFormulateMountOptions_AllOptions(t *testing.T) {
 		LocConstraint:       "us-east",
 		UID:                 "1000",
 		GID:                 "2000",
-		UMask:               "0022",
 		LogLevel:            "debug",
 		ReadOnly:            true,
 		MaxThreads:          "32",
@@ -603,11 +596,9 @@ func TestCreateS3MountConfig_ChmodFails(t *testing.T) {
 
 // mockEnvMounter implements the envMounter interface for testing
 type mockEnvMounter struct {
-	*mounterUtils.FakeMounterUtilsImpl
+	mounterUtils.MounterUtils
 }
 
 func (m *mockEnvMounter) FuseMountWithEnv(path string, comm string, args []string, envVars []string) error {
 	return nil
 }
-
-// Made with Bob
