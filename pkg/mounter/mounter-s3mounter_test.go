@@ -106,7 +106,7 @@ func TestMountpointS3Mount_NodeServer_Positive(t *testing.T) {
 		return nil
 	}
 	CreateFile = func(path string) (*os.File, error) {
-		return &os.File{}, nil
+		return os.CreateTemp("", "test")
 	}
 	Chmod = func(path string, perm os.FileMode) error {
 		return nil
@@ -142,7 +142,7 @@ func TestMountpointS3Mount_NodeServer_WithEnvMounter(t *testing.T) {
 		return nil
 	}
 	CreateFile = func(path string) (*os.File, error) {
-		return &os.File{}, nil
+		return os.CreateTemp("", "test")
 	}
 	Chmod = func(path string, perm os.FileMode) error {
 		return nil
@@ -174,7 +174,7 @@ func TestMountpointS3Mount_WorkerNode_Positive(t *testing.T) {
 		return nil
 	}
 	CreateFile = func(path string) (*os.File, error) {
-		return &os.File{}, nil
+		return os.CreateTemp("", "test")
 	}
 	Chmod = func(path string, perm os.FileMode) error {
 		return nil
@@ -242,7 +242,7 @@ func TestMountpointS3Mount_WorkerNode_Negative(t *testing.T) {
 		return nil
 	}
 	CreateFile = func(path string) (*os.File, error) {
-		return &os.File{}, nil
+		return os.CreateTemp("", "test")
 	}
 	Chmod = func(path string, perm os.FileMode) error {
 		return nil
@@ -523,7 +523,7 @@ func TestCreateS3MountConfig_Success(t *testing.T) {
 		return nil
 	}
 	CreateFile = func(path string) (*os.File, error) {
-		return &os.File{}, nil
+		return os.CreateTemp("", "test")
 	}
 	Chmod = func(path string, perm os.FileMode) error {
 		return nil
@@ -578,7 +578,7 @@ func TestCreateS3MountConfig_ChmodFails(t *testing.T) {
 		return nil
 	}
 	CreateFile = func(path string) (*os.File, error) {
-		return &os.File{}, nil
+		return os.CreateTemp("", "test")
 	}
 	Chmod = func(path string, perm os.FileMode) error {
 		return errors.New("failed to chmod")
