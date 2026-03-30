@@ -46,7 +46,7 @@ ENV GOARCH=$ARCH
 ENV GO111MODULE=on
 
 RUN git clone https://github.com/rclone/rclone.git && \
-      cd rclone && git checkout tags/v1.69.0 && \
+      cd rclone && git checkout tags/v1.73.3 && \
       go build && ./rclone version && \
       cp rclone /usr/local/bin/rclone
 

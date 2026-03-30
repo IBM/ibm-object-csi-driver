@@ -11,6 +11,7 @@
 package driver
 
 import (
+	"context"
 	"errors"
 	"net"
 	"net/url"
@@ -20,7 +21,6 @@ import (
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"go.uber.org/zap"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 )
