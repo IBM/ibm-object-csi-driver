@@ -150,7 +150,7 @@ func TestMountpointS3Mount_NodeServer_WithEnvMounter(t *testing.T) {
 
 	// Create a mock that implements envMounter interface
 	mockUtils := &mockEnvMounter{
-		FakeMounterUtilsImpl: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
 	}
 
 	s3Mounter := &MountpointS3Mounter{
