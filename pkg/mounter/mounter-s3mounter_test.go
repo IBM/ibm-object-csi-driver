@@ -121,6 +121,7 @@ func TestMountpointS3Mount_NodeServer_Positive(t *testing.T) {
 	s3Mounter := &MountpointS3Mounter{
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path, comm string, args []string) error {
+				// Mock successful mount
 				return nil
 			},
 		}),
@@ -158,7 +159,12 @@ func TestMountpointS3Mount_NodeServer_WithEnvMounter(t *testing.T) {
 	}
 
 	s3Mounter := &MountpointS3Mounter{
-		MounterUtils:  mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseMountFn: func(path, comm string, args []string) error {
+				// Mock successful mount with env vars
+				return nil
+			},
+		}),
 		BucketName:    "test-bucket",
 		EndPoint:      "https://s3.us-east.cloud-object-storage.appdomain.cloud",
 		LocConstraint: "us-east",
