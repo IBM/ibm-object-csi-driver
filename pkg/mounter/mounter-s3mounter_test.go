@@ -54,22 +54,25 @@ func TestNewMountpointS3Mounter_Success(t *testing.T) {
 	assert.Equal(t, "hmac", s3Mounter.AuthType)
 }
 
-func TestNewMountpointS3Mounter_PerformanceTuning(t *testing.T) {
+func TestNewMountpointS3Mounter_PassthroughOptions(t *testing.T) {
 	mounter := NewMountpointS3Mounter(s3MounterSecretMap, s3MounterMountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
 
 	s3Mounter, ok := mounter.(*MountpointS3Mounter)
 	assert.True(t, ok)
 
-	assert.Equal(t, "32", s3Mounter.MaxThreads)
-	assert.Equal(t, "16777216", s3Mounter.ReadPartSize)
-	assert.Equal(t, "16777216", s3Mounter.WritePartSize)
-	assert.Equal(t, "20", s3Mounter.MaxThroughputGbps)
-	assert.Equal(t, "crc32c", s3Mounter.UploadChecksums)
+	// Verify passthrough options are preserved with -- prefix
+	assert.Contains(t, s3Mounter.MountOptions, "--max-threads=32")
+	assert.Contains(t, s3Mounter.MountOptions, "--read-part-size=16777216")
+	assert.Contains(t, s3Mounter.MountOptions, "--write-part-size=16777216")
+	assert.Contains(t, s3Mounter.MountOptions, "--maximum-throughput-gbps=20")
+	assert.Contains(t, s3Mounter.MountOptions, "--upload-checksums=crc32c")
+	assert.Contains(t, s3Mounter.MountOptions, "--max-cache-size=1024")
+	assert.Contains(t, s3Mounter.MountOptions, "--metadata-ttl=60")
+	assert.Contains(t, s3Mounter.MountOptions, "--negative-metadata-ttl=30")
+	assert.Contains(t, s3Mounter.MountOptions, "--log-metrics")
+	
+	// Verify structured fields are set correctly
 	assert.Equal(t, "/tmp/cache", s3Mounter.CacheDir)
-	assert.Equal(t, "1024", s3Mounter.MaxCacheSize)
-	assert.Equal(t, "60", s3Mounter.MetadataTTL)
-	assert.Equal(t, "30", s3Mounter.NegativeMetadataTTL)
-	assert.True(t, s3Mounter.LogMetrics)
 }
 
 func TestNewMountpointS3Mounter_GidWithoutUid(t *testing.T) {
@@ -111,18 +114,16 @@ func TestMountpointS3Mount_NodeServer_Positive(t *testing.T) {
 	Chmod = func(path string, perm os.FileMode) error {
 		return nil
 	}
+	Stat = func(path string) (os.FileInfo, error) {
+		return nil, nil
+	}
 
-	// Create a mock that implements envMounter interface
-	mockUtils := &mockEnvMounter{
+	s3Mounter := &MountpointS3Mounter{
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path, comm string, args []string) error {
 				return nil
 			},
 		}),
-	}
-
-	s3Mounter := &MountpointS3Mounter{
-		MounterUtils:  mockUtils,
 		BucketName:    "test-bucket",
 		ObjectPath:    "test-path",
 		EndPoint:      "https://s3.us-east.cloud-object-storage.appdomain.cloud",
@@ -152,14 +153,12 @@ func TestMountpointS3Mount_NodeServer_WithEnvMounter(t *testing.T) {
 	Chmod = func(path string, perm os.FileMode) error {
 		return nil
 	}
-
-	// Create a mock that implements envMounter interface
-	mockUtils := &mockEnvMounter{
-		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+	Stat = func(path string) (os.FileInfo, error) {
+		return nil, nil
 	}
 
 	s3Mounter := &MountpointS3Mounter{
-		MounterUtils:  mockUtils,
+		MounterUtils:  mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
 		BucketName:    "test-bucket",
 		EndPoint:      "https://s3.us-east.cloud-object-storage.appdomain.cloud",
 		LocConstraint: "us-east",
@@ -398,30 +397,33 @@ func TestRemoveS3MountConfigFile_Negative(t *testing.T) {
 
 func TestFormulateMountOptions_AllOptions(t *testing.T) {
 	s3Mounter := &MountpointS3Mounter{
-		BucketName:          "test-bucket",
-		ObjectPath:          "test-path",
-		EndPoint:            "https://s3.us-east.cloud-object-storage.appdomain.cloud",
-		LocConstraint:       "us-east",
-		UID:                 "1000",
-		GID:                 "2000",
-		LogLevel:            "debug",
-		ReadOnly:            true,
-		MaxThreads:          "32",
-		ReadPartSize:        "16777216",
-		WritePartSize:       "16777216",
-		MaxThroughputGbps:   "20",
-		UploadChecksums:     "crc32c",
-		CacheDir:            "/tmp/cache",
-		MaxCacheSize:        "1024",
-		MetadataTTL:         "60",
-		NegativeMetadataTTL: "30",
-		LogMetrics:          true,
-		MountOptions:        []string{"--dir-mode=0755"},
+		BucketName:    "test-bucket",
+		ObjectPath:    "test-path",
+		EndPoint:      "https://s3.us-east.cloud-object-storage.appdomain.cloud",
+		LocConstraint: "us-east",
+		UID:           "1000",
+		GID:           "2000",
+		LogLevel:      "debug",
+		LogDirectory:  "/var/log/mount-s3",
+		CacheDir:      "/tmp/cache",
+		ReadOnly:      true,
+		MountOptions: []string{
+			"--dir-mode=0755",
+			"--max-threads=32",
+			"--read-part-size=16777216",
+			"--write-part-size=16777216",
+			"--maximum-throughput-gbps=20",
+			"--upload-checksums=crc32c",
+			"--max-cache-size=1024",
+			"--metadata-ttl=60",
+			"--negative-metadata-ttl=30",
+			"--log-metrics",
+		},
 	}
 
 	nodeServerOp, envVars, workerNodeOp := s3Mounter.formulateMountOptions("test-bucket/test-path", target, "/config/path")
 
-	// Check node server options
+	// Check node server options - structured fields
 	assert.Contains(t, nodeServerOp, "test-bucket/test-path")
 	assert.Contains(t, nodeServerOp, target)
 	assert.Contains(t, nodeServerOp, "--allow-other")
@@ -430,42 +432,37 @@ func TestFormulateMountOptions_AllOptions(t *testing.T) {
 	assert.Contains(t, nodeServerOp, "--uid=1000")
 	assert.Contains(t, nodeServerOp, "--gid=2000")
 	assert.Contains(t, nodeServerOp, "--debug")
+	assert.Contains(t, nodeServerOp, "--log-directory=/var/log/mount-s3")
+	assert.Contains(t, nodeServerOp, "--cache=/tmp/cache")
 	assert.Contains(t, nodeServerOp, "--read-only")
+	
+	// Check node server options - passthrough fields
+	assert.Contains(t, nodeServerOp, "--dir-mode=0755")
 	assert.Contains(t, nodeServerOp, "--max-threads=32")
 	assert.Contains(t, nodeServerOp, "--read-part-size=16777216")
 	assert.Contains(t, nodeServerOp, "--write-part-size=16777216")
 	assert.Contains(t, nodeServerOp, "--maximum-throughput-gbps=20")
 	assert.Contains(t, nodeServerOp, "--upload-checksums=crc32c")
-	assert.Contains(t, nodeServerOp, "--cache=/tmp/cache")
 	assert.Contains(t, nodeServerOp, "--max-cache-size=1024")
 	assert.Contains(t, nodeServerOp, "--metadata-ttl=60")
 	assert.Contains(t, nodeServerOp, "--negative-metadata-ttl=30")
 	assert.Contains(t, nodeServerOp, "--log-metrics")
-	assert.Contains(t, nodeServerOp, "--dir-mode=0755")
 
 	// Check env vars
 	assert.Len(t, envVars, 2)
 	assert.Contains(t, envVars[0], "AWS_SHARED_CREDENTIALS_FILE=")
 	assert.Contains(t, envVars[1], "AWS_CONFIG_FILE=")
 
-	// Check worker node options
+	// Check worker node options - only structured fields are in the struct
 	assert.Equal(t, "true", workerNodeOp.AllowOther)
 	assert.Equal(t, "https://s3.us-east.cloud-object-storage.appdomain.cloud", workerNodeOp.EndpointURL)
 	assert.Equal(t, "us-east", workerNodeOp.Region)
 	assert.Equal(t, "1000", workerNodeOp.UID)
 	assert.Equal(t, "2000", workerNodeOp.GID)
 	assert.Equal(t, "debug", workerNodeOp.LogLevel)
-	assert.Equal(t, "true", workerNodeOp.ReadOnly)
-	assert.Equal(t, "32", workerNodeOp.MaxThreads)
-	assert.Equal(t, "16777216", workerNodeOp.ReadPartSize)
-	assert.Equal(t, "16777216", workerNodeOp.WritePartSize)
-	assert.Equal(t, "20", workerNodeOp.MaxThroughputGbps)
-	assert.Equal(t, "crc32c", workerNodeOp.UploadChecksums)
+	assert.Equal(t, "/var/log/mount-s3", workerNodeOp.LogDirectory)
 	assert.Equal(t, "/tmp/cache", workerNodeOp.CacheDir)
-	assert.Equal(t, "1024", workerNodeOp.MaxCacheSize)
-	assert.Equal(t, "60", workerNodeOp.MetadataTTL)
-	assert.Equal(t, "30", workerNodeOp.NegativeMetadataTTL)
-	assert.True(t, workerNodeOp.LogMetrics)
+	assert.Equal(t, "true", workerNodeOp.ReadOnly)
 }
 
 func TestFormulateMountOptions_LogLevelDebugCrt(t *testing.T) {
@@ -599,11 +596,3 @@ func TestCreateS3MountConfig_ChmodFails(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to chmod")
 }
 
-// mockEnvMounter implements the envMounter interface for testing
-type mockEnvMounter struct {
-	mounterUtils.MounterUtils
-}
-
-func (m *mockEnvMounter) FuseMountWithEnv(path string, comm string, args []string, envVars []string) error {
-	return nil
-}
