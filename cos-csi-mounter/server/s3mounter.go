@@ -6,38 +6,33 @@ import (
 	"go.uber.org/zap"
 )
 
+// s3MounterArgs holds the args sent from the node server for mount-s3.
+// This struct must match the s3MounterArgs in pkg/mounter/mounter_s3mounter.go
 type s3MounterArgs struct {
-	ReadOnly       string `json:"read-only,omitempty"`
-	AllowOther     string `json:"allow-other,omitempty"`
-	AllowDelete    string `json:"allow-delete,omitempty"`
-	AllowOverwrite string `json:"allow-overwrite,omitempty"`
-	UID            string `json:"uid,omitempty"`
-	GID            string `json:"gid,omitempty"`
-	// Removed: UMask        — mount-s3 has no --umask flag; use --dir-mode/--file-mode via MountOptions
-	// Removed: AwsConfigDir — mount-s3 has no --aws-config-dir flag
-	LogLevel     string `json:"log-level,omitempty"` // valid: "debug", "debug-crt", "no-log"
-	LogDirectory string `json:"log-directory,omitempty"`
-	EndpointURL  string `json:"endpoint-url,omitempty"`
-	// Region is passed explicitly as --region CLI flag in addition to being written
-	// in the AWS config file, to ensure it is always set even if AWS_CONFIG_FILE
-	// env var is not propagated correctly to the mount-s3 subprocess.
-	Region string `json:"region,omitempty"`
-	// AWS credential file paths — NOT CLI flags.
-	// Worker sets these as AWS_SHARED_CREDENTIALS_FILE and AWS_CONFIG_FILE
-	// env vars on the mount-s3 subprocess before invoking it.
+	// Always set.
+	AllowOther         string `json:"allow-other,omitempty"`
 	AwsCredentialsFile string `json:"aws-credentials-file,omitempty"`
 	AwsConfigFile      string `json:"aws-config-file,omitempty"`
 
-	MaxThreads          string `json:"max-threads,omitempty"`
-	ReadPartSize        string `json:"read-part-size,omitempty"`
-	WritePartSize       string `json:"write-part-size,omitempty"`
-	MaxThroughputGbps   string `json:"maximum-throughput-gbps,omitempty"`
-	UploadChecksums     string `json:"upload-checksums,omitempty"`
-	CacheDir            string `json:"cache,omitempty"`
-	MaxCacheSize        string `json:"max-cache-size,omitempty"`
-	MetadataTTL         string `json:"metadata-ttl,omitempty"`
-	NegativeMetadataTTL string `json:"negative-metadata-ttl,omitempty"`
-	LogMetrics          bool   `json:"log-metrics,omitempty"`
+	// SecretMap-sourced.
+	EndpointURL string `json:"endpoint-url,omitempty"`
+	Region      string `json:"region,omitempty"`
+
+	// Identity.
+	UID string `json:"uid,omitempty"`
+	GID string `json:"gid,omitempty"`
+
+	// Logging (translated from LogLevel).
+	LogLevel     string `json:"log-level,omitempty"`
+	LogDirectory string `json:"log-directory,omitempty"`
+
+	// Cache.
+	CacheDir string `json:"cache,omitempty"`
+
+	// Write operations - conflict resolution applied when read-only is set.
+	ReadOnly          string `json:"read-only,omitempty"`
+	AllowOverwrite    string `json:"allow-overwrite,omitempty"`
+	IncrementalUpload string `json:"incremental-upload,omitempty"`
 }
 
 // PopulateArgsSlice builds the CLI args slice for mount-s3.
@@ -50,6 +45,20 @@ type s3MounterArgs struct {
 func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, error) {
 	result := []string{bucket, targetPath}
 
+	// --- Read-only priority resolution ---
+	// If read-only is set, clear all write-related flags to ensure clean read-only mount.
+	// This prevents conflicts where both read-only and write flags are set.
+	if args.ReadOnly == "true" {
+		if args.AllowOverwrite == "true" {
+			logger.Warn("read-only is set, clearing allow-overwrite")
+			args.AllowOverwrite = ""
+		}
+		if args.IncrementalUpload == "true" {
+			logger.Warn("read-only is set, clearing incremental-upload")
+			args.IncrementalUpload = ""
+		}
+	}
+
 	// --allow-other: boolean flag, no value
 	if args.AllowOther == "true" {
 		result = append(result, "--allow-other")
@@ -60,14 +69,14 @@ func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string
 		result = append(result, "--read-only")
 	}
 
-	// --allow-delete: boolean flag, no value
-	if args.AllowDelete == "true" {
-		result = append(result, "--allow-delete")
-	}
-
-	// --allow-overwrite: boolean flag, no value
+	// --allow-overwrite: boolean flag, no value (cleared if read-only is set)
 	if args.AllowOverwrite == "true" {
 		result = append(result, "--allow-overwrite")
+	}
+
+	// --incremental-upload: boolean flag, no value (cleared if read-only is set)
+	if args.IncrementalUpload == "true" {
+		result = append(result, "--incremental-upload")
 	}
 
 	// --uid
@@ -113,55 +122,9 @@ func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string
 		result = append(result, "--log-directory="+args.LogDirectory)
 	}
 
-	// --- Performance tuning options ---
-	// Only appended when explicitly set. mount-s3 built-in defaults apply otherwise.
-
-	// --max-threads (default: 16)
-	if args.MaxThreads != "" {
-		result = append(result, "--max-threads="+args.MaxThreads)
-	}
-
-	// --read-part-size (default: 8 MiB)
-	if args.ReadPartSize != "" {
-		result = append(result, "--read-part-size="+args.ReadPartSize)
-	}
-
-	// --write-part-size (default: 8 MiB)
-	if args.WritePartSize != "" {
-		result = append(result, "--write-part-size="+args.WritePartSize)
-	}
-
-	// --maximum-throughput-gbps (default: auto-detect on EC2, 10 Gbps elsewhere)
-	if args.MaxThroughputGbps != "" {
-		result = append(result, "--maximum-throughput-gbps="+args.MaxThroughputGbps)
-	}
-
-	// --upload-checksums (default: crc32c)
-	if args.UploadChecksums != "" {
-		result = append(result, "--upload-checksums="+args.UploadChecksums)
-	}
-
-	// --cache + --max-cache-size (default: disabled)
+	// --cache
 	if args.CacheDir != "" {
 		result = append(result, "--cache="+args.CacheDir)
-		if args.MaxCacheSize != "" {
-			result = append(result, "--max-cache-size="+args.MaxCacheSize)
-		}
-	}
-
-	// --metadata-ttl (default: minimal, or 60s if --cache is set)
-	if args.MetadataTTL != "" {
-		result = append(result, "--metadata-ttl="+args.MetadataTTL)
-	}
-
-	// --negative-metadata-ttl (default: same as metadata-ttl)
-	if args.NegativeMetadataTTL != "" {
-		result = append(result, "--negative-metadata-ttl="+args.NegativeMetadataTTL)
-	}
-
-	// --log-metrics (default: false) — boolean flag, no value
-	if args.LogMetrics {
-		result = append(result, "--log-metrics")
 	}
 
 	return result, nil
@@ -214,14 +177,6 @@ func (args s3MounterArgs) Validate(targetPath string) error {
 		}
 	}
 
-	// allow-delete must be a boolean string if set
-	if args.AllowDelete != "" {
-		if isBool := isBoolString(args.AllowDelete); !isBool {
-			logger.Error("cannot convert value of allow-delete into boolean", zap.Any("allow-delete", args.AllowDelete))
-			return fmt.Errorf("cannot convert value of allow-delete into boolean: %v", args.AllowDelete)
-		}
-	}
-
 	// allow-overwrite must be a boolean string if set
 	if args.AllowOverwrite != "" {
 		if isBool := isBoolString(args.AllowOverwrite); !isBool {
@@ -230,11 +185,12 @@ func (args s3MounterArgs) Validate(targetPath string) error {
 		}
 	}
 
-	// upload-checksums must be a valid value if set.
-	// Validated early here so users get a clear error rather than a cryptic mount-s3 failure.
-	if args.UploadChecksums != "" && args.UploadChecksums != "crc32c" && args.UploadChecksums != "off" {
-		logger.Error("invalid upload-checksums value", zap.String("value", args.UploadChecksums))
-		return fmt.Errorf("invalid upload-checksums value '%s': must be 'crc32c' or 'off'", args.UploadChecksums)
+	// incremental-upload must be a boolean string if set
+	if args.IncrementalUpload != "" {
+		if isBool := isBoolString(args.IncrementalUpload); !isBool {
+			logger.Error("cannot convert value of incremental-upload into boolean", zap.Any("incremental-upload", args.IncrementalUpload))
+			return fmt.Errorf("cannot convert value of incremental-upload into boolean: %v", args.IncrementalUpload)
+		}
 	}
 
 	// Ensure cache directory exists if specified
