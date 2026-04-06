@@ -469,7 +469,7 @@ func (s3 *MountpointS3Mounter) Unmount(target string) error {
 //	  credentials   <- AWS credentials (access/secret key)
 //	  config        <- AWS config (region, endpoint_url)
 func createS3MountConfig(configPathWithVolID string, s3 *MountpointS3Mounter) error {
-	if err := MakeDir(configPathWithVolID, 0755); err != nil { // #nosec G301
+	if err := MakeDir(configPathWithVolID, 0755); err != nil { // #nosec G301 -- 0755 permissions required for AWS config directory access
 		klog.Errorf("MountpointS3Mounter: Cannot create config dir %s: %v", configPathWithVolID, err)
 		return err
 	}
@@ -505,7 +505,7 @@ func createS3MountConfig(configPathWithVolID string, s3 *MountpointS3Mounter) er
 
 // writeConfigFile writes lines to a file with 0600 permissions.
 func writeConfigFile(filePath string, lines []string) error {
-	f, err := CreateFile(filePath) // #nosec G304
+	f, err := CreateFile(filePath) // #nosec G304 -- filePath is constructed from validated volume ID and config directory
 	if err != nil {
 		return fmt.Errorf("cannot create file %s: %w", filePath, err)
 	}
@@ -515,7 +515,7 @@ func writeConfigFile(filePath string, lines []string) error {
 		}
 	}()
 
-	if err := Chmod(filePath, 0600); err != nil { // #nosec G302
+	if err := Chmod(filePath, 0600); err != nil { // #nosec G302 -- 0600 permissions required to protect AWS credentials file
 		return fmt.Errorf("cannot chmod file %s: %w", filePath, err)
 	}
 
