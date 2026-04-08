@@ -441,6 +441,38 @@ func TestCreateVolume(t *testing.T) {
 			expectedErr:  errors.New("Secret resource not found"),
 		},
 		{
+			testCaseName: "Negative: PVC and Secret in same namespace",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: volumeCapabilities[0],
+						},
+					},
+				},
+				Parameters: map[string]string{
+					constants.PVCNameKey:      testPVCName,
+					constants.PVCNamespaceKey: testPVCNs,
+				},
+			},
+			cosSession: &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetPVCFn: func(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error) {
+					return &v1.PersistentVolumeClaim{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								constants.SecretNameKey:      testSecretName,
+								constants.SecretNamespaceKey: testPVCNs, // Same namespace as PVC
+							},
+						},
+					}, nil
+				},
+			}),
+			expectedResp: nil,
+			expectedErr:  errors.New("PVC and secret cannot be in the same namespace"),
+		},
+		{
 			testCaseName: "Negative: Invalid bucket versioning name in secret",
 			req: &csi.CreateVolumeRequest{
 				Name: testVolumeName,

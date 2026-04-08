@@ -126,6 +126,11 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			secretNamespace = constants.DefaultNamespace
 		}
 
+		// Validate that PVC and secret are not in the same namespace
+		if pvcNamespace == secretNamespace {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("PVC and secret cannot be in the same namespace. PVC namespace: %s, Secret namespace: %s", pvcNamespace, secretNamespace))
+		}
+
 		secret, err := cs.Stats.GetSecret(customSecretName, secretNamespace)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret resource not found %v", err))
