@@ -164,8 +164,7 @@ func TestCreateVolume(t *testing.T) {
 					return &v1.PersistentVolumeClaim{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
-								constants.SecretNameKey:      testSecretName,
-								constants.SecretNamespaceKey: testSecretNs,
+								constants.SecretNameKey: testSecretName,
 							},
 						},
 					}, nil
@@ -441,7 +440,7 @@ func TestCreateVolume(t *testing.T) {
 			expectedErr:  errors.New("Secret resource not found"),
 		},
 		{
-			testCaseName: "Negative: PVC and Secret in same namespace",
+			testCaseName: "Negative: Secret not found in PVC namespace",
 			req: &csi.CreateVolumeRequest{
 				Name: testVolumeName,
 				VolumeCapabilities: []*csi.VolumeCapability{
@@ -462,15 +461,17 @@ func TestCreateVolume(t *testing.T) {
 					return &v1.PersistentVolumeClaim{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
-								constants.SecretNameKey:      testSecretName,
-								constants.SecretNamespaceKey: testPVCNs, // Same namespace as PVC
+								constants.SecretNameKey: testSecretName,
 							},
 						},
 					}, nil
 				},
+				GetSecretFn: func(secretName, secretNamespace string) (*v1.Secret, error) {
+					return nil, errors.New("secret not found")
+				},
 			}),
 			expectedResp: nil,
-			expectedErr:  errors.New("PVC and secret cannot be in the same namespace"),
+			expectedErr:  errors.New("Secret resource not found"),
 		},
 		{
 			testCaseName: "Negative: Invalid bucket versioning name in secret",
@@ -521,8 +522,7 @@ func TestCreateVolume(t *testing.T) {
 					return &v1.PersistentVolumeClaim{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
-								constants.SecretNameKey:      testSecretName,
-								constants.SecretNamespaceKey: testSecretNs,
+								constants.SecretNameKey: testSecretName,
 							},
 						},
 					}, nil
@@ -741,7 +741,7 @@ func TestCreateVolume(t *testing.T) {
 					constants.QuotaLimitKey:        "true",
 					constants.ResourceConfigApiKey: "fake-res-conf-key",
 					"pvcNamespace":                 "test-namespace",
-					"secretNamespace":              "different-namespace",
+					"secretNamespace":              "test-namespace",
 				},
 			},
 			cosSession:       &s3client.FakeCOSSessionFactory{},
@@ -751,6 +751,7 @@ func TestCreateVolume(t *testing.T) {
 					VolumeId:      testVolumeName,
 					CapacityBytes: 1073741824,
 					VolumeContext: map[string]string{
+						"bucketName":         "",
 						"userProvidedBucket": "false",
 						"locationConstraint": "test-region",
 						"cosEndpoint":        "test-endpoint",
