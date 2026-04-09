@@ -740,8 +740,6 @@ func TestCreateVolume(t *testing.T) {
 					"mounter":                      "s3fs",
 					constants.QuotaLimitKey:        "true",
 					constants.ResourceConfigApiKey: "fake-res-conf-key",
-					"pvcNamespace":                 "test-namespace",
-					"secretNamespace":              "test-namespace",
 				},
 			},
 			cosSession:       &s3client.FakeCOSSessionFactory{},

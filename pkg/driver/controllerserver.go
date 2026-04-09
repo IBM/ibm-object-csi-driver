@@ -125,7 +125,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 
 		secret, err := cs.Stats.GetSecret(customSecretName, secretNamespace)
 		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret resource not found %v", err))
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("error getting Secret: %v", err))
 		}
 
 		secretMapCustom := parseCustomSecret(secret)
