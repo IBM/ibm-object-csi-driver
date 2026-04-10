@@ -20,7 +20,7 @@ import (
 //
 // Only flags that require code-level handling are modelled as struct fields:
 //   - Conflict resolution : ReadOnly takes priority — clears AllowOverwrite / IncrementalUpload
-//   - Directory validation: LogDirectory / CacheDir (must exist before mount)
+//   - Directory creation  : LogDirectory / CacheDir are created by the worker's Validate()
 //   - Name translation   : LogLevel ("debug" → --debug, not --log-level=debug)
 //   - Special precedence : UID / GID (secretMap < mountOptions)
 //   - Always-emitted     : allow-other (deduplicated here)
@@ -51,12 +51,10 @@ type MountpointS3Mounter struct {
 	// mount-s3 has no --log-level flag.
 	LogLevel string
 
-	// LogDirectory must exist on the node before mount-s3 starts.
-	// Validated in Mount() before calling formulateMountOptions.
+	// LogDirectory is forwarded to the worker; worker's Validate() creates it via ensureDir.
 	LogDirectory string
 
-	// CacheDir must exist on the node before mount-s3 starts.
-	// Validated in Mount() before calling formulateMountOptions.
+	// CacheDir is forwarded to the worker; worker's Validate() creates it via ensureDir.
 	CacheDir string
 
 	// Conflict resolution — ReadOnly takes priority over write flags.
@@ -75,8 +73,9 @@ type MountpointS3Mounter struct {
 }
 
 // s3MounterArgs holds the args sent to the worker node daemon for mount-s3.
-// Only structured fields are represented here; passthrough flags are embedded
-// in the Args slice at the call site.
+// Structured fields cover all named flags; Args carries any remaining
+// passthrough flags (e.g. --allow-delete, --hello, --never=true).
+// This struct must stay in sync with s3MounterArgs in the worker (cos-csi-mounter).
 type s3MounterArgs struct {
 	// Always set.
 	AllowOther         string `json:"allow-other,omitempty"`
@@ -102,6 +101,11 @@ type s3MounterArgs struct {
 	ReadOnly          string `json:"read-only,omitempty"`
 	AllowOverwrite    string `json:"allow-overwrite,omitempty"`
 	IncrementalUpload string `json:"incremental-upload,omitempty"`
+
+	// Passthrough flags — user-supplied flags not handled by structured fields
+	// (e.g. --allow-delete, --hello, --never=true).
+	// Worker's PopulateArgsSlice appends these last so they have highest precedence.
+	Args []string `json:"args,omitempty"`
 }
 
 const (
@@ -123,21 +127,6 @@ type envMounter interface {
 
 // NewMountpointS3Mounter creates a new MountpointS3Mounter from the unified
 // secret format.
-//
-// Source mapping and precedence (lowest → highest):
-//
-//  1. secretMap identity keys — accessKey, secretKey, bucketName, objectPath,
-//     cosEndpoint, locationConstraint, uid, gid
-//  2. StorageClass mountOptions (mountOptions []string arg) — parsed first
-//  3. Secret mountOptions (secretMap["mountOptions"] multiline string) — parsed
-//     second and therefore wins over StorageClass on any overlapping flag
-//
-// Special case: if read-only is present in either source, it takes priority and
-// clears allow-overwrite and incremental-upload regardless of where they came from.
-//
-// For passthrough flags (unrecognised by the structured parser), the same
-// precedence applies: secret passthroughs are appended after SC passthroughs,
-// so mount-s3 sees the secret value last (last-value-wins semantics).
 func NewMountpointS3Mounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
 	klog.Info("-newMountpointS3Mounter-")
 
@@ -178,14 +167,9 @@ func NewMountpointS3Mounter(secretMap map[string]string, mountOptions []string, 
 	mounter.AuthType = "hmac"
 
 	// --- Merge and parse mountOptions ---
-	// Step 1: StorageClass mountOptions (already split by kubelet).
 	scRemainder := parseMountpointS3Options(mounter, mountOptions)
-
-	// Step 2: Secret mountOptions (multiline string, parsed after SC so it wins).
 	secretOpts := splitSecretMountOptions(secretMap["mountOptions"])
 	secretRemainder := parseMountpointS3Options(mounter, secretOpts)
-
-	// Step 3: SC passthroughs first, secret passthroughs last (last-value-wins).
 	mounter.MountOptions = append(scRemainder, secretRemainder...)
 	mounter.MounterUtils = mounterUtils
 
@@ -197,14 +181,7 @@ func NewMountpointS3Mounter(secretMap map[string]string, mountOptions []string, 
 	return mounter
 }
 
-// splitSecretMountOptions splits the multiline mountOptions string from the
-// secret into a []string suitable for parseMountpointS3Options.
-//
-// Rules:
-//   - Each non-empty line is one flag.
-//   - Lines beginning with '#' (after trimming) are comments — skipped.
-//   - Leading/trailing whitespace on each line is trimmed.
-//   - Blank lines are skipped.
+// splitSecretMountOptions splits the multiline mountOptions string from the secret.
 func splitSecretMountOptions(raw string) []string {
 	if raw == "" {
 		return nil
@@ -221,49 +198,19 @@ func splitSecretMountOptions(raw string) []string {
 }
 
 // parseMountpointS3Options parses mount-s3 options from the provided slice.
-//
-// Only flags that require code-level handling are matched by name — everything
-// else is forwarded unchanged to mount-s3 via the returned remainder slice.
-//
-// The remainder always has a "--" prefix added when missing, so mount-s3
-// receives syntactically valid flags regardless of how the user wrote them.
-// This handles both boolean flags ("allow-delete" → "--allow-delete") and
-// key-value pairs ("max-threads=32" → "--max-threads=32") correctly because
-// the original opt string is preserved and only the prefix is fixed.
-//
-// Rules:
-//   - Flags may be provided with or without a leading "--" prefix.
-//   - Boolean flags need no value.
-//   - Value flags must be in "flag=value" or "--flag=value" form.
-//   - "allow-other" is silently consumed — formulateMountOptions always adds it.
-//   - "umask" is consumed with a warning — mount-s3 has no --umask flag.
-//   - uid/gid override secretMap values (caller sets secretMap values first).
 func parseMountpointS3Options(mounter *MountpointS3Mounter, opts []string) []string {
 	var remaining []string
 
 	for _, opt := range opts {
-		// Normalise: strip optional leading "--" so switch cases are uniform.
 		trimmed := strings.TrimPrefix(opt, "--")
 		key, value, hasValue := strings.Cut(trimmed, "=")
 
 		switch key {
-
-		// ------------------------------------------------------------------
-		// Always emitted — consume to avoid duplicates.
-		// ------------------------------------------------------------------
 		case "allow-other":
 			// formulateMountOptions unconditionally adds --allow-other.
-
-		// ------------------------------------------------------------------
-		// Invalid for mount-s3 — warn and drop so mount-s3 doesn't fail.
-		// ------------------------------------------------------------------
 		case "umask":
 			klog.Warningf("parseMountpointS3Options: 'umask' is not supported by mount-s3. " +
 				"Use --dir-mode / --file-mode instead. Ignoring.")
-
-		// ------------------------------------------------------------------
-		// Identity — mountOptions values override secretMap values.
-		// ------------------------------------------------------------------
 		case "uid":
 			if hasValue {
 				mounter.UID = value
@@ -272,20 +219,10 @@ func parseMountpointS3Options(mounter *MountpointS3Mounter, opts []string) []str
 			if hasValue {
 				mounter.GID = value
 			}
-
-		// ------------------------------------------------------------------
-		// Log level — requires name translation in formulateMountOptions.
-		// mount-s3 has no --log-level flag; valid values map to separate flags:
-		//   "debug" → --debug, "debug-crt" → --debug-crt, "no-log" → --no-log
-		// ------------------------------------------------------------------
 		case "log-level":
 			if hasValue {
 				mounter.LogLevel = value
 			}
-
-		// ------------------------------------------------------------------
-		// Directory flags — validated for existence before mount-s3 starts.
-		// ------------------------------------------------------------------
 		case "log-directory":
 			if hasValue {
 				mounter.LogDirectory = value
@@ -294,26 +231,12 @@ func parseMountpointS3Options(mounter *MountpointS3Mounter, opts []string) []str
 			if hasValue {
 				mounter.CacheDir = value
 			}
-
-		// ------------------------------------------------------------------
-		// Conflict trio — tracked for read-only priority resolution in Mount().
-		// read-only clears allow-overwrite and incremental-upload if all three
-		// are set, so SC defaults don't block users from requesting read-only.
-		// ------------------------------------------------------------------
 		case "read-only":
 			mounter.ReadOnly = true
 		case "allow-overwrite":
 			mounter.AllowOverwrite = true
 		case "incremental-upload":
 			mounter.IncrementalUpload = true
-
-		// ------------------------------------------------------------------
-		// Everything else — pass through to mount-s3 unchanged.
-		// Ensure "--" prefix so mount-s3 always receives a valid flag.
-		// Works for both boolean flags and key-value pairs:
-		//   "allow-delete"   → "--allow-delete"
-		//   "max-threads=32" → "--max-threads=32"
-		// ------------------------------------------------------------------
 		default:
 			if strings.HasPrefix(opt, "--") {
 				remaining = append(remaining, opt)
@@ -332,11 +255,6 @@ func (s3 *MountpointS3Mounter) Mount(source string, target string) error {
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
 
 	// --- Read-only priority resolution ---
-	// If read-only is set, it takes priority over all write-related flags.
-	// AllowOverwrite and IncrementalUpload are cleared here, and allow-delete
-	// is filtered from MountOptions, so the mount succeeds cleanly in read-only mode.
-	// This means users can always request read-only via their secret even when
-	// the StorageClass has write flags as defaults.
 	if s3.ReadOnly {
 		if s3.AllowOverwrite {
 			klog.Infof("MountpointS3Mounter: read-only set — clearing allow-overwrite")
@@ -347,7 +265,6 @@ func (s3 *MountpointS3Mounter) Mount(source string, target string) error {
 			s3.IncrementalUpload = false
 		}
 
-		// Filter out allow-delete from passthrough options
 		var filtered []string
 		for _, opt := range s3.MountOptions {
 			trimmed := strings.TrimPrefix(opt, "--")
@@ -360,21 +277,9 @@ func (s3 *MountpointS3Mounter) Mount(source string, target string) error {
 		s3.MountOptions = filtered
 	}
 
-	// --- Directory validation ---
-	// mount-s3 fails with a confusing error if these directories don't exist.
-	// Validate here to surface a clear error message before spawning the process.
-	if s3.LogDirectory != "" {
-		if _, err := Stat(s3.LogDirectory); err != nil {
-			return fmt.Errorf("MountpointS3Mounter: log-directory %q does not exist or is not accessible: %w",
-				s3.LogDirectory, err)
-		}
-	}
-	if s3.CacheDir != "" {
-		if _, err := Stat(s3.CacheDir); err != nil {
-			return fmt.Errorf("MountpointS3Mounter: cache directory %q does not exist or is not accessible: %w",
-				s3.CacheDir, err)
-		}
-	}
+	// NOTE: No directory validation or creation here.
+	// LogDirectory and CacheDir are forwarded to the worker via workerNodeOp.
+	// The worker's Validate() calls ensureDir() which creates them if missing.
 
 	// --- Config path ---
 	var configPath string
@@ -391,7 +296,6 @@ func (s3 *MountpointS3Mounter) Mount(source string, target string) error {
 		return err
 	}
 
-	// Build bucket path with optional object path prefix.
 	bucketName := s3.BucketName
 	if s3.ObjectPath != "" {
 		trimmedPath := strings.TrimPrefix(s3.ObjectPath, "/")
@@ -412,6 +316,8 @@ func (s3 *MountpointS3Mounter) Mount(source string, target string) error {
 		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`,
 			target, bucketName, constants.AMAZONS3MOUNTER, jsonData)
 
+		klog.Infof("MountpointS3Mounter: worker payload: %s", payload)
+
 		err = mounterRequest(payload, "http://unix/api/cos/mount")
 		if err != nil {
 			klog.Errorf("failed to mount on worker: %v", err)
@@ -426,8 +332,7 @@ func (s3 *MountpointS3Mounter) Mount(source string, target string) error {
 		return m.FuseMountWithEnv(target, constants.MountpointS3BinaryPath, args, envVars)
 	}
 
-	klog.Warning("MounterUtils does not implement FuseMountWithEnv, falling back to FuseMount. " +
-		"Ensure AWS_SHARED_CREDENTIALS_FILE and AWS_CONFIG_FILE are set in the process environment.")
+	klog.Warning("MounterUtils does not implement FuseMountWithEnv, falling back to FuseMount.")
 	return s3.MounterUtils.FuseMount(target, constants.MountpointS3BinaryPath, args)
 }
 
@@ -461,15 +366,8 @@ func (s3 *MountpointS3Mounter) Unmount(target string) error {
 }
 
 // createS3MountConfig creates the AWS credentials and config files.
-// mount-s3 locates these via AWS_SHARED_CREDENTIALS_FILE and AWS_CONFIG_FILE env vars.
-//
-// Directory structure:
-//
-//	<configPathWithVolID>/
-//	  credentials   <- AWS credentials (access/secret key)
-//	  config        <- AWS config (region, endpoint_url)
 func createS3MountConfig(configPathWithVolID string, s3 *MountpointS3Mounter) error {
-	if err := MakeDir(configPathWithVolID, 0755); err != nil { // #nosec G301 -- 0755 permissions required for AWS config directory access
+	if err := MakeDir(configPathWithVolID, 0755); err != nil { // #nosec G301 -- config directory needs to be readable by mount-s3 process
 		klog.Errorf("MountpointS3Mounter: Cannot create config dir %s: %v", configPathWithVolID, err)
 		return err
 	}
@@ -505,7 +403,7 @@ func createS3MountConfig(configPathWithVolID string, s3 *MountpointS3Mounter) er
 
 // writeConfigFile writes lines to a file with 0600 permissions.
 func writeConfigFile(filePath string, lines []string) error {
-	f, err := CreateFile(filePath) // #nosec G304 -- filePath is constructed from validated volume ID and config directory
+	f, err := CreateFile(filePath) // #nosec G304 -- filePath is constructed from validated volume ID and predefined config file names
 	if err != nil {
 		return fmt.Errorf("cannot create file %s: %w", filePath, err)
 	}
@@ -515,7 +413,7 @@ func writeConfigFile(filePath string, lines []string) error {
 		}
 	}()
 
-	if err := Chmod(filePath, 0600); err != nil { // #nosec G302 -- 0600 permissions required to protect AWS credentials file
+	if err := Chmod(filePath, 0600); err != nil { // #nosec G302 -- credentials file must be readable only by owner for security
 		return fmt.Errorf("cannot chmod file %s: %w", filePath, err)
 	}
 
@@ -529,24 +427,6 @@ func writeConfigFile(filePath string, lines []string) error {
 }
 
 // formulateMountOptions builds the CLI args, env vars, and worker payload for mount-s3.
-//
-// Only structured fields are emitted here. All other user-supplied flags arrive
-// pre-formatted in s3.MountOptions and are appended at the end.
-//
-// By the time this is called, Mount() has already:
-//   - Cleared AllowOverwrite / IncrementalUpload if ReadOnly is set
-//   - Validated LogDirectory and CacheDir existence
-//
-// Flag ordering:
-//  1. Positional args   : bucket, mountpoint
-//  2. Always-on         : --allow-other
-//  3. SecretMap-sourced : --endpoint-url, --region
-//  4. Identity          : --uid, --gid
-//  5. Logging           : --debug/--debug-crt/--no-log, --log-directory
-//  6. Cache             : --cache
-//  7. Write flags       : --allow-overwrite, --incremental-upload
-//  8. Read-only         : --read-only
-//  9. User passthrough  : s3.MountOptions (appended last — highest precedence)
 func (s3 *MountpointS3Mounter) formulateMountOptions(bucket, target, configPathWithVolID string) (nodeServerOp []string, envVars []string, workerNodeOp s3MounterArgs) {
 	nodeServerOp = []string{bucket, target, "--allow-other"}
 
@@ -584,7 +464,6 @@ func (s3 *MountpointS3Mounter) formulateMountOptions(bucket, target, configPathW
 	}
 
 	// --- Log level (name translation) ---
-	// mount-s3 has no --log-level flag; each level maps to its own flag.
 	switch s3.LogLevel {
 	case "debug":
 		nodeServerOp = append(nodeServerOp, "--debug")
@@ -602,21 +481,19 @@ func (s3 *MountpointS3Mounter) formulateMountOptions(bucket, target, configPathW
 		}
 	}
 
-	// --- Log directory (existence validated in Mount()) ---
+	// --- Log directory ---
 	if s3.LogDirectory != "" {
 		nodeServerOp = append(nodeServerOp, "--log-directory="+s3.LogDirectory)
 		workerNodeOp.LogDirectory = s3.LogDirectory
 	}
 
-	// --- Cache directory (existence validated in Mount()) ---
+	// --- Cache directory ---
 	if s3.CacheDir != "" {
 		nodeServerOp = append(nodeServerOp, "--cache="+s3.CacheDir)
 		workerNodeOp.CacheDir = s3.CacheDir
 	}
 
 	// --- Write flags ---
-	// These are only emitted if ReadOnly is false.
-	// Mount() clears these when ReadOnly is set, so no conflict is possible here.
 	if s3.AllowOverwrite {
 		nodeServerOp = append(nodeServerOp, "--allow-overwrite")
 		workerNodeOp.AllowOverwrite = "true"
@@ -627,16 +504,15 @@ func (s3 *MountpointS3Mounter) formulateMountOptions(bucket, target, configPathW
 	}
 
 	// --- Read-only ---
-	// Safe to emit here — Mount() already cleared AllowOverwrite and
-	// IncrementalUpload above, so no conflicting flags will be present.
 	if s3.ReadOnly {
 		nodeServerOp = append(nodeServerOp, "--read-only")
 		workerNodeOp.ReadOnly = "true"
 	}
 
 	// --- User passthrough (appended last — highest precedence) ---
-	// All entries already have "--" prefix (enforced by parseMountpointS3Options).
+	// Set on BOTH paths so the worker daemon receives passthrough flags too.
 	nodeServerOp = append(nodeServerOp, s3.MountOptions...)
+	workerNodeOp.Args = s3.MountOptions
 
 	klog.Infof("MountpointS3 nodeServerOp: %v", nodeServerOp)
 	klog.Infof("MountpointS3 workerNodeOp: %+v", workerNodeOp)
