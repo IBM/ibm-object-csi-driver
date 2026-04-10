@@ -437,7 +437,7 @@ func TestCreateVolume(t *testing.T) {
 				},
 			}),
 			expectedResp: nil,
-			expectedErr:  errors.New("Secret resource not found"),
+			expectedErr:  errors.New("error getting Secret"),
 		},
 		{
 			testCaseName: "Negative: Secret not found in PVC namespace",
@@ -471,7 +471,7 @@ func TestCreateVolume(t *testing.T) {
 				},
 			}),
 			expectedResp: nil,
-			expectedErr:  errors.New("Secret resource not found"),
+			expectedErr:  errors.New("error getting Secret"),
 		},
 		{
 			testCaseName: "Negative: Invalid bucket versioning name in secret",
@@ -938,7 +938,7 @@ func TestDeleteVolume(t *testing.T) {
 				},
 			}),
 			expectedResp: nil,
-			expectedErr:  errors.New("Secret resource not found"),
+			expectedErr:  errors.New("error getting Secret"),
 		},
 		{
 			testCaseName: "Negative: Access Key not provided",
