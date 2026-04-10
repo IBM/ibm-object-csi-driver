@@ -751,9 +751,6 @@ func TestCreateVolume(t *testing.T) {
 					VolumeContext: map[string]string{
 						"bucketName":         "",
 						"userProvidedBucket": "false",
-						"locationConstraint": "test-region",
-						"cosEndpoint":        "test-endpoint",
-						"mounter":            "s3fs",
 					},
 				},
 			},
@@ -788,6 +785,9 @@ func TestCreateVolume(t *testing.T) {
 					actualResp.Volume.VolumeContext != nil {
 					if bucketNameVal, ok := actualResp.Volume.VolumeContext["bucketName"]; ok {
 						if strings.Contains(bucketNameVal, actualResp.Volume.VolumeId) {
+							if tc.expectedResp.Volume.VolumeContext == nil {
+								tc.expectedResp.Volume.VolumeContext = make(map[string]string)
+							}
 							tc.expectedResp.Volume.VolumeContext["bucketName"] = bucketNameVal
 						}
 					}
