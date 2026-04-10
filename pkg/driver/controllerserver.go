@@ -379,7 +379,7 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 
 		secret, err := cs.Stats.GetSecret(secretName, secretNamespace)
 		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret resource not found %v", err))
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("error getting Secret: %v", err))
 		}
 
 		secretMapCustom := parseCustomSecret(secret)
