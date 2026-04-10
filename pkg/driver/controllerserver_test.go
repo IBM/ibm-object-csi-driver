@@ -751,6 +751,9 @@ func TestCreateVolume(t *testing.T) {
 					VolumeContext: map[string]string{
 						"bucketName":         "",
 						"userProvidedBucket": "false",
+						"cosEndpoint":        "test-endpoint",
+						"locationConstraint": "test-region",
+						"mounter":            "s3fs",
 					},
 				},
 			},
