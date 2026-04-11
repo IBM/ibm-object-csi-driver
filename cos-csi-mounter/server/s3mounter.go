@@ -33,6 +33,11 @@ type s3MounterArgs struct {
 	ReadOnly          string `json:"read-only,omitempty"`
 	AllowOverwrite    string `json:"allow-overwrite,omitempty"`
 	IncrementalUpload string `json:"incremental-upload,omitempty"`
+
+	// Passthrough flags — user-supplied flags not handled by structured fields
+	// (e.g. --allow-delete, --hello, --never=true).
+	// PopulateArgsSlice appends these last so they have highest precedence.
+	Args []string `json:"args,omitempty"`
 }
 
 // PopulateArgsSlice builds the CLI args slice for mount-s3.
@@ -126,6 +131,11 @@ func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string
 	if args.CacheDir != "" {
 		result = append(result, "--cache="+args.CacheDir)
 	}
+
+	// --- User passthrough flags (appended last — highest precedence) ---
+	// These are flags like --allow-delete, --hello, --never=true that aren't
+	// handled by the structured fields above.
+	result = append(result, args.Args...)
 
 	return result, nil
 }
