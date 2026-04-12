@@ -113,7 +113,7 @@ jobs:
 
     env:
       IS_LATEST_RELEASE: 'true'
-      APP_VERSION: 0.12.22
+      APP_VERSION: 0.12.23
 
     steps:
     - name: Checkout Code
@@ -139,8 +139,8 @@ jobs:
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.deb.tar.gz.sha256
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz
           /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz.sha256
-        tag_name: v0.12.22
-        name: v0.12.22
+        tag_name: v0.12.23
+        name: v0.12.23
         body: |
           ## 🚀 What’s New
           - Testing aws-s3Mounter image
