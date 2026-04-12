@@ -34,25 +34,25 @@ type s3MounterArgs struct {
 	AllowOverwrite    string `json:"allow-overwrite,omitempty"`
 	IncrementalUpload string `json:"incremental-upload,omitempty"`
 
-	// Passthrough flags — user-supplied flags not handled by structured fields
-	// (e.g. --allow-delete, --hello, --never=true).
-	// PopulateArgsSlice appends these last so they have highest precedence.
+	// Passthrough flags — user-supplied flags not handled by structured fields.
+	// Secret flags override SC flags when the same key appears in both.
+	// These are already deduplicated by the node server before being sent here.
 	Args []string `json:"args,omitempty"`
 }
 
 // PopulateArgsSlice builds the CLI args slice for mount-s3.
-//
-// Key rules:
-//   - AwsCredentialsFile and AwsConfigFile are NOT CLI flags — use EnvVars() for those
-//   - Boolean flags (--allow-other, --read-only) are emitted without a value
-//     because mount-s3 does not accept --allow-other=true syntax
-//   - LogLevel maps to --debug / --debug-crt / --no-log (mount-s3 has no --log-level)
 func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, error) {
 	result := []string{bucket, targetPath}
 
-	// --- Read-only priority resolution ---
-	// If read-only is set, clear all write-related flags to ensure clean read-only mount.
-	// This prevents conflicts where both read-only and write flags are set.
+	// Block incremental-upload flag (causes data loss with IBM COS).
+	// This flag uses multiple PutObject calls that overwrite each other,
+	// resulting in ~75% data loss.
+	if args.IncrementalUpload == "true" {
+		logger.Warn("incremental-upload is not supported with IBM Cloud Object Storage, disabling")
+		args.IncrementalUpload = ""
+	}
+
+	// Read-only priority resolution.
 	if args.ReadOnly == "true" {
 		if args.AllowOverwrite == "true" {
 			logger.Warn("read-only is set, clearing allow-overwrite")
@@ -64,48 +64,31 @@ func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string
 		}
 	}
 
-	// --allow-other: boolean flag, no value
 	if args.AllowOther == "true" {
 		result = append(result, "--allow-other")
 	}
-
-	// --read-only: boolean flag, no value
 	if args.ReadOnly == "true" {
 		result = append(result, "--read-only")
 	}
-
-	// --allow-overwrite: boolean flag, no value (cleared if read-only is set)
 	if args.AllowOverwrite == "true" {
 		result = append(result, "--allow-overwrite")
 	}
-
-	// --incremental-upload: boolean flag, no value (cleared if read-only is set)
 	if args.IncrementalUpload == "true" {
 		result = append(result, "--incremental-upload")
 	}
-
-	// --uid
 	if args.UID != "" {
 		result = append(result, "--uid="+args.UID)
 	}
-
-	// --gid
 	if args.GID != "" {
 		result = append(result, "--gid="+args.GID)
 	}
-
-	// --endpoint-url
 	if args.EndpointURL != "" {
 		result = append(result, "--endpoint-url="+args.EndpointURL)
 	}
-
-	// --region
 	if args.Region != "" {
 		result = append(result, "--region="+args.Region)
 	}
 
-	// Log level: mount-s3 has no --log-level flag.
-	// Map to the supported flags only.
 	switch args.LogLevel {
 	case "debug":
 		result = append(result, "--debug")
@@ -122,27 +105,20 @@ func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string
 		}
 	}
 
-	// --log-directory
 	if args.LogDirectory != "" {
 		result = append(result, "--log-directory="+args.LogDirectory)
 	}
-
-	// --cache
 	if args.CacheDir != "" {
 		result = append(result, "--cache="+args.CacheDir)
 	}
 
-	// --- User passthrough flags (appended last — highest precedence) ---
-	// These are flags like --allow-delete, --hello, --never=true that aren't
-	// handled by the structured fields above.
+	// Passthrough flags appended last — already deduplicated by node server.
 	result = append(result, args.Args...)
 
 	return result, nil
 }
 
-// EnvVars returns the environment variables that must be set on the mount-s3
-// subprocess so it can locate the AWS credentials and config files.
-// The caller must add these to cmd.Env before cmd.Start().
+// EnvVars returns the environment variables for the mount-s3 subprocess.
 func (args s3MounterArgs) EnvVars() []string {
 	var envVars []string
 	if args.AwsCredentialsFile != "" {
@@ -160,7 +136,6 @@ func (args s3MounterArgs) Validate(targetPath string) error {
 		return err
 	}
 
-	// allow-other must be a boolean string if set
 	if args.AllowOther != "" {
 		if isBool := isBoolString(args.AllowOther); !isBool {
 			logger.Error("cannot convert value of allow-other into boolean", zap.Any("allow-other", args.AllowOther))
@@ -168,34 +143,27 @@ func (args s3MounterArgs) Validate(targetPath string) error {
 		}
 	}
 
-	// AwsCredentialsFile and AwsConfigFile replace the old AwsConfigDir check
 	if args.AwsCredentialsFile == "" {
 		logger.Error("aws-credentials-file is required for mount-s3")
 		return fmt.Errorf("aws-credentials-file is required for mount-s3")
 	}
-
 	if args.AwsConfigFile == "" {
 		logger.Error("aws-config-file is required for mount-s3")
 		return fmt.Errorf("aws-config-file is required for mount-s3")
 	}
 
-	// read-only must be a boolean string if set
 	if args.ReadOnly != "" {
 		if isBool := isBoolString(args.ReadOnly); !isBool {
 			logger.Error("cannot convert value of read-only into boolean", zap.Any("read-only", args.ReadOnly))
 			return fmt.Errorf("cannot convert value of read-only into boolean: %v", args.ReadOnly)
 		}
 	}
-
-	// allow-overwrite must be a boolean string if set
 	if args.AllowOverwrite != "" {
 		if isBool := isBoolString(args.AllowOverwrite); !isBool {
 			logger.Error("cannot convert value of allow-overwrite into boolean", zap.Any("allow-overwrite", args.AllowOverwrite))
 			return fmt.Errorf("cannot convert value of allow-overwrite into boolean: %v", args.AllowOverwrite)
 		}
 	}
-
-	// incremental-upload must be a boolean string if set
 	if args.IncrementalUpload != "" {
 		if isBool := isBoolString(args.IncrementalUpload); !isBool {
 			logger.Error("cannot convert value of incremental-upload into boolean", zap.Any("incremental-upload", args.IncrementalUpload))
@@ -203,15 +171,13 @@ func (args s3MounterArgs) Validate(targetPath string) error {
 		}
 	}
 
-	// Ensure cache directory exists if specified
+	// ensureDir creates the directory if it does not exist.
 	if args.CacheDir != "" {
 		if err := ensureDir(args.CacheDir); err != nil {
 			logger.Error("failed to create cache directory", zap.String("cache-dir", args.CacheDir), zap.Error(err))
 			return fmt.Errorf("failed to create cache directory '%s': %w", args.CacheDir, err)
 		}
 	}
-
-	// Ensure log directory exists if specified
 	if args.LogDirectory != "" {
 		if err := ensureDir(args.LogDirectory); err != nil {
 			logger.Error("failed to create log directory", zap.String("log-dir", args.LogDirectory), zap.Error(err))
