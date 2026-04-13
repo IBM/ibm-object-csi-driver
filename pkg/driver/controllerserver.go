@@ -125,7 +125,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 
 		secret, err := cs.Stats.GetSecret(customSecretName, secretNamespace)
 		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("error getting Secret: %v", err))
+			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 
 		secretMapCustom := parseCustomSecret(secret)
@@ -379,7 +379,7 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 
 		secret, err := cs.Stats.GetSecret(secretName, secretNamespace)
 		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("error getting Secret: %v", err))
+			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 
 		secretMapCustom := parseCustomSecret(secret)
