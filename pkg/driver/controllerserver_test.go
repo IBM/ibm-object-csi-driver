@@ -434,7 +434,7 @@ func TestCreateVolume(t *testing.T) {
 					}, nil
 				},
 				GetSecretFn: func(secretName, secretNamespace string) (*v1.Secret, error) {
-					return nil, fmt.Errorf("error getting Secret: %v", errors.New("failed to get secret"))
+					return nil, errors.New("secrets \"test-cos-secret1\" not found")
 				},
 			}),
 			expectedResp: nil,
@@ -468,7 +468,7 @@ func TestCreateVolume(t *testing.T) {
 					}, nil
 				},
 				GetSecretFn: func(secretName, secretNamespace string) (*v1.Secret, error) {
-					return nil, fmt.Errorf("error getting Secret: %v", errors.New("secret not found"))
+					return nil, errors.New("secrets \"testSecretName\" not found")
 				},
 			}),
 			expectedResp: nil,
@@ -935,7 +935,7 @@ func TestDeleteVolume(t *testing.T) {
 					}, nil
 				},
 				GetSecretFn: func(secretName, secretNamespace string) (*v1.Secret, error) {
-					return nil, fmt.Errorf("error getting Secret: %v", errors.New("secret not found"))
+					return nil, errors.New("secrets \"testSecretName\" not found")
 				},
 			}),
 			expectedResp: nil,
