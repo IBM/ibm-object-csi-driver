@@ -419,7 +419,7 @@ func createS3MountConfig(configPathWithVolID string, s3 *MountpointS3Mounter) er
 
 // writeConfigFile writes lines to a file with 0600 permissions.
 func writeConfigFile(filePath string, lines []string) error {
-	f, err := CreateFile(filePath) // #nosec G304
+	f, err := CreateFile(filePath) // #nosec G304 -- file path is constructed from controlled configPathWithVolID and constant filename
 	if err != nil {
 		return fmt.Errorf("cannot create file %s: %w", filePath, err)
 	}
@@ -429,7 +429,7 @@ func writeConfigFile(filePath string, lines []string) error {
 		}
 	}()
 
-	if err := Chmod(filePath, 0600); err != nil { // #nosec G302
+	if err := Chmod(filePath, 0600); err != nil { // #nosec G302 -- credentials file requires restrictive permissions (owner read/write only)
 		return fmt.Errorf("cannot chmod file %s: %w", filePath, err)
 	}
 
