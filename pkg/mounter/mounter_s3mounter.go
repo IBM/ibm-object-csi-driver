@@ -383,7 +383,7 @@ func (s3 *MountpointS3Mounter) Unmount(target string) error {
 
 // createS3MountConfig creates the AWS credentials and config files.
 func createS3MountConfig(configPathWithVolID string, s3 *MountpointS3Mounter) error {
-	if err := MakeDir(configPathWithVolID, 0755); err != nil { // #nosec G301
+	if err := MakeDir(configPathWithVolID, 0755); err != nil { // #nosec G301 -- config directory needs to be readable by mount-s3 process
 		klog.Errorf("MountpointS3Mounter: Cannot create config dir %s: %v", configPathWithVolID, err)
 		return err
 	}
