@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -433,7 +434,7 @@ func TestCreateVolume(t *testing.T) {
 					}, nil
 				},
 				GetSecretFn: func(secretName, secretNamespace string) (*v1.Secret, error) {
-					return nil, errors.New("failed to get secret")
+					return nil, fmt.Errorf("error getting Secret: %v", errors.New("failed to get secret"))
 				},
 			}),
 			expectedResp: nil,
@@ -467,7 +468,7 @@ func TestCreateVolume(t *testing.T) {
 					}, nil
 				},
 				GetSecretFn: func(secretName, secretNamespace string) (*v1.Secret, error) {
-					return nil, errors.New("secret not found")
+					return nil, fmt.Errorf("error getting Secret: %v", errors.New("secret not found"))
 				},
 			}),
 			expectedResp: nil,
@@ -934,7 +935,7 @@ func TestDeleteVolume(t *testing.T) {
 					}, nil
 				},
 				GetSecretFn: func(secretName, secretNamespace string) (*v1.Secret, error) {
-					return nil, errors.New("secret not found")
+					return nil, fmt.Errorf("error getting Secret: %v", errors.New("secret not found"))
 				},
 			}),
 			expectedResp: nil,
