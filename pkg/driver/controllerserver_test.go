@@ -164,8 +164,7 @@ func TestCreateVolume(t *testing.T) {
 					return &v1.PersistentVolumeClaim{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
-								constants.SecretNameKey:      testSecretName,
-								constants.SecretNamespaceKey: testSecretNs,
+								constants.SecretNameKey: testSecretName,
 							},
 						},
 					}, nil
@@ -434,11 +433,45 @@ func TestCreateVolume(t *testing.T) {
 					}, nil
 				},
 				GetSecretFn: func(secretName, secretNamespace string) (*v1.Secret, error) {
-					return nil, errors.New("failed to get secret")
+					return nil, errors.New("secrets \"test-cos-secret1\" not found")
 				},
 			}),
 			expectedResp: nil,
-			expectedErr:  errors.New("Secret resource not found"),
+			expectedErr:  errors.New("error getting Secret"),
+		},
+		{
+			testCaseName: "Negative: Secret not found in PVC namespace",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: volumeCapabilities[0],
+						},
+					},
+				},
+				Parameters: map[string]string{
+					constants.PVCNameKey:      testPVCName,
+					constants.PVCNamespaceKey: testPVCNs,
+				},
+			},
+			cosSession: &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				GetPVCFn: func(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error) {
+					return &v1.PersistentVolumeClaim{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								constants.SecretNameKey: testSecretName,
+							},
+						},
+					}, nil
+				},
+				GetSecretFn: func(secretName, secretNamespace string) (*v1.Secret, error) {
+					return nil, errors.New("secrets \"testSecretName\" not found")
+				},
+			}),
+			expectedResp: nil,
+			expectedErr:  errors.New("error getting Secret"),
 		},
 		{
 			testCaseName: "Negative: Invalid bucket versioning name in secret",
@@ -489,8 +522,7 @@ func TestCreateVolume(t *testing.T) {
 					return &v1.PersistentVolumeClaim{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
-								constants.SecretNameKey:      testSecretName,
-								constants.SecretNamespaceKey: testSecretNs,
+								constants.SecretNameKey: testSecretName,
 							},
 						},
 					}, nil
@@ -717,9 +749,10 @@ func TestCreateVolume(t *testing.T) {
 					VolumeId:      testVolumeName,
 					CapacityBytes: 1073741824,
 					VolumeContext: map[string]string{
+						"bucketName":         "",
 						"userProvidedBucket": "false",
-						"locationConstraint": "test-region",
 						"cosEndpoint":        "test-endpoint",
+						"locationConstraint": "test-region",
 						"mounter":            "s3fs",
 					},
 				},
@@ -755,6 +788,9 @@ func TestCreateVolume(t *testing.T) {
 					actualResp.Volume.VolumeContext != nil {
 					if bucketNameVal, ok := actualResp.Volume.VolumeContext["bucketName"]; ok {
 						if strings.Contains(bucketNameVal, actualResp.Volume.VolumeId) {
+							if tc.expectedResp.Volume.VolumeContext == nil {
+								tc.expectedResp.Volume.VolumeContext = make(map[string]string)
+							}
 							tc.expectedResp.Volume.VolumeContext["bucketName"] = bucketNameVal
 						}
 					}
@@ -898,11 +934,11 @@ func TestDeleteVolume(t *testing.T) {
 					}, nil
 				},
 				GetSecretFn: func(secretName, secretNamespace string) (*v1.Secret, error) {
-					return nil, errors.New("secret not found")
+					return nil, errors.New("secrets \"testSecretName\" not found")
 				},
 			}),
 			expectedResp: nil,
-			expectedErr:  errors.New("Secret resource not found"),
+			expectedErr:  errors.New("error getting Secret"),
 		},
 		{
 			testCaseName: "Negative: Access Key not provided",
