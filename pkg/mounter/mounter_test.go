@@ -90,6 +90,35 @@ func TestNewMounter(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
+			name:   "MountpointS3 Mounter",
+			attrib: map[string]string{"mounter": constants.AMAZONS3MOUNTER},
+			secretMap: map[string]string{
+				"cosEndpoint":        "test-endpoint",
+				"locationConstraint": "test-loc-constraint",
+				"bucketName":         "test-bucket-name",
+				"objectPath":         "test-obj-path",
+				"accessKey":          "test-access-key",
+				"secretKey":          "test-secret-key",
+				"uid":                "1000",
+				"gid":                "2000",
+			},
+			mountOptions: []string{"--dir-mode=0755", "--file-mode=0644"},
+			expected: &MountpointS3Mounter{
+				BucketName:    "test-bucket-name",
+				ObjectPath:    "test-obj-path",
+				EndPoint:      "test-endpoint",
+				LocConstraint: "test-loc-constraint",
+				AccessKey:     "test-access-key",
+				SecretKey:     "test-secret-key",
+				AuthType:      "hmac",
+				UID:           "1000",
+				GID:           "2000",
+				MountOptions:  []string{"--dir-mode=0755", "--file-mode=0644"},
+				MounterUtils:  &mounterUtils.MounterOptsUtils{},
+			},
+			expectedErr: nil,
+		},
+		{
 			name:   "Default Mounter",
 			attrib: map[string]string{},
 			secretMap: map[string]string{
@@ -137,6 +166,14 @@ func TestNewMounter(t *testing.T) {
 					t.Errorf("MountOptions mismatch.\nGot:  %v\nWant: %v", rclone.MountOptions, expected.MountOptions)
 				}
 				rclone.MountOptions = nil
+				expected.MountOptions = nil
+			}
+			if s3mounter, ok := result.(*MountpointS3Mounter); ok {
+				expected := test.expected.(*MountpointS3Mounter)
+				if !stringSlicesEqualIgnoreOrder(s3mounter.MountOptions, expected.MountOptions) {
+					t.Errorf("MountOptions mismatch.\nGot:  %v\nWant: %v", s3mounter.MountOptions, expected.MountOptions)
+				}
+				s3mounter.MountOptions = nil
 				expected.MountOptions = nil
 			}
 
