@@ -114,6 +114,7 @@ jobs:
     env:
       IS_LATEST_RELEASE: 'true'
       APP_VERSION: 0.12.27
+      
 
     steps:
     - name: Checkout Code

@@ -711,7 +711,7 @@ cache=/tmp/cache`,
 			raw: `# Comment 1
 
 # Comment 2`,
-			expected: []string{},
+			expected: nil,
 		},
 	}
 
