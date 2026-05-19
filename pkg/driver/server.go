@@ -77,7 +77,10 @@ func (s *nonBlockingGRPCServer) Setup(endpoint string, ids csi.IdentityServer, c
 	s.logger.Info("nonBlockingGRPCServer-Setup", zap.Reflect("Endpoint", endpoint))
 
 	opts := []grpc.ServerOption{
-		grpc.UnaryInterceptor(logGRPC),
+		grpc.ChainUnaryInterceptor(
+			UnaryServerInterceptor(s.logger), // Request ID interceptor
+			logGRPC,                           // Legacy logging interceptor
+		),
 	}
 
 	u, err := url.Parse(endpoint)
