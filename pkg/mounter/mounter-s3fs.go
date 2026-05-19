@@ -12,6 +12,7 @@
 package mounter
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -21,8 +22,10 @@ import (
 	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
+	"github.com/IBM/ibm-object-csi-driver/pkg/logger"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
-	"k8s.io/klog/v2"
+	"github.com/IBM/ibm-object-csi-driver/pkg/requestid"
+	"go.uber.org/zap"
 )
 
 // Mounter interface defined in mounter.go
@@ -51,8 +54,6 @@ var (
 )
 
 func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils, defaultParams map[string]string) Mounter {
-	klog.Info("-newS3fsMounter-")
-
 	var (
 		val       string
 		check     bool
@@ -100,9 +101,6 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 		mounter.AuthType = "hmac"
 	}
 
-	klog.Infof("newS3fsMounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]\n\tkpRootKeyCrn: [%s]",
-		mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType, mounter.KpRootKeyCrn)
-
 	updatedOptions := updateS3FSMountOptions(mountOptions, secretMap, defaultParams)
 	mounter.MountOptions = updatedOptions
 
@@ -111,9 +109,12 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 	return mounter
 }
 
-func (s3fs *S3fsMounter) Mount(source string, target string) error {
-	klog.Info("-S3FSMounter Mount-")
-	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
+func (s3fs *S3fsMounter) Mount(ctx context.Context, source string, target string) error {
+	reqID := requestid.FromContext(ctx)
+	log := logger.WithRequestID(ctx)
+	
+	log.Info(fmt.Sprintf("[%s] S3FSMounter Mount started", reqID),
+		zap.String("source", source), zap.String("target", target))
 
 	var s3fsCredDir string
 	if mountWorker {
@@ -129,22 +130,23 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	metaPath := path.Join(s3fsCredDir, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 
 	if pathExist, err = checkPath(metaPath); err != nil {
-		klog.Errorf("S3FSMounter Mount: Cannot stat directory %s: %v", metaPath, err)
-		return fmt.Errorf("S3FSMounter Mount: Cannot stat directory %s: %v", metaPath, err)
+		log.Error(fmt.Sprintf("[%s] Cannot stat directory", reqID), zap.String("meta_path", metaPath), zap.Error(err))
+		return fmt.Errorf("[%s] S3FSMounter Mount: Cannot stat directory %s: %v", reqID, metaPath, err)
 	}
 
 	if !pathExist {
+		log.Debug(fmt.Sprintf("[%s] Creating meta directory", reqID), zap.String("meta_path", metaPath))
 		if err = MakeDir(metaPath, 0755); // #nosec G301: used for s3fs
 		err != nil {
-			klog.Errorf("S3FSMounter Mount: Cannot create directory %s: %v", metaPath, err)
-			return fmt.Errorf("S3FSMounter Mount: Cannot create directory %s: %v", metaPath, err)
+			log.Error(fmt.Sprintf("[%s] Cannot create directory", reqID), zap.String("meta_path", metaPath), zap.Error(err))
+			return fmt.Errorf("[%s] S3FSMounter Mount: Cannot create directory %s: %v", reqID, metaPath, err)
 		}
 	}
 
 	passwdFile := path.Join(metaPath, passFile)
 	if err = writePassWrap(passwdFile, s3fs.AccessKeys); err != nil {
-		klog.Errorf("S3FSMounter Mount: Cannot create file %s: %v", passwdFile, err)
-		return fmt.Errorf("S3FSMounter Mount: Cannot create file %s: %v", passwdFile, err)
+		log.Error(fmt.Sprintf("[%s] Cannot create password file", reqID), zap.String("passwd_file", passwdFile), zap.Error(err))
+		return fmt.Errorf("[%s] S3FSMounter Mount: Cannot create file %s: %v", reqID, passwdFile, err)
 	}
 
 	if s3fs.ObjectPath != "" {
@@ -157,58 +159,75 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 		bucketName = s3fs.BucketName
 	}
 
+	log.Info(fmt.Sprintf("[%s] Formulating mount options", reqID),
+		zap.String("bucket_name", bucketName),
+		zap.String("auth_type", s3fs.AuthType))
 	args, wnOp := s3fs.formulateMountOptions(bucketName, target, passwdFile)
 
 	if mountWorker {
-		klog.Info(" Mount on Worker started...")
+		log.Info(fmt.Sprintf("[%s] Mount on Worker started", reqID))
 
 		jsonData, err := json.Marshal(wnOp)
 		if err != nil {
-			klog.Fatalf("Error marshalling data: %v", err)
+			log.Error(fmt.Sprintf("[%s] Error marshalling data", reqID), zap.Error(err))
 			return err
 		}
 
 		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.S3FS, jsonData)
 
-		klog.Info("Worker Mounting Payload...", payload)
+		log.Debug(fmt.Sprintf("[%s] Worker mounting payload", reqID), zap.String("payload", payload))
 
-		err = mounterRequest(payload, "http://unix/api/cos/mount")
+		err = mounterRequest(ctx, payload, "http://unix/api/cos/mount", log)
 		if err != nil {
-			klog.Error("failed to mount on  worker...", err)
+			log.Error(fmt.Sprintf("[%s] Failed to mount on worker", reqID), zap.Error(err))
 			return err
 		}
+		log.Info(fmt.Sprintf("[%s] S3FSMounter Mount completed successfully on worker", reqID))
 		return nil
 	}
-	klog.Info("NodeServer Mounting...")
-	return s3fs.MounterUtils.FuseMount(target, constants.S3FS, args)
+	
+	log.Info(fmt.Sprintf("[%s] NodeServer mounting", reqID))
+	err = s3fs.MounterUtils.FuseMount(target, constants.S3FS, args)
+	if err != nil {
+		log.Error(fmt.Sprintf("[%s] FuseMount failed", reqID), zap.Error(err))
+	} else {
+		log.Info(fmt.Sprintf("[%s] S3FSMounter Mount completed successfully", reqID))
+	}
+	return err
 }
 
-func (s3fs *S3fsMounter) Unmount(target string) error {
-	klog.Info("-S3FSMounter Unmount-")
-	klog.Infof("Unmount args:\n\ttarget: <%s>", target)
+func (s3fs *S3fsMounter) Unmount(ctx context.Context, target string) error {
+	reqID := requestid.FromContext(ctx)
+	log := logger.WithRequestID(ctx)
+	
+	log.Info(fmt.Sprintf("[%s] S3FSMounter Unmount started", reqID), zap.String("target", target))
 
 	if mountWorker {
-		klog.Info("Unmount on Worker started...")
+		log.Info(fmt.Sprintf("[%s] Unmount on Worker started", reqID))
 
 		payload := fmt.Sprintf(`{"path":"%s"}`, target)
 
-		err := mounterRequest(payload, "http://unix/api/cos/unmount")
+		err := mounterRequest(ctx, payload, "http://unix/api/cos/unmount", log)
 		if err != nil {
-			klog.Error("failed to unmount on  worker...", err)
+			log.Error(fmt.Sprintf("[%s] Failed to unmount on worker", reqID), zap.Error(err))
 			return err
 		}
 
 		removeFile(constants.MounterConfigPathOnHost, target)
+		log.Info(fmt.Sprintf("[%s] S3FSMounter Unmount completed successfully on worker", reqID))
 		return nil
 	}
-	klog.Info("NodeServer Unmounting...")
+	
+	log.Info(fmt.Sprintf("[%s] NodeServer unmounting", reqID))
 
 	err := s3fs.MounterUtils.FuseUnmount(target)
 	if err != nil {
+		log.Error(fmt.Sprintf("[%s] FuseUnmount failed", reqID), zap.Error(err))
 		return err
 	}
 
 	removeFile(constants.MounterConfigPathOnPodS3fs, target)
+	log.Info(fmt.Sprintf("[%s] S3FSMounter Unmount completed successfully", reqID))
 	return nil
 }
 
