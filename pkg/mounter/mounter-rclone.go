@@ -13,6 +13,7 @@ package mounter
 
 import (
 	"bufio"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -22,8 +23,10 @@ import (
 	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
+	"github.com/IBM/ibm-object-csi-driver/pkg/logger"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
-	"k8s.io/klog/v2"
+	"github.com/IBM/ibm-object-csi-driver/pkg/requestid"
+	"go.uber.org/zap"
 )
 
 // Mounter interface defined in mounter.go
@@ -57,8 +60,6 @@ var (
 )
 
 func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
-	klog.Info("-newRcloneMounter-")
-
 	var (
 		val       string
 		check     bool
@@ -120,9 +121,6 @@ func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounte
 		mounter.UID = secretMap["uid"]
 	}
 
-	klog.Infof("newRcloneMounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
-		mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType)
-
 	updatedOptions := updateMountOptions(mountOptions, secretMap)
 	mounter.MountOptions = updatedOptions
 
@@ -176,9 +174,12 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 	return updatedOptions
 }
 
-func (rclone *RcloneMounter) Mount(source string, target string) error {
-	klog.Info("-RcloneMounter Mount-")
-	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
+func (rclone *RcloneMounter) Mount(ctx context.Context, source string, target string) error {
+	reqID := requestid.FromContext(ctx)
+	log := logger.WithRequestID(ctx)
+	
+	log.Info(fmt.Sprintf("[%s] RcloneMounter Mount started", reqID),
+		zap.String("source", source), zap.String("target", target))
 
 	var bucketName string
 	var err error
@@ -191,8 +192,10 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 	}
 
 	configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
+	log.Debug(fmt.Sprintf("[%s] Creating rclone config", reqID), zap.String("config_path", configPathWithVolID))
+	
 	if err = createConfigWrap(configPathWithVolID, rclone); err != nil {
-		klog.Errorf("RcloneMounter Mount: Cannot create rclone config file %v", err)
+		log.Error(fmt.Sprintf("[%s] Cannot create rclone config file", reqID), zap.Error(err))
 		return err
 	}
 
@@ -203,55 +206,75 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 		bucketName = fmt.Sprintf("%s:%s", remote, rclone.BucketName)
 	}
 
+	log.Info(fmt.Sprintf("[%s] Formulating mount options", reqID),
+		zap.String("bucket_name", bucketName),
+		zap.String("auth_type", rclone.AuthType))
 	args, wnOp := rclone.formulateMountOptions(bucketName, target, configPathWithVolID)
 
 	if mountWorker {
-		klog.Info("Mount on Worker started...")
+		log.Info(fmt.Sprintf("[%s] Mount on Worker started", reqID))
 
 		jsonData, err := json.Marshal(wnOp)
 		if err != nil {
-			klog.Fatalf("Error marshalling data: %v", err)
+			log.Error(fmt.Sprintf("[%s] Error marshalling data", reqID), zap.Error(err))
 			return err
 		}
 
 		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.RClone, jsonData)
 
-		err = mounterRequest(payload, "http://unix/api/cos/mount")
+		log.Debug(fmt.Sprintf("[%s] Worker mounting payload", reqID), zap.String("payload", payload))
+
+		err = mounterRequest(ctx, payload, "http://unix/api/cos/mount", log)
 		if err != nil {
-			klog.Error("failed to mount on  worker...", err)
+			log.Error(fmt.Sprintf("[%s] Failed to mount on worker", reqID), zap.Error(err))
 			return err
 		}
+		log.Info(fmt.Sprintf("[%s] RcloneMounter Mount completed successfully on worker", reqID))
 		return nil
 	}
-	klog.Info("NodeServer Mounting...")
-	return rclone.MounterUtils.FuseMount(target, constants.RClone, args)
+	
+	log.Info(fmt.Sprintf("[%s] NodeServer mounting", reqID))
+	err = rclone.MounterUtils.FuseMount(target, constants.RClone, args)
+	if err != nil {
+		log.Error(fmt.Sprintf("[%s] FuseMount failed", reqID), zap.Error(err))
+	} else {
+		log.Info(fmt.Sprintf("[%s] RcloneMounter Mount completed successfully", reqID))
+	}
+	return err
 }
 
-func (rclone *RcloneMounter) Unmount(target string) error {
-	klog.Info("-RcloneMounter Unmount-")
+func (rclone *RcloneMounter) Unmount(ctx context.Context, target string) error {
+	reqID := requestid.FromContext(ctx)
+	log := logger.WithRequestID(ctx)
+	
+	log.Info(fmt.Sprintf("[%s] RcloneMounter Unmount started", reqID), zap.String("target", target))
 
 	if mountWorker {
-		klog.Info("Unmount on Worker started...")
+		log.Info(fmt.Sprintf("[%s] Unmount on Worker started", reqID))
 
 		payload := fmt.Sprintf(`{"path":"%s"}`, target)
 
-		err := mounterRequest(payload, "http://unix/api/cos/unmount")
+		err := mounterRequest(ctx, payload, "http://unix/api/cos/unmount", log)
 		if err != nil {
-			klog.Error("failed to unmount on  worker...", err)
+			log.Error(fmt.Sprintf("[%s] Failed to unmount on worker", reqID), zap.Error(err))
 			return err
 		}
 
 		removeConfigFile(constants.MounterConfigPathOnHost, target)
+		log.Info(fmt.Sprintf("[%s] RcloneMounter Unmount completed successfully on worker", reqID))
 		return nil
 	}
-	klog.Info("NodeServer Unmounting...")
+	
+	log.Info(fmt.Sprintf("[%s] NodeServer unmounting", reqID))
 
 	err := rclone.MounterUtils.FuseUnmount(target)
 	if err != nil {
+		log.Error(fmt.Sprintf("[%s] FuseUnmount failed", reqID), zap.Error(err))
 		return err
 	}
 
 	removeConfigFile(constants.MounterConfigPathOnPodRclone, target)
+	log.Info(fmt.Sprintf("[%s] RcloneMounter Unmount completed successfully", reqID))
 	return nil
 }
 
