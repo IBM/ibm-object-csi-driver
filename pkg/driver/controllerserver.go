@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
+	"github.com/IBM/ibm-object-csi-driver/pkg/logger"
+	"github.com/IBM/ibm-object-csi-driver/pkg/requestid"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
 	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"github.com/aws/smithy-go"
@@ -42,7 +44,11 @@ type controllerServer struct {
 	Logger     *zap.Logger
 }
 
-func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+	// Extract request ID from context (added by interceptor)
+	reqID := requestid.FromContext(ctx)
+	log := cs.Logger.With(zap.String("request_id", reqID))
+	
 	var (
 		bucketName         string
 		endPoint           string
@@ -54,30 +60,37 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		quotaLimitEnabled  bool
 	)
 
+	log.Info("CreateVolume started", zap.String("volume_name", req.GetName()))
+
 	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
+		logger.Error(ctx, cs.Logger, "Error modifying request", zap.Error(err))
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Error in modifying requests %v", reqID, err))
 	}
-	klog.V(3).Infof("CSIControllerServer-CreateVolume: Request: %v", modifiedRequest.(*csi.CreateVolumeRequest))
+	log.Debug("CreateVolume request details", zap.Any("request", modifiedRequest.(*csi.CreateVolumeRequest)))
 
 	volumeName, err := sanitizeVolumeID(req.GetName())
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in sanitizeVolumeID %v", err))
+		logger.Error(ctx, cs.Logger, "Error sanitizing volume ID", zap.Error(err))
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Error in sanitizeVolumeID %v", reqID, err))
 	}
 	volumeID := volumeName
 	if len(volumeID) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "Volume name missing in request")
+		logger.Error(ctx, cs.Logger, "Volume name missing in request")
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Volume name missing in request", reqID))
 	}
-	klog.Infof("Got a request to create volume: %s", volumeID)
+	log.Info("Processing volume creation", zap.String("volume_id", volumeID))
 
 	caps := req.GetVolumeCapabilities()
 	if caps == nil {
-		return nil, status.Error(codes.InvalidArgument, "Volume Capabilities missing in request")
+		logger.Error(ctx, cs.Logger, "Volume capabilities missing in request")
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Volume Capabilities missing in request", reqID))
 	}
 	for _, cap := range caps {
-		klog.Infof("Volume capability: %s", cap)
+		log.Debug("Volume capability", zap.String("capability", cap.String()))
 		if cap.GetBlock() != nil {
-			return nil, status.Error(codes.InvalidArgument, "Volume type block Volume not supported")
+			logger.Error(ctx, cs.Logger, "Block volume not supported")
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Volume type block Volume not supported", reqID))
 		}
 	}
 
@@ -85,32 +98,35 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	if params == nil {
 		params = make(map[string]string)
 	}
-	klog.Info("CreateVolume Parameters:\n\t", params)
+	log.Info("CreateVolume parameters received", zap.Int("param_count", len(params)))
 
 	secretMap := req.GetSecrets()
-	klog.Info("req.GetSecrets() length:\t", len(secretMap))
+	log.Info("Secrets received", zap.Int("secret_count", len(secretMap)))
 
 	var customSecretName string
 	if len(secretMap) == 0 {
-		klog.Info("Did not find the secret that matches pvc name. Fetching custom secret from PVC annotations")
+		log.Info("No secret in request, fetching custom secret from PVC annotations")
 
 		pvcName = params[constants.PVCNameKey]
 		pvcNamespace = params[constants.PVCNamespaceKey]
 
 		if pvcName == "" {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("pvcName not specified, could not fetch the secret %v", err))
+			logger.Error(ctx, cs.Logger, "PVC name not specified")
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] pvcName not specified, could not fetch the secret", reqID))
 		}
 
 		if pvcNamespace == "" {
 			pvcNamespace = constants.DefaultNamespace
 		}
 
+		log.Info("Fetching PVC", zap.String("pvc_name", pvcName), zap.String("namespace", pvcNamespace))
 		pvcRes, err := cs.Stats.GetPVC(pvcName, pvcNamespace)
 		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("PVC resource not found %v", err))
+			logger.Error(ctx, cs.Logger, "PVC resource not found", zap.Error(err))
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] PVC resource not found %v", reqID, err))
 		}
 
-		klog.Info("pvc annotations:\n\t", pvcRes.Annotations)
+		log.Debug("PVC annotations", zap.Any("annotations", pvcRes.Annotations))
 
 		pvcAnnotations := pvcRes.Annotations
 
@@ -118,27 +134,30 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		secretNamespace := pvcAnnotations[constants.SecretNamespaceKey]
 
 		if customSecretName == "" {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("secretName annotation 'cos.csi.driver/secret' not specified in the PVC annotations, could not fetch the secret %v", err))
+			logger.Error(ctx, cs.Logger, "Secret name annotation not found in PVC")
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] secretName annotation 'cos.csi.driver/secret' not specified in the PVC annotations", reqID))
 		}
 
 		if secretNamespace == "" {
-			klog.Info("secretNamespace annotation 'cos.csi.driver/secret-namespace' not specified in PVC annotations:\t", pvcRes.Annotations, "\t trying to fetch the secret in default namespace")
+			log.Warn("Secret namespace not specified in PVC annotations, using default namespace")
 			secretNamespace = constants.DefaultNamespace
 		}
 
+		log.Info("Fetching secret", zap.String("secret_name", customSecretName), zap.String("namespace", secretNamespace))
 		secret, err := cs.Stats.GetSecret(customSecretName, secretNamespace)
 		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret resource not found %v", err))
+			logger.Error(ctx, cs.Logger, "Secret resource not found", zap.Error(err))
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Secret resource not found %v", reqID, err))
 		}
 
 		secretMapCustom := parseCustomSecret(secret)
-		klog.Info("custom secret parameters parsed successfully, length of custom secret: ", len(secretMapCustom))
+		log.Info("Custom secret parsed successfully", zap.Int("secret_param_count", len(secretMapCustom)))
 
 		if objectPath, exists := secretMapCustom["objectPath"]; exists {
-			klog.Infof("volume_id:%q objectPath found in secret: %q", volumeID, objectPath)
+			log.Info("ObjectPath found in secret", zap.String("volume_id", volumeID), zap.String("object_path", objectPath))
 			params["objectPath"] = objectPath
 		} else {
-			klog.Infof("volume_id:%q no objectPath in secret (mounting bucket root)", volumeID)
+			log.Info("No objectPath in secret, mounting bucket root", zap.String("volume_id", volumeID))
 		}
 
 		secretMap = secretMapCustom
