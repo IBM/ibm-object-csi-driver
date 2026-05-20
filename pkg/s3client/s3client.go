@@ -17,6 +17,7 @@
 package s3client
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -29,6 +30,7 @@ import (
 	"github.com/IBM/ibm-cos-sdk-go/aws/session"
 	"github.com/IBM/ibm-cos-sdk-go/service/s3"
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
+	"github.com/IBM/ibm-object-csi-driver/pkg/requestid"
 	"go.uber.org/zap"
 )
 
@@ -53,20 +55,20 @@ type ObjectStorageCredentials struct {
 // ObjectStorageSession is an interface of an object store session
 type ObjectStorageSession interface {
 	// CheckBucketAccess method check that a bucket can be accessed
-	CheckBucketAccess(bucket string) error
+	CheckBucketAccess(ctx context.Context, bucket string) error
 
 	// CheckObjectPathExistence method checks that object-path exists inside bucket
-	CheckObjectPathExistence(bucket, objectpath string) (bool, error)
+	CheckObjectPathExistence(ctx context.Context, bucket, objectpath string) (bool, error)
 
 	// CreateBucket methods creates a new bucket
-	CreateBucket(bucket, kpRootKeyCrn string) (string, error)
+	CreateBucket(ctx context.Context, bucket, kpRootKeyCrn string) (string, error)
 
 	// DeleteBucket methods deletes a bucket (with all of its objects)
-	DeleteBucket(bucket string) error
+	DeleteBucket(ctx context.Context, bucket string) error
 
-	SetBucketVersioning(bucket string, enable bool) error
+	SetBucketVersioning(ctx context.Context, bucket string, enable bool) error
 
-	UpdateQuotaLimit(quota int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error
+	UpdateQuotaLimit(ctx context.Context, quota int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error
 }
 
 // COSSessionFactory represents a COS (S3) session factory
@@ -115,80 +117,115 @@ func (f *defaultRCClientFactory) NewResourceConfigurationV1(options *rc.Resource
 	return rc.NewResourceConfigurationV1(options)
 }
 
-func (s *COSSession) CheckBucketAccess(bucket string) error {
+func (s *COSSession) CheckBucketAccess(ctx context.Context, bucket string) error {
+	reqID := requestid.FromContext(ctx)
+	log := s.logger.With(zap.String("request_id", reqID))
+	
+	log.Info(fmt.Sprintf("[%s] CheckBucketAccess started", reqID), zap.String("bucket", bucket))
 	_, err := s.svc.HeadBucket(&s3.HeadBucketInput{
 		Bucket: aws.String(bucket),
 	})
+	if err != nil {
+		log.Error(fmt.Sprintf("[%s] CheckBucketAccess failed", reqID), zap.String("bucket", bucket), zap.Error(err))
+	} else {
+		log.Info(fmt.Sprintf("[%s] CheckBucketAccess completed", reqID), zap.String("bucket", bucket))
+	}
 	return err
 }
 
-func (s *COSSession) CheckObjectPathExistence(bucket string, objectpath string) (bool, error) {
-	s.logger.Info("CheckObjectPathExistence args", zap.String("bucket", bucket), zap.String("objectpath", objectpath))
+func (s *COSSession) CheckObjectPathExistence(ctx context.Context, bucket string, objectpath string) (bool, error) {
+	reqID := requestid.FromContext(ctx)
+	log := s.logger.With(zap.String("request_id", reqID))
+	
+	log.Info(fmt.Sprintf("[%s] CheckObjectPathExistence started", reqID),
+		zap.String("bucket", bucket), zap.String("objectpath", objectpath))
+	
 	objectpath = strings.TrimPrefix(objectpath, "/")
 	if !strings.HasSuffix(objectpath, "/") {
 		objectpath = objectpath + "/"
 	}
+	
 	resp, err := s.svc.ListObjectsV2(&s3.ListObjectsV2Input{
 		Bucket:  aws.String(bucket),
 		MaxKeys: aws.Int64(1),
 		Prefix:  aws.String(objectpath),
 	})
 	if err != nil {
-		s.logger.Error("cannot list bucket", zap.String("bucket", bucket))
-		return false, fmt.Errorf("cannot list bucket '%s': %v", bucket, err)
+		log.Error(fmt.Sprintf("[%s] Cannot list bucket", reqID), zap.String("bucket", bucket), zap.Error(err))
+		return false, fmt.Errorf("[%s] cannot list bucket '%s': %v", reqID, bucket, err)
 	}
+	
+	exists := false
 	if len(resp.Contents) == 1 {
 		object := *(resp.Contents[0].Key)
 		if (object == objectpath) || (strings.TrimSuffix(object, "/") == objectpath) {
-			return true, nil
+			exists = true
 		}
 	}
-	return false, nil
+	
+	log.Info(fmt.Sprintf("[%s] CheckObjectPathExistence completed", reqID),
+		zap.String("bucket", bucket), zap.String("objectpath", objectpath), zap.Bool("exists", exists))
+	return exists, nil
 }
 
-func (s *COSSession) CreateBucket(bucket, kpRootKeyCrn string) (res string, err error) {
+func (s *COSSession) CreateBucket(ctx context.Context, bucket, kpRootKeyCrn string) (res string, err error) {
+	reqID := requestid.FromContext(ctx)
+	log := s.logger.With(zap.String("request_id", reqID))
+	
+	log.Info(fmt.Sprintf("[%s] CreateBucket started", reqID),
+		zap.String("bucket", bucket),
+		zap.Bool("encryption_enabled", kpRootKeyCrn != ""))
+	
 	if kpRootKeyCrn != "" {
+		log.Debug(fmt.Sprintf("[%s] Creating bucket with KP encryption", reqID), zap.String("bucket", bucket))
 		_, err = s.svc.CreateBucket(&s3.CreateBucketInput{
 			Bucket:                      aws.String(bucket),
 			IBMSSEKPCustomerRootKeyCrn:  aws.String(kpRootKeyCrn),
 			IBMSSEKPEncryptionAlgorithm: aws.String(constants.KPEncryptionAlgorithm),
 		})
 	} else {
+		log.Debug(fmt.Sprintf("[%s] Creating bucket without encryption", reqID), zap.String("bucket", bucket))
 		_, err = s.svc.CreateBucket(&s3.CreateBucketInput{
 			Bucket: aws.String(bucket),
 		})
 	}
 
 	if err != nil {
-		// TODO
-		// CreateVolume: Unable to create the bucket: %BucketAlreadyExists:
-		// The requested bucket name is not available. The bucket namespace is shared by all users of the system.
-		// Please select a different name and try again.
-
 		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "BucketAlreadyOwnedByYou" {
-			s.logger.Warn("bucket already exists", zap.String("bucket", bucket))
-			return fmt.Sprintf("bucket '%s' already exists", bucket), nil
+			log.Warn(fmt.Sprintf("[%s] Bucket already exists", reqID), zap.String("bucket", bucket))
+			return fmt.Sprintf("[%s] bucket '%s' already exists", reqID, bucket), nil
 		}
+		log.Error(fmt.Sprintf("[%s] CreateBucket failed", reqID), zap.String("bucket", bucket), zap.Error(err))
 		return "", err
 	}
 
+	log.Info(fmt.Sprintf("[%s] CreateBucket completed successfully", reqID), zap.String("bucket", bucket))
 	return "", nil
 }
 
-func (s *COSSession) DeleteBucket(bucket string) error {
+func (s *COSSession) DeleteBucket(ctx context.Context, bucket string) error {
+	reqID := requestid.FromContext(ctx)
+	log := s.logger.With(zap.String("request_id", reqID))
+	
+	log.Info(fmt.Sprintf("[%s] DeleteBucket started", reqID), zap.String("bucket", bucket))
+	
 	resp, err := s.svc.ListObjects(&s3.ListObjectsInput{
 		Bucket: aws.String(bucket),
 	})
 
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "NoSuchBucket" {
-			s.logger.Warn("bucket already deleted", zap.String("bucket", bucket))
+			log.Warn(fmt.Sprintf("[%s] Bucket already deleted", reqID), zap.String("bucket", bucket))
 			return nil
 		}
-
-		return fmt.Errorf("cannot list bucket '%s': %v", bucket, err)
+		log.Error(fmt.Sprintf("[%s] Cannot list bucket", reqID), zap.String("bucket", bucket), zap.Error(err))
+		return fmt.Errorf("[%s] cannot list bucket '%s': %v", reqID, bucket, err)
 	}
 
+	objectCount := len(resp.Contents)
+	log.Info(fmt.Sprintf("[%s] Deleting objects from bucket", reqID),
+		zap.String("bucket", bucket), zap.Int("object_count", objectCount))
+	
 	for _, key := range resp.Contents {
 		_, err = s.svc.DeleteObject(&s3.DeleteObjectInput{
 			Bucket: aws.String(bucket),
@@ -196,23 +233,37 @@ func (s *COSSession) DeleteBucket(bucket string) error {
 		})
 
 		if err != nil {
-			return fmt.Errorf("cannot delete object %s/%s: %v", bucket, *key.Key, err)
+			log.Error(fmt.Sprintf("[%s] Cannot delete object", reqID),
+				zap.String("bucket", bucket), zap.String("key", *key.Key), zap.Error(err))
+			return fmt.Errorf("[%s] cannot delete object %s/%s: %v", reqID, bucket, *key.Key, err)
 		}
 	}
 
+	log.Info(fmt.Sprintf("[%s] Deleting bucket", reqID), zap.String("bucket", bucket))
 	_, err = s.svc.DeleteBucket(&s3.DeleteBucketInput{
 		Bucket: aws.String(bucket),
 	})
 
+	if err != nil {
+		log.Error(fmt.Sprintf("[%s] DeleteBucket failed", reqID), zap.String("bucket", bucket), zap.Error(err))
+	} else {
+		log.Info(fmt.Sprintf("[%s] DeleteBucket completed successfully", reqID), zap.String("bucket", bucket))
+	}
 	return err
 }
 
-func (s *COSSession) SetBucketVersioning(bucket string, enable bool) error {
+func (s *COSSession) SetBucketVersioning(ctx context.Context, bucket string, enable bool) error {
+	reqID := requestid.FromContext(ctx)
+	log := s.logger.With(zap.String("request_id", reqID))
+	
 	status := s3.BucketVersioningStatusSuspended
 	if enable {
 		status = s3.BucketVersioningStatusEnabled
 	}
-	s.logger.Info("Setting versioning for bucket", zap.String("bucket", bucket), zap.Bool("enable", enable))
+	
+	log.Info(fmt.Sprintf("[%s] SetBucketVersioning started", reqID),
+		zap.String("bucket", bucket), zap.Bool("enable", enable))
+	
 	_, err := s.svc.PutBucketVersioning(&s3.PutBucketVersioningInput{
 		Bucket: aws.String(bucket),
 		VersioningConfiguration: &s3.VersioningConfiguration{
@@ -220,10 +271,13 @@ func (s *COSSession) SetBucketVersioning(bucket string, enable bool) error {
 		},
 	})
 	if err != nil {
-		s.logger.Error("Failed to set versioning", zap.String("bucket", bucket), zap.Bool("enable", enable), zap.Error(err))
-		return fmt.Errorf("failed to set versioning to %v for bucket '%s': %v", enable, bucket, err)
+		log.Error(fmt.Sprintf("[%s] SetBucketVersioning failed", reqID),
+			zap.String("bucket", bucket), zap.Bool("enable", enable), zap.Error(err))
+		return fmt.Errorf("[%s] failed to set versioning to %v for bucket '%s': %v", reqID, enable, bucket, err)
 	}
-	s.logger.Info("Versioning set successfully for bucket", zap.String("bucket", bucket), zap.Bool("enable", enable))
+	
+	log.Info(fmt.Sprintf("[%s] SetBucketVersioning completed successfully", reqID),
+		zap.String("bucket", bucket), zap.Bool("enable", enable))
 	return nil
 }
 
@@ -256,12 +310,20 @@ func (s *COSSessionFactory) NewObjectStorageSession(endpoint, locationConstraint
 	}
 }
 
-func (s *COSSession) UpdateQuotaLimit(quota int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error {
+func (s *COSSession) UpdateQuotaLimit(ctx context.Context, quota int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error {
+	reqID := requestid.FromContext(ctx)
+	log := s.logger.With(zap.String("request_id", reqID))
+	
+	log.Info(fmt.Sprintf("[%s] UpdateQuotaLimit started", reqID),
+		zap.String("bucket", bucketName), zap.Int64("quota", quota))
+	
 	var configEndpoint string
 	if strings.Contains(strings.ToLower(cosEndpoint), "private") {
 		configEndpoint = constants.ResourceConfigEPPrivate
+		log.Debug(fmt.Sprintf("[%s] Using private resource config endpoint", reqID))
 	} else {
 		configEndpoint = constants.ResourceConfigEPDirect
+		log.Debug(fmt.Sprintf("[%s] Using direct resource config endpoint", reqID))
 	}
 
 	iamTokenURL := iamEndpoint + "/identity/token"
@@ -271,12 +333,14 @@ func (s *COSSession) UpdateQuotaLimit(quota int64, apiKey, bucketName, cosEndpoi
 		URL:    iamTokenURL,
 	}
 
+	log.Debug(fmt.Sprintf("[%s] Creating resource configuration service", reqID))
 	service, err := s.rcClientFactory.NewResourceConfigurationV1(&rc.ResourceConfigurationV1Options{
 		Authenticator: authenticator,
 		URL:           configEndpoint,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create resource configuration service: %w", err)
+		log.Error(fmt.Sprintf("[%s] Failed to create resource configuration service", reqID), zap.Error(err))
+		return fmt.Errorf("[%s] failed to create resource configuration service: %w", reqID, err)
 	}
 
 	bucketPatch := make(map[string]interface{})
@@ -287,10 +351,16 @@ func (s *COSSession) UpdateQuotaLimit(quota int64, apiKey, bucketName, cosEndpoi
 		BucketPatch: bucketPatch,
 	}
 
+	log.Info(fmt.Sprintf("[%s] Updating bucket quota", reqID),
+		zap.String("bucket", bucketName), zap.Int64("quota", quota))
 	_, err = service.UpdateBucketConfig(options)
 	if err != nil {
-		return fmt.Errorf("failed to update quota for bucket %s to %d bytes: %w", bucketName, quota, err)
+		log.Error(fmt.Sprintf("[%s] Failed to update quota", reqID),
+			zap.String("bucket", bucketName), zap.Int64("quota", quota), zap.Error(err))
+		return fmt.Errorf("[%s] failed to update quota for bucket %s to %d bytes: %w", reqID, bucketName, quota, err)
 	}
 
+	log.Info(fmt.Sprintf("[%s] UpdateQuotaLimit completed successfully", reqID),
+		zap.String("bucket", bucketName), zap.Int64("quota", quota))
 	return nil
 }

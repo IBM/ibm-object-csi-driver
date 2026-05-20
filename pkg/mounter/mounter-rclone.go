@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 /*******************************************************************************
  * IBM Confidential
  * OCO Source Materials
@@ -13,6 +16,7 @@ package mounter
 
 import (
 	"bufio"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -22,8 +26,10 @@ import (
 	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
+	"github.com/IBM/ibm-object-csi-driver/pkg/logger"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
-	"k8s.io/klog/v2"
+	"github.com/IBM/ibm-object-csi-driver/pkg/requestid"
+	"go.uber.org/zap"
 )
 
 // Mounter interface defined in mounter.go
@@ -54,11 +60,10 @@ const (
 var (
 	createConfigWrap = createConfig
 	removeConfigFile = removeRcloneConfigFile
+	rcloneLogger, _  = zap.NewProduction()
 )
 
 func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
-	klog.Info("-newRcloneMounter-")
-
 	var (
 		val       string
 		check     bool
@@ -120,9 +125,6 @@ func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounte
 		mounter.UID = secretMap["uid"]
 	}
 
-	klog.Infof("newRcloneMounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
-		mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType)
-
 	updatedOptions := updateMountOptions(mountOptions, secretMap)
 	mounter.MountOptions = updatedOptions
 
@@ -145,7 +147,7 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 	stringData, ok := secretMap["mountOptions"]
 
 	if !ok {
-		klog.Infof("No new mountOptions found. Using default mountOptions: %v", dafaultMountOptions)
+		rcloneLogger.Info("No new mountOptions found. Using default mountOptions", zap.Any("default_mount_options", dafaultMountOptions))
 		return dafaultMountOptions
 	}
 
@@ -158,7 +160,7 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 		}
 		opts := strings.Split(line, "=")
 		if len(opts) != 2 {
-			klog.Infof("Invalid mount option: %s\n", line)
+			rcloneLogger.Info("Invalid mount option", zap.String("line", line))
 			continue
 		}
 		mountOptsMap[strings.TrimSpace(opts[0])] = strings.TrimSpace(opts[1])
@@ -171,14 +173,18 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 		updatedOptions = append(updatedOptions, option)
 	}
 
-	klog.Infof("Updated rclone Options: %v", updatedOptions)
+	rcloneLogger.Info("Updated rclone Options", zap.Any("updated_options", updatedOptions))
 
 	return updatedOptions
 }
 
-func (rclone *RcloneMounter) Mount(source string, target string) error {
-	klog.Info("-RcloneMounter Mount-")
-	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
+func (rclone *RcloneMounter) Mount(ctx context.Context, source string, target string) error {
+	reqID := requestid.FromContext(ctx)
+	baseLogger, _ := zap.NewProduction()
+	log := logger.WithRequestID(ctx, baseLogger)
+	
+	log.Info(fmt.Sprintf("[%s] RcloneMounter Mount started", reqID),
+		zap.String("source", source), zap.String("target", target))
 
 	var bucketName string
 	var err error
@@ -191,8 +197,10 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 	}
 
 	configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
+	log.Debug(fmt.Sprintf("[%s] Creating rclone config", reqID), zap.String("config_path", configPathWithVolID))
+	
 	if err = createConfigWrap(configPathWithVolID, rclone); err != nil {
-		klog.Errorf("RcloneMounter Mount: Cannot create rclone config file %v", err)
+		log.Error(fmt.Sprintf("[%s] Cannot create rclone config file", reqID), zap.Error(err))
 		return err
 	}
 
@@ -203,55 +211,76 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 		bucketName = fmt.Sprintf("%s:%s", remote, rclone.BucketName)
 	}
 
+	log.Info(fmt.Sprintf("[%s] Formulating mount options", reqID),
+		zap.String("bucket_name", bucketName),
+		zap.String("auth_type", rclone.AuthType))
 	args, wnOp := rclone.formulateMountOptions(bucketName, target, configPathWithVolID)
 
 	if mountWorker {
-		klog.Info("Mount on Worker started...")
+		log.Info(fmt.Sprintf("[%s] Mount on Worker started", reqID))
 
 		jsonData, err := json.Marshal(wnOp)
 		if err != nil {
-			klog.Fatalf("Error marshalling data: %v", err)
+			log.Error(fmt.Sprintf("[%s] Error marshalling data", reqID), zap.Error(err))
 			return err
 		}
 
 		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.RClone, jsonData)
 
-		err = mounterRequest(payload, "http://unix/api/cos/mount")
+		log.Debug(fmt.Sprintf("[%s] Worker mounting payload", reqID), zap.String("payload", payload))
+
+		err = mounterRequest(ctx, payload, "http://unix/api/cos/mount", log)
 		if err != nil {
-			klog.Error("failed to mount on  worker...", err)
+			log.Error(fmt.Sprintf("[%s] Failed to mount on worker", reqID), zap.Error(err))
 			return err
 		}
+		log.Info(fmt.Sprintf("[%s] RcloneMounter Mount completed successfully on worker", reqID))
 		return nil
 	}
-	klog.Info("NodeServer Mounting...")
-	return rclone.MounterUtils.FuseMount(target, constants.RClone, args)
+	
+	log.Info(fmt.Sprintf("[%s] NodeServer mounting", reqID))
+	err = rclone.MounterUtils.FuseMount(target, constants.RClone, args)
+	if err != nil {
+		log.Error(fmt.Sprintf("[%s] FuseMount failed", reqID), zap.Error(err))
+	} else {
+		log.Info(fmt.Sprintf("[%s] RcloneMounter Mount completed successfully", reqID))
+	}
+	return err
 }
 
-func (rclone *RcloneMounter) Unmount(target string) error {
-	klog.Info("-RcloneMounter Unmount-")
+func (rclone *RcloneMounter) Unmount(ctx context.Context, target string) error {
+	reqID := requestid.FromContext(ctx)
+	baseLogger, _ := zap.NewProduction()
+	log := logger.WithRequestID(ctx, baseLogger)
+	
+	log.Info(fmt.Sprintf("[%s] RcloneMounter Unmount started", reqID), zap.String("target", target))
 
 	if mountWorker {
-		klog.Info("Unmount on Worker started...")
+		log.Info(fmt.Sprintf("[%s] Unmount on Worker started", reqID))
 
 		payload := fmt.Sprintf(`{"path":"%s"}`, target)
 
-		err := mounterRequest(payload, "http://unix/api/cos/unmount")
+		err := mounterRequest(ctx, payload, "http://unix/api/cos/unmount", log)
 		if err != nil {
-			klog.Error("failed to unmount on  worker...", err)
+			log.Error(fmt.Sprintf("[%s] Failed to unmount on worker", reqID), zap.Error(err))
 			return err
 		}
 
 		removeConfigFile(constants.MounterConfigPathOnHost, target)
+		log.Info(fmt.Sprintf("[%s] RcloneMounter Unmount completed successfully on worker", reqID))
 		return nil
 	}
-	klog.Info("NodeServer Unmounting...")
+	
+	log.Info(fmt.Sprintf("[%s] NodeServer unmounting", reqID))
 
 	err := rclone.MounterUtils.FuseUnmount(target)
 	if err != nil {
+		log.Error(fmt.Sprintf("[%s] FuseUnmount failed", reqID), zap.Error(err))
 		return err
 	}
 
 	removeConfigFile(constants.MounterConfigPathOnPodRclone, target)
+	log.Info(fmt.Sprintf("[%s] RcloneMounter Unmount completed successfully", reqID))
 	return nil
 }
 
@@ -299,34 +328,34 @@ func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
 
 	if err := MakeDir(configPathWithVolID, 0755); // #nosec G301: used for rclone
 	err != nil {
-		klog.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", configPathWithVolID, err)
+		rcloneLogger.Error("RcloneMounter Mount: Cannot create directory", zap.String("path", configPathWithVolID), zap.Error(err))
 		return err
 	}
 
 	configFile := path.Join(configPathWithVolID, configFileName)
 	file, err := CreateFile(configFile) // #nosec G304 used for rclone
 	if err != nil {
-		klog.Errorf("RcloneMounter Mount: Cannot create file %s: %v", configFileName, err)
+		rcloneLogger.Error("RcloneMounter Mount: Cannot create file", zap.String("file", configFileName), zap.Error(err))
 		return err
 	}
 	defer func() {
 		if err = file.Close(); err != nil {
-			klog.Errorf("RcloneMounter Mount: Cannot close file %s: %v", configFileName, err)
+			rcloneLogger.Error("RcloneMounter Mount: Cannot close file", zap.String("file", configFileName), zap.Error(err))
 		}
 	}()
 
 	err = Chmod(configFile, 0644) // #nosec G302: used for rclone
 	if err != nil {
-		klog.Errorf("RcloneMounter Mount: Cannot change permissions on file  %s: %v", configFileName, err)
+		rcloneLogger.Error("RcloneMounter Mount: Cannot change permissions on file", zap.String("file", configFileName), zap.Error(err))
 		return err
 	}
 
-	klog.Info("-Rclone writing to config-")
+	rcloneLogger.Info("Rclone writing to config")
 	datawriter := bufio.NewWriter(file)
 	for _, line := range configParams {
 		_, err = datawriter.WriteString(line + "\n")
 		if err != nil {
-			klog.Errorf("RcloneMounter Mount: Could not write to config file: %v", err)
+			rcloneLogger.Error("RcloneMounter Mount: Could not write to config file", zap.Error(err))
 			return err
 		}
 	}
@@ -334,7 +363,7 @@ func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
 	if err != nil {
 		return err
 	}
-	klog.Info("-Rclone created rclone config file-")
+	rcloneLogger.Info("Rclone created rclone config file")
 	return nil
 }
 
@@ -380,21 +409,21 @@ func removeRcloneConfigFile(configPath, target string) {
 		_, err := Stat(configPathWithVolID)
 		if err != nil {
 			if os.IsNotExist(err) {
-				klog.Infof("removeRcloneConfigFile: Config file directory does not exist: %s", configPathWithVolID)
+				rcloneLogger.Info("removeRcloneConfigFile: Config file directory does not exist", zap.String("path", configPathWithVolID))
 				return
 			}
-			klog.Errorf("removeRcloneConfigFile: Attempt %d - Failed to stat path %s: %v", retry, configPathWithVolID, err)
+			rcloneLogger.Error("removeRcloneConfigFile: Failed to stat path", zap.Int("attempt", retry), zap.String("path", configPathWithVolID), zap.Error(err))
 			time.Sleep(constants.Interval)
 			continue
 		}
 		err = RemoveAll(configPathWithVolID)
 		if err != nil {
-			klog.Errorf("removeRcloneConfigFile: Attempt %d - Failed to remove config file path %s: %v", retry, configPathWithVolID, err)
+			rcloneLogger.Error("removeRcloneConfigFile: Failed to remove config file path", zap.Int("attempt", retry), zap.String("path", configPathWithVolID), zap.Error(err))
 			time.Sleep(constants.Interval)
 			continue
 		}
-		klog.Infof("removeRcloneConfigFile: Successfully removed config file path: %s", configPathWithVolID)
+		rcloneLogger.Info("removeRcloneConfigFile: Successfully removed config file path", zap.String("path", configPathWithVolID))
 		return
 	}
-	klog.Errorf("removeRcloneConfigFile: Failed to remove config file path after %d attempts", maxRetries)
+	rcloneLogger.Error("removeRcloneConfigFile: Failed to remove config file path after max attempts", zap.Int("max_attempts", maxRetries))
 }

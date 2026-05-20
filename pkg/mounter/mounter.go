@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -13,15 +14,20 @@ import (
 	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
+	"github.com/IBM/ibm-object-csi-driver/pkg/logger"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
+	"github.com/IBM/ibm-object-csi-driver/pkg/requestid"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"k8s.io/klog/v2"
 )
 
 var (
-	mountWorker    = true
-	mounterRequest = createCOSCSIMounterRequest
+	mountWorker = true
+	// mounterRequest is a function variable that can be overridden for testing
+	mounterRequest = func(ctx context.Context, payload string, url string, log *zap.Logger) error {
+		return createCOSCSIMounterRequest(ctx, payload, url, log)
+	}
 
 	MakeDir    = os.MkdirAll
 	CreateFile = os.Create
@@ -31,8 +37,8 @@ var (
 )
 
 type Mounter interface {
-	Mount(source string, target string) error
-	Unmount(target string) error
+	Mount(ctx context.Context, source string, target string) error
+	Unmount(ctx context.Context, target string) error
 }
 
 type CSIMounterFactory struct{}
@@ -46,7 +52,6 @@ func NewCSIMounterFactory() *CSIMounterFactory {
 }
 
 func (s *CSIMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string, defaultMOMap map[string]string) Mounter {
-	klog.Info("-NewMounter-")
 	var mounter, val string
 	var check bool
 
@@ -127,16 +132,19 @@ func writePass(pwFileName string, pwFileContent string) error {
 	return nil
 }
 
-func createCOSCSIMounterRequest(payload string, url string) error {
+func createCOSCSIMounterRequest(ctx context.Context, payload string, url string, log *zap.Logger) error {
+	reqID := requestid.FromContext(ctx)
+	
 	// Get socket path
 	socketPath := os.Getenv(constants.COSCSIMounterSocketPathEnv)
 	if socketPath == "" {
 		socketPath = constants.COSCSIMounterSocketPath
 	}
-	klog.Infof("COS CSI Mounter Socket Path: %s", socketPath)
+	log.Info(fmt.Sprintf("[%s] COS CSI Mounter Socket Path", reqID), zap.String("socket_path", socketPath))
 
 	err := isGRPCServerAvailable(socketPath)
 	if err != nil {
+		log.Error(fmt.Sprintf("[%s] COS CSI Mounter service not available", reqID), zap.Error(err))
 		return err
 	}
 
@@ -156,58 +164,67 @@ func createCOSCSIMounterRequest(payload string, url string) error {
 	// Create POST request
 	req, err := http.NewRequest("POST", url, strings.NewReader(payload))
 	if err != nil {
+		log.Error(fmt.Sprintf("[%s] Failed to create HTTP request", reqID), zap.Error(err))
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Request-ID", reqID) // Add request ID to HTTP header
+	
+	log.Info(fmt.Sprintf("[%s] Sending request to cos-csi-mounter", reqID), zap.String("url", url))
 	response, err := client.Do(req)
 	if err != nil {
+		log.Error(fmt.Sprintf("[%s] Failed to send request to cos-csi-mounter", reqID), zap.Error(err))
 		return err
 	}
 
 	defer func() {
 		if err := response.Body.Close(); err != nil {
-			klog.Errorf("failed to close response body: %v", err)
+			log.Error(fmt.Sprintf("[%s] Failed to close response body", reqID), zap.Error(err))
 		}
 	}()
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
+		log.Error(fmt.Sprintf("[%s] Failed to read response body", reqID), zap.Error(err))
 		return err
 	}
 
 	responseBody := string(body)
-	klog.Infof("response from cos-csi-mounter -> Response body: %s, Response code: %v", responseBody, response.StatusCode)
+	log.Info(fmt.Sprintf("[%s] Response from cos-csi-mounter", reqID),
+		zap.String("response_body", responseBody),
+		zap.Int("status_code", response.StatusCode))
 
 	if response.StatusCode != http.StatusOK {
-		return parseGRPCResponse(response.StatusCode, responseBody)
+		return parseGRPCResponse(reqID, response.StatusCode, responseBody)
 	}
 	return nil
 }
 
 // parseGRPCResponse takes both response body and error code and frames error message
-func parseGRPCResponse(code int, response string) error {
+func parseGRPCResponse(reqID string, code int, response string) error {
 	errMsg := parseErrFromResponse(response)
+	errMsgWithReqID := fmt.Sprintf("[%s] %s", reqID, errMsg)
 	switch code {
 	case http.StatusBadRequest:
-		return status.Error(codes.InvalidArgument, errMsg)
+		return status.Error(codes.InvalidArgument, errMsgWithReqID)
 	case http.StatusNotFound:
-		return status.Error(codes.NotFound, errMsg)
+		return status.Error(codes.NotFound, errMsgWithReqID)
 	case http.StatusConflict:
-		return status.Error(codes.AlreadyExists, errMsg)
+		return status.Error(codes.AlreadyExists, errMsgWithReqID)
 	case http.StatusForbidden:
-		return status.Error(codes.PermissionDenied, errMsg)
+		return status.Error(codes.PermissionDenied, errMsgWithReqID)
 	case http.StatusTooManyRequests:
-		return status.Error(codes.ResourceExhausted, errMsg)
+		return status.Error(codes.ResourceExhausted, errMsgWithReqID)
 	case http.StatusNotImplemented:
-		return status.Error(codes.Unimplemented, errMsg)
+		return status.Error(codes.Unimplemented, errMsgWithReqID)
 	case http.StatusInternalServerError:
-		return status.Error(codes.Internal, errMsg)
+		return status.Error(codes.Internal, errMsgWithReqID)
 	case http.StatusServiceUnavailable:
-		return status.Error(codes.Unavailable, errMsg)
+		return status.Error(codes.Unavailable, errMsgWithReqID)
 	case http.StatusUnauthorized:
-		return status.Error(codes.Unauthenticated, errMsg)
+		return status.Error(codes.Unauthenticated, errMsgWithReqID)
 	default:
-		return status.Error(codes.Unknown, errMsg)
+		return status.Error(codes.Unknown, errMsgWithReqID)
 	}
 }
 
@@ -231,7 +248,7 @@ func parseErrFromResponse(response string) string {
 	var errFromResp map[string]string
 	err := json.Unmarshal([]byte(response), &errFromResp)
 	if err != nil {
-		klog.Warning("failed to unmarshal response from server", err)
+		// Can't log here as we don't have logger context, just return the response
 		return response
 	}
 	val, exists := errFromResp["error"]
