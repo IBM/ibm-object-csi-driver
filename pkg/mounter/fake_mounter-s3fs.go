@@ -1,6 +1,12 @@
+//go:build linux
+// +build linux
+
 package mounter
 
-import "errors"
+import (
+	"context"
+	"errors"
+)
 
 type fakes3fsMounter struct {
 	bucketName    string
@@ -29,14 +35,14 @@ func fakenewS3fsMounter(isFailedMount, isFailedUnmount bool) Mounter {
 	}
 }
 
-func (s3fs *fakes3fsMounter) Mount(source string, target string) error {
+func (s3fs *fakes3fsMounter) Mount(ctx context.Context, source string, target string) error {
 	if s3fs.isFailedMount {
 		return errors.New("failed to mount s3fs")
 	}
 	return nil
 }
 
-func (s3fs *fakes3fsMounter) Unmount(target string) error {
+func (s3fs *fakes3fsMounter) Unmount(ctx context.Context, target string) error {
 	if s3fs.isFailedUnmount {
 		return errors.New("failed to unmount s3fs")
 	}

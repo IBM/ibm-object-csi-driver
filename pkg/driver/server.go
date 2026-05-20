@@ -19,10 +19,10 @@ import (
 	"sync"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
+	"github.com/IBM/ibm-object-csi-driver/pkg/requestid"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
-	"k8s.io/klog/v2"
 )
 
 // NonBlockingGRPCServer Defines Non blocking GRPC server interfaces
@@ -79,7 +79,7 @@ func (s *nonBlockingGRPCServer) Setup(endpoint string, ids csi.IdentityServer, c
 	opts := []grpc.ServerOption{
 		grpc.ChainUnaryInterceptor(
 			UnaryServerInterceptor(s.logger), // Request ID interceptor
-			logGRPC,                           // Legacy logging interceptor
+			s.logGRPC,                         // Logging interceptor
 		),
 	}
 
@@ -133,13 +133,13 @@ func (s *nonBlockingGRPCServer) Setup(endpoint string, ids csi.IdentityServer, c
 
 	switch s.mode {
 	case "controller":
-		klog.V(3).Info("--Starting server in controller mode--")
+		s.logger.Debug("Starting server in controller mode")
 		csi.RegisterControllerServer(s.server, cs)
 	case "node":
-		klog.V(3).Info("--Starting server in node server mode--")
+		s.logger.Debug("Starting server in node server mode")
 		csi.RegisterNodeServer(s.server, ns)
 	case "controller-node":
-		klog.V(3).Info("--Starting node and controller server mode--")
+		s.logger.Debug("Starting node and controller server mode")
 		csi.RegisterControllerServer(s.server, cs)
 		csi.RegisterNodeServer(s.server, ns)
 	}
@@ -161,14 +161,17 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, c
 	}
 }
 
-// logGRPC ...
-func logGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-	klog.V(3).Infof("GRPC call: %s", info.FullMethod)
+// logGRPC logs GRPC calls with request ID context
+func (s *nonBlockingGRPCServer) logGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	reqID := requestid.FromContext(ctx)
+	log := s.logger.With(zap.String("request_id", reqID))
+	
+	log.Debug("GRPC call", zap.String("method", info.FullMethod))
 	resp, err := handler(ctx, req)
 	if err != nil {
-		klog.Errorf("GRPC error: %v", err)
+		log.Error("GRPC error", zap.Error(err), zap.String("method", info.FullMethod))
 	} else {
-		klog.V(5).Infof("GRPC response: %+v", resp)
+		log.Debug("GRPC response", zap.Any("response", resp), zap.String("method", info.FullMethod))
 	}
 	return resp, err
 }

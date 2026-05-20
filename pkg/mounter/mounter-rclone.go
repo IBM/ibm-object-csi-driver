@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 /*******************************************************************************
  * IBM Confidential
  * OCO Source Materials
@@ -57,6 +60,7 @@ const (
 var (
 	createConfigWrap = createConfig
 	removeConfigFile = removeRcloneConfigFile
+	rcloneLogger, _  = zap.NewProduction()
 )
 
 func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
@@ -143,7 +147,7 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 	stringData, ok := secretMap["mountOptions"]
 
 	if !ok {
-		klog.Infof("No new mountOptions found. Using default mountOptions: %v", dafaultMountOptions)
+		rcloneLogger.Info("No new mountOptions found. Using default mountOptions", zap.Any("default_mount_options", dafaultMountOptions))
 		return dafaultMountOptions
 	}
 
@@ -156,7 +160,7 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 		}
 		opts := strings.Split(line, "=")
 		if len(opts) != 2 {
-			klog.Infof("Invalid mount option: %s\n", line)
+			rcloneLogger.Info("Invalid mount option", zap.String("line", line))
 			continue
 		}
 		mountOptsMap[strings.TrimSpace(opts[0])] = strings.TrimSpace(opts[1])
@@ -169,14 +173,15 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 		updatedOptions = append(updatedOptions, option)
 	}
 
-	klog.Infof("Updated rclone Options: %v", updatedOptions)
+	rcloneLogger.Info("Updated rclone Options", zap.Any("updated_options", updatedOptions))
 
 	return updatedOptions
 }
 
 func (rclone *RcloneMounter) Mount(ctx context.Context, source string, target string) error {
 	reqID := requestid.FromContext(ctx)
-	log := logger.WithRequestID(ctx)
+	baseLogger, _ := zap.NewProduction()
+	log := logger.WithRequestID(ctx, baseLogger)
 	
 	log.Info(fmt.Sprintf("[%s] RcloneMounter Mount started", reqID),
 		zap.String("source", source), zap.String("target", target))
@@ -245,7 +250,8 @@ func (rclone *RcloneMounter) Mount(ctx context.Context, source string, target st
 
 func (rclone *RcloneMounter) Unmount(ctx context.Context, target string) error {
 	reqID := requestid.FromContext(ctx)
-	log := logger.WithRequestID(ctx)
+	baseLogger, _ := zap.NewProduction()
+	log := logger.WithRequestID(ctx, baseLogger)
 	
 	log.Info(fmt.Sprintf("[%s] RcloneMounter Unmount started", reqID), zap.String("target", target))
 
@@ -322,34 +328,34 @@ func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
 
 	if err := MakeDir(configPathWithVolID, 0755); // #nosec G301: used for rclone
 	err != nil {
-		klog.Errorf("RcloneMounter Mount: Cannot create directory %s: %v", configPathWithVolID, err)
+		rcloneLogger.Error("RcloneMounter Mount: Cannot create directory", zap.String("path", configPathWithVolID), zap.Error(err))
 		return err
 	}
 
 	configFile := path.Join(configPathWithVolID, configFileName)
 	file, err := CreateFile(configFile) // #nosec G304 used for rclone
 	if err != nil {
-		klog.Errorf("RcloneMounter Mount: Cannot create file %s: %v", configFileName, err)
+		rcloneLogger.Error("RcloneMounter Mount: Cannot create file", zap.String("file", configFileName), zap.Error(err))
 		return err
 	}
 	defer func() {
 		if err = file.Close(); err != nil {
-			klog.Errorf("RcloneMounter Mount: Cannot close file %s: %v", configFileName, err)
+			rcloneLogger.Error("RcloneMounter Mount: Cannot close file", zap.String("file", configFileName), zap.Error(err))
 		}
 	}()
 
 	err = Chmod(configFile, 0644) // #nosec G302: used for rclone
 	if err != nil {
-		klog.Errorf("RcloneMounter Mount: Cannot change permissions on file  %s: %v", configFileName, err)
+		rcloneLogger.Error("RcloneMounter Mount: Cannot change permissions on file", zap.String("file", configFileName), zap.Error(err))
 		return err
 	}
 
-	klog.Info("-Rclone writing to config-")
+	rcloneLogger.Info("Rclone writing to config")
 	datawriter := bufio.NewWriter(file)
 	for _, line := range configParams {
 		_, err = datawriter.WriteString(line + "\n")
 		if err != nil {
-			klog.Errorf("RcloneMounter Mount: Could not write to config file: %v", err)
+			rcloneLogger.Error("RcloneMounter Mount: Could not write to config file", zap.Error(err))
 			return err
 		}
 	}
@@ -357,7 +363,7 @@ func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
 	if err != nil {
 		return err
 	}
-	klog.Info("-Rclone created rclone config file-")
+	rcloneLogger.Info("Rclone created rclone config file")
 	return nil
 }
 
@@ -403,21 +409,21 @@ func removeRcloneConfigFile(configPath, target string) {
 		_, err := Stat(configPathWithVolID)
 		if err != nil {
 			if os.IsNotExist(err) {
-				klog.Infof("removeRcloneConfigFile: Config file directory does not exist: %s", configPathWithVolID)
+				rcloneLogger.Info("removeRcloneConfigFile: Config file directory does not exist", zap.String("path", configPathWithVolID))
 				return
 			}
-			klog.Errorf("removeRcloneConfigFile: Attempt %d - Failed to stat path %s: %v", retry, configPathWithVolID, err)
+			rcloneLogger.Error("removeRcloneConfigFile: Failed to stat path", zap.Int("attempt", retry), zap.String("path", configPathWithVolID), zap.Error(err))
 			time.Sleep(constants.Interval)
 			continue
 		}
 		err = RemoveAll(configPathWithVolID)
 		if err != nil {
-			klog.Errorf("removeRcloneConfigFile: Attempt %d - Failed to remove config file path %s: %v", retry, configPathWithVolID, err)
+			rcloneLogger.Error("removeRcloneConfigFile: Failed to remove config file path", zap.Int("attempt", retry), zap.String("path", configPathWithVolID), zap.Error(err))
 			time.Sleep(constants.Interval)
 			continue
 		}
-		klog.Infof("removeRcloneConfigFile: Successfully removed config file path: %s", configPathWithVolID)
+		rcloneLogger.Info("removeRcloneConfigFile: Successfully removed config file path", zap.String("path", configPathWithVolID))
 		return
 	}
-	klog.Errorf("removeRcloneConfigFile: Failed to remove config file path after %d attempts", maxRetries)
+	rcloneLogger.Error("removeRcloneConfigFile: Failed to remove config file path after max attempts", zap.Int("max_attempts", maxRetries))
 }
