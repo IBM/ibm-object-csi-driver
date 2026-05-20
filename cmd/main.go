@@ -92,13 +92,13 @@ func getConfigBool(envKey string, defaultConf bool, logger zap.Logger) bool {
 
 func main() {
 	klog.InitFlags(nil)
-	defer klog.Flush()
-
 	logger := getZapLogger()
+	defer logger.Sync() // #nosec G104: Best effort sync
+
 	loggerLevel := zap.NewAtomicLevel()
 	options := getOptions()
 
-	klog.V(1).Info("Starting Server...")
+	logger.Info("Starting Server...")
 
 	debugTrace := getConfigBool("DEBUG_TRACE", false, *logger)
 	if debugTrace {

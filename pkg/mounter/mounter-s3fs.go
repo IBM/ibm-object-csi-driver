@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 /*******************************************************************************
  * IBM Confidential
  * OCO Source Materials
@@ -49,8 +52,9 @@ const (
 )
 
 var (
-	writePassWrap = writePass
-	removeFile    = removeS3FSCredFile
+	writePassWrap   = writePass
+	removeFile      = removeS3FSCredFile
+	s3fsLogger, _   = zap.NewProduction()
 )
 
 func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils, defaultParams map[string]string) Mounter {
@@ -111,7 +115,8 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 
 func (s3fs *S3fsMounter) Mount(ctx context.Context, source string, target string) error {
 	reqID := requestid.FromContext(ctx)
-	log := logger.WithRequestID(ctx)
+	baseLogger, _ := zap.NewProduction()
+	log := logger.WithRequestID(ctx, baseLogger)
 	
 	log.Info(fmt.Sprintf("[%s] S3FSMounter Mount started", reqID),
 		zap.String("source", source), zap.String("target", target))
@@ -198,7 +203,8 @@ func (s3fs *S3fsMounter) Mount(ctx context.Context, source string, target string
 
 func (s3fs *S3fsMounter) Unmount(ctx context.Context, target string) error {
 	reqID := requestid.FromContext(ctx)
-	log := logger.WithRequestID(ctx)
+	baseLogger, _ := zap.NewProduction()
+	log := logger.WithRequestID(ctx, baseLogger)
 	
 	log.Info(fmt.Sprintf("[%s] S3FSMounter Unmount started", reqID), zap.String("target", target))
 
@@ -267,7 +273,7 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 
 	stringData, ok := secretMap["mountOptions"]
 	if !ok {
-		klog.Infof("No new mountOptions found. Using default mountOptions: %v", mountOptsMap)
+		s3fsLogger.Info("No new mountOptions found. Using default mountOptions", zap.Any("default_mount_options", mountOptsMap))
 	} else {
 		lines := strings.Split(stringData, "\n")
 		// Update map
@@ -281,7 +287,7 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 			} else if len(opts) == 1 {
 				mountOptsMap[strings.TrimSpace(opts[0])] = strings.TrimSpace(opts[0])
 			} else {
-				klog.Infof("Invalid mount option: %s\n", line)
+				s3fsLogger.Info("Invalid mount option", zap.String("line", line))
 			}
 		}
 	}
@@ -318,7 +324,7 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 		}
 	}
 
-	klog.Infof("updated S3fsMounter Options: %v", updatedOptions)
+	s3fsLogger.Info("updated S3fsMounter Options", zap.Any("updated_options", updatedOptions))
 	return updatedOptions
 }
 
@@ -380,21 +386,21 @@ func removeS3FSCredFile(credDir, target string) {
 		_, err := Stat(metaPath)
 		if err != nil {
 			if os.IsNotExist(err) {
-				klog.Infof("removeS3FSCredFile: Password file directory does not exist: %s", metaPath)
+				s3fsLogger.Info("removeS3FSCredFile: Password file directory does not exist", zap.String("path", metaPath))
 				return
 			}
-			klog.Errorf("removeS3FSCredFile: Attempt %d - Failed to stat path %s: %v", retry, metaPath, err)
+			s3fsLogger.Error("removeS3FSCredFile: Failed to stat path", zap.Int("attempt", retry), zap.String("path", metaPath), zap.Error(err))
 			time.Sleep(constants.Interval)
 			continue
 		}
 		err = RemoveAll(metaPath)
 		if err != nil {
-			klog.Errorf("removeS3FSCredFile: Attempt %d - Failed to remove password file path %s: %v", retry, metaPath, err)
+			s3fsLogger.Error("removeS3FSCredFile: Failed to remove password file path", zap.Int("attempt", retry), zap.String("path", metaPath), zap.Error(err))
 			time.Sleep(constants.Interval)
 			continue
 		}
-		klog.Infof("removeS3FSCredFile: Successfully removed password file path: %s", metaPath)
+		s3fsLogger.Info("removeS3FSCredFile: Successfully removed password file path", zap.String("path", metaPath))
 		return
 	}
-	klog.Errorf("removeS3FSCredFile: Failed to remove password file after %d attempts", maxRetries)
+	s3fsLogger.Error("removeS3FSCredFile: Failed to remove password file after max attempts", zap.Int("max_attempts", maxRetries))
 }

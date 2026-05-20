@@ -34,7 +34,6 @@ import (
 	"google.golang.org/grpc/status"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/klog/v2"
 )
 
 var (
@@ -177,26 +176,32 @@ func (s *fakeObjectStorageSession) UpdateQuotaLimit(quota int64, apiKey, bucketN
 }
 
 // Fake NewMounterFactory
-type FakeS3fsMounterFactory struct{}
-
-func FakeNewS3fsMounterFactory() *FakeS3fsMounterFactory {
-	return &FakeS3fsMounterFactory{}
+type FakeS3fsMounterFactory struct {
+	logger *zap.Logger
 }
 
-type Fakes3fsMounter struct{}
+func FakeNewS3fsMounterFactory() *FakeS3fsMounterFactory {
+	// Create a no-op logger for tests
+	logger, _ := zap.NewDevelopment()
+	return &FakeS3fsMounterFactory{logger: logger}
+}
+
+type Fakes3fsMounter struct {
+	logger *zap.Logger
+}
 
 func (s *FakeS3fsMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string, defaultMOMap map[string]string) mounter.Mounter {
-	klog.Info("-New S3FS Fake Mounter-")
-	return &Fakes3fsMounter{}
+	s.logger.Info("New S3FS Fake Mounter")
+	return &Fakes3fsMounter{logger: s.logger}
 }
 
 func (s3fs *Fakes3fsMounter) Mount(source string, target string) error {
-	klog.Info("-S3FSMounter Mount-")
+	s3fs.logger.Info("S3FSMounter Mount", zap.String("source", source), zap.String("target", target))
 	return nil
 }
 
 func (s3fs *Fakes3fsMounter) Unmount(target string) error {
-	klog.Info("-S3FSMounter Unmount-")
+	s3fs.logger.Info("S3FSMounter Unmount", zap.String("target", target))
 	return nil
 }
 

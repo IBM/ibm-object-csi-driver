@@ -150,7 +150,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Secret resource not found %v", reqID, err))
 		}
 
-		secretMapCustom := parseCustomSecret(secret)
+		secretMapCustom := parseCustomSecret(secret, log)
 		log.Info("Custom secret parsed successfully", zap.Int("secret_param_count", len(secretMapCustom)))
 
 		if objectPath, exists := secretMapCustom["objectPath"]; exists {
@@ -645,7 +645,7 @@ func (cs *controllerServer) ControllerModifyVolume(ctx context.Context, req *csi
 }
 
 func getObjectStorageCredentialsFromSecret(secretMap map[string]string, iamEP string) (*s3client.ObjectStorageCredentials, error) {
-	klog.Infof("- getObjectStorageCredentialsFromSecret-")
+	log.Info("Getting object storage credentials from secret")
 	var (
 		accessKey         string
 		secretKey         string
@@ -688,8 +688,8 @@ func getObjectStorageCredentialsFromSecret(secretMap map[string]string, iamEP st
 	}, nil
 }
 
-func parseCustomSecret(secret *v1.Secret) map[string]string {
-	klog.Infof("-parseCustomSecret-")
+func parseCustomSecret(secret *v1.Secret, log *zap.Logger) map[string]string {
+	log.Info("Parsing custom secret")
 	secretMapCustom := make(map[string]string)
 
 	var (
@@ -777,7 +777,7 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 }
 
 func getTempBucketName(mounterType, volumeID string) string {
-	klog.Infof("mounterType: %v", mounterType)
+	log.Info("Getting temp bucket name", zap.String("mounter_type", mounterType))
 	currentTime := time.Now()
 	timestamp := currentTime.Format("20060102150405")
 
