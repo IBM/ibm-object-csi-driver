@@ -30,7 +30,7 @@ FROM registry.access.redhat.com/ubi8/ubi AS rclone-builder
 RUN yum install wget git gcc -y
 
 ENV ARCH=amd64
-ENV GO_VERSION=1.25.8
+ENV GO_VERSION=1.25.9
 
 RUN echo $ARCH $GO_VERSION
 
@@ -46,7 +46,7 @@ ENV GOARCH=$ARCH
 ENV GO111MODULE=on
 
 RUN git clone https://github.com/rclone/rclone.git && \
-      cd rclone && git checkout tags/v1.73.3 && \
+      cd rclone && git checkout tags/v1.73.5 && \
       go build && ./rclone version && \
       cp rclone /usr/local/bin/rclone
 
