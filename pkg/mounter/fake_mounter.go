@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 package mounter
 
 import "github.com/IBM/ibm-object-csi-driver/pkg/constants"
