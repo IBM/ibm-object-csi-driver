@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 package main
 
 import (
@@ -165,7 +168,7 @@ func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser)
 			reqID = "unknown"
 		}
 		log := logger.With(zap.String("request_id", reqID))
-		
+
 		var request MountRequest
 
 		if err := c.BindJSON(&request); err != nil {
@@ -227,7 +230,7 @@ func handleCosUnmount(mounter mounterUtils.MounterUtils) gin.HandlerFunc {
 			reqID = "unknown"
 		}
 		log := logger.With(zap.String("request_id", reqID))
-		
+
 		var request struct {
 			Path string `json:"path"`
 		}

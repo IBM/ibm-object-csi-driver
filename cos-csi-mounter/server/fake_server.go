@@ -1,5 +1,5 @@
-//go:build !unit_test
-// +build !unit_test
+//go:build linux
+// +build linux
 
 package main
 
