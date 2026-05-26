@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
-	"github.com/IBM/ibm-object-csi-driver/pkg/logger"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/IBM/ibm-object-csi-driver/pkg/requestid"
 	"go.uber.org/zap"
@@ -134,7 +133,7 @@ func writePass(pwFileName string, pwFileContent string) error {
 
 func createCOSCSIMounterRequest(ctx context.Context, payload string, url string, log *zap.Logger) error {
 	reqID := requestid.FromContext(ctx)
-	
+
 	// Get socket path
 	socketPath := os.Getenv(constants.COSCSIMounterSocketPathEnv)
 	if socketPath == "" {
@@ -169,7 +168,7 @@ func createCOSCSIMounterRequest(ctx context.Context, payload string, url string,
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Request-ID", reqID) // Add request ID to HTTP header
-	
+
 	log.Info(fmt.Sprintf("[%s] Sending request to cos-csi-mounter", reqID), zap.String("url", url))
 	response, err := client.Do(req)
 	if err != nil {
