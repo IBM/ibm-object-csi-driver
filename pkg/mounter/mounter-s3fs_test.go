@@ -1,6 +1,10 @@
+//go:build linux
+// +build linux
+
 package mounter
 
 import (
+	"context"
 	"errors"
 	"os"
 	"testing"
@@ -8,6 +12,7 @@ import (
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 )
 
 var (
@@ -88,7 +93,7 @@ func TestS3FSMount_NodeServer_Positive(t *testing.T) {
 		ObjectPath:    "test-objectPath",
 	}
 
-	err := s3fs.Mount(source, target)
+	err := s3fs.Mount(context.Background(), source, target)
 	assert.NoError(t, err)
 }
 
@@ -101,7 +106,7 @@ func TestS3FSMount_WorkerNode_Positive(t *testing.T) {
 	writePassWrap = func(_, _ string) error {
 		return nil
 	}
-	mounterRequest = func(_, _ string) error {
+	mounterRequest = func(_ context.Context, _, _ string, _ *zap.Logger) error {
 		return nil
 	}
 
@@ -114,7 +119,7 @@ func TestS3FSMount_WorkerNode_Positive(t *testing.T) {
 		AuthType: "hmac",
 	}
 
-	err := s3fs.Mount(source, target)
+	err := s3fs.Mount(context.Background(), source, target)
 	assert.NoError(t, err)
 }
 
@@ -125,7 +130,7 @@ func TestMount_CreateDirFails_Negative(t *testing.T) {
 		return errors.New("failed to create directory")
 	}
 
-	err := s3fs.Mount(source, target)
+	err := s3fs.Mount(context.Background(), source, target)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Cannot create directory")
 }
@@ -140,7 +145,7 @@ func TestMount_FailedToCreatePassFile_Negative(t *testing.T) {
 
 	s3fs := &S3fsMounter{}
 
-	err := s3fs.Mount(source, target)
+	err := s3fs.Mount(context.Background(), source, target)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create file")
 }
@@ -154,13 +159,13 @@ func TestS3FSMount_WorkerNode_Negative(t *testing.T) {
 	writePassWrap = func(_, _ string) error {
 		return nil
 	}
-	mounterRequest = func(_, _ string) error {
+	mounterRequest = func(_ context.Context, _, _ string, _ *zap.Logger) error {
 		return errors.New("failed to perform http request")
 	}
 
 	s3fs := &S3fsMounter{}
 
-	err := s3fs.Mount(source, target)
+	err := s3fs.Mount(context.Background(), source, target)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to perform http request")
 }
@@ -176,7 +181,7 @@ func TestUnmount_NodeServer(t *testing.T) {
 		},
 	})}
 
-	err := s3fs.Unmount(target)
+	err := s3fs.Unmount(context.Background(), target)
 	assert.NoError(t, err)
 }
 
@@ -191,11 +196,11 @@ func TestUnmount_WorkerNode(t *testing.T) {
 		},
 	})}
 
-	mounterRequest = func(_, _ string) error {
+	mounterRequest = func(_ context.Context, _, _ string, _ *zap.Logger) error {
 		return nil
 	}
 
-	err := s3fs.Unmount(target)
+	err := s3fs.Unmount(context.Background(), target)
 	assert.NoError(t, err)
 }
 
@@ -208,11 +213,11 @@ func TestUnmount_WorkerNode_Negative(t *testing.T) {
 		},
 	})}
 
-	mounterRequest = func(_, _ string) error {
+	mounterRequest = func(_ context.Context, _, _ string, _ *zap.Logger) error {
 		return errors.New("failed to create http request")
 	}
 
-	err := s3fs.Unmount(target)
+	err := s3fs.Unmount(context.Background(), target)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create http request")
 }
@@ -228,7 +233,7 @@ func TestUnmount_NodeServer_Negative(t *testing.T) {
 		},
 	})}
 
-	err := s3fs.Unmount(target)
+	err := s3fs.Unmount(context.Background(), target)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to unmount")
 }
