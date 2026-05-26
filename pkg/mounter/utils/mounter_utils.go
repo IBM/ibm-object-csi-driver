@@ -15,7 +15,7 @@ import (
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/mitchellh/go-ps"
-	"k8s.io/klog/v2"
+	"go.uber.org/zap"
 	k8sMountUtils "k8s.io/mount-utils"
 )
 
@@ -23,6 +23,9 @@ var unmount = syscall.Unmount
 var commandWithCtx = exec.CommandContext
 
 var ErrTimeoutWaitProcess = errors.New("timeout waiting for process to end")
+
+// Package-level logger for mounter utils
+var mounterUtilLogger, _ = zap.NewProduction()
 
 type MounterUtils interface {
 	FuseUnmount(path string) error
@@ -33,8 +36,11 @@ type MounterOptsUtils struct {
 }
 
 func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) error {
-	klog.Info("-FuseMount-")
-	klog.Infof("FuseMount: params:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%v>", path, comm, args)
+	mounterUtilLogger.Info("FuseMount started")
+	mounterUtilLogger.Info("FuseMount parameters",
+		zap.String("path", path),
+		zap.String("command", comm),
+		zap.Strings("args", args))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	var mounted bool
@@ -47,98 +53,125 @@ func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) e
 	cmd := commandWithCtx(ctx, comm, args...)
 	err := cmd.Start()
 	if err != nil {
-		klog.Errorf("FuseMount: command start failed: mounter=%s, args=%v, error=%v", comm, args, err)
+		mounterUtilLogger.Error("FuseMount: command start failed",
+			zap.String("mounter", comm),
+			zap.Strings("args", args),
+			zap.Error(err))
 		return fmt.Errorf("FuseMount: '%s' command start failed: %v", comm, err)
 	}
-	klog.Infof("FuseMount: command 'start' succeeded for '%s' mounter", comm)
+	mounterUtilLogger.Info("FuseMount: command start succeeded", zap.String("mounter", comm))
 
 	waitCh := make(chan error, 1)
 	mountCh := make(chan error, 1)
 
 	go func() {
-		klog.Infof("FuseMount: cmd.Wait() goroutine start for mounter=%s, path=%v", comm, path)
+		mounterUtilLogger.Info("FuseMount: cmd.Wait() goroutine start",
+			zap.String("mounter", comm),
+			zap.String("path", path))
 		waitCh <- cmd.Wait()
-		klog.Infof("FuseMount: cmd.Wait() goroutine end for mounter=%s, path=%v", comm, path)
+		mounterUtilLogger.Info("FuseMount: cmd.Wait() goroutine end",
+			zap.String("mounter", comm),
+			zap.String("path", path))
 	}()
 
 	go func() {
-		klog.Infof("FuseMount: waitForMount() goroutine start for mounter=%s, path=%v", comm, path)
+		mounterUtilLogger.Info("FuseMount: waitForMount() goroutine start",
+			zap.String("mounter", comm),
+			zap.String("path", path))
 		mountCh <- waitForMount(ctx, path, 2*time.Second, 30*time.Second) // kubelet retries NodePublishVolume after 120 seconds
-		klog.Infof("FuseMount: waitForMount() goroutine end  for mounter=%s, path=%v", comm, path)
+		mounterUtilLogger.Info("FuseMount: waitForMount() goroutine end",
+			zap.String("mounter", comm),
+			zap.String("path", path))
 	}()
 
 	select {
 	case err := <-waitCh:
 		if err != nil {
-			klog.Warningf("FuseMount: command 'wait' failed: mounter=%s, args=%v, error=%v", comm, args, err)
-			klog.Infof("FuseMount: checking if path already exists and is a mountpoint: path=%s", path)
+			mounterUtilLogger.Warn("FuseMount: command wait failed",
+				zap.String("mounter", comm),
+				zap.Strings("args", args),
+				zap.Error(err))
+			mounterUtilLogger.Info("FuseMount: checking if path already exists and is a mountpoint",
+				zap.String("path", path))
 			if isMount, err1 := isMountpoint(path); err1 == nil && isMount { // check if bucket already got mounted
-				klog.Infof("bucket is already mounted using '%s' mounter", comm)
+				mounterUtilLogger.Info("Bucket is already mounted", zap.String("mounter", comm))
 				mounted = true
 				return nil
 			}
 			return fmt.Errorf("'%s' mount failed: %v", comm, err)
 		}
-		klog.Infof("FuseMount: command 'wait' succeeded for '%s' mounter", comm)
+		mounterUtilLogger.Info("FuseMount: command wait succeeded", zap.String("mounter", comm))
 		if err := <-mountCh; err != nil {
 			return err
 		}
 
 	case err := <-mountCh:
 		if err != nil {
-			klog.Errorf("FuseMount: path is not mountpoint. Mount failed: mounter=%s, path=%s", comm, path)
+			mounterUtilLogger.Error("FuseMount: path is not mountpoint, mount failed",
+				zap.String("mounter", comm),
+				zap.String("path", path))
 			return fmt.Errorf("'%s' mount failed: %v", comm, err)
 		}
 	}
 
-	klog.Infof("bucket mounted successfully using '%s' mounter", comm)
+	mounterUtilLogger.Info("Bucket mounted successfully", zap.String("mounter", comm))
 	mounted = true
 	return nil
 }
 
 func (su *MounterOptsUtils) FuseUnmount(path string) error {
-	klog.Info("-FuseUnmount-")
+	mounterUtilLogger.Info("FuseUnmount started", zap.String("path", path))
 	// check if mountpoint exists
 	isMount, checkMountErr := isMountpoint(path)
 	if isMount || checkMountErr != nil {
-		klog.Infof("isMountpoint  %v", isMount)
+		mounterUtilLogger.Info("isMountpoint check", zap.Bool("is_mount", isMount))
 		err := unmount(path, 0)
 		if err != nil {
-			klog.Warningf("Standard unmount failed for %s: %v. Trying lazy unmount...", path, err)
+			mounterUtilLogger.Warn("Standard unmount failed, trying lazy unmount",
+				zap.String("path", path),
+				zap.Error(err))
 			// Try lazy (MNT_DETACH) unmount
 			err = unmount(path, syscall.MNT_DETACH)
 			if err != nil {
-				klog.Warningf("Lazy unmount failed for %s: %v. Trying force unmount...", path, err)
+				mounterUtilLogger.Warn("Lazy unmount failed, trying force unmount",
+					zap.String("path", path),
+					zap.Error(err))
 				// Try force unmount as last resort
 				err = unmount(path, syscall.MNT_FORCE)
 				if err != nil {
-					klog.Errorf("Force unmount failed for %s: %v", path, err)
+					mounterUtilLogger.Error("Force unmount failed",
+						zap.String("path", path),
+						zap.Error(err))
 					return fmt.Errorf("all unmount attempts failed for %s: %v", path, err)
 				}
-				klog.Infof("Force unmounted %s successfully", path)
+				mounterUtilLogger.Info("Force unmounted successfully", zap.String("path", path))
 			} else {
-				klog.Infof("Lazy unmounted %s successfully", path)
+				mounterUtilLogger.Info("Lazy unmounted successfully", zap.String("path", path))
 			}
 		} else {
-			klog.Infof("Unmounted %s with standard unmount successfully", path)
+			mounterUtilLogger.Info("Unmounted with standard unmount successfully", zap.String("path", path))
 		}
 	}
 
 	// as fuse quits immediately, we will try to wait until the process is done
 	process, err := findFuseMountProcess(path)
 	if err != nil {
-		klog.Infof("Error getting PID of fuse mount: %s", err)
+		mounterUtilLogger.Info("Error getting PID of fuse mount", zap.Error(err))
 		return nil
 	}
 	if process == nil {
-		klog.Infof("Unable to find PID of fuse mount %s, it must have finished already", path)
+		mounterUtilLogger.Info("Unable to find PID of fuse mount, it must have finished already",
+			zap.String("path", path))
 		return nil
 	}
-	klog.Infof("Found fuse pid %v of mount %s, checking if it still runs", process.Pid, path)
+	mounterUtilLogger.Info("Found fuse pid of mount, checking if it still runs",
+		zap.Int("pid", process.Pid),
+		zap.String("path", path))
 
 	err = waitForProcess(process, 1)
 	if errors.Is(err, ErrTimeoutWaitProcess) {
-		klog.Infof("timeout waiting for pid %d to end, killing process", process.Pid)
+		mounterUtilLogger.Info("Timeout waiting for pid to end, killing process",
+			zap.Int("pid", process.Pid))
 		return process.Kill()
 	}
 
@@ -146,24 +179,30 @@ func (su *MounterOptsUtils) FuseUnmount(path string) error {
 }
 
 func isMountpoint(pathname string) (bool, error) {
-	klog.Infof("Checking if path is mountpoint: Pathname - %s", pathname)
+	mounterUtilLogger.Info("Checking if path is mountpoint", zap.String("pathname", pathname))
 
 	out, err := exec.Command("mountpoint", pathname).CombinedOutput()
 	outStr := strings.ToLower(strings.TrimSpace(string(out)))
-	klog.Infof("mountpoint status for path '%s', error: %v, output: %s", pathname, err, string(out))
+	mounterUtilLogger.Info("Mountpoint status",
+		zap.String("path", pathname),
+		zap.Error(err),
+		zap.String("output", string(out)))
 	if err != nil {
 		if strings.HasSuffix(outStr, "transport endpoint is not connected") {
 			return true, nil
 		}
 		if strings.HasSuffix(outStr, "is not a mountpoint") {
-			klog.Infof("Path is NOT a mountpoint: pathname - %s", pathname)
+			mounterUtilLogger.Info("Path is NOT a mountpoint", zap.String("pathname", pathname))
 			return false, nil
 		}
-		klog.Errorf("Failed to check mountpoint for path '%s', error: %v, output: %s", pathname, err, string(out))
+		mounterUtilLogger.Error("Failed to check mountpoint for path",
+			zap.String("path", pathname),
+			zap.Error(err),
+			zap.String("output", string(out)))
 		return false, fmt.Errorf("failed to check mountpoint for path '%s', error: %v, output: %s", pathname, err, string(out))
 	}
 	if strings.HasSuffix(outStr, "is a mountpoint") {
-		klog.Infof("Path is a mountpoint: pathname - %s", pathname)
+		mounterUtilLogger.Info("Path is a mountpoint", zap.String("pathname", pathname))
 		return true, nil
 	}
 
@@ -180,16 +219,21 @@ func waitForMount(ctx context.Context, path string, initialDelay, timeout time.D
 		select {
 		case <-ctx.Done():
 			err := ctx.Err()
-			klog.Infof("waitForMount: context is done, error: %v", err)
+			mounterUtilLogger.Info("waitForMount: context is done", zap.Error(err))
 			return err
 		default:
 			isMount, err := k8sMountUtils.New("").IsMountPoint(path)
 			if err == nil && isMount {
-				klog.Infof("Path is a mountpoint: pathname: %s", path)
+				mounterUtilLogger.Info("Path is a mountpoint", zap.String("pathname", path))
 				return nil
 			}
 
-			klog.Infof("Mountpoint check in progress: attempt=%d, path=%s, isMount=%v, err=%v, timeout=%v", attempt, path, isMount, err, timeout)
+			mounterUtilLogger.Info("Mountpoint check in progress",
+				zap.Int("attempt", attempt),
+				zap.String("path", path),
+				zap.Bool("is_mount", isMount),
+				zap.Error(err),
+				zap.Duration("timeout", timeout))
 			time.Sleep(constants.Interval)
 			elapsed += constants.Interval
 			if elapsed >= timeout {
@@ -208,11 +252,15 @@ func findFuseMountProcess(path string) (*os.Process, error) {
 	for _, p := range processes {
 		cmdLine, err := getCmdLine(p.Pid())
 		if err != nil {
-			klog.Errorf("Unable to get cmdline of PID %v: %s", p.Pid(), err)
+			mounterUtilLogger.Error("Unable to get cmdline of PID",
+				zap.Int("pid", p.Pid()),
+				zap.Error(err))
 			continue
 		}
 		if strings.Contains(cmdLine, path) {
-			klog.Infof("Found matching pid %v on path %s", p.Pid(), path)
+			mounterUtilLogger.Info("Found matching pid on path",
+				zap.Int("pid", p.Pid()),
+				zap.String("path", path))
 			return os.FindProcess(p.Pid())
 		}
 	}
@@ -235,21 +283,28 @@ func waitForProcess(p *os.Process, backoff int) error {
 	}
 	cmdLine, err := getCmdLine(p.Pid)
 	if err != nil {
-		klog.Warningf("Error checking cmdline of PID %v, assuming it is dead: %s", p.Pid, err)
+		mounterUtilLogger.Warn("Error checking cmdline of PID, assuming it is dead",
+			zap.Int("pid", p.Pid),
+			zap.Error(err))
 		return nil
 	}
 	if cmdLine == "" {
 		// ignore defunct processes
 		// TODO: debug why this happens in the first place
 		// seems to only happen on k8s, not on local docker
-		klog.Warning("Fuse process seems dead, returning")
+		mounterUtilLogger.Warn("Fuse process seems dead, returning")
 		return nil
 	}
 	if err := p.Signal(syscall.Signal(0)); err != nil {
-		klog.Warningf("Fuse process does not seem active or we are unprivileged: %s", err)
+		mounterUtilLogger.Warn("Fuse process does not seem active or we are unprivileged",
+			zap.Error(err))
 		return nil
 	}
-	klog.Infof("Fuse process with PID %v still active, waiting... %v", p.Pid, backoff)
+	mounterUtilLogger.Info("Fuse process still active, waiting",
+		zap.Int("pid", p.Pid),
+		zap.Int("backoff", backoff))
 	time.Sleep(time.Duration(500) * time.Millisecond)
 	return waitForProcess(p, backoff+1)
 }
+
+// Made with Bob

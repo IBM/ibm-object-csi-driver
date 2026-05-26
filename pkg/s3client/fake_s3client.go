@@ -1,6 +1,7 @@
 package s3client
 
 import (
+	"context"
 	"errors"
 
 	"go.uber.org/zap"
@@ -26,39 +27,39 @@ func (f *FakeCOSSessionFactory) NewObjectStorageSession(endpoint, region string,
 	}
 }
 
-func (s *fakeCOSSession) CheckBucketAccess(bucket string) error {
+func (s *fakeCOSSession) CheckBucketAccess(ctx context.Context, bucket string) error {
 	if s.factory.FailCheckBucketAccess {
 		return errors.New("failed to check bucket access")
 	}
 	return nil
 }
 
-func (s *fakeCOSSession) SetBucketVersioning(bucket string, enable bool) error {
+func (s *fakeCOSSession) SetBucketVersioning(ctx context.Context, bucket string, enable bool) error {
 	if s.factory.FailBucketVersioning {
 		return errors.New("failed to set bucket versioning")
 	}
 	return nil
 }
 
-func (s *fakeCOSSession) CheckObjectPathExistence(bucket, objectpath string) (bool, error) {
+func (s *fakeCOSSession) CheckObjectPathExistence(ctx context.Context, bucket, objectpath string) (bool, error) {
 	return true, nil
 }
 
-func (s *fakeCOSSession) CreateBucket(bucket, kpRootKeyCrn string) (string, error) {
+func (s *fakeCOSSession) CreateBucket(ctx context.Context, bucket, kpRootKeyCrn string) (string, error) {
 	if s.factory.FailCreateBucket {
 		return "", errors.New("failed to create bucket")
 	}
 	return "", nil
 }
 
-func (s *fakeCOSSession) DeleteBucket(bucket string) error {
+func (s *fakeCOSSession) DeleteBucket(ctx context.Context, bucket string) error {
 	if s.factory.FailDeleteBucket {
 		return errors.New("failed to delete bucket")
 	}
 	return nil
 }
 
-func (s *fakeCOSSession) UpdateQuotaLimit(quota int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error {
+func (s *fakeCOSSession) UpdateQuotaLimit(ctx context.Context, quota int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error {
 	if s.factory.FailUpdateQuotaLimit {
 		return errors.New("failed to update quota limit")
 	}
