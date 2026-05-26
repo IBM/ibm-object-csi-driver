@@ -24,7 +24,6 @@ import (
 	pkgUtils "github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"go.uber.org/zap"
-	"k8s.io/klog/v2"
 )
 
 var (

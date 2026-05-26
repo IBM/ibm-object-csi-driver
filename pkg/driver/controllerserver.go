@@ -32,7 +32,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/klog/v2"
 )
 
 // Implements Controller csi.ControllerServer
@@ -47,7 +46,6 @@ type controllerServer struct {
 func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	// Extract request ID from context (added by interceptor)
 	reqID := requestid.FromContext(ctx)
-	log := cs.Logger.With(zap.String("request_id", reqID))
 	
 	var (
 		bucketName         string
@@ -60,14 +58,14 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		quotaLimitEnabled  bool
 	)
 
-	log.Info("CreateVolume started", zap.String("volume_name", req.GetName()))
+	logger.Info(ctx, cs.Logger, "CreateVolume started", zap.String("volume_name", req.GetName()))
 
 	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
 	if err != nil {
 		logger.Error(ctx, cs.Logger, "Error modifying request", zap.Error(err))
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Error in modifying requests %v", reqID, err))
 	}
-	log.Debug("CreateVolume request details", zap.Any("request", modifiedRequest.(*csi.CreateVolumeRequest)))
+	logger.Debug(ctx, cs.Logger, "CreateVolume request details", zap.Any("request", modifiedRequest.(*csi.CreateVolumeRequest)))
 
 	volumeName, err := sanitizeVolumeID(req.GetName())
 	if err != nil {
@@ -79,7 +77,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		logger.Error(ctx, cs.Logger, "Volume name missing in request")
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Volume name missing in request", reqID))
 	}
-	log.Info("Processing volume creation", zap.String("volume_id", volumeID))
+	logger.Info(ctx, cs.Logger, "Processing volume creation", zap.String("volume_id", volumeID))
 
 	caps := req.GetVolumeCapabilities()
 	if caps == nil {
@@ -87,7 +85,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Volume Capabilities missing in request", reqID))
 	}
 	for _, cap := range caps {
-		log.Debug("Volume capability", zap.String("capability", cap.String()))
+		logger.Debug(ctx, cs.Logger, "Volume capability", zap.String("capability", cap.String()))
 		if cap.GetBlock() != nil {
 			logger.Error(ctx, cs.Logger, "Block volume not supported")
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Volume type block Volume not supported", reqID))
@@ -98,14 +96,14 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	if params == nil {
 		params = make(map[string]string)
 	}
-	log.Info("CreateVolume parameters received", zap.Int("param_count", len(params)))
+	logger.Info(ctx, cs.Logger, "CreateVolume parameters received", zap.Int("param_count", len(params)))
 
 	secretMap := req.GetSecrets()
-	log.Info("Secrets received", zap.Int("secret_count", len(secretMap)))
+	logger.Info(ctx, cs.Logger, "Secrets received", zap.Int("secret_count", len(secretMap)))
 
 	var customSecretName string
 	if len(secretMap) == 0 {
-		log.Info("No secret in request, fetching custom secret from PVC annotations")
+		logger.Info(ctx, cs.Logger, "No secret in request, fetching custom secret from PVC annotations")
 
 		pvcName = params[constants.PVCNameKey]
 		pvcNamespace = params[constants.PVCNamespaceKey]
@@ -119,14 +117,14 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 			pvcNamespace = constants.DefaultNamespace
 		}
 
-		log.Info("Fetching PVC", zap.String("pvc_name", pvcName), zap.String("namespace", pvcNamespace))
+		logger.Info(ctx, cs.Logger, "Fetching PVC", zap.String("pvc_name", pvcName), zap.String("namespace", pvcNamespace))
 		pvcRes, err := cs.Stats.GetPVC(pvcName, pvcNamespace)
 		if err != nil {
 			logger.Error(ctx, cs.Logger, "PVC resource not found", zap.Error(err))
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] PVC resource not found %v", reqID, err))
 		}
 
-		log.Debug("PVC annotations", zap.Any("annotations", pvcRes.Annotations))
+		logger.Debug(ctx, cs.Logger, "PVC annotations", zap.Any("annotations", pvcRes.Annotations))
 
 		pvcAnnotations := pvcRes.Annotations
 
@@ -139,52 +137,52 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		}
 
 		if secretNamespace == "" {
-			log.Warn("Secret namespace not specified in PVC annotations, using default namespace")
+			logger.Warn(ctx, cs.Logger, "Secret namespace not specified in PVC annotations, using default namespace")
 			secretNamespace = constants.DefaultNamespace
 		}
 
-		log.Info("Fetching secret", zap.String("secret_name", customSecretName), zap.String("namespace", secretNamespace))
+		logger.Info(ctx, cs.Logger, "Fetching secret", zap.String("secret_name", customSecretName), zap.String("namespace", secretNamespace))
 		secret, err := cs.Stats.GetSecret(customSecretName, secretNamespace)
 		if err != nil {
 			logger.Error(ctx, cs.Logger, "Secret resource not found", zap.Error(err))
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Secret resource not found %v", reqID, err))
 		}
 
-		secretMapCustom := parseCustomSecret(secret, log)
-		log.Info("Custom secret parsed successfully", zap.Int("secret_param_count", len(secretMapCustom)))
+		secretMapCustom := parseCustomSecret(ctx, secret, cs.Logger)
+		logger.Info(ctx, cs.Logger, "Custom secret parsed successfully", zap.Int("secret_param_count", len(secretMapCustom)))
 
 		if objectPath, exists := secretMapCustom["objectPath"]; exists {
-			log.Info("ObjectPath found in secret", zap.String("volume_id", volumeID), zap.String("object_path", objectPath))
+			logger.Info(ctx, cs.Logger, "ObjectPath found in secret", zap.String("volume_id", volumeID), zap.String("object_path", objectPath))
 			params["objectPath"] = objectPath
 		} else {
-			log.Info("No objectPath in secret, mounting bucket root", zap.String("volume_id", volumeID))
+			logger.Info(ctx, cs.Logger, "No objectPath in secret, mounting bucket root", zap.String("volume_id", volumeID))
 		}
 
 		secretMap = secretMapCustom
 	}
 	if quotaLimitStr, ok := secretMap[constants.QuotaLimitKey]; ok && quotaLimitStr != "" {
-		log.Info(fmt.Sprintf("[%s] Quota limit parameter found", reqID), zap.String("quota_limit", quotaLimitStr))
+		logger.Info(ctx, cs.Logger, "Quota limit parameter found", zap.String("quota_limit", quotaLimitStr))
 		quotaLimitEnabled, err = strconv.ParseBool(quotaLimitStr)
 		if err != nil {
-			log.Error(fmt.Sprintf("[%s] Invalid quota limit value", reqID), zap.String("value", quotaLimitStr), zap.Error(err))
+			logger.Error(ctx, cs.Logger, "Invalid quota limit value", zap.String("value", quotaLimitStr), zap.Error(err))
 			return nil, status.Error(codes.InvalidArgument,
 				fmt.Sprintf("[%s] invalid quotaLimit value %q: must be 'true' or 'false'", reqID, quotaLimitStr))
 		}
 
 		if quotaLimitEnabled {
 			if secretMap[constants.ResourceConfigApiKey] == "" {
-				log.Error(fmt.Sprintf("[%s] Resource config API key missing for quota limit", reqID))
+				logger.Error(ctx, cs.Logger, "Resource config API key missing for quota limit")
 				return nil, status.Error(codes.InvalidArgument,
 					fmt.Sprintf("[%s] resourceConfigApiKey missing in secret, cannot set quota limit for bucket", reqID))
 			}
 
 			quotaBytes := req.GetCapacityRange().GetRequiredBytes()
 			if quotaBytes <= 0 {
-				log.Error(fmt.Sprintf("[%s] Invalid storage size for quota limit", reqID), zap.Int64("bytes", quotaBytes))
+				logger.Error(ctx, cs.Logger, "Invalid storage size for quota limit", zap.Int64("bytes", quotaBytes))
 				return nil, status.Error(codes.InvalidArgument,
 					fmt.Sprintf("[%s] enable quotaLimit requested but no positive storage size requested in PVC", reqID))
 			}
-			log.Info(fmt.Sprintf("[%s] Quota limit enabled", reqID), zap.Int64("quota_bytes", quotaBytes))
+			logger.Info(ctx, cs.Logger, "Quota limit enabled", zap.Int64("quota_bytes", quotaBytes))
 		}
 	}
 
@@ -195,7 +193,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		params["cosEndpoint"] = endPoint
 	}
 	if endPoint == "" {
-		log.Error(fmt.Sprintf("[%s] COS endpoint not specified", reqID))
+		logger.Error(ctx, cs.Logger, "COS endpoint not specified")
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] cosEndpoint unknown", reqID))
 	}
 
@@ -206,13 +204,13 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		params["locationConstraint"] = locationConstraint
 	}
 	if locationConstraint == "" {
-		log.Error(fmt.Sprintf("[%s] Location constraint not specified", reqID))
+		logger.Error(ctx, cs.Logger, "Location constraint not specified")
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] locationConstraint unknown", reqID))
 	}
 
 	kpRootKeyCrn = secretMap["kpRootKeyCRN"]
 	if kpRootKeyCrn != "" {
-		log.Info(fmt.Sprintf("[%s] Key Protect root key CRN provided for bucket encryption", reqID))
+		logger.Info(ctx, cs.Logger, "Key Protect root key CRN provided for bucket encryption")
 	}
 
 	mounter := secretMap["mounter"]
@@ -221,7 +219,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	} else {
 		params["mounter"] = mounter
 	}
-	log.Info(fmt.Sprintf("[%s] Mounter type configured", reqID), zap.String("mounter", mounter))
+	logger.Info(ctx, cs.Logger, "Mounter type configured", zap.String("mounter", mounter))
 
 	bucketName = secretMap["bucketName"]
 
@@ -229,28 +227,28 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	if val, ok := secretMap[constants.BucketVersioning]; ok && val != "" {
 		enable := strings.ToLower(strings.TrimSpace(val))
 		if enable != "true" && enable != "false" {
-			log.Error(fmt.Sprintf("[%s] Invalid bucket versioning value in secret", reqID), zap.String("value", val))
+			logger.Error(ctx, cs.Logger, "Invalid bucket versioning value in secret", zap.String("value", val))
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Invalid BucketVersioning value in secret: %s. Value set %s. Must be 'true' or 'false'", reqID, customSecretName, val))
 		}
 		bucketVersioning = enable
-		log.Info(fmt.Sprintf("[%s] Bucket versioning from secret", reqID), zap.String("versioning", bucketVersioning))
+		logger.Info(ctx, cs.Logger, "Bucket versioning from secret", zap.String("versioning", bucketVersioning))
 	} else if val, ok := params[constants.BucketVersioning]; ok && val != "" {
 		enable := strings.ToLower(strings.TrimSpace(val))
 		if enable != "true" && enable != "false" {
-			log.Error(fmt.Sprintf("[%s] Invalid bucket versioning value in storage class", reqID), zap.String("value", val))
+			logger.Error(ctx, cs.Logger, "Invalid bucket versioning value in storage class", zap.String("value", val))
 			return nil, status.Error(codes.InvalidArgument,
 				fmt.Sprintf("[%s] Invalid bucketVersioning value in storage class: %s. Must be 'true' or 'false'", reqID, val))
 		}
 		bucketVersioning = enable
-		log.Info(fmt.Sprintf("[%s] Bucket versioning from storage class", reqID), zap.String("versioning", bucketVersioning))
+		logger.Info(ctx, cs.Logger, "Bucket versioning from storage class", zap.String("versioning", bucketVersioning))
 	}
 
-	creds, err := getObjectStorageCredentialsFromSecret(secretMap, cs.iamEndpoint)
+	creds, err := getObjectStorageCredentialsFromSecret(ctx, secretMap, cs.iamEndpoint, cs.Logger)
 	if err != nil {
-		log.Error(fmt.Sprintf("[%s] Error getting credentials from secret", reqID), zap.Error(err))
+		logger.Error(ctx, cs.Logger, "Error getting credentials from secret", zap.Error(err))
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Error in getting credentials %v", reqID, err))
 	}
-	log.Info(fmt.Sprintf("[%s] Creating object storage session", reqID),
+	logger.Info(ctx, cs.Logger, "Creating object storage session",
 		zap.String("endpoint", endPoint),
 		zap.String("location_constraint", locationConstraint))
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
@@ -258,79 +256,79 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	params["userProvidedBucket"] = "true"
 	if bucketName != "" {
 		// User Provided bucket. Check its existence and create if not present
-		log.Info(fmt.Sprintf("[%s] Bucket name provided", reqID), zap.String("bucket_name", bucketName))
-		log.Info(fmt.Sprintf("[%s] Checking if bucket already exists", reqID), zap.String("bucket_name", bucketName))
+		logger.Info(ctx, cs.Logger, "Bucket name provided", zap.String("bucket_name", bucketName))
+		logger.Info(ctx, cs.Logger, "Checking if bucket already exists", zap.String("bucket_name", bucketName))
 		if err := sess.CheckBucketAccess(ctx, bucketName); err != nil {
-			log.Info(fmt.Sprintf("[%s] Bucket not accessible, creating new bucket", reqID),
+			logger.Info(ctx, cs.Logger, "Bucket not accessible, creating new bucket",
 				zap.String("bucket_name", bucketName), zap.Error(err))
-			err = createBucket(ctx, sess, bucketName, kpRootKeyCrn, log)
+			err = createBucket(ctx, sess, bucketName, kpRootKeyCrn, cs.Logger)
 			if err != nil {
-				log.Error(fmt.Sprintf("[%s] Failed to create bucket", reqID),
+				logger.Error(ctx, cs.Logger, "Failed to create bucket",
 					zap.String("bucket_name", bucketName), zap.Error(err))
 				return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("[%s] %v: %v", reqID, err, bucketName))
 			}
 			params["userProvidedBucket"] = "false"
-			log.Info(fmt.Sprintf("[%s] Created bucket successfully", reqID), zap.String("bucket_name", bucketName))
+			logger.Info(ctx, cs.Logger, "Created bucket successfully", zap.String("bucket_name", bucketName))
 		}
 
 		if quotaLimitEnabled {
 			quotaBytes := req.GetCapacityRange().GetRequiredBytes()
 			resConfApikey := secretMap[constants.ResourceConfigApiKey]
 
-			log.Info(fmt.Sprintf("[%s] Applying hard quota to bucket", reqID),
+			logger.Info(ctx, cs.Logger, "Applying hard quota to bucket",
 				zap.Int64("quota_bytes", quotaBytes), zap.String("bucket_name", bucketName))
 			err = sess.UpdateQuotaLimit(ctx, quotaBytes, resConfApikey, bucketName, endPoint, creds.IAMEndpoint)
 			if err != nil {
-				log.Error(fmt.Sprintf("[%s] Failed to set quota limit on bucket", reqID),
+				logger.Error(ctx, cs.Logger, "Failed to set quota limit on bucket",
 					zap.String("bucket_name", bucketName), zap.Error(err))
 				if params["userProvidedBucket"] == "false" {
 					if delErr := sess.DeleteBucket(ctx, bucketName); delErr != nil {
-						log.Error(fmt.Sprintf("[%s] Failed to delete bucket after quota limit failure", reqID),
+						logger.Error(ctx, cs.Logger, "Failed to delete bucket after quota limit failure",
 							zap.String("bucket_name", bucketName), zap.Error(delErr))
 					}
 				}
 				return nil, status.Error(codes.Internal, fmt.Sprintf("[%s] failed to set bucket quota limit: %v", reqID, err))
 			}
-			log.Info(fmt.Sprintf("[%s] Successfully applied hard quota to bucket", reqID),
+			logger.Info(ctx, cs.Logger, "Successfully applied hard quota to bucket",
 				zap.Int64("quota_bytes", quotaBytes), zap.String("bucket_name", bucketName))
 		}
 
 		if bucketVersioning != "" {
 			enable := strings.ToLower(strings.TrimSpace(bucketVersioning)) == "true"
-			log.Info(fmt.Sprintf("[%s] Setting bucket versioning", reqID),
+			logger.Info(ctx, cs.Logger, "Setting bucket versioning",
 				zap.Bool("enable", enable), zap.String("bucket_name", bucketName))
 
 			err := sess.SetBucketVersioning(ctx, bucketName, enable)
 			if err != nil {
-				log.Error(fmt.Sprintf("[%s] Failed to set bucket versioning", reqID),
+				logger.Error(ctx, cs.Logger, "Failed to set bucket versioning",
 					zap.Bool("enable", enable), zap.String("bucket_name", bucketName), zap.Error(err))
 				if params["userProvidedBucket"] == "false" {
 					err1 := sess.DeleteBucket(ctx, bucketName)
 					if err1 != nil {
-						log.Error(fmt.Sprintf("[%s] Failed to delete bucket after versioning failure", reqID),
+						logger.Error(ctx, cs.Logger, "Failed to delete bucket after versioning failure",
 							zap.String("bucket_name", bucketName), zap.Error(err1))
 						return nil, status.Error(codes.Internal, fmt.Sprintf("[%s] cannot set versioning: %v and cannot delete bucket %s: %v", reqID, err, bucketName, err1))
 					}
 				}
 				return nil, status.Error(codes.Internal, fmt.Sprintf("[%s] failed to set versioning %t for bucket %s: %v", reqID, enable, bucketName, err))
 			}
-			log.Info(fmt.Sprintf("[%s] Bucket versioning set successfully", reqID),
+			logger.Info(ctx, cs.Logger, "Bucket versioning set successfully",
 				zap.Bool("enable", enable), zap.String("bucket_name", bucketName))
 		}
 
 		params["bucketName"] = bucketName
 	} else {
 		// Generate random temp bucket name based on volume id
-		log.Info(fmt.Sprintf("[%s] Bucket name not provided, generating temp bucket", reqID))
-		tempBucketName := getTempBucketName(mounter, volumeID)
+		logger.Info(ctx, cs.Logger, "Bucket name not provided, generating temp bucket")
+		tempBucketName := getTempBucketName(ctx, mounter, volumeID, cs.Logger)
 		if tempBucketName == "" {
-			log.Error(fmt.Sprintf("[%s] Unable to generate temp bucket name", reqID))
+			logger.Error(ctx, cs.Logger, "Unable to generate temp bucket name")
 			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("[%s] Unable to access the bucket: %v", reqID, tempBucketName))
 		}
-		log.Info(fmt.Sprintf("[%s] Creating temp bucket", reqID), zap.String("temp_bucket_name", tempBucketName))
-		err = createBucket(ctx, sess, tempBucketName, kpRootKeyCrn, log)
+		logger.Info(ctx, cs.Logger, "Creating temp bucket", zap.String("temp_bucket_name", tempBucketName))
+		err = createBucket(ctx, sess, tempBucketName, kpRootKeyCrn, cs.Logger)
 		if err != nil {
-			log.Error(fmt.Sprintf("[%s] Failed to create temp bucket", reqID),
+			logger.Error(ctx, cs.Logger, "Failed to create temp bucket",
 				zap.String("temp_bucket_name", tempBucketName), zap.Error(err))
 			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("[%s] %v: %v", reqID, err, tempBucketName))
 		}
@@ -339,48 +337,48 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 			quotaBytes := req.GetCapacityRange().GetRequiredBytes()
 			resConfApikey := secretMap[constants.ResourceConfigApiKey]
 
-			log.Info(fmt.Sprintf("[%s] Applying hard quota to temp bucket", reqID),
+			logger.Info(ctx, cs.Logger, "Applying hard quota to temp bucket",
 				zap.Int64("quota_bytes", quotaBytes), zap.String("temp_bucket_name", tempBucketName))
 			err = sess.UpdateQuotaLimit(ctx, quotaBytes, resConfApikey, tempBucketName, endPoint, creds.IAMEndpoint)
 			if err != nil {
-				log.Error(fmt.Sprintf("[%s] Failed to set quota limit on temp bucket", reqID),
+				logger.Error(ctx, cs.Logger, "Failed to set quota limit on temp bucket",
 					zap.String("temp_bucket_name", tempBucketName), zap.Error(err))
 				if delErr := sess.DeleteBucket(ctx, tempBucketName); delErr != nil {
-					log.Error(fmt.Sprintf("[%s] Failed to delete temp bucket after quota limit failure", reqID),
+					logger.Error(ctx, cs.Logger, "Failed to delete temp bucket after quota limit failure",
 						zap.String("temp_bucket_name", tempBucketName), zap.Error(delErr))
 				}
 				return nil, status.Error(codes.Internal, fmt.Sprintf("[%s] failed to set bucket quota limit: %v", reqID, err))
 			}
-			log.Info(fmt.Sprintf("[%s] Successfully applied hard quota to temp bucket", reqID),
+			logger.Info(ctx, cs.Logger, "Successfully applied hard quota to temp bucket",
 				zap.Int64("quota_bytes", quotaBytes), zap.String("temp_bucket_name", tempBucketName))
 		}
 
 		if bucketVersioning != "" {
 			enable := strings.ToLower(strings.TrimSpace(bucketVersioning)) == "true"
-			log.Info(fmt.Sprintf("[%s] Setting temp bucket versioning", reqID),
+			logger.Info(ctx, cs.Logger, "Setting temp bucket versioning",
 				zap.Bool("enable", enable), zap.String("temp_bucket_name", tempBucketName))
 
 			err := sess.SetBucketVersioning(ctx, tempBucketName, enable)
 			if err != nil {
-				log.Error(fmt.Sprintf("[%s] Failed to set temp bucket versioning", reqID),
+				logger.Error(ctx, cs.Logger, "Failed to set temp bucket versioning",
 					zap.Bool("enable", enable), zap.String("temp_bucket_name", tempBucketName), zap.Error(err))
 				err1 := sess.DeleteBucket(ctx, tempBucketName)
 				if err1 != nil {
-					log.Error(fmt.Sprintf("[%s] Failed to delete temp bucket after versioning failure", reqID),
+					logger.Error(ctx, cs.Logger, "Failed to delete temp bucket after versioning failure",
 						zap.String("temp_bucket_name", tempBucketName), zap.Error(err1))
 					return nil, status.Error(codes.Internal, fmt.Sprintf("[%s] cannot set versioning: %v and cannot delete temp bucket %s: %v", reqID, err, tempBucketName, err1))
 				}
 				return nil, status.Error(codes.Internal, fmt.Sprintf("[%s] failed to set versioning %t for temp bucket %s: %v", reqID, enable, tempBucketName, err))
 			}
-			log.Info(fmt.Sprintf("[%s] Temp bucket versioning set successfully", reqID),
+			logger.Info(ctx, cs.Logger, "Temp bucket versioning set successfully",
 				zap.Bool("enable", enable), zap.String("temp_bucket_name", tempBucketName))
 		}
-		log.Info(fmt.Sprintf("[%s] Created temp bucket successfully", reqID), zap.String("temp_bucket_name", tempBucketName))
+		logger.Info(ctx, cs.Logger, "Created temp bucket successfully", zap.String("temp_bucket_name", tempBucketName))
 		params["userProvidedBucket"] = "false"
 		params["bucketName"] = tempBucketName
 	}
 	
-	log.Info(fmt.Sprintf("[%s] CreateVolume completed successfully", reqID),
+	logger.Info(ctx, cs.Logger, "CreateVolume completed successfully",
 		zap.String("volume_id", volumeID),
 		zap.String("bucket_name", params["bucketName"]),
 		zap.Int64("capacity_bytes", req.GetCapacityRange().GetRequiredBytes()))
@@ -397,153 +395,149 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	// Extract request ID from context
 	reqID := requestid.FromContext(ctx)
-	log := cs.Logger.With(zap.String("request_id", reqID))
 	
-	log.Info(fmt.Sprintf("[%s] DeleteVolume started", reqID))
+	logger.Info(ctx, cs.Logger, "DeleteVolume started")
 	
 	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
 	if err != nil {
-		log.Error(fmt.Sprintf("[%s] Error modifying request", reqID), zap.Error(err))
+		logger.Error(ctx, cs.Logger, "Error modifying request", zap.Error(err))
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Error in modifying requests %v", reqID, err))
 	}
-	log.Debug(fmt.Sprintf("[%s] DeleteVolume request details", reqID), zap.Any("request", modifiedRequest.(*csi.DeleteVolumeRequest)))
+	logger.Debug(ctx, cs.Logger, "DeleteVolume request details", zap.Any("request", modifiedRequest.(*csi.DeleteVolumeRequest)))
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
-		log.Error(fmt.Sprintf("[%s] Volume ID missing in request", reqID))
+		logger.Error(ctx, cs.Logger, "Volume ID missing in request")
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Volume ID missing in request", reqID))
 	}
-	log.Info(fmt.Sprintf("[%s] Deleting volume", reqID), zap.String("volume_id", volumeID))
+	logger.Info(ctx, cs.Logger, "Deleting volume", zap.String("volume_id", volumeID))
 	
 	secretMap := req.GetSecrets()
-	log.Info(fmt.Sprintf("[%s] Secrets received", reqID), zap.Int("secret_count", len(secretMap)))
+	logger.Info(ctx, cs.Logger, "Secrets received", zap.Int("secret_count", len(secretMap)))
 
 	endPoint := secretMap["cosEndpoint"]
 	locationConstraint := secretMap["locationConstraint"]
 
 	if len(secretMap) == 0 {
-		log.Info(fmt.Sprintf("[%s] No secret in request, fetching from PV", reqID))
+		logger.Info(ctx, cs.Logger, "No secret in request, fetching from PV")
 
 		pv, err := cs.Stats.GetPV(volumeID)
 		if err != nil {
-			log.Error(fmt.Sprintf("[%s] Failed to get PV", reqID), zap.String("volume_id", volumeID), zap.Error(err))
+			logger.Error(ctx, cs.Logger, "Failed to get PV", zap.String("volume_id", volumeID), zap.Error(err))
 			return nil, err
 		}
 
-		log.Debug(fmt.Sprintf("[%s] PV resource retrieved", reqID), zap.Any("pv", pv))
+		logger.Debug(ctx, cs.Logger, "PV resource retrieved", zap.Any("pv", pv))
 
 		secretName := pv.Spec.CSI.NodePublishSecretRef.Name
 		secretNamespace := pv.Spec.CSI.NodePublishSecretRef.Namespace
 
 		if secretName == "" {
-			log.Error(fmt.Sprintf("[%s] Secret details not found in PV", reqID))
+			logger.Error(ctx, cs.Logger, "Secret details not found in PV")
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Secret details not found, could not fetch the secret", reqID))
 		}
 
 		if secretNamespace == "" {
-			log.Warn(fmt.Sprintf("[%s] Secret namespace not found, using default namespace", reqID))
+			logger.Warn(ctx, cs.Logger, "Secret namespace not found, using default namespace")
 			secretNamespace = constants.DefaultNamespace
 		}
 
 		endPoint = pv.Spec.CSI.VolumeAttributes["cosEndpoint"]
 		locationConstraint = pv.Spec.CSI.VolumeAttributes["locationConstraint"]
 
-		log.Info(fmt.Sprintf("[%s] Secret details found", reqID),
+		logger.Info(ctx, cs.Logger, "Secret details found",
 			zap.String("secret_name", secretName),
 			zap.String("secret_namespace", secretNamespace))
 
 		secret, err := cs.Stats.GetSecret(secretName, secretNamespace)
 		if err != nil {
-			log.Error(fmt.Sprintf("[%s] Secret resource not found", reqID), zap.Error(err))
+			logger.Error(ctx, cs.Logger, "Secret resource not found", zap.Error(err))
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Secret resource not found %v", reqID, err))
 		}
 
-		secretMapCustom := parseCustomSecret(secret)
-		log.Info(fmt.Sprintf("[%s] Custom secret parsed successfully", reqID), zap.Int("secret_param_count", len(secretMapCustom)))
+		secretMapCustom := parseCustomSecret(ctx, secret, cs.Logger)
+		logger.Info(ctx, cs.Logger, "Custom secret parsed successfully", zap.Int("secret_param_count", len(secretMapCustom)))
 		secretMap = secretMapCustom
 	}
 
-	creds, err := getObjectStorageCredentialsFromSecret(secretMap, cs.iamEndpoint)
+	creds, err := getObjectStorageCredentialsFromSecret(ctx, secretMap, cs.iamEndpoint, cs.Logger)
 	if err != nil {
-		log.Error(fmt.Sprintf("[%s] Error getting credentials from secret", reqID), zap.Error(err))
+		logger.Error(ctx, cs.Logger, "Error getting credentials from secret", zap.Error(err))
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Error in getting credentials %v", reqID, err))
 	}
 
-	log.Info(fmt.Sprintf("[%s] Creating object storage session for deletion", reqID),
+	logger.Info(ctx, cs.Logger, "Creating object storage session for deletion",
 		zap.String("endpoint", endPoint),
 		zap.String("location_constraint", locationConstraint))
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
 
 	bucketToDelete, err := cs.Stats.BucketToDelete(volumeID)
 	if err != nil {
-		log.Warn(fmt.Sprintf("[%s] No bucket to delete or error getting bucket info", reqID), zap.Error(err))
+		logger.Warn(ctx, cs.Logger, "No bucket to delete or error getting bucket info", zap.Error(err))
 		return &csi.DeleteVolumeResponse{}, nil
 	}
 
 	if bucketToDelete != "" {
-		log.Info(fmt.Sprintf("[%s] Deleting bucket", reqID), zap.String("bucket_name", bucketToDelete))
+		logger.Info(ctx, cs.Logger, "Deleting bucket", zap.String("bucket_name", bucketToDelete))
 		err = sess.DeleteBucket(ctx, bucketToDelete)
 		if err != nil {
-			log.Warn(fmt.Sprintf("[%s] Cannot delete bucket", reqID),
+			logger.Warn(ctx, cs.Logger, "Cannot delete bucket",
 				zap.String("bucket_name", bucketToDelete), zap.Error(err))
 		} else {
-			log.Info(fmt.Sprintf("[%s] Bucket deleted successfully", reqID), zap.String("bucket_name", bucketToDelete))
+			logger.Info(ctx, cs.Logger, "Bucket deleted successfully", zap.String("bucket_name", bucketToDelete))
 		}
 	} else {
-		log.Info(fmt.Sprintf("[%s] No bucket to delete", reqID))
+		logger.Info(ctx, cs.Logger, "No bucket to delete")
 	}
 
-	log.Info(fmt.Sprintf("[%s] DeleteVolume completed successfully", reqID), zap.String("volume_id", volumeID))
+	logger.Info(ctx, cs.Logger, "DeleteVolume completed successfully", zap.String("volume_id", volumeID))
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
 func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	log := cs.Logger.With(zap.String("request_id", reqID))
 	
-	log.Debug(fmt.Sprintf("[%s] ControllerPublishVolume request", reqID), zap.Any("request", req))
-	log.Info(fmt.Sprintf("[%s] ControllerPublishVolume not implemented", reqID))
+	logger.Debug(ctx, cs.Logger, "ControllerPublishVolume request", zap.Any("request", req))
+	logger.Info(ctx, cs.Logger, "ControllerPublishVolume not implemented")
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("[%s] ControllerPublishVolume", reqID))
 }
 
 func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	log := cs.Logger.With(zap.String("request_id", reqID))
 	
-	log.Debug(fmt.Sprintf("[%s] ControllerUnpublishVolume request", reqID), zap.Any("request", req))
-	log.Info(fmt.Sprintf("[%s] ControllerUnpublishVolume not implemented", reqID))
+	logger.Debug(ctx, cs.Logger, "ControllerUnpublishVolume request", zap.Any("request", req))
+	logger.Info(ctx, cs.Logger, "ControllerUnpublishVolume not implemented")
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("[%s] ControllerUnpublishVolume", reqID))
 }
 
 func (cs *controllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	log := cs.Logger.With(zap.String("request_id", reqID))
 	
-	log.Info(fmt.Sprintf("[%s] ValidateVolumeCapabilities started", reqID))
-	log.Debug(fmt.Sprintf("[%s] ValidateVolumeCapabilities request", reqID), zap.Any("request", req))
+	logger.Info(ctx, cs.Logger, "ValidateVolumeCapabilities started")
+	logger.Debug(ctx, cs.Logger, "ValidateVolumeCapabilities request", zap.Any("request", req))
 
 	// Validate Arguments
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
-		log.Error(fmt.Sprintf("[%s] Volume ID missing in request", reqID))
+		logger.Error(ctx, cs.Logger, "Volume ID missing in request")
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Volume ID missing in request", reqID))
 	}
 
 	volCaps := req.GetVolumeCapabilities()
 	if len(volCaps) == 0 {
-		log.Error(fmt.Sprintf("[%s] Volume capabilities missing in request", reqID))
+		logger.Error(ctx, cs.Logger, "Volume capabilities missing in request")
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Volume capabilities missing in request", reqID))
 	}
 
 	var confirmed *csi.ValidateVolumeCapabilitiesResponse_Confirmed
 	if isValidVolumeCapabilities(volCaps) {
-		log.Info(fmt.Sprintf("[%s] Volume capabilities are valid", reqID), zap.String("volume_id", volumeID))
+		logger.Info(ctx, cs.Logger, "Volume capabilities are valid", zap.String("volume_id", volumeID))
 		confirmed = &csi.ValidateVolumeCapabilitiesResponse_Confirmed{VolumeCapabilities: volCaps}
 	} else {
-		log.Warn(fmt.Sprintf("[%s] Volume capabilities are invalid", reqID), zap.String("volume_id", volumeID))
+		logger.Warn(ctx, cs.Logger, "Volume capabilities are invalid", zap.String("volume_id", volumeID))
 	}
 
-	log.Info(fmt.Sprintf("[%s] ValidateVolumeCapabilities completed", reqID), zap.String("volume_id", volumeID))
+	logger.Info(ctx, cs.Logger, "ValidateVolumeCapabilities completed", zap.String("volume_id", volumeID))
 	return &csi.ValidateVolumeCapabilitiesResponse{
 		Confirmed: confirmed,
 	}, nil
@@ -551,28 +545,23 @@ func (cs *controllerServer) ValidateVolumeCapabilities(ctx context.Context, req 
 
 func (cs *controllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	log := cs.Logger.With(zap.String("request_id", reqID))
 	
-	log.Debug(fmt.Sprintf("[%s] ListVolumes request", reqID), zap.Any("request", req))
-	log.Info(fmt.Sprintf("[%s] ListVolumes not implemented", reqID))
+	logger.Debug(ctx, cs.Logger, "ListVolumes request", zap.Any("request", req))
+	logger.Info(ctx, cs.Logger, "ListVolumes not implemented")
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("[%s] ListVolumes", reqID))
 }
 
 func (cs *controllerServer) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	log := cs.Logger.With(zap.String("request_id", reqID))
 	
-	log.Debug(fmt.Sprintf("[%s] GetCapacity request", reqID), zap.Any("request", req))
-	log.Info(fmt.Sprintf("[%s] GetCapacity not implemented", reqID))
+	logger.Debug(ctx, cs.Logger, "GetCapacity request", zap.Any("request", req))
+	logger.Info(ctx, cs.Logger, "GetCapacity not implemented")
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("[%s] GetCapacity", reqID))
 }
 
 func (cs *controllerServer) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
-	reqID := requestid.FromContext(ctx)
-	log := cs.Logger.With(zap.String("request_id", reqID))
-	
-	log.Info(fmt.Sprintf("[%s] ControllerGetCapabilities started", reqID))
-	log.Debug(fmt.Sprintf("[%s] ControllerGetCapabilities request", reqID), zap.Any("request", req))
+	logger.Info(ctx, cs.Logger, "ControllerGetCapabilities started")
+	logger.Debug(ctx, cs.Logger, "ControllerGetCapabilities request", zap.Any("request", req))
 	
 	var caps []*csi.ControllerServiceCapability
 	for _, cap := range controllerCapabilities {
@@ -586,66 +575,60 @@ func (cs *controllerServer) ControllerGetCapabilities(ctx context.Context, req *
 		caps = append(caps, c)
 	}
 	
-	log.Info(fmt.Sprintf("[%s] ControllerGetCapabilities completed", reqID), zap.Int("capability_count", len(caps)))
+	logger.Info(ctx, cs.Logger, "ControllerGetCapabilities completed", zap.Int("capability_count", len(caps)))
 	return &csi.ControllerGetCapabilitiesResponse{Capabilities: caps}, nil
 }
 
 func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	log := cs.Logger.With(zap.String("request_id", reqID))
 	
-	log.Debug(fmt.Sprintf("[%s] CreateSnapshot request", reqID), zap.Any("request", req))
-	log.Info(fmt.Sprintf("[%s] CreateSnapshot not implemented", reqID))
+	logger.Debug(ctx, cs.Logger, "CreateSnapshot request", zap.Any("request", req))
+	logger.Info(ctx, cs.Logger, "CreateSnapshot not implemented")
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("[%s] CreateSnapshot", reqID))
 }
 
 func (cs *controllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	log := cs.Logger.With(zap.String("request_id", reqID))
 	
-	log.Debug(fmt.Sprintf("[%s] DeleteSnapshot request", reqID), zap.Any("request", req))
-	log.Info(fmt.Sprintf("[%s] DeleteSnapshot not implemented", reqID))
+	logger.Debug(ctx, cs.Logger, "DeleteSnapshot request", zap.Any("request", req))
+	logger.Info(ctx, cs.Logger, "DeleteSnapshot not implemented")
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("[%s] DeleteSnapshot", reqID))
 }
 
 func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	log := cs.Logger.With(zap.String("request_id", reqID))
 	
-	log.Debug(fmt.Sprintf("[%s] ListSnapshots request", reqID), zap.Any("request", req))
-	log.Info(fmt.Sprintf("[%s] ListSnapshots not implemented", reqID))
+	logger.Debug(ctx, cs.Logger, "ListSnapshots request", zap.Any("request", req))
+	logger.Info(ctx, cs.Logger, "ListSnapshots not implemented")
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("[%s] ListSnapshots", reqID))
 }
 
 func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	log := cs.Logger.With(zap.String("request_id", reqID))
 	
-	log.Debug(fmt.Sprintf("[%s] ControllerExpandVolume request", reqID), zap.Any("request", req))
-	log.Info(fmt.Sprintf("[%s] ControllerExpandVolume not implemented", reqID))
+	logger.Debug(ctx, cs.Logger, "ControllerExpandVolume request", zap.Any("request", req))
+	logger.Info(ctx, cs.Logger, "ControllerExpandVolume not implemented")
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("[%s] ControllerExpandVolume", reqID))
 }
 
 func (cs *controllerServer) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	log := cs.Logger.With(zap.String("request_id", reqID))
 	
-	log.Debug(fmt.Sprintf("[%s] ControllerGetVolume request", reqID), zap.Any("request", req))
-	log.Info(fmt.Sprintf("[%s] ControllerGetVolume not implemented", reqID))
+	logger.Debug(ctx, cs.Logger, "ControllerGetVolume request", zap.Any("request", req))
+	logger.Info(ctx, cs.Logger, "ControllerGetVolume not implemented")
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("[%s] ControllerGetVolume", reqID))
 }
 
 func (cs *controllerServer) ControllerModifyVolume(ctx context.Context, req *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	log := cs.Logger.With(zap.String("request_id", reqID))
 	
-	log.Debug(fmt.Sprintf("[%s] ControllerModifyVolume request", reqID), zap.Any("request", req))
-	log.Info(fmt.Sprintf("[%s] ControllerModifyVolume not implemented", reqID))
+	logger.Debug(ctx, cs.Logger, "ControllerModifyVolume request", zap.Any("request", req))
+	logger.Info(ctx, cs.Logger, "ControllerModifyVolume not implemented")
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("[%s] ControllerModifyVolume", reqID))
 }
 
-func getObjectStorageCredentialsFromSecret(secretMap map[string]string, iamEP string) (*s3client.ObjectStorageCredentials, error) {
-	log.Info("Getting object storage credentials from secret")
+func getObjectStorageCredentialsFromSecret(ctx context.Context, secretMap map[string]string, iamEP string, log *zap.Logger) (*s3client.ObjectStorageCredentials, error) {
+	logger.Info(ctx, log, "Getting object storage credentials from secret")
 	var (
 		accessKey         string
 		secretKey         string
@@ -688,8 +671,8 @@ func getObjectStorageCredentialsFromSecret(secretMap map[string]string, iamEP st
 	}, nil
 }
 
-func parseCustomSecret(secret *v1.Secret, log *zap.Logger) map[string]string {
-	log.Info("Parsing custom secret")
+func parseCustomSecret(ctx context.Context, secret *v1.Secret, log *zap.Logger) map[string]string {
+	logger.Info(ctx, log, "Parsing custom secret")
 	secretMapCustom := make(map[string]string)
 
 	var (
@@ -776,8 +759,8 @@ func parseCustomSecret(secret *v1.Secret, log *zap.Logger) map[string]string {
 	return secretMapCustom
 }
 
-func getTempBucketName(mounterType, volumeID string) string {
-	log.Info("Getting temp bucket name", zap.String("mounter_type", mounterType))
+func getTempBucketName(ctx context.Context, mounterType, volumeID string, log *zap.Logger) string {
+	logger.Info(ctx, log, "Getting temp bucket name", zap.String("mounter_type", mounterType))
 	currentTime := time.Now()
 	timestamp := currentTime.Format("20060102150405")
 
@@ -786,23 +769,21 @@ func getTempBucketName(mounterType, volumeID string) string {
 }
 
 func createBucket(ctx context.Context, sess s3client.ObjectStorageSession, bucketName, kpRootKeyCrn string, log *zap.Logger) error {
-	reqID := requestid.FromContext(ctx)
-	
 	msg, err := sess.CreateBucket(ctx, bucketName, kpRootKeyCrn)
 	if msg != "" {
-		log.Info(fmt.Sprintf("[%s] Bucket creation info", reqID), zap.String("message", msg))
+		logger.Info(ctx, log, "Bucket creation info", zap.String("message", msg))
 	}
 	if err != nil {
 		var apiErr smithy.APIError
 		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "BucketAlreadyExists" {
-			log.Warn(fmt.Sprintf("[%s] Bucket already exists", reqID), zap.String("bucket", bucketName))
+			logger.Warn(ctx, log, "Bucket already exists", zap.String("bucket", bucketName))
 		} else {
-			log.Error(fmt.Sprintf("[%s] Unable to create bucket", reqID), zap.String("bucket", bucketName), zap.Error(err))
+			logger.Error(ctx, log, "Unable to create bucket", zap.String("bucket", bucketName), zap.Error(err))
 			return errors.New("unable to create the bucket")
 		}
 	}
 	if err := sess.CheckBucketAccess(ctx, bucketName); err != nil {
-		log.Error(fmt.Sprintf("[%s] Unable to access bucket", reqID), zap.String("bucket", bucketName), zap.Error(err))
+		logger.Error(ctx, log, "Unable to access bucket", zap.String("bucket", bucketName), zap.Error(err))
 		return errors.New("unable to access the bucket")
 	}
 	return nil
