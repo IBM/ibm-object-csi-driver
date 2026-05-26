@@ -31,7 +31,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"k8s.io/klog/v2"
 )
 
 // Options is the combined set of options for all operating modes.
@@ -91,7 +90,6 @@ func getConfigBool(envKey string, defaultConf bool, logger zap.Logger) bool {
 }
 
 func main() {
-	klog.InitFlags(nil)
 	logger := getZapLogger()
 	defer logger.Sync() // #nosec G104: Best effort sync
 

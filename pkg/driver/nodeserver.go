@@ -15,7 +15,6 @@ import (
 	"fmt"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
-	"github.com/IBM/ibm-object-csi-driver/pkg/logger"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/IBM/ibm-object-csi-driver/pkg/requestid"
@@ -46,7 +45,7 @@ type NodeServerConfig struct {
 
 func (ns *nodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	log := ns.Logger.With(zap.String("request_id", reqID))
+	log := ns.logger.With(zap.String("request_id", reqID))
 	
 	log.Info(fmt.Sprintf("[%s] NodeStageVolume started", reqID))
 	log.Debug(fmt.Sprintf("[%s] NodeStageVolume request", reqID), zap.Any("request", req))
@@ -71,7 +70,7 @@ func (ns *nodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 func (ns *nodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	log := ns.Logger.With(zap.String("request_id", reqID))
+	log := ns.logger.With(zap.String("request_id", reqID))
 	
 	log.Info(fmt.Sprintf("[%s] NodeUnstageVolume started", reqID))
 	log.Debug(fmt.Sprintf("[%s] NodeUnstageVolume request", reqID), zap.Any("request", req))
@@ -96,7 +95,7 @@ func (ns *nodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 
 func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	log := ns.Logger.With(zap.String("request_id", reqID))
+	log := ns.logger.With(zap.String("request_id", reqID))
 	
 	log.Info(fmt.Sprintf("[%s] NodePublishVolume started", reqID))
 	
@@ -230,7 +229,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 
 func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	log := ns.Logger.With(zap.String("request_id", reqID))
+	log := ns.logger.With(zap.String("request_id", reqID))
 	
 	log.Info(fmt.Sprintf("[%s] NodeUnpublishVolume started", reqID))
 	log.Debug(fmt.Sprintf("[%s] NodeUnpublishVolume request", reqID), zap.Any("request", req))
@@ -270,7 +269,7 @@ func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 
 func (ns *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	log := ns.Logger.With(zap.String("request_id", reqID))
+	log := ns.logger.With(zap.String("request_id", reqID))
 	
 	log.Info(fmt.Sprintf("[%s] NodeGetVolumeStats started", reqID))
 	log.Debug(fmt.Sprintf("[%s] NodeGetVolumeStats request", reqID), zap.Any("request", req))
@@ -351,7 +350,7 @@ func (ns *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 
 func (ns *nodeServer) NodeExpandVolume(ctx context.Context, _ *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	log := ns.Logger.With(zap.String("request_id", reqID))
+	log := ns.logger.With(zap.String("request_id", reqID))
 	
 	log.Info(fmt.Sprintf("[%s] NodeExpandVolume not implemented", reqID))
 	return &csi.NodeExpandVolumeResponse{}, status.Error(codes.Unimplemented, fmt.Sprintf("[%s] NodeExpandVolume is not implemented", reqID))
@@ -359,7 +358,7 @@ func (ns *nodeServer) NodeExpandVolume(ctx context.Context, _ *csi.NodeExpandVol
 
 func (ns *nodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	log := ns.Logger.With(zap.String("request_id", reqID))
+	log := ns.logger.With(zap.String("request_id", reqID))
 	
 	log.Info(fmt.Sprintf("[%s] NodeGetCapabilities started", reqID))
 	log.Debug(fmt.Sprintf("[%s] NodeGetCapabilities request", reqID), zap.Any("request", req))
@@ -382,7 +381,7 @@ func (ns *nodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 
 func (ns *nodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	log := ns.Logger.With(zap.String("request_id", reqID))
+	log := ns.logger.With(zap.String("request_id", reqID))
 	
 	log.Info(fmt.Sprintf("[%s] NodeGetInfo started", reqID))
 	log.Debug(fmt.Sprintf("[%s] NodeGetInfo request", reqID), zap.Any("request", req))
