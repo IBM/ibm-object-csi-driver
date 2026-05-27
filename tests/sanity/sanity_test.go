@@ -12,6 +12,7 @@
 package sanity
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -149,28 +150,28 @@ func (f *FakeObjectStorageSessionFactory) NewObjectStorageSession(endpoint, loca
 	}
 }
 
-func (s *fakeObjectStorageSession) CheckBucketAccess(bucket string) error {
+func (s *fakeObjectStorageSession) CheckBucketAccess(ctx context.Context, bucket string) error {
 	return nil
 }
 
-func (s *fakeObjectStorageSession) SetBucketVersioning(bucketName string, enable bool) error {
+func (s *fakeObjectStorageSession) SetBucketVersioning(ctx context.Context, bucketName string, enable bool) error {
 	s.logger.Info(fmt.Sprintf("Fake SetBucketVersioning called for bucket %s with enable=%t", bucketName, enable))
 	return nil
 }
 
-func (s *fakeObjectStorageSession) CheckObjectPathExistence(bucket, objectpath string) (bool, error) {
+func (s *fakeObjectStorageSession) CheckObjectPathExistence(ctx context.Context, bucket, objectpath string) (bool, error) {
 	return true, nil
 }
 
-func (s *fakeObjectStorageSession) CreateBucket(bucket, kpRootKeyCrn string) (string, error) {
+func (s *fakeObjectStorageSession) CreateBucket(ctx context.Context, bucket, kpRootKeyCrn string) (string, error) {
 	return "", nil
 }
 
-func (s *fakeObjectStorageSession) DeleteBucket(bucket string) error {
+func (s *fakeObjectStorageSession) DeleteBucket(ctx context.Context, bucket string) error {
 	return nil
 }
 
-func (s *fakeObjectStorageSession) UpdateQuotaLimit(quota int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error {
+func (s *fakeObjectStorageSession) UpdateQuotaLimit(ctx context.Context, quota int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error {
 	s.logger.Info(fmt.Sprintf("Fake UpdateQuotaLimit called for bucket %s with quota %d", bucketName, quota))
 	return nil
 }
@@ -195,12 +196,12 @@ func (s *FakeS3fsMounterFactory) NewMounter(attrib map[string]string, secretMap 
 	return &Fakes3fsMounter{logger: s.logger}
 }
 
-func (s3fs *Fakes3fsMounter) Mount(source string, target string) error {
+func (s3fs *Fakes3fsMounter) Mount(ctx context.Context, source string, target string) error {
 	s3fs.logger.Info("S3FSMounter Mount", zap.String("source", source), zap.String("target", target))
 	return nil
 }
 
-func (s3fs *Fakes3fsMounter) Unmount(target string) error {
+func (s3fs *Fakes3fsMounter) Unmount(ctx context.Context, target string) error {
 	s3fs.logger.Info("S3FSMounter Unmount", zap.String("target", target))
 	return nil
 }
