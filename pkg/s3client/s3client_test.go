@@ -1,6 +1,7 @@
 package s3client
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -126,14 +127,14 @@ func Test_NewObjectStorageIAMSession_Positive(t *testing.T) {
 
 func Test_CheckBucketAccess_Error(t *testing.T) {
 	sess := getSession(&fakeS3API{ErrHeadBucket: errFoo})
-	err := sess.CheckBucketAccess(testBucket)
+	err := sess.CheckBucketAccess(context.Background(), testBucket)
 	assert.Error(t, err)
 	assert.EqualError(t, err, errFooMsg)
 }
 
 func Test_CheckBucketAccess_Positive(t *testing.T) {
 	sess := getSession(&fakeS3API{})
-	err := sess.CheckBucketAccess(testBucket)
+	err := sess.CheckBucketAccess(context.Background(), testBucket)
 	assert.NoError(t, err)
 }
 
@@ -141,7 +142,7 @@ func Test_CheckObjectPathExistence_Positive(t *testing.T) {
 	testObject = strings.TrimPrefix(testObjectPath, "/")
 	testObject = testObject + "/"
 	sess := getSession(&fakeS3API{ObjectPath: testObject})
-	exist, err := sess.CheckObjectPathExistence(testBucket, testObjectPath)
+	exist, err := sess.CheckObjectPathExistence(context.Background(), testBucket, testObjectPath)
 	assert.NoError(t, err)
 	assert.Equal(t, exist, true)
 }
@@ -149,7 +150,7 @@ func Test_CheckObjectPathExistence_Positive(t *testing.T) {
 func Test_CheckObjectPathExistence_WithoutSuffix(t *testing.T) {
 	testObject = strings.TrimPrefix(testObjectPath, "/")
 	sess := getSession(&fakeS3API{ObjectPath: testObject})
-	exist, err := sess.CheckObjectPathExistence(testBucket, testObjectPath)
+	exist, err := sess.CheckObjectPathExistence(context.Background(), testBucket, testObjectPath)
 	assert.NoError(t, err)
 	assert.Equal(t, exist, false)
 }
@@ -157,14 +158,14 @@ func Test_CheckObjectPathExistence_WithoutSuffix(t *testing.T) {
 func Test_CheckObjectPathExistence_PathNotFound(t *testing.T) {
 	sess := getSession(&fakeS3API{ObjectPath: "test/object-path-xxxx"})
 	testObject = "test/object-path-xxxx"
-	exist, err := sess.CheckObjectPathExistence(testBucket, testObjectPath)
+	exist, err := sess.CheckObjectPathExistence(context.Background(), testBucket, testObjectPath)
 	assert.NoError(t, err)
 	assert.Equal(t, exist, false)
 }
 
 func Test_CheckObjectPathExistence_Error(t *testing.T) {
 	sess := getSession(&fakeS3API{ErrListObjectsV2: errFoo})
-	_, err := sess.CheckObjectPathExistence(testBucket, testObjectPath)
+	_, err := sess.CheckObjectPathExistence(context.Background(), testBucket, testObjectPath)
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "cannot list bucket")
 	}
@@ -172,7 +173,7 @@ func Test_CheckObjectPathExistence_Error(t *testing.T) {
 
 func Test_CreateBucketAccess_Error(t *testing.T) {
 	sess := getSession(&fakeS3API{ErrCreateBucket: errFoo})
-	_, err := sess.CreateBucket(testBucket, testKpRootKeyCrn)
+	_, err := sess.CreateBucket(context.Background(), testBucket, testKpRootKeyCrn)
 	if assert.Error(t, err) {
 		assert.EqualError(t, err, errFooMsg)
 	}
@@ -180,31 +181,31 @@ func Test_CreateBucketAccess_Error(t *testing.T) {
 
 func Test_CreateBucketAccess_BucketAlreadyExists_Positive(t *testing.T) {
 	sess := getSession(&fakeS3API{ErrCreateBucket: awserr.New("BucketAlreadyOwnedByYou", "", errFoo)})
-	_, err := sess.CreateBucket(testBucket, testKpRootKeyCrn)
+	_, err := sess.CreateBucket(context.Background(), testBucket, testKpRootKeyCrn)
 	assert.NoError(t, err)
 }
 
 func Test_CreateBucket_Positive(t *testing.T) {
 	sess := getSession(&fakeS3API{})
-	_, err := sess.CreateBucket(testBucket, testKpRootKeyCrn)
+	_, err := sess.CreateBucket(context.Background(), testBucket, testKpRootKeyCrn)
 	assert.NoError(t, err)
 }
 
 func Test_SetBucketVersioning_True_Positive(t *testing.T) {
 	sess := getSession(&fakeS3API{})
-	err := sess.SetBucketVersioning(testBucket, true)
+	err := sess.SetBucketVersioning(context.Background(), testBucket, true)
 	assert.NoError(t, err)
 }
 
 func Test_SetBucketVersioning_False_Positive(t *testing.T) {
 	sess := getSession(&fakeS3API{})
-	err := sess.SetBucketVersioning(testBucket, false)
+	err := sess.SetBucketVersioning(context.Background(), testBucket, false)
 	assert.NoError(t, err)
 }
 
 func Test_SetBucketVersioning_Error(t *testing.T) {
 	sess := getSession(&fakeS3API{ErrPutBucketVersioning: errFoo})
-	err := sess.SetBucketVersioning(testBucket, true)
+	err := sess.SetBucketVersioning(context.Background(), testBucket, true)
 	if assert.Error(t, err) {
 		assert.EqualError(t, err, "failed to set versioning to true for bucket 'test-bucket': foo")
 	}
@@ -212,13 +213,13 @@ func Test_SetBucketVersioning_Error(t *testing.T) {
 
 func Test_DeleteBucket_BucketAlreadyDeleted_Positive(t *testing.T) {
 	sess := getSession(&fakeS3API{ErrListObjects: awserr.New("NoSuchBucket", "", errFoo)})
-	err := sess.DeleteBucket(testBucket)
+	err := sess.DeleteBucket(context.Background(), testBucket)
 	assert.NoError(t, err)
 }
 
 func Test_DeleteBucket_ListObjectsError(t *testing.T) {
 	sess := getSession(&fakeS3API{ErrListObjects: errFoo})
-	err := sess.DeleteBucket(testBucket)
+	err := sess.DeleteBucket(context.Background(), testBucket)
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "cannot list bucket")
 	}
@@ -226,7 +227,7 @@ func Test_DeleteBucket_ListObjectsError(t *testing.T) {
 
 func Test_DeleteBucket_DeleteObjectError(t *testing.T) {
 	sess := getSession(&fakeS3API{ErrDeleteObject: errFoo})
-	err := sess.DeleteBucket(testBucket)
+	err := sess.DeleteBucket(context.Background(), testBucket)
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "cannot delete object")
 	}
@@ -234,7 +235,7 @@ func Test_DeleteBucket_DeleteObjectError(t *testing.T) {
 
 func Test_DeleteBucket_Error(t *testing.T) {
 	sess := getSession(&fakeS3API{ErrDeleteBucket: errFoo})
-	err := sess.DeleteBucket(testBucket)
+	err := sess.DeleteBucket(context.Background(), testBucket)
 	if assert.Error(t, err) {
 		assert.EqualError(t, err, errFooMsg)
 	}
@@ -242,7 +243,7 @@ func Test_DeleteBucket_Error(t *testing.T) {
 
 func Test_DeleteBucket_Positive(t *testing.T) {
 	sess := getSession(&fakeS3API{})
-	err := sess.DeleteBucket(testBucket)
+	err := sess.DeleteBucket(context.Background(), testBucket)
 	assert.NoError(t, err)
 }
 
@@ -251,7 +252,7 @@ func Test_UpdateQuotaLimit_Positive(t *testing.T) {
 		ReturnClient: &fakeRCAPI{},
 	}
 	sess := getSessionWithRCFactory(&fakeS3API{}, factory)
-	err := sess.UpdateQuotaLimit(1073741824, testAPIKey, testBucket, testEndpoint, testIAMEndpoint)
+	err := sess.UpdateQuotaLimit(context.Background(), 1073741824, testAPIKey, testBucket, testEndpoint, testIAMEndpoint)
 	assert.NoError(t, err)
 }
 
@@ -260,7 +261,7 @@ func Test_UpdateQuotaLimit_ClientCreationError(t *testing.T) {
 		ErrNewClient: errFoo,
 	}
 	sess := getSessionWithRCFactory(&fakeS3API{}, factory)
-	err := sess.UpdateQuotaLimit(1073741824, testAPIKey, testBucket, testEndpoint, testIAMEndpoint)
+	err := sess.UpdateQuotaLimit(context.Background(), 1073741824, testAPIKey, testBucket, testEndpoint, testIAMEndpoint)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create resource configuration service")
 }
@@ -270,7 +271,7 @@ func Test_UpdateQuotaLimit_UpdateError(t *testing.T) {
 		ReturnClient: &fakeRCAPI{ErrUpdateBucketConfig: errFoo},
 	}
 	sess := getSessionWithRCFactory(&fakeS3API{}, factory)
-	err := sess.UpdateQuotaLimit(1073741824, testAPIKey, testBucket, testEndpoint, testIAMEndpoint)
+	err := sess.UpdateQuotaLimit(context.Background(), 1073741824, testAPIKey, testBucket, testEndpoint, testIAMEndpoint)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to update quota for bucket")
 }
@@ -280,6 +281,6 @@ func Test_UpdateQuotaLimit_PrivateEndpoint_Positive(t *testing.T) {
 		ReturnClient: &fakeRCAPI{},
 	}
 	sess := getSessionWithRCFactory(&fakeS3API{}, factory)
-	err := sess.UpdateQuotaLimit(1073741824, testAPIKey, testBucket, "https://s3.private.us-south.cloud-object-storage.appdomain.cloud", testIAMEndpoint)
+	err := sess.UpdateQuotaLimit(context.Background(), 1073741824, testAPIKey, testBucket, "https://s3.private.us-south.cloud-object-storage.appdomain.cloud", testIAMEndpoint)
 	assert.NoError(t, err)
 }
