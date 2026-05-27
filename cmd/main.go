@@ -91,7 +91,9 @@ func getConfigBool(envKey string, defaultConf bool, logger zap.Logger) bool {
 
 func main() {
 	logger := getZapLogger()
-	defer logger.Sync() // #nosec G104: Best effort sync
+	defer func() {
+		_ = logger.Sync() // #nosec G104: Best effort sync
+	}()
 
 	loggerLevel := zap.NewAtomicLevel()
 	options := getOptions()
