@@ -180,9 +180,12 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 
 func (rclone *RcloneMounter) Mount(ctx context.Context, source string, target string) error {
 	reqID := requestid.FromContext(ctx)
-	baseLogger, _ := zap.NewProduction()
+	baseLogger, logErr := zap.NewProduction()
+	if logErr != nil {
+		return fmt.Errorf("failed to create logger: %w", logErr)
+	}
 	log := logger.WithRequestID(ctx, baseLogger)
-	
+
 	log.Info(fmt.Sprintf("[%s] RcloneMounter Mount started", reqID),
 		zap.String("source", source), zap.String("target", target))
 
@@ -198,7 +201,7 @@ func (rclone *RcloneMounter) Mount(ctx context.Context, source string, target st
 
 	configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 	log.Debug(fmt.Sprintf("[%s] Creating rclone config", reqID), zap.String("config_path", configPathWithVolID))
-	
+
 	if err = createConfigWrap(configPathWithVolID, rclone); err != nil {
 		log.Error(fmt.Sprintf("[%s] Cannot create rclone config file", reqID), zap.Error(err))
 		return err
@@ -237,7 +240,7 @@ func (rclone *RcloneMounter) Mount(ctx context.Context, source string, target st
 		log.Info(fmt.Sprintf("[%s] RcloneMounter Mount completed successfully on worker", reqID))
 		return nil
 	}
-	
+
 	log.Info(fmt.Sprintf("[%s] NodeServer mounting", reqID))
 	err = rclone.MounterUtils.FuseMount(target, constants.RClone, args)
 	if err != nil {
@@ -250,9 +253,12 @@ func (rclone *RcloneMounter) Mount(ctx context.Context, source string, target st
 
 func (rclone *RcloneMounter) Unmount(ctx context.Context, target string) error {
 	reqID := requestid.FromContext(ctx)
-	baseLogger, _ := zap.NewProduction()
+	baseLogger, logErr := zap.NewProduction()
+	if logErr != nil {
+		return fmt.Errorf("failed to create logger: %w", logErr)
+	}
 	log := logger.WithRequestID(ctx, baseLogger)
-	
+
 	log.Info(fmt.Sprintf("[%s] RcloneMounter Unmount started", reqID), zap.String("target", target))
 
 	if mountWorker {
@@ -270,10 +276,11 @@ func (rclone *RcloneMounter) Unmount(ctx context.Context, target string) error {
 		log.Info(fmt.Sprintf("[%s] RcloneMounter Unmount completed successfully on worker", reqID))
 		return nil
 	}
-	
+
 	log.Info(fmt.Sprintf("[%s] NodeServer unmounting", reqID))
 
-	err := rclone.MounterUtils.FuseUnmount(target)
+	var err error
+	err = rclone.MounterUtils.FuseUnmount(target)
 	if err != nil {
 		log.Error(fmt.Sprintf("[%s] FuseUnmount failed", reqID), zap.Error(err))
 		return err
