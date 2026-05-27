@@ -135,7 +135,16 @@ func TestLogGRPC(t *testing.T) {
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		actualResp, actualErr := logGRPC(ctx, nil, &grpc.UnaryServerInfo{}, tc.handler)
+		lgr, teardown := GetTestLogger(t)
+		defer teardown()
+
+		server := &nonBlockingGRPCServer{
+			mode:   "controller",
+			logger: lgr,
+		}
+
+		ctx := context.Background()
+		actualResp, actualErr := server.logGRPC(ctx, nil, &grpc.UnaryServerInfo{}, tc.handler)
 
 		if tc.expectedErr != nil {
 			assert.Error(t, actualErr)
