@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest AS s3fs-builder
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10-1179.1741863533 AS s3fs-builder
 
 ARG   RHSM_PASS=blank
 ARG   RHSM_USER=blank
@@ -26,7 +26,7 @@ RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && cd s3fs-fuse && \
     ./autogen.sh && ./configure --prefix=/usr/local --with-openssl && make && make install && \
     rm -rf /var/lib/apt/lists/*
 
-FROM registry.access.redhat.com/ubi9/ubi:latest AS rclone-builder
+FROM registry.access.redhat.com/ubi8/ubi AS rclone-builder
 RUN yum install wget git gcc -y
 
 ENV ARCH=amd64
