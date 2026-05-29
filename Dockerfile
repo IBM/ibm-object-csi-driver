@@ -50,7 +50,7 @@ RUN git clone https://github.com/rclone/rclone.git && \
       go build && ./rclone version && \
       cp rclone /usr/local/bin/rclone
 
-FROM registry.access.redhat.com/ubi9/ubi:latest
+FROM registry.access.redhat.com/ubi8/ubi:latest
 
 # Default values
 ARG git_commit_id=unknown
