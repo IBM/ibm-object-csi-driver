@@ -3,6 +3,7 @@ package mounter
 import (
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
@@ -181,18 +182,49 @@ func TestUpdateS3FSMountOptionsWithUnknownOptions(t *testing.T) {
 		defaultMountOp    []string
 		secretMap         map[string]string
 		wantUnknownNotEmpty bool
+		wantUnknownContains string
 	}{
 		{
 			name:           "Known and unknown options",
 			defaultMountOp: []string{"allow_other", "enable_content_md5=true"},
 			secretMap:      map[string]string{"mountOptions": "cipher_suites=default"},
 			wantUnknownNotEmpty: true,
+			wantUnknownContains: "enable_content_md5=true",
 		},
 		{
 			name:           "Only known options",
 			defaultMountOp: []string{"allow_other"},
 			secretMap:      map[string]string{},
 			wantUnknownNotEmpty: false,
+			wantUnknownContains: "",
+		},
+		{
+			name:           "Unknown option without value",
+			defaultMountOp: []string{"custom_flag"},
+			secretMap:      map[string]string{},
+			wantUnknownNotEmpty: true,
+			wantUnknownContains: "custom_flag",
+		},
+		{
+			name:           "Multiple unknown options from secretMap",
+			defaultMountOp: []string{},
+			secretMap:      map[string]string{"mountOptions": "unknown1=val1\nunknown2=val2"},
+			wantUnknownNotEmpty: true,
+			wantUnknownContains: "unknown1=val1",
+		},
+		{
+			name:           "Empty line in mountOptions",
+			defaultMountOp: []string{},
+			secretMap:      map[string]string{"mountOptions": "allow_other\n\nunknown_opt=test"},
+			wantUnknownNotEmpty: true,
+			wantUnknownContains: "unknown_opt=test",
+		},
+		{
+			name:           "Invalid option in defaultMountOp",
+			defaultMountOp: []string{"", "allow_other"},
+			secretMap:      map[string]string{},
+			wantUnknownNotEmpty: false,
+			wantUnknownContains: "",
 		},
 	}
 
@@ -202,6 +234,9 @@ func TestUpdateS3FSMountOptionsWithUnknownOptions(t *testing.T) {
 			hasUnknown := addMountParam != ""
 			if hasUnknown != tt.wantUnknownNotEmpty {
 				t.Errorf("got addMountParam=%q, wantUnknownNotEmpty=%v", addMountParam, tt.wantUnknownNotEmpty)
+			}
+			if tt.wantUnknownContains != "" && !strings.Contains(addMountParam, tt.wantUnknownContains) {
+				t.Errorf("addMountParam=%q does not contain %q", addMountParam, tt.wantUnknownContains)
 			}
 		})
 	}
