@@ -28,16 +28,17 @@ import (
 // Mounter interface defined in mounter.go
 // s3fsMounter Implements Mounter
 type S3fsMounter struct {
-	BucketName    string //From Secret in SC
-	ObjectPath    string //From Secret in SC
-	EndPoint      string //From Secret in SC
-	LocConstraint string //From Secret in SC
-	AuthType      string
-	AccessKeys    string
-	IAMEndpoint   string
-	KpRootKeyCrn  string
-	MountOptions  []string
-	MounterUtils  utils.MounterUtils
+	BucketName     string //From Secret in SC
+	ObjectPath     string //From Secret in SC
+	EndPoint       string //From Secret in SC
+	LocConstraint  string //From Secret in SC
+	AuthType       string
+	AccessKeys     string
+	IAMEndpoint    string
+	KpRootKeyCrn   string
+	MountOptions   []string
+	AddMountParam  string
+	MounterUtils   utils.MounterUtils
 }
 
 const (
@@ -103,8 +104,9 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 	klog.Infof("newS3fsMounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]\n\tkpRootKeyCrn: [%s]",
 		mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType, mounter.KpRootKeyCrn)
 
-	updatedOptions := updateS3FSMountOptions(mountOptions, secretMap, defaultParams)
+	updatedOptions, addMountParam := updateS3FSMountOptions(mountOptions, secretMap, defaultParams)
 	mounter.MountOptions = updatedOptions
+	mounter.AddMountParam = addMountParam
 
 	mounter.MounterUtils = mounterUtils
 
@@ -212,8 +214,25 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 	return nil
 }
 
-func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string, defaultParams map[string]string) []string {
+func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string, defaultParams map[string]string) ([]string, string) {
+	// Known S3FS mount options (from S3FSArgs struct in cos-csi-mounter)
+	knownS3FSOptions := map[string]bool{
+		"allow_other": true, "auto_cache": true, "cipher_suites": true,
+		"connect_timeout": true, "curldbg": true, "dbglevel": true,
+		"default_acl": true, "disable_noobj_cache": true, "endpoint": true,
+		"gid": true, "ibm_iam_auth": true, "ibm_iam_endpoint": true,
+		"instance_name": true, "kernel_cache": true, "max_background": true,
+		"max_dirty_data": true, "max_stat_cache_size": true, "mp_umask": true,
+		"multipart_size": true, "multireq_max": true, "parallel_count": true,
+		"passwd_file": true, "ro": true, "readwrite_timeout": true,
+		"retries": true, "sigv2": true, "sigv4": true,
+		"stat_cache_expire": true, "uid": true, "umask": true,
+		"url": true, "use_path_request_style": true, "use_xattr": true,
+		"tmpdir": true, "use_cache": true,
+	}
+
 	mountOptsMap := make(map[string]string)
+	var unknownOptions []string
 
 	// Create map out of array
 	for _, val := range defaultMountOp {
@@ -221,10 +240,20 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 			continue
 		}
 		opts := strings.Split(val, "=")
+		optName := strings.TrimSpace(opts[0])
+		
 		if len(opts) == 2 {
-			mountOptsMap[opts[0]] = opts[1]
+			if knownS3FSOptions[optName] {
+				mountOptsMap[optName] = opts[1]
+			} else {
+				unknownOptions = append(unknownOptions, val)
+			}
 		} else if len(opts) == 1 {
-			mountOptsMap[opts[0]] = opts[0]
+			if knownS3FSOptions[optName] {
+				mountOptsMap[optName] = optName
+			} else {
+				unknownOptions = append(unknownOptions, val)
+			}
 		}
 	}
 
@@ -251,16 +280,29 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 		klog.Infof("No new mountOptions found. Using default mountOptions: %v", mountOptsMap)
 	} else {
 		lines := strings.Split(stringData, "\n")
-		// Update map
+		// Update map and separate unknown options
 		for _, line := range lines {
 			if strings.TrimSpace(line) == "" {
 				continue
 			}
 			opts := strings.Split(line, "=")
+			optName := strings.TrimSpace(opts[0])
+			
 			if len(opts) == 2 {
-				mountOptsMap[strings.TrimSpace(opts[0])] = strings.TrimSpace(opts[1])
+				optValue := strings.TrimSpace(opts[1])
+				if knownS3FSOptions[optName] {
+					mountOptsMap[optName] = optValue
+				} else {
+					// Unknown option - add to unknownOptions list
+					unknownOptions = append(unknownOptions, fmt.Sprintf("%s=%s", optName, optValue))
+				}
 			} else if len(opts) == 1 {
-				mountOptsMap[strings.TrimSpace(opts[0])] = strings.TrimSpace(opts[0])
+				if knownS3FSOptions[optName] {
+					mountOptsMap[optName] = optName
+				} else {
+					// Unknown option - add to unknownOptions list
+					unknownOptions = append(unknownOptions, optName)
+				}
 			} else {
 				klog.Infof("Invalid mount option: %s\n", line)
 			}
@@ -299,8 +341,14 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 		}
 	}
 
+	// Build addMountParam string from unknown options
+	addMountParam := strings.Join(unknownOptions, ",")
+
 	klog.Infof("updated S3fsMounter Options: %v", updatedOptions)
-	return updatedOptions
+	if addMountParam != "" {
+		klog.Infof("addMountParam (unknown options): %s", addMountParam)
+	}
+	return updatedOptions, addMountParam
 }
 
 func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string) (nodeServerOp []string, workerNodeOp map[string]string) {
@@ -351,6 +399,13 @@ func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string
 		nodeServerOp = append(nodeServerOp, "-o", "default_acl=private")
 		workerNodeOp["default_acl"] = "private"
 	}
+
+	// Add unknown mount options to workerNodeOp for mounter service
+	if s3fs.AddMountParam != "" {
+		workerNodeOp["add-mount-param"] = s3fs.AddMountParam
+		klog.Infof("Adding unknown mount options to mounter request: %s", s3fs.AddMountParam)
+	}
+
 	return
 }
 
