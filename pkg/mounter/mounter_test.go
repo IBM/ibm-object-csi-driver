@@ -148,6 +148,7 @@ func TestNewMounter(t *testing.T) {
 			}
 		})
 	}
+}
 
 func TestParseAndClassifyMountOption(t *testing.T) {
 	knownOptions := map[string]bool{"cipher_suites": true, "allow_other": true}
