@@ -205,4 +205,3 @@ func TestUpdateS3FSMountOptionsWithUnknownOptions(t *testing.T) {
 		})
 	}
 }
-}
