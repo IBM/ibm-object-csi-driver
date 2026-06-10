@@ -267,11 +267,14 @@ func TestRcloneUnmount_WorkerNode(t *testing.T) {
 func TestRcloneUnmount_WorkerNode_Negative(t *testing.T) {
 	mountWorker = true
 
-	rclone := &RcloneMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-		FuseUnmountFn: func(path string) error {
-			return nil
-		},
-	})}
+	rclone := &RcloneMounter{
+		logger: zap.NewNop(),
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseUnmountFn: func(path string) error {
+				return nil
+			},
+		}),
+	}
 
 	mounterRequest = func(_ context.Context, _, _ string, _ *zap.Logger) error {
 		return errors.New("failed to create http request")
@@ -287,11 +290,14 @@ func TestRcloneUnmount_NodeServer_Negative(t *testing.T) {
 
 	removeConfigFile = func(_, _ string) {}
 
-	rclone := &RcloneMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-		FuseUnmountFn: func(path string) error {
-			return errors.New("failed to unmount")
-		},
-	})}
+	rclone := &RcloneMounter{
+		logger: zap.NewNop(),
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseUnmountFn: func(path string) error {
+				return errors.New("failed to unmount")
+			},
+		}),
+	}
 
 	err := rclone.Unmount(context.Background(), target)
 	assert.Error(t, err)
