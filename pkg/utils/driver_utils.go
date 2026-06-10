@@ -22,7 +22,16 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/fs"
 )
 
-var utilLogger, _ = zap.NewProduction()
+var utilLogger *zap.Logger
+
+func init() {
+	var err error
+	utilLogger, err = zap.NewProduction()
+	if err != nil {
+		// Fallback to no-op logger if production logger fails
+		utilLogger = zap.NewNop()
+	}
+}
 
 type StatsUtils interface {
 	BucketToDelete(volumeID string) (string, error)
