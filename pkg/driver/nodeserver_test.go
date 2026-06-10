@@ -343,7 +343,7 @@ func TestNodePublishVolume(t *testing.T) {
 				IsFailedMount: true,
 			},
 			expectedResp: nil,
-			expectedErr:  errors.New("mounter not supported on this platform"),
+			expectedErr:  errors.New("failed to mount s3fs"),
 		},
 	}
 
@@ -448,7 +448,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 				IsFailedUnmount: true,
 			},
 			expectedResp: nil,
-			expectedErr:  errors.New("mounter not supported on this platform"),
+			expectedErr:  errors.New("failed to unmount s3fs"),
 		},
 	}
 
