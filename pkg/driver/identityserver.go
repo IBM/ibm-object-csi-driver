@@ -28,12 +28,14 @@ type identityServer struct {
 
 func (csiIdentity *identityServer) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	log := csiIdentity.logger.With(zap.String("request_id", reqID))
-	
-	log.Debug("identityServer-GetPluginInfo", zap.Any("request", req))
+
+	// Check if S3Driver is nil before accessing its logger
 	if csiIdentity.S3Driver == nil {
 		return nil, status.Error(codes.InvalidArgument, "Driver not configured")
 	}
+
+	log := csiIdentity.logger.With(zap.String("request_id", reqID))
+	log.Debug("identityServer-GetPluginInfo", zap.Any("request", req))
 
 	return &csi.GetPluginInfoResponse{
 		Name:          csiIdentity.name,
@@ -44,7 +46,7 @@ func (csiIdentity *identityServer) GetPluginInfo(ctx context.Context, req *csi.G
 func (csiIdentity *identityServer) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
 	reqID := requestid.FromContext(ctx)
 	log := csiIdentity.logger.With(zap.String("request_id", reqID))
-	
+
 	log.Debug("identityServer-GetPluginCapabilities", zap.Any("request", req))
 	return &csi.GetPluginCapabilitiesResponse{
 		Capabilities: []*csi.PluginCapability{
@@ -76,7 +78,7 @@ func (csiIdentity *identityServer) GetPluginCapabilities(ctx context.Context, re
 func (csiIdentity *identityServer) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
 	reqID := requestid.FromContext(ctx)
 	log := csiIdentity.logger.With(zap.String("request_id", reqID))
-	
+
 	log.Debug("identityServer-Probe", zap.Any("request", req))
 	return &csi.ProbeResponse{}, nil
 }
