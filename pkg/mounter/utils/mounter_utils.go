@@ -25,7 +25,16 @@ var commandWithCtx = exec.CommandContext
 var ErrTimeoutWaitProcess = errors.New("timeout waiting for process to end")
 
 // Package-level logger for mounter utils
-var mounterUtilLogger, _ = zap.NewProduction()
+var mounterUtilLogger *zap.Logger
+
+func init() {
+	var err error
+	mounterUtilLogger, err = zap.NewProduction()
+	if err != nil {
+		// Fallback to no-op logger if production logger fails
+		mounterUtilLogger = zap.NewNop()
+	}
+}
 
 type MounterUtils interface {
 	FuseUnmount(path string) error
