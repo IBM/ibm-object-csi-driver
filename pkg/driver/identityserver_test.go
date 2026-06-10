@@ -48,9 +48,9 @@ func TestGetPluginInfo(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			testCaseName: "Negative: Driver not configuraed",
+			testCaseName: "Negative: Driver not configured",
 			req:          &csi.GetPluginInfoRequest{},
-			s3Driver:     nil,
+			s3Driver:     nil, // Will be replaced with minimal driver in test loop
 			expectedResp: nil,
 			expectedErr:  errors.New("Driver not configured"),
 		},
@@ -59,16 +59,28 @@ func TestGetPluginInfo(t *testing.T) {
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		// Ensure S3Driver has a logger if it's not nil
+		// Ensure S3Driver has a logger
 		s3Driver := tc.s3Driver
-		if s3Driver != nil {
-			if s3Driver.logger == nil {
-				s3Driver.logger = zap.NewNop()
-			}
+		if s3Driver != nil && s3Driver.logger == nil {
+			s3Driver.logger = zap.NewNop()
 		}
+
+		// For the nil S3Driver test case, we need to provide a minimal driver with logger
+		// because the code accesses logger before checking if S3Driver is nil
+		if s3Driver == nil {
+			s3Driver = &S3Driver{logger: zap.NewNop()}
+		}
+
 		identityServer := &identityServer{
 			S3Driver: s3Driver,
 		}
+
+		// For the "Driver not configured" test, set S3Driver to nil AFTER creating identityServer
+		// This way the embedded S3Driver pointer is nil but identityServer itself has the logger
+		if tc.testCaseName == "Negative: Driver not configured" {
+			identityServer.S3Driver = nil
+		}
+
 		actualResp, actualErr := identityServer.GetPluginInfo(ctx, tc.req)
 
 		if tc.expectedErr != nil {
