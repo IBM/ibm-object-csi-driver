@@ -136,6 +136,7 @@ func TestRcloneMount_NodeServer_Positive(t *testing.T) {
 		EndPoint:   "testEndpoint",
 		GID:        "testGID",
 		UID:        "testUID",
+		logger:     zap.NewNop(),
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path, comm string, args []string) error {
 				return nil
@@ -152,7 +153,9 @@ func TestRcloneMount_NodeServer_Positive(t *testing.T) {
 }
 
 func TestRcloneMount_CreateConfigFails_Negative(t *testing.T) {
-	rclone := &RcloneMounter{}
+	rclone := &RcloneMounter{
+		logger: zap.NewNop(),
+	}
 
 	createConfigWrap = func(_ string, _ *RcloneMounter) error {
 		return errors.New("failed to create config file")
@@ -173,6 +176,7 @@ func TestRcloneMount_WorkerNode_Positive(t *testing.T) {
 		GID:        "testGID",
 		UID:        "testUID",
 		ObjectPath: "testObjectPath",
+		logger:     zap.NewNop(),
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path, comm string, args []string) error {
 				return nil
@@ -201,6 +205,7 @@ func TestRcloneMount_WorkerNode_Negative(t *testing.T) {
 		GID:        "testGID",
 		UID:        "testUID",
 		ObjectPath: "testObjectPath",
+		logger:     zap.NewNop(),
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path, comm string, args []string) error {
 				return nil
@@ -225,11 +230,14 @@ func TestRcloneUnmount_NodeServer(t *testing.T) {
 
 	removeConfigFile = func(_, _ string) {}
 
-	rclone := &RcloneMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-		FuseUnmountFn: func(path string) error {
-			return nil
-		},
-	})}
+	rclone := &RcloneMounter{
+		logger: zap.NewNop(),
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseUnmountFn: func(path string) error {
+				return nil
+			},
+		}),
+	}
 
 	err := rclone.Unmount(context.Background(), target)
 	assert.NoError(t, err)
@@ -240,11 +248,13 @@ func TestRcloneUnmount_WorkerNode(t *testing.T) {
 
 	removeConfigFile = func(_, _ string) {}
 
-	rclone := &RcloneMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-		FuseUnmountFn: func(path string) error {
-			return nil
-		},
-	})}
+	rclone := &RcloneMounter{
+		logger: zap.NewNop(),
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseUnmountFn: func(path string) error {
+				return nil
+			},
+		})}
 
 	mounterRequest = func(_ context.Context, _, _ string, _ *zap.Logger) error {
 		return nil
