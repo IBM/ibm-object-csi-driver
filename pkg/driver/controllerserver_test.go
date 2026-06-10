@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
+	"github.com/IBM/ibm-object-csi-driver/pkg/requestid"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
 	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -37,7 +38,8 @@ import (
 )
 
 var (
-	ctx = context.Background()
+	// Create context with request ID for testing
+	ctx = requestid.WithRequestID(context.Background(), "test-request-id")
 
 	driverName    = "testDriver"
 	driverVersion = "testDriverVersion"

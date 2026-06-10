@@ -17,13 +17,20 @@
 package driver
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
 
+	"github.com/IBM/ibm-object-csi-driver/pkg/requestid"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
+)
+
+var (
+	// Create context with request ID for testing (shared with other test files in driver package)
+	testCtx = requestid.WithRequestID(context.Background(), "test-identity-request-id")
 )
 
 func TestGetPluginInfo(t *testing.T) {
