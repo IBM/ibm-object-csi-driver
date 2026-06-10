@@ -279,7 +279,7 @@ func (rclone *RcloneMounter) Unmount(ctx context.Context, target string) error {
 
 	log.Info(fmt.Sprintf("[%s] NodeServer unmounting", reqID))
 
-	var err error = rclone.MounterUtils.FuseUnmount(target)
+	err := rclone.MounterUtils.FuseUnmount(target)
 	if err != nil {
 		log.Error(fmt.Sprintf("[%s] FuseUnmount failed", reqID), zap.Error(err))
 		return err
