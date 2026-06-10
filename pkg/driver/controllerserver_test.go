@@ -405,7 +405,7 @@ func TestCreateVolume(t *testing.T) {
 				},
 			}),
 			expectedResp: nil,
-			expectedErr:  errors.New("could not fetch the secret"),
+			expectedErr:  errors.New("[] secretName annotation 'cos.csi.driver/secret' not specified in the PVC annotations"),
 		},
 		{
 			testCaseName: "Negative: Secret and PVC Names Different, Failed to get Secret",
@@ -564,7 +564,7 @@ func TestCreateVolume(t *testing.T) {
 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
 			expectedResp:     nil,
 			expectedErr: status.Error(codes.InvalidArgument,
-				"resourceConfigApiKey missing in secret, cannot set quota limit for bucket"),
+				"[] resourceConfigApiKey missing in secret, cannot set quota limit for bucket"),
 		},
 
 		{
@@ -587,7 +587,7 @@ func TestCreateVolume(t *testing.T) {
 			cosSession:       &s3client.FakeCOSSessionFactory{},
 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
 			expectedResp:     nil,
-			expectedErr:      status.Error(codes.InvalidArgument, `invalid quotaLimit value "yes": must be 'true' or 'false'`),
+			expectedErr:      status.Error(codes.InvalidArgument, `[] invalid quotaLimit value "yes": must be 'true' or 'false'`),
 		},
 		{
 			testCaseName: "Negative: quotaLimit=true with zero capacity (direct secrets)",
@@ -610,7 +610,7 @@ func TestCreateVolume(t *testing.T) {
 			cosSession:       &s3client.FakeCOSSessionFactory{},
 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
 			expectedResp:     nil,
-			expectedErr:      status.Error(codes.InvalidArgument, "enable quotaLimit requested but no positive storage size requested in PVC"),
+			expectedErr:      status.Error(codes.InvalidArgument, "[] enable quotaLimit requested but no positive storage size requested in PVC"),
 		},
 		{
 			testCaseName: "Positive: quotaLimit=true with positive capacity (direct secrets)",

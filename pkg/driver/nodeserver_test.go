@@ -343,7 +343,7 @@ func TestNodePublishVolume(t *testing.T) {
 				IsFailedMount: true,
 			},
 			expectedResp: nil,
-			expectedErr:  errors.New("failed to mount s3fs"),
+			expectedErr:  errors.New("mounter not supported on this platform"),
 		},
 	}
 
@@ -448,7 +448,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 				IsFailedUnmount: true,
 			},
 			expectedResp: nil,
-			expectedErr:  errors.New("failed to unmount s3fs"),
+			expectedErr:  errors.New("mounter not supported on this platform"),
 		},
 	}
 
@@ -545,7 +545,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 			expectedResp: &csi.NodeGetVolumeStatsResponse{
 				VolumeCondition: &csi.VolumeCondition{
 					Abnormal: true,
-					Message:  "transpoint endpoint is not connected",
+					Message:  "[] transpoint endpoint is not connected",
 				},
 			},
 			expectedErr: nil,
