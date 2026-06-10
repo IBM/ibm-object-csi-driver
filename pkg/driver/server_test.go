@@ -37,7 +37,10 @@ func TestNonBlockingGRPCServer(t *testing.T) {
 		nonBlockingServer, ok := s.(*nonBlockingGRPCServer)
 		assert.Equal(t, true, ok)
 
-		listener, err := nonBlockingServer.Setup(*testEndpoint, &identityServer{}, &controllerServer{}, &nodeServer{})
+		listener, err := nonBlockingServer.Setup(*testEndpoint,
+			&identityServer{S3Driver: &S3Driver{logger: zap.NewNop()}},
+			&controllerServer{Logger: zap.NewNop()},
+			&nodeServer{S3Driver: &S3Driver{logger: zap.NewNop()}})
 		assert.NoError(t, err)
 		assert.NotNil(t, listener)
 
@@ -96,7 +99,10 @@ func TestSetup(t *testing.T) {
 			mode:   tc.mode,
 			logger: lgr,
 		}
-		_, actualErr := server.Setup(*tc.endpoint, &identityServer{}, &controllerServer{}, &nodeServer{})
+		_, actualErr := server.Setup(*tc.endpoint,
+			&identityServer{S3Driver: &S3Driver{logger: zap.NewNop()}},
+			&controllerServer{Logger: zap.NewNop()},
+			&nodeServer{S3Driver: &S3Driver{logger: zap.NewNop()}})
 
 		if tc.expectedErr != nil {
 			assert.Error(t, actualErr)

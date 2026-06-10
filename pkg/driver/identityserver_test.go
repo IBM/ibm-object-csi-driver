@@ -59,11 +59,15 @@ func TestGetPluginInfo(t *testing.T) {
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		if tc.s3Driver != nil && tc.s3Driver.logger == nil {
-			tc.s3Driver.logger = zap.NewNop()
+		// Ensure S3Driver has a logger if it's not nil
+		s3Driver := tc.s3Driver
+		if s3Driver != nil {
+			if s3Driver.logger == nil {
+				s3Driver.logger = zap.NewNop()
+			}
 		}
 		identityServer := &identityServer{
-			S3Driver: tc.s3Driver,
+			S3Driver: s3Driver,
 		}
 		actualResp, actualErr := identityServer.GetPluginInfo(ctx, tc.req)
 
