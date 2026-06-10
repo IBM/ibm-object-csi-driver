@@ -133,6 +133,9 @@ func TestNewMounter(t *testing.T) {
 				}
 				s3fs.MountOptions = nil
 				expected.MountOptions = nil
+				// Exclude logger from comparison as it's initialized internally
+				s3fs.logger = nil
+				expected.logger = nil
 			}
 			if rclone, ok := result.(*RcloneMounter); ok {
 				expected := test.expected.(*RcloneMounter)
@@ -141,6 +144,9 @@ func TestNewMounter(t *testing.T) {
 				}
 				rclone.MountOptions = nil
 				expected.MountOptions = nil
+				// Exclude logger from comparison as it's initialized internally
+				rclone.logger = nil
+				expected.logger = nil
 			}
 
 			assert.Equal(t, result, test.expected)
