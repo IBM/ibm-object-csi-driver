@@ -91,6 +91,7 @@ func TestS3FSMount_NodeServer_Positive(t *testing.T) {
 		LocConstraint: "test-location",
 		MountOptions:  mountOptions,
 		ObjectPath:    "test-objectPath",
+		logger:        zap.NewNop(),
 	}
 
 	err := s3fs.Mount(context.Background(), source, target)
@@ -117,6 +118,7 @@ func TestS3FSMount_WorkerNode_Positive(t *testing.T) {
 			},
 		}),
 		AuthType: "hmac",
+		logger:   zap.NewNop(),
 	}
 
 	err := s3fs.Mount(context.Background(), source, target)
@@ -124,7 +126,9 @@ func TestS3FSMount_WorkerNode_Positive(t *testing.T) {
 }
 
 func TestMount_CreateDirFails_Negative(t *testing.T) {
-	s3fs := &S3fsMounter{}
+	s3fs := &S3fsMounter{
+		logger: zap.NewNop(),
+	}
 
 	MakeDir = func(path string, perm os.FileMode) error {
 		return errors.New("failed to create directory")
@@ -143,7 +147,9 @@ func TestMount_FailedToCreatePassFile_Negative(t *testing.T) {
 		return errors.New("failed to create file")
 	}
 
-	s3fs := &S3fsMounter{}
+	s3fs := &S3fsMounter{
+		logger: zap.NewNop(),
+	}
 
 	err := s3fs.Mount(context.Background(), source, target)
 	assert.Error(t, err)
@@ -163,7 +169,9 @@ func TestS3FSMount_WorkerNode_Negative(t *testing.T) {
 		return errors.New("failed to perform http request")
 	}
 
-	s3fs := &S3fsMounter{}
+	s3fs := &S3fsMounter{
+		logger: zap.NewNop(),
+	}
 
 	err := s3fs.Mount(context.Background(), source, target)
 	assert.Error(t, err)
@@ -175,11 +183,14 @@ func TestUnmount_NodeServer(t *testing.T) {
 
 	removeFile = func(_, _ string) {}
 
-	s3fs := &S3fsMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-		FuseUnmountFn: func(path string) error {
-			return nil
-		},
-	})}
+	s3fs := &S3fsMounter{
+		logger: zap.NewNop(),
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseUnmountFn: func(path string) error {
+				return nil
+			},
+		}),
+	}
 
 	err := s3fs.Unmount(context.Background(), target)
 	assert.NoError(t, err)
@@ -190,11 +201,14 @@ func TestUnmount_WorkerNode(t *testing.T) {
 
 	removeFile = func(_, _ string) {}
 
-	s3fs := &S3fsMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-		FuseUnmountFn: func(path string) error {
-			return nil
-		},
-	})}
+	s3fs := &S3fsMounter{
+		logger: zap.NewNop(),
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseUnmountFn: func(path string) error {
+				return nil
+			},
+		}),
+	}
 
 	mounterRequest = func(_ context.Context, _, _ string, _ *zap.Logger) error {
 		return nil
@@ -207,11 +221,14 @@ func TestUnmount_WorkerNode(t *testing.T) {
 func TestUnmount_WorkerNode_Negative(t *testing.T) {
 	mountWorker = true
 
-	s3fs := &S3fsMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-		FuseUnmountFn: func(path string) error {
-			return nil
-		},
-	})}
+	s3fs := &S3fsMounter{
+		logger: zap.NewNop(),
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseUnmountFn: func(path string) error {
+				return nil
+			},
+		}),
+	}
 
 	mounterRequest = func(_ context.Context, _, _ string, _ *zap.Logger) error {
 		return errors.New("failed to create http request")
@@ -227,11 +244,14 @@ func TestUnmount_NodeServer_Negative(t *testing.T) {
 
 	removeFile = func(_, _ string) {}
 
-	s3fs := &S3fsMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-		FuseUnmountFn: func(path string) error {
-			return errors.New("failed to unmount")
-		},
-	})}
+	s3fs := &S3fsMounter{
+		logger: zap.NewNop(),
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseUnmountFn: func(path string) error {
+				return errors.New("failed to unmount")
+			},
+		}),
+	}
 
 	err := s3fs.Unmount(context.Background(), target)
 	assert.Error(t, err)
