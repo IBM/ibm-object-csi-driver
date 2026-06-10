@@ -207,7 +207,7 @@ func Test_SetBucketVersioning_Error(t *testing.T) {
 	sess := getSession(&fakeS3API{ErrPutBucketVersioning: errFoo})
 	err := sess.SetBucketVersioning(context.Background(), testBucket, true)
 	if assert.Error(t, err) {
-		assert.EqualError(t, err, "failed to set versioning to true for bucket 'test-bucket': foo")
+		assert.EqualError(t, err, "[] failed to set versioning to true for bucket 'test-bucket': foo")
 	}
 }
 
