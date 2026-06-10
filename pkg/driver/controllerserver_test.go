@@ -735,6 +735,7 @@ func TestCreateVolume(t *testing.T) {
 			},
 			cosSession: tc.cosSession,
 			Stats:      tc.driverStatsUtils,
+			Logger:     zap.NewNop(),
 		}
 		actualResp, actualErr := controllerServer.CreateVolume(ctx, tc.req)
 
