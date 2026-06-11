@@ -11,6 +11,7 @@ import (
 	"github.com/IBM/go-sdk-core/v5/core"
 	rc "github.com/IBM/ibm-cos-sdk-go-config/v2/resourceconfigurationv1"
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
+	"github.com/IBM/ibm-object-csi-driver/pkg/logger"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -25,12 +26,7 @@ import (
 var utilLogger *zap.Logger
 
 func init() {
-	var err error
-	utilLogger, err = zap.NewProduction()
-	if err != nil {
-		// Fallback to no-op logger if production logger fails
-		utilLogger = zap.NewNop()
-	}
+	utilLogger = logger.NewConsoleLoggerOrNop("driver-utils")
 }
 
 type StatsUtils interface {

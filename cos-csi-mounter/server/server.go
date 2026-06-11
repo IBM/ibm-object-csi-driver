@@ -52,7 +52,7 @@ func setUpLogger() *zap.Logger {
 	encoderCfg.EncodeTime = zapcore.ISO8601TimeEncoder
 
 	logger := zap.New(zapcore.NewCore(
-		zapcore.NewJSONEncoder(encoderCfg),
+		zapcore.NewConsoleEncoder(encoderCfg),
 		zapcore.Lock(os.Stdout),
 		atom,
 	), zap.AddCaller()).With(zap.String("ServiceName", "cos-csi-mounter"))
@@ -172,50 +172,50 @@ func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser)
 		var request MountRequest
 
 		if err := c.BindJSON(&request); err != nil {
-			log.Error(fmt.Sprintf("[%s] Invalid request", reqID), zap.Error(err))
+			log.Error("Invalid request", zap.Error(err))
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("[%s] invalid request", reqID)})
 			return
 		}
 
-		log.Info(fmt.Sprintf("[%s] New mount request", reqID),
+		log.Info("New mount request",
 			zap.String("bucket", request.Bucket),
 			zap.String("path", request.Path),
 			zap.String("mounter", request.Mounter),
 			zap.Any("args", request.Args))
 
 		if request.Mounter != constants.S3FS && request.Mounter != constants.RClone {
-			log.Error(fmt.Sprintf("[%s] Invalid mounter", reqID), zap.String("mounter", request.Mounter))
+			log.Error("Invalid mounter", zap.String("mounter", request.Mounter))
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("[%s] invalid mounter", reqID)})
 			return
 		}
 
 		if request.Bucket == "" {
-			log.Error(fmt.Sprintf("[%s] Missing bucket in request", reqID))
+			log.Error("Missing bucket in request")
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("[%s] missing bucket", reqID)})
 			return
 		}
 
 		// validate mounter args
-		log.Debug(fmt.Sprintf("[%s] Parsing mounter args", reqID))
+		log.Debug("Parsing mounter args")
 		args, err := parser.Parse(request)
 		if err != nil {
-			log.Error(fmt.Sprintf("[%s] Failed to parse mounter args", reqID),
+			log.Error("Failed to parse mounter args",
 				zap.String("mounter", request.Mounter), zap.Error(err))
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("[%s] invalid args for mounter: %v", reqID, err)})
 			return
 		}
 
-		log.Info(fmt.Sprintf("[%s] Mounting bucket", reqID),
+		log.Info("Mounting bucket",
 			zap.String("path", request.Path),
 			zap.String("mounter", request.Mounter))
 		err = mounter.FuseMount(request.Path, request.Mounter, args)
 		if err != nil {
-			log.Error(fmt.Sprintf("[%s] Mount failed", reqID), zap.Error(err))
+			log.Error("Mount failed", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("[%s] mount failed: %v", reqID, err)})
 			return
 		}
 
-		log.Info(fmt.Sprintf("[%s] Bucket mount successful", reqID),
+		log.Info("Bucket mount successful",
 			zap.String("bucket", request.Bucket),
 			zap.String("path", request.Path))
 		c.JSON(http.StatusOK, gin.H{"status": "success"})
@@ -236,22 +236,22 @@ func handleCosUnmount(mounter mounterUtils.MounterUtils) gin.HandlerFunc {
 		}
 
 		if err := c.BindJSON(&request); err != nil {
-			log.Error(fmt.Sprintf("[%s] Invalid request", reqID), zap.Error(err))
+			log.Error("Invalid request", zap.Error(err))
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("[%s] invalid request", reqID)})
 			return
 		}
 
-		log.Info(fmt.Sprintf("[%s] New unmount request", reqID), zap.String("path", request.Path))
+		log.Info("New unmount request", zap.String("path", request.Path))
 
-		log.Info(fmt.Sprintf("[%s] Unmounting bucket", reqID), zap.String("path", request.Path))
+		log.Info("Unmounting bucket", zap.String("path", request.Path))
 		err := mounter.FuseUnmount(request.Path)
 		if err != nil {
-			log.Error(fmt.Sprintf("[%s] Unmount failed", reqID), zap.Error(err))
+			log.Error("Unmount failed", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("[%s] unmount failed: %v", reqID, err)})
 			return
 		}
 
-		log.Info(fmt.Sprintf("[%s] Bucket unmount successful", reqID), zap.String("path", request.Path))
+		log.Info("Bucket unmount successful", zap.String("path", request.Path))
 		c.JSON(http.StatusOK, gin.H{"status": "success"})
 	}
 }

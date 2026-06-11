@@ -65,12 +65,7 @@ var (
 )
 
 func init() {
-	var err error
-	rcloneLogger, err = zap.NewProduction()
-	if err != nil {
-		// Fallback to no-op logger if production logger fails
-		rcloneLogger = zap.NewNop()
-	}
+	rcloneLogger = logger.NewConsoleLoggerOrNop("rclone-mounter")
 }
 
 func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
@@ -140,11 +135,8 @@ func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounte
 
 	mounter.MounterUtils = mounterUtils
 
-	// Initialize logger - use production logger or fallback to nop
-	mounter.logger, _ = zap.NewProduction()
-	if mounter.logger == nil {
-		mounter.logger = zap.NewNop()
-	}
+	// Initialize logger - use console logger or fallback to nop
+	mounter.logger = logger.NewConsoleLoggerOrNop("rclone-mounter")
 
 	return mounter
 }
