@@ -275,5 +275,3 @@ func TestUnaryServerInterceptor_DurationLogging(t *testing.T) {
 	}
 	assert.True(t, foundDuration, "Should log request duration")
 }
-
-// Made with Bob

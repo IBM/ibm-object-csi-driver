@@ -380,5 +380,3 @@ func TestAllLogLevelsWithRequestID(t *testing.T) {
 		assert.True(t, found, "Expected request_id in %s level log", entry.Level)
 	}
 }
-
-// Made with Bob

@@ -275,5 +275,3 @@ func TestRequestIDInMultipleHandlers(t *testing.T) {
 		})
 	}
 }
-
-// Made with Bob
