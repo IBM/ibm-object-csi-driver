@@ -545,7 +545,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 			expectedResp: &csi.NodeGetVolumeStatsResponse{
 				VolumeCondition: &csi.VolumeCondition{
 					Abnormal: true,
-					Message:  "[] transpoint endpoint is not connected",
+					Message:  "[test-request-id] transpoint endpoint is not connected",
 				},
 			},
 			expectedErr: nil,
