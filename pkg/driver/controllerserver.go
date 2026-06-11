@@ -46,7 +46,7 @@ type controllerServer struct {
 func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	// Extract request ID from context (added by interceptor)
 	reqID := requestid.FromContext(ctx)
-	
+
 	var (
 		bucketName         string
 		endPoint           string
@@ -377,7 +377,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		params["userProvidedBucket"] = "false"
 		params["bucketName"] = tempBucketName
 	}
-	
+
 	logger.Info(ctx, cs.Logger, "CreateVolume completed successfully",
 		zap.String("volume_id", volumeID),
 		zap.String("bucket_name", params["bucketName"]),
@@ -395,9 +395,15 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	// Extract request ID from context
 	reqID := requestid.FromContext(ctx)
-	
-	logger.Info(ctx, cs.Logger, "DeleteVolume started")
-	
+
+	volumeID := req.GetVolumeId()
+	if len(volumeID) == 0 {
+		logger.Error(ctx, cs.Logger, "Volume ID missing in request")
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Volume ID missing in request", reqID))
+	}
+
+	logger.Info(ctx, cs.Logger, "DeleteVolume started", zap.String("volume_id", volumeID))
+
 	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
 	if err != nil {
 		logger.Error(ctx, cs.Logger, "Error modifying request", zap.Error(err))
@@ -405,13 +411,6 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	}
 	logger.Debug(ctx, cs.Logger, "DeleteVolume request details", zap.Any("request", modifiedRequest.(*csi.DeleteVolumeRequest)))
 
-	volumeID := req.GetVolumeId()
-	if len(volumeID) == 0 {
-		logger.Error(ctx, cs.Logger, "Volume ID missing in request")
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Volume ID missing in request", reqID))
-	}
-	logger.Info(ctx, cs.Logger, "Deleting volume", zap.String("volume_id", volumeID))
-	
 	secretMap := req.GetSecrets()
 	logger.Info(ctx, cs.Logger, "Secrets received", zap.Int("secret_count", len(secretMap)))
 
@@ -490,13 +489,15 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 		logger.Info(ctx, cs.Logger, "No bucket to delete")
 	}
 
-	logger.Info(ctx, cs.Logger, "DeleteVolume completed successfully", zap.String("volume_id", volumeID))
+	logger.Info(ctx, cs.Logger, "DeleteVolume completed successfully",
+		zap.String("volume_id", volumeID),
+		zap.String("bucket_name", bucketToDelete))
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
 func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	
+
 	logger.Debug(ctx, cs.Logger, "ControllerPublishVolume request", zap.Any("request", req))
 	logger.Info(ctx, cs.Logger, "ControllerPublishVolume not implemented")
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("[%s] ControllerPublishVolume", reqID))
@@ -504,7 +505,7 @@ func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 
 func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	
+
 	logger.Debug(ctx, cs.Logger, "ControllerUnpublishVolume request", zap.Any("request", req))
 	logger.Info(ctx, cs.Logger, "ControllerUnpublishVolume not implemented")
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("[%s] ControllerUnpublishVolume", reqID))
@@ -512,7 +513,7 @@ func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 
 func (cs *controllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	
+
 	logger.Info(ctx, cs.Logger, "ValidateVolumeCapabilities started")
 	logger.Debug(ctx, cs.Logger, "ValidateVolumeCapabilities request", zap.Any("request", req))
 
@@ -545,7 +546,7 @@ func (cs *controllerServer) ValidateVolumeCapabilities(ctx context.Context, req 
 
 func (cs *controllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	
+
 	logger.Debug(ctx, cs.Logger, "ListVolumes request", zap.Any("request", req))
 	logger.Info(ctx, cs.Logger, "ListVolumes not implemented")
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("[%s] ListVolumes", reqID))
@@ -553,7 +554,7 @@ func (cs *controllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 
 func (cs *controllerServer) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	
+
 	logger.Debug(ctx, cs.Logger, "GetCapacity request", zap.Any("request", req))
 	logger.Info(ctx, cs.Logger, "GetCapacity not implemented")
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("[%s] GetCapacity", reqID))
@@ -562,7 +563,7 @@ func (cs *controllerServer) GetCapacity(ctx context.Context, req *csi.GetCapacit
 func (cs *controllerServer) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
 	logger.Info(ctx, cs.Logger, "ControllerGetCapabilities started")
 	logger.Debug(ctx, cs.Logger, "ControllerGetCapabilities request", zap.Any("request", req))
-	
+
 	var caps []*csi.ControllerServiceCapability
 	for _, cap := range controllerCapabilities {
 		c := &csi.ControllerServiceCapability{
@@ -574,14 +575,14 @@ func (cs *controllerServer) ControllerGetCapabilities(ctx context.Context, req *
 		}
 		caps = append(caps, c)
 	}
-	
+
 	logger.Info(ctx, cs.Logger, "ControllerGetCapabilities completed", zap.Int("capability_count", len(caps)))
 	return &csi.ControllerGetCapabilitiesResponse{Capabilities: caps}, nil
 }
 
 func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	
+
 	logger.Debug(ctx, cs.Logger, "CreateSnapshot request", zap.Any("request", req))
 	logger.Info(ctx, cs.Logger, "CreateSnapshot not implemented")
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("[%s] CreateSnapshot", reqID))
@@ -589,7 +590,7 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 
 func (cs *controllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	
+
 	logger.Debug(ctx, cs.Logger, "DeleteSnapshot request", zap.Any("request", req))
 	logger.Info(ctx, cs.Logger, "DeleteSnapshot not implemented")
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("[%s] DeleteSnapshot", reqID))
@@ -597,7 +598,7 @@ func (cs *controllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteS
 
 func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	
+
 	logger.Debug(ctx, cs.Logger, "ListSnapshots request", zap.Any("request", req))
 	logger.Info(ctx, cs.Logger, "ListSnapshots not implemented")
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("[%s] ListSnapshots", reqID))
@@ -605,7 +606,7 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 
 func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	
+
 	logger.Debug(ctx, cs.Logger, "ControllerExpandVolume request", zap.Any("request", req))
 	logger.Info(ctx, cs.Logger, "ControllerExpandVolume not implemented")
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("[%s] ControllerExpandVolume", reqID))
@@ -613,7 +614,7 @@ func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 
 func (cs *controllerServer) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	
+
 	logger.Debug(ctx, cs.Logger, "ControllerGetVolume request", zap.Any("request", req))
 	logger.Info(ctx, cs.Logger, "ControllerGetVolume not implemented")
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("[%s] ControllerGetVolume", reqID))
@@ -621,7 +622,7 @@ func (cs *controllerServer) ControllerGetVolume(ctx context.Context, req *csi.Co
 
 func (cs *controllerServer) ControllerModifyVolume(ctx context.Context, req *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
 	reqID := requestid.FromContext(ctx)
-	
+
 	logger.Debug(ctx, cs.Logger, "ControllerModifyVolume request", zap.Any("request", req))
 	logger.Info(ctx, cs.Logger, "ControllerModifyVolume not implemented")
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("[%s] ControllerModifyVolume", reqID))

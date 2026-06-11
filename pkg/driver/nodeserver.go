@@ -95,18 +95,6 @@ func (ns *nodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	reqID := requestid.FromContext(ctx)
 
-	logger.Info(ctx, ns.logger, "NodePublishVolume started")
-
-	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
-	if err != nil {
-		logger.Error(ctx, ns.logger, "Error modifying request", zap.Error(err))
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Error in modifying requests %v", reqID, err))
-	}
-	logger.Debug(ctx, ns.logger, "NodePublishVolume request", zap.Any("request", modifiedRequest.(*csi.NodePublishVolumeRequest)))
-
-	volumeMountGroup := req.GetVolumeCapability().GetMount().GetVolumeMountGroup()
-	logger.Debug(ctx, ns.logger, "Volume mount group", zap.String("volume_mount_group", volumeMountGroup))
-
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		logger.Error(ctx, ns.logger, "Volume ID missing in request")
@@ -118,6 +106,20 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		logger.Error(ctx, ns.logger, "Target path missing in request")
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Target path missing in request", reqID))
 	}
+
+	logger.Info(ctx, ns.logger, "NodePublishVolume started",
+		zap.String("volume_id", volumeID),
+		zap.String("target_path", targetPath))
+
+	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
+	if err != nil {
+		logger.Error(ctx, ns.logger, "Error modifying request", zap.Error(err))
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Error in modifying requests %v", reqID, err))
+	}
+	logger.Debug(ctx, ns.logger, "NodePublishVolume request", zap.Any("request", modifiedRequest.(*csi.NodePublishVolumeRequest)))
+
+	volumeMountGroup := req.GetVolumeCapability().GetMount().GetVolumeMountGroup()
+	logger.Debug(ctx, ns.logger, "Volume mount group", zap.String("volume_mount_group", volumeMountGroup))
 
 	if req.GetVolumeCapability() == nil {
 		logger.Error(ctx, ns.logger, "Volume capability missing in request")
@@ -220,16 +222,14 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 
 	logger.Info(ctx, ns.logger, "NodePublishVolume completed successfully",
-		zap.String("bucket_name", secretMap["bucketName"]),
-		zap.String("target_path", targetPath))
+		zap.String("volume_id", volumeID),
+		zap.String("target_path", targetPath),
+		zap.String("bucket_name", secretMap["bucketName"]))
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
 func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	reqID := requestid.FromContext(ctx)
-
-	logger.Info(ctx, ns.logger, "NodeUnpublishVolume started")
-	logger.Debug(ctx, ns.logger, "NodeUnpublishVolume request", zap.Any("request", req))
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
@@ -242,6 +242,11 @@ func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		logger.Error(ctx, ns.logger, "Target path missing in request")
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Target path missing in request", reqID))
 	}
+
+	logger.Info(ctx, ns.logger, "NodeUnpublishVolume started",
+		zap.String("volume_id", volumeID),
+		zap.String("target_path", targetPath))
+	logger.Debug(ctx, ns.logger, "NodeUnpublishVolume request", zap.Any("request", req))
 
 	logger.Info(ctx, ns.logger, "Unmounting target path", zap.String("target_path", targetPath))
 
@@ -260,7 +265,9 @@ func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		return nil, status.Error(codes.Internal, fmt.Sprintf("[%s] %v", reqID, err.Error()))
 	}
 
-	logger.Info(ctx, ns.logger, "NodeUnpublishVolume completed successfully", zap.String("target_path", targetPath))
+	logger.Info(ctx, ns.logger, "NodeUnpublishVolume completed successfully",
+		zap.String("volume_id", volumeID),
+		zap.String("target_path", targetPath))
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
