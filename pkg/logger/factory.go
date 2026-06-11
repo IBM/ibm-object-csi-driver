@@ -25,6 +25,7 @@ func NewConsoleLogger(serviceName string) (*zap.Logger, error) {
 	encoderCfg := zap.NewProductionEncoderConfig()
 	encoderCfg.TimeKey = "timestamp"
 	encoderCfg.EncodeTime = zapcore.ISO8601TimeEncoder
+	encoderCfg.EncodeLevel = zapcore.CapitalLevelEncoder
 
 	logger := zap.New(zapcore.NewCore(
 		zapcore.NewConsoleEncoder(encoderCfg),
