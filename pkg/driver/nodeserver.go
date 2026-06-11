@@ -18,7 +18,6 @@ import (
 	"github.com/IBM/ibm-object-csi-driver/pkg/logger"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
-	"github.com/IBM/ibm-object-csi-driver/pkg/requestid"
 	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"go.uber.org/zap"
@@ -45,7 +44,6 @@ type NodeServerConfig struct {
 }
 
 func (ns *nodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	reqID := requestid.FromContext(ctx)
 
 	logger.Info(ctx, ns.logger, "NodeStageVolume started")
 	logger.Debug(ctx, ns.logger, "NodeStageVolume request", zap.Any("request", req))
@@ -53,13 +51,13 @@ func (ns *nodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		logger.Error(ctx, ns.logger, "Volume ID missing in request")
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Volume ID missing in request", reqID))
+		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 
 	stagingTargetPath := req.GetStagingTargetPath()
 	if len(stagingTargetPath) == 0 {
 		logger.Error(ctx, ns.logger, "Target path missing in request")
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Target path missing in request", reqID))
+		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
 	}
 
 	logger.Info(ctx, ns.logger, "NodeStageVolume completed",
@@ -69,7 +67,6 @@ func (ns *nodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 }
 
 func (ns *nodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-	reqID := requestid.FromContext(ctx)
 
 	logger.Info(ctx, ns.logger, "NodeUnstageVolume started")
 	logger.Debug(ctx, ns.logger, "NodeUnstageVolume request", zap.Any("request", req))
@@ -77,13 +74,13 @@ func (ns *nodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		logger.Error(ctx, ns.logger, "Volume ID missing in request")
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Volume ID missing in request", reqID))
+		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 
 	stagingTargetPath := req.GetStagingTargetPath()
 	if len(stagingTargetPath) == 0 {
 		logger.Error(ctx, ns.logger, "Target path missing in request")
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Target path missing in request", reqID))
+		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
 	}
 
 	logger.Info(ctx, ns.logger, "NodeUnstageVolume completed",
@@ -93,18 +90,17 @@ func (ns *nodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 }
 
 func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	reqID := requestid.FromContext(ctx)
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		logger.Error(ctx, ns.logger, "Volume ID missing in request")
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Volume ID missing in request", reqID))
+		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 
 	targetPath := req.GetTargetPath()
 	if len(targetPath) == 0 {
 		logger.Error(ctx, ns.logger, "Target path missing in request")
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Target path missing in request", reqID))
+		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
 	}
 
 	logger.Info(ctx, ns.logger, "NodePublishVolume started",
@@ -114,7 +110,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
 	if err != nil {
 		logger.Error(ctx, ns.logger, "Error modifying request", zap.Error(err))
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Error in modifying requests %v", reqID, err))
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests: %v", err))
 	}
 	logger.Debug(ctx, ns.logger, "NodePublishVolume request", zap.Any("request", modifiedRequest.(*csi.NodePublishVolumeRequest)))
 
@@ -123,7 +119,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 
 	if req.GetVolumeCapability() == nil {
 		logger.Error(ctx, ns.logger, "Volume capability missing in request")
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Volume capability missing in request", reqID))
+		return nil, status.Error(codes.InvalidArgument, "Volume capability missing in request")
 	}
 
 	logger.Info(ctx, ns.logger, "Checking mount point", zap.String("target_path", targetPath))
@@ -131,7 +127,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	if err != nil {
 		logger.Error(ctx, ns.logger, "Cannot validate target mount point",
 			zap.String("target_path", targetPath), zap.Error(err))
-		return nil, status.Error(codes.Internal, fmt.Sprintf("[%s] %v", reqID, err.Error()))
+		return nil, status.Error(codes.Internal, fmt.Sprintf("%v", err.Error()))
 	}
 
 	deviceID := ""
@@ -180,7 +176,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 
 	if len(secretMap["cosEndpoint"]) == 0 {
 		logger.Error(ctx, ns.logger, "S3 Service endpoint not provided")
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] S3 Service endpoint not provided", reqID))
+		return nil, status.Error(codes.InvalidArgument, "S3 Service endpoint not provided")
 	}
 
 	if len(secretMap["iamEndpoint"]) == 0 {
@@ -194,12 +190,12 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		tempBucketName, err := ns.Stats.GetBucketNameFromPV(volumeID)
 		if err != nil {
 			logger.Error(ctx, ns.logger, "Unable to fetch PV", zap.String("volume_id", volumeID), zap.Error(err))
-			return nil, status.Error(codes.Internal, fmt.Sprintf("[%s] %v", reqID, err.Error()))
+			return nil, status.Error(codes.Internal, fmt.Sprintf("%v", err.Error()))
 		}
 
 		if tempBucketName == "" {
 			logger.Error(ctx, ns.logger, "Unable to fetch bucket name from PV")
-			return nil, status.Error(codes.Internal, fmt.Sprintf("[%s] unable to fetch bucket name from pv", reqID))
+			return nil, status.Error(codes.Internal, "unable to fetch bucket name from pv")
 		}
 
 		secretMap["bucketName"] = tempBucketName
@@ -229,18 +225,17 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 }
 
 func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
-	reqID := requestid.FromContext(ctx)
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		logger.Error(ctx, ns.logger, "Volume ID missing in request")
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Volume ID missing in request", reqID))
+		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 
 	targetPath := req.GetTargetPath()
 	if len(targetPath) == 0 {
 		logger.Error(ctx, ns.logger, "Target path missing in request")
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Target path missing in request", reqID))
+		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
 	}
 
 	logger.Info(ctx, ns.logger, "NodeUnpublishVolume started",
@@ -253,7 +248,7 @@ func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	attrib, err := ns.Stats.GetPVAttributes(volumeID)
 	if err != nil {
 		logger.Error(ctx, ns.logger, "Failed to get PV details", zap.String("volume_id", volumeID), zap.Error(err))
-		return nil, status.Error(codes.NotFound, fmt.Sprintf("[%s] Failed to get PV details", reqID))
+		return nil, status.Error(codes.NotFound, "Failed to get PV details")
 	}
 
 	mounterObj := ns.Mounter.NewMounter(attrib, nil, nil, nil)
@@ -262,7 +257,7 @@ func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	if err = mounterObj.Unmount(ctx, targetPath); err != nil {
 		//TODO: Need to handle the case with non existing mount separately - https://github.com/IBM/ibm-object-csi-driver/issues/46
 		logger.Error(ctx, ns.logger, "Unmount failed", zap.String("target_path", targetPath), zap.Error(err))
-		return nil, status.Error(codes.Internal, fmt.Sprintf("[%s] %v", reqID, err.Error()))
+		return nil, status.Error(codes.Internal, fmt.Sprintf("%v", err.Error()))
 	}
 
 	logger.Info(ctx, ns.logger, "NodeUnpublishVolume completed successfully",
@@ -272,7 +267,6 @@ func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 }
 
 func (ns *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-	reqID := requestid.FromContext(ctx)
 
 	logger.Info(ctx, ns.logger, "NodeGetVolumeStats started")
 	logger.Debug(ctx, ns.logger, "NodeGetVolumeStats request", zap.Any("request", req))
@@ -280,13 +274,13 @@ func (ns *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		logger.Error(ctx, ns.logger, "Volume ID missing in request")
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Volume ID missing in request", reqID))
+		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 
 	volumePath := req.VolumePath
 	if volumePath == "" {
 		logger.Error(ctx, ns.logger, "Volume path doesn't exist")
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("[%s] Path Doesn't exist", reqID))
+		return nil, status.Error(codes.InvalidArgument, "Path Doesn't exist")
 	}
 
 	logger.Debug(ctx, ns.logger, "Getting filesystem stats", zap.String("volume_path", volumePath))
@@ -299,7 +293,7 @@ func (ns *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 		return &csi.NodeGetVolumeStatsResponse{
 			VolumeCondition: &csi.VolumeCondition{
 				Abnormal: true,
-				Message:  fmt.Sprintf("[%s] %v", reqID, err.Error()),
+				Message:  fmt.Sprintf("%v", err.Error()),
 			},
 		}, nil
 	}
@@ -352,10 +346,9 @@ func (ns *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 }
 
 func (ns *nodeServer) NodeExpandVolume(ctx context.Context, _ *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
-	reqID := requestid.FromContext(ctx)
 
 	logger.Info(ctx, ns.logger, "NodeExpandVolume not implemented")
-	return &csi.NodeExpandVolumeResponse{}, status.Error(codes.Unimplemented, fmt.Sprintf("[%s] NodeExpandVolume is not implemented", reqID))
+	return &csi.NodeExpandVolumeResponse{}, status.Error(codes.Unimplemented, "NodeExpandVolume is not implemented")
 }
 
 func (ns *nodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
