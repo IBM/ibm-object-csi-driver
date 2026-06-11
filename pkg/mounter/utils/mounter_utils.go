@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
+	"github.com/IBM/ibm-object-csi-driver/pkg/logger"
 	"github.com/mitchellh/go-ps"
 	"go.uber.org/zap"
 	k8sMountUtils "k8s.io/mount-utils"
@@ -28,12 +29,7 @@ var ErrTimeoutWaitProcess = errors.New("timeout waiting for process to end")
 var mounterUtilLogger *zap.Logger
 
 func init() {
-	var err error
-	mounterUtilLogger, err = zap.NewProduction()
-	if err != nil {
-		// Fallback to no-op logger if production logger fails
-		mounterUtilLogger = zap.NewNop()
-	}
+	mounterUtilLogger = logger.NewConsoleLoggerOrNop("mounter-utils")
 }
 
 type MounterUtils interface {

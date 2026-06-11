@@ -60,12 +60,7 @@ var (
 )
 
 func init() {
-	var err error
-	s3fsLogger, err = zap.NewProduction()
-	if err != nil {
-		// Fallback to no-op logger if production logger fails
-		s3fsLogger = zap.NewNop()
-	}
+	s3fsLogger = logger.NewConsoleLoggerOrNop("s3fs-mounter")
 }
 
 func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils, defaultParams map[string]string) Mounter {
@@ -121,11 +116,8 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 
 	mounter.MounterUtils = mounterUtils
 
-	// Initialize logger - use production logger or fallback to nop
-	mounter.logger, _ = zap.NewProduction()
-	if mounter.logger == nil {
-		mounter.logger = zap.NewNop()
-	}
+	// Initialize logger - use console logger or fallback to nop
+	mounter.logger = logger.NewConsoleLoggerOrNop("s3fs-mounter")
 
 	return mounter
 }
