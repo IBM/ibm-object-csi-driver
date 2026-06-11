@@ -315,5 +315,3 @@ func waitForProcess(p *os.Process, backoff int) error {
 	time.Sleep(time.Duration(500) * time.Millisecond)
 	return waitForProcess(p, backoff+1)
 }
-
-// Made with Bob
