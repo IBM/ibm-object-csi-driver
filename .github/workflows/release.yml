@@ -139,8 +139,8 @@ jobs:
             /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.deb.tar.gz.sha256
             /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz
             /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz.sha256
-          tag_name: v0.1.0
-          name: v0.1.0
+          tag_name: v0.1.21
+          name: v0.1.21
           body: |
             ## 🚀 What's New
             - Add support for AddMountParam to pass any s3fs mount option
