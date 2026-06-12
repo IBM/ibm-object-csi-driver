@@ -81,6 +81,10 @@ func (args S3FSArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, err
 	}
 
 	for k, v := range m {
+		// Skip add-mount-param as it's processed separately below
+		if k == "add-mount-param" {
+			continue
+		}
 		result = append(result, "-o")
 		if strings.ToLower(strings.TrimSpace(v)) == "true" {
 			result = append(result, k) // -o, key

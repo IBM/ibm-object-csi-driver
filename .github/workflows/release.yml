@@ -139,10 +139,11 @@ jobs:
             /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.deb.tar.gz.sha256
             /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz
             /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz.sha256
-          tag_name: v0.12.29
-          name: v0.12.29
+          tag_name: v0.12.30
+          name: v0.12.30
           body: |
             ## 🚀 What's New
+            - Fix: Exclude add-mount-param from being passed to s3fs command
             - Add support for AddMountParam to pass any s3fs mount option
             - Enables all 82 s3fs-fuse mount options without code changes
             - Supports unknown/additional mount options via comma-separated string
