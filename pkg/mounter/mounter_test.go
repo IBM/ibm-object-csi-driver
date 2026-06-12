@@ -164,7 +164,7 @@ func TestParseAndClassifyMountOption(t *testing.T) {
 		{"allow_other", "allow_other", "allow_other", true},
 		{"enable_content_md5=true", "enable_content_md5", "true", false},
 		{"", "", "", false},
-		{"key=value=extra", "", "", false},
+		{"key=value=extra", "key", "value=extra", false},
 	}
 
 	for _, tt := range tests {
