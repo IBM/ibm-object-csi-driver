@@ -3,6 +3,7 @@ package mounter
 import (
 	"errors"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
