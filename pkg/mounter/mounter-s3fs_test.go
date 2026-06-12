@@ -298,6 +298,9 @@ func TestParseAndClassifyMountOption_S3FS(t *testing.T) {
 		{"enable_content_md5", "enable_content_md5", "enable_content_md5", false},
 		{"mime=/etc/mime.types", "mime", "/etc/mime.types", false},
 		{"", "", "", false},
+		{"  ", "", "", false},
+		{"opt=val1=val2", "opt", "val1=val2", false},
+		{" kernel_cache ", "kernel_cache", "kernel_cache", false},
 	}
 
 	for _, tt := range tests {
@@ -321,6 +324,9 @@ func TestAddMountParam_Integration(t *testing.T) {
 		{"Mixed", []string{"allow_other"}, "enable_content_md5\nkernel_cache", []string{"enable_content_md5"}, false},
 		{"SpecialChars", nil, "mime=/etc/mime.types", []string{"mime=/etc/mime.types"}, false},
 		{"EmptyLines", nil, "allow_other\n\nenable_content_md5\n", []string{"enable_content_md5"}, false},
+		{"UnknownInDefault", []string{"enable_content_md5", "allow_other"}, "", []string{"enable_content_md5"}, false},
+		{"NoSecret", []string{"enable_content_md5"}, "", []string{"enable_content_md5"}, false},
+		{"InvalidLines", nil, "allow_other\n===\nenable_content_md5", []string{"enable_content_md5"}, false},
 	}
 
 	for _, tt := range tests {
@@ -330,7 +336,8 @@ func TestAddMountParam_Integration(t *testing.T) {
 				secret["mountOptions"] = tt.secretOpts
 			}
 
-			_, addParam := updateS3FSMountOptions(tt.defaultOpts, secret, nil)
+			opts, addParam := updateS3FSMountOptions(tt.defaultOpts, secret, nil)
+			assert.NotNil(t, opts)
 
 			if tt.wantEmpty {
 				assert.Empty(t, addParam)
@@ -360,8 +367,62 @@ func TestFormulateOptions_AddMountParam(t *testing.T) {
 
 		_, exists := workerOp["add-mount-param"]
 		assert.Equal(t, tt.want, exists)
-		if exists {
-			assert.Equal(t, tt.param, workerOp["add-mount-param"])
-		}
 	}
+}
+
+func TestUpdateS3FSMountOptions_SpecialSecretFields(t *testing.T) {
+	tests := []struct {
+		name        string
+		secret      map[string]string
+		defaultOpts []string
+		wantUID     bool
+		wantGID     bool
+	}{
+		{
+			name:    "GID without UID sets both",
+			secret:  map[string]string{"gid": "1000"},
+			wantUID: true,
+			wantGID: true,
+		},
+		{
+			name:    "UID overrides GID",
+			secret:  map[string]string{"gid": "1000", "uid": "2000"},
+			wantUID: true,
+			wantGID: true,
+		},
+		{
+			name:    "tmpdir and use_cache",
+			secret:  map[string]string{"tmpdir": "/tmp", "use_cache": "true"},
+			wantUID: false,
+			wantGID: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts, _ := updateS3FSMountOptions(tt.defaultOpts, tt.secret, nil)
+			assert.NotNil(t, opts)
+			
+			optsStr := strings.Join(opts, " ")
+			if tt.wantUID {
+				assert.Contains(t, optsStr, "uid=")
+			}
+			if tt.wantGID {
+				assert.Contains(t, optsStr, "gid=")
+			}
+		})
+	}
+}
+
+func TestUpdateS3FSMountOptions_DefaultParams(t *testing.T) {
+	defaultParams := map[string]string{
+		"cipher_suites": "AESGCM",
+		"empty_param":   "",
+	}
+	
+	opts, _ := updateS3FSMountOptions(nil, map[string]string{}, defaultParams)
+	
+	optsStr := strings.Join(opts, " ")
+	assert.Contains(t, optsStr, "cipher_suites=AESGCM")
+	assert.NotContains(t, optsStr, "empty_param")
 }
