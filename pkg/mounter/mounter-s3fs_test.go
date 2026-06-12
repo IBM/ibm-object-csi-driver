@@ -285,3 +285,83 @@ func TestRemoveS3FSCredFile_Negative(t *testing.T) {
 	removeS3FSCredFile("/test", target)
 	assert.Equal(t, maxRetries, called)
 }
+
+func TestParseAndClassifyMountOption_S3FS(t *testing.T) {
+	knownOpts := map[string]bool{"allow_other": true, "parallel_count": true}
+	
+	tests := []struct {
+		opt, name, val string
+		known          bool
+	}{
+		{"allow_other", "allow_other", "allow_other", true},
+		{"parallel_count=20", "parallel_count", "20", true},
+		{"enable_content_md5", "enable_content_md5", "enable_content_md5", false},
+		{"mime=/etc/mime.types", "mime", "/etc/mime.types", false},
+		{"", "", "", false},
+	}
+
+	for _, tt := range tests {
+		name, val, known := parseAndClassifyMountOption(tt.opt, knownOpts)
+		assert.Equal(t, tt.name, name)
+		assert.Equal(t, tt.val, val)
+		assert.Equal(t, tt.known, known)
+	}
+}
+
+func TestAddMountParam_Integration(t *testing.T) {
+	tests := []struct {
+		name           string
+		defaultOpts    []string
+		secretOpts     string
+		wantUnknown    []string
+		wantEmpty      bool
+	}{
+		{"OnlyKnown", []string{"allow_other"}, "kernel_cache", nil, true},
+		{"OnlyUnknown", nil, "enable_content_md5\ncomplement_stat", []string{"enable_content_md5", "complement_stat"}, false},
+		{"Mixed", []string{"allow_other"}, "enable_content_md5\nkernel_cache", []string{"enable_content_md5"}, false},
+		{"SpecialChars", nil, "mime=/etc/mime.types", []string{"mime=/etc/mime.types"}, false},
+		{"EmptyLines", nil, "allow_other\n\nenable_content_md5\n", []string{"enable_content_md5"}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			secret := map[string]string{}
+			if tt.secretOpts != "" {
+				secret["mountOptions"] = tt.secretOpts
+			}
+
+			_, addParam := updateS3FSMountOptions(tt.defaultOpts, secret, nil)
+
+			if tt.wantEmpty {
+				assert.Empty(t, addParam)
+			} else {
+				assert.NotEmpty(t, addParam)
+				for _, opt := range tt.wantUnknown {
+					assert.Contains(t, addParam, opt)
+				}
+			}
+		})
+	}
+}
+
+func TestFormulateOptions_AddMountParam(t *testing.T) {
+	tests := []struct {
+		param string
+		want  bool
+	}{
+		{"", false},
+		{"enable_content_md5", true},
+		{"enable_content_md5,complement_stat", true},
+	}
+
+	for _, tt := range tests {
+		s3fs := &S3fsMounter{AddMountParam: tt.param, EndPoint: "https://s3.test.com"}
+		_, workerOp := s3fs.formulateMountOptions("bucket", "/target", "/passwd")
+
+		_, exists := workerOp["add-mount-param"]
+		assert.Equal(t, tt.want, exists)
+		if exists {
+			assert.Equal(t, tt.param, workerOp["add-mount-param"])
+		}
+	}
+}
