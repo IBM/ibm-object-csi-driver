@@ -221,7 +221,7 @@ func parseAndClassifyMountOption(optionStr string, knownOptions map[string]bool)
 		return "", "", false
 	}
 	
-	opts := strings.Split(optionStr, "=")
+	opts := strings.SplitN(optionStr, "=", 2)
 	optName := strings.TrimSpace(opts[0])
 	
 	if len(opts) == 2 {
