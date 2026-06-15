@@ -340,12 +340,12 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 	var unknownOptionsList []string
 	for optName, optValue := range unknownOptionsMap {
 		if optName == optValue {
-			unknownOptionsList = append(unknownOptionsList, optName)
+			unknownOptionsList = append(unknownOptionsList, fmt.Sprintf("-o %s", optName))
 		} else {
-			unknownOptionsList = append(unknownOptionsList, fmt.Sprintf("%s=%s", optName, optValue))
+			unknownOptionsList = append(unknownOptionsList, fmt.Sprintf("-o %s=%s", optName, optValue))
 		}
 	}
-	addMountParam := strings.Join(unknownOptionsList, ",")
+	addMountParam := strings.Join(unknownOptionsList, " ")
 
 	klog.Infof("updated S3fsMounter Options: %v", updatedOptions)
 	if addMountParam != "" {

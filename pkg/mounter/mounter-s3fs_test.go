@@ -358,8 +358,8 @@ func TestFormulateOptions_AddMountParam(t *testing.T) {
 		want  bool
 	}{
 		{"", false},
-		{"enable_content_md5", true},
-		{"enable_content_md5,complement_stat", true},
+		{"-o enable_content_md5", true},
+		{"-o enable_content_md5 -o complement_stat", true},
 	}
 
 	for _, tt := range tests {
