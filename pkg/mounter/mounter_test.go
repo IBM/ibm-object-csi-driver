@@ -56,7 +56,7 @@ func TestNewMounter(t *testing.T) {
 				AuthType:      "iam",
 				KpRootKeyCrn:  "test-kp-root-key-crn",
 				MountOptions:  []string{"cipher_suites=default"},
-				AddMountParam: "opt1=val1",
+				AddMountParam: "-o opt1=val1",
 				MounterUtils:  &mounterUtils.MounterOptsUtils{},
 			},
 			expectedErr: nil,
