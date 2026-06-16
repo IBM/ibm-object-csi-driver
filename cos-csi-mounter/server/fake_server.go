@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"net"
 	"net/http"
@@ -17,13 +18,13 @@ type MockMounterUtils struct {
 	mock.Mock
 }
 
-func (m *MockMounterUtils) FuseMount(path string, mounter string, args []string) error {
-	argsCalled := m.Called(path, mounter, args)
+func (m *MockMounterUtils) FuseMount(ctx context.Context, path string, mounter string, args []string) error {
+	argsCalled := m.Called(ctx, path, mounter, args)
 	return argsCalled.Error(0)
 }
 
-func (m *MockMounterUtils) FuseUnmount(path string) error {
-	argsCalled := m.Called(path)
+func (m *MockMounterUtils) FuseUnmount(ctx context.Context, path string) error {
+	argsCalled := m.Called(ctx, path)
 	return argsCalled.Error(0)
 }
 

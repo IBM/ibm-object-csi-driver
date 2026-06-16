@@ -19,6 +19,7 @@ import (
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestSetupSocket_CreatesSocket(t *testing.T) {
@@ -235,7 +236,7 @@ func TestHandleCosMount_FuseMountFails(t *testing.T) {
 	expectedArgs := []string{"--endpoint=https://s3.example.com"}
 
 	mockParser.On("Parse", request).Return(expectedArgs, nil)
-	mockMounter.On("FuseMount", request.Path, request.Mounter, expectedArgs).Return(fmt.Errorf("mount error"))
+	mockMounter.On("FuseMount", mock.Anything, request.Path, request.Mounter, expectedArgs).Return(fmt.Errorf("mount error"))
 
 	router := gin.Default()
 	router.POST("/mount", handleCosMount(mockMounter, mockParser))
@@ -268,7 +269,7 @@ func TestHandleCosMount_Success(t *testing.T) {
 	expectedArgs := []string{"--endpoint=https://s3.example.com"}
 
 	mockParser.On("Parse", request).Return(expectedArgs, nil)
-	mockMounter.On("FuseMount", request.Path, request.Mounter, expectedArgs).Return(nil)
+	mockMounter.On("FuseMount", mock.Anything, request.Path, request.Mounter, expectedArgs).Return(nil)
 
 	router := gin.Default()
 	router.POST("/mount", handleCosMount(mockMounter, mockParser))
@@ -303,11 +304,11 @@ func TestHandleCosUnmount_InvalidJSON(t *testing.T) {
 }
 
 func TestHandleCosUnmount_UnmountFailure(t *testing.T) {
-	mock := new(MockMounterUtils)
-	mock.On("FuseUnmount", "/mnt/fail").Return(errors.New("mock failure"))
+	mockMounter := new(MockMounterUtils)
+	mockMounter.On("FuseUnmount", mock.Anything, "/mnt/fail").Return(errors.New("mock failure"))
 
 	router := gin.Default()
-	router.POST("/unmount", handleCosUnmount(mock))
+	router.POST("/unmount", handleCosUnmount(mockMounter))
 
 	reqBody := map[string]string{"path": "/mnt/fail"}
 	body, _ := json.Marshal(reqBody)
@@ -320,15 +321,15 @@ func TestHandleCosUnmount_UnmountFailure(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 	assert.Contains(t, w.Body.String(), "unmount failed")
-	mock.AssertExpectations(t)
+	mockMounter.AssertExpectations(t)
 }
 
 func TestHandleCosUnmount_Success(t *testing.T) {
-	mock := new(MockMounterUtils)
-	mock.On("FuseUnmount", "/mnt/success").Return(nil)
+	mockMounter := new(MockMounterUtils)
+	mockMounter.On("FuseUnmount", mock.Anything, "/mnt/success").Return(nil)
 
 	router := gin.Default()
-	router.POST("/unmount", handleCosUnmount(mock))
+	router.POST("/unmount", handleCosUnmount(mockMounter))
 
 	reqBody := map[string]string{"path": "/mnt/success"}
 	body, _ := json.Marshal(reqBody)
@@ -341,5 +342,5 @@ func TestHandleCosUnmount_Success(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), "success")
-	mock.AssertExpectations(t)
+	mockMounter.AssertExpectations(t)
 }

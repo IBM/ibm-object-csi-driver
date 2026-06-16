@@ -243,7 +243,7 @@ func (rclone *RcloneMounter) Mount(ctx context.Context, source string, target st
 	}
 
 	logger.Info(ctx, rclone.logger, "NodeServer mounting")
-	err = rclone.MounterUtils.FuseMount(target, constants.RClone, args)
+	err = rclone.MounterUtils.FuseMount(ctx, target, constants.RClone, args)
 	if err != nil {
 		logger.Error(ctx, rclone.logger, "FuseMount failed", zap.Error(err))
 	} else {
@@ -273,7 +273,7 @@ func (rclone *RcloneMounter) Unmount(ctx context.Context, target string) error {
 
 	logger.Info(ctx, rclone.logger, "NodeServer unmounting")
 
-	err := rclone.MounterUtils.FuseUnmount(target)
+	err := rclone.MounterUtils.FuseUnmount(ctx, target)
 	if err != nil {
 		logger.Error(ctx, rclone.logger, "FuseUnmount failed", zap.Error(err))
 		return err
