@@ -26,7 +26,8 @@ import (
 var utilLogger *zap.Logger
 
 func init() {
-	utilLogger = logger.NewConsoleLoggerOrNop("driver-utils")
+	utilLogger = logger.NewJSONLoggerOrNop("ibm-object-csi-driver")
+	utilLogger = utilLogger.With(zap.String("component", "driver-utils"))
 }
 
 type StatsUtils interface {

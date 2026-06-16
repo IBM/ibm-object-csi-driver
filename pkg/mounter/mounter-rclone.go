@@ -65,7 +65,8 @@ var (
 )
 
 func init() {
-	rcloneLogger = logger.NewConsoleLoggerOrNop("rclone-mounter")
+	rcloneLogger = logger.NewJSONLoggerOrNop("rclone-mounter")
+	rcloneLogger = rcloneLogger.With(zap.String("component", "rclone-mounter"))
 }
 
 func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
@@ -135,8 +136,9 @@ func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounte
 
 	mounter.MounterUtils = mounterUtils
 
-	// Initialize logger - use console logger or fallback to nop
-	mounter.logger = logger.NewConsoleLoggerOrNop("rclone-mounter")
+	// Initialize logger - use JSON logger or fallback to nop
+	mounter.logger = logger.NewJSONLoggerOrNop("rclone-mounter")
+	mounter.logger = mounter.logger.With(zap.String("component", "rclone-mounter"))
 
 	return mounter
 }

@@ -60,7 +60,8 @@ var (
 )
 
 func init() {
-	s3fsLogger = logger.NewConsoleLoggerOrNop("s3fs-mounter")
+	s3fsLogger = logger.NewJSONLoggerOrNop("s3fs-mounter")
+	s3fsLogger = s3fsLogger.With(zap.String("component", "s3fs-mounter"))
 }
 
 func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils, defaultParams map[string]string) Mounter {
@@ -116,8 +117,9 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 
 	mounter.MounterUtils = mounterUtils
 
-	// Initialize logger - use console logger or fallback to nop
-	mounter.logger = logger.NewConsoleLoggerOrNop("s3fs-mounter")
+	// Initialize logger - use JSON logger or fallback to nop
+	mounter.logger = logger.NewJSONLoggerOrNop("s3fs-mounter")
+	mounter.logger = mounter.logger.With(zap.String("component", "s3fs-mounter"))
 
 	return mounter
 }
