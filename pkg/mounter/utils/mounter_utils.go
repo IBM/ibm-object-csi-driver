@@ -29,25 +29,41 @@ var ErrTimeoutWaitProcess = errors.New("timeout waiting for process to end")
 var mounterUtilLogger *zap.Logger
 
 func init() {
-	mounterUtilLogger = logger.NewConsoleLoggerOrNop("mounter-utils")
+	mounterUtilLogger = logger.NewJSONLoggerOrNop("cos-csi-mounter")
+	mounterUtilLogger = mounterUtilLogger.With(zap.String("component", "mounter-utils"))
+}
+
+// getRequestIDFromContext extracts request_id from context
+func getRequestIDFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return "unknown"
+	}
+	if reqID, ok := ctx.Value("request_id").(string); ok && reqID != "" {
+		return reqID
+	}
+	return "unknown"
 }
 
 type MounterUtils interface {
-	FuseUnmount(path string) error
-	FuseMount(path string, comm string, args []string) error
+	FuseUnmount(ctx context.Context, path string) error
+	FuseMount(ctx context.Context, path string, comm string, args []string) error
 }
 
 type MounterOptsUtils struct {
 }
 
-func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) error {
-	mounterUtilLogger.Info("FuseMount started")
-	mounterUtilLogger.Info("FuseMount parameters",
+func (su *MounterOptsUtils) FuseMount(ctx context.Context, path string, comm string, args []string) error {
+	// Extract request_id from context for logging
+	requestID := getRequestIDFromContext(ctx)
+	log := mounterUtilLogger.With(zap.String("request_id", requestID))
+
+	log.Info("FuseMount started")
+	log.Info("FuseMount parameters",
 		zap.String("path", path),
 		zap.String("command", comm),
 		zap.Strings("args", args))
 
-	ctx, cancel := context.WithCancel(context.Background())
+	mountCtx, cancel := context.WithCancel(ctx)
 	var mounted bool
 	defer func() {
 		if !mounted {
@@ -55,36 +71,36 @@ func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) e
 		}
 	}()
 
-	cmd := commandWithCtx(ctx, comm, args...)
+	cmd := commandWithCtx(mountCtx, comm, args...)
 	err := cmd.Start()
 	if err != nil {
-		mounterUtilLogger.Error("FuseMount: command start failed",
+		log.Error("FuseMount: command start failed",
 			zap.String("mounter", comm),
 			zap.Strings("args", args),
 			zap.Error(err))
 		return fmt.Errorf("FuseMount: '%s' command start failed: %v", comm, err)
 	}
-	mounterUtilLogger.Info("FuseMount: command start succeeded", zap.String("mounter", comm))
+	log.Info("FuseMount: command start succeeded", zap.String("mounter", comm))
 
 	waitCh := make(chan error, 1)
 	mountCh := make(chan error, 1)
 
 	go func() {
-		mounterUtilLogger.Info("FuseMount: cmd.Wait() goroutine start",
+		log.Info("FuseMount: cmd.Wait() goroutine start",
 			zap.String("mounter", comm),
 			zap.String("path", path))
 		waitCh <- cmd.Wait()
-		mounterUtilLogger.Info("FuseMount: cmd.Wait() goroutine end",
+		log.Info("FuseMount: cmd.Wait() goroutine end",
 			zap.String("mounter", comm),
 			zap.String("path", path))
 	}()
 
 	go func() {
-		mounterUtilLogger.Info("FuseMount: waitForMount() goroutine start",
+		log.Info("FuseMount: waitForMount() goroutine start",
 			zap.String("mounter", comm),
 			zap.String("path", path))
-		mountCh <- waitForMount(ctx, path, 2*time.Second, 30*time.Second) // kubelet retries NodePublishVolume after 120 seconds
-		mounterUtilLogger.Info("FuseMount: waitForMount() goroutine end",
+		mountCh <- waitForMount(mountCtx, path, 2*time.Second, 30*time.Second) // kubelet retries NodePublishVolume after 120 seconds
+		log.Info("FuseMount: waitForMount() goroutine end",
 			zap.String("mounter", comm),
 			zap.String("path", path))
 	}()
@@ -92,90 +108,94 @@ func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) e
 	select {
 	case err := <-waitCh:
 		if err != nil {
-			mounterUtilLogger.Warn("FuseMount: command wait failed",
+			log.Warn("FuseMount: command wait failed",
 				zap.String("mounter", comm),
 				zap.Strings("args", args),
 				zap.Error(err))
-			mounterUtilLogger.Info("FuseMount: checking if path already exists and is a mountpoint",
+			log.Info("FuseMount: checking if path already exists and is a mountpoint",
 				zap.String("path", path))
 			if isMount, err1 := isMountpoint(path); err1 == nil && isMount { // check if bucket already got mounted
-				mounterUtilLogger.Info("Bucket is already mounted", zap.String("mounter", comm))
+				log.Info("Bucket is already mounted", zap.String("mounter", comm))
 				mounted = true
 				return nil
 			}
 			return fmt.Errorf("'%s' mount failed: %v", comm, err)
 		}
-		mounterUtilLogger.Info("FuseMount: command wait succeeded", zap.String("mounter", comm))
+		log.Info("FuseMount: command wait succeeded", zap.String("mounter", comm))
 		if err := <-mountCh; err != nil {
 			return err
 		}
 
 	case err := <-mountCh:
 		if err != nil {
-			mounterUtilLogger.Error("FuseMount: path is not mountpoint, mount failed",
+			log.Error("FuseMount: path is not mountpoint, mount failed",
 				zap.String("mounter", comm),
 				zap.String("path", path))
 			return fmt.Errorf("'%s' mount failed: %v", comm, err)
 		}
 	}
 
-	mounterUtilLogger.Info("Bucket mounted successfully", zap.String("mounter", comm))
+	log.Info("Bucket mounted successfully", zap.String("mounter", comm))
 	mounted = true
 	return nil
 }
 
-func (su *MounterOptsUtils) FuseUnmount(path string) error {
-	mounterUtilLogger.Info("FuseUnmount started", zap.String("path", path))
+func (su *MounterOptsUtils) FuseUnmount(ctx context.Context, path string) error {
+	// Extract request_id from context for logging
+	requestID := getRequestIDFromContext(ctx)
+	log := mounterUtilLogger.With(zap.String("request_id", requestID))
+
+	log.Info("FuseUnmount started", zap.String("path", path))
 	// check if mountpoint exists
 	isMount, checkMountErr := isMountpoint(path)
 	if isMount || checkMountErr != nil {
-		mounterUtilLogger.Info("isMountpoint check", zap.Bool("is_mount", isMount))
+		log.Info("isMountpoint check", zap.Bool("is_mount", isMount))
 		err := unmount(path, 0)
 		if err != nil {
-			mounterUtilLogger.Warn("Standard unmount failed, trying lazy unmount",
+			log.Warn("Standard unmount failed, trying lazy unmount",
 				zap.String("path", path),
 				zap.Error(err))
 			// Try lazy (MNT_DETACH) unmount
 			err = unmount(path, syscall.MNT_DETACH)
 			if err != nil {
-				mounterUtilLogger.Warn("Lazy unmount failed, trying force unmount",
+				log.Warn("Lazy unmount failed, trying force unmount",
 					zap.String("path", path),
 					zap.Error(err))
 				// Try force unmount as last resort
 				err = unmount(path, syscall.MNT_FORCE)
 				if err != nil {
-					mounterUtilLogger.Error("Force unmount failed",
+					log.Error("Force unmount failed",
 						zap.String("path", path),
 						zap.Error(err))
 					return fmt.Errorf("all unmount attempts failed for %s: %v", path, err)
 				}
-				mounterUtilLogger.Info("Force unmounted successfully", zap.String("path", path))
+				log.Info("Force unmounted successfully", zap.String("path", path))
 			} else {
-				mounterUtilLogger.Info("Lazy unmounted successfully", zap.String("path", path))
+				log.Info("Lazy unmounted successfully", zap.String("path", path))
 			}
 		} else {
-			mounterUtilLogger.Info("Unmounted with standard unmount successfully", zap.String("path", path))
+			log.Info("Unmounted with standard unmount successfully", zap.String("path", path))
 		}
 	}
 
 	// as fuse quits immediately, we will try to wait until the process is done
 	process, err := findFuseMountProcess(path)
 	if err != nil {
-		mounterUtilLogger.Info("Error getting PID of fuse mount", zap.Error(err))
+		log.Info("Error getting PID of fuse mount", zap.Error(err))
 		return nil
 	}
 	if process == nil {
-		mounterUtilLogger.Info("Unable to find PID of fuse mount, it must have finished already",
+		log.Info("Unable to find PID of fuse mount, it must have finished already",
 			zap.String("path", path))
 		return nil
 	}
-	mounterUtilLogger.Info("Found fuse pid of mount, checking if it still runs",
+	log.Info("Found fuse pid of mount, checking if it still runs",
 		zap.Int("pid", process.Pid),
 		zap.String("path", path))
 
 	err = waitForProcess(process, 1)
 	if errors.Is(err, ErrTimeoutWaitProcess) {
-		mounterUtilLogger.Info("Timeout waiting for pid to end, killing process",
+		log.Info("Timeout waiting for pid to end, killing process",
 			zap.Int("pid", process.Pid))
 		return process.Kill()
 	}

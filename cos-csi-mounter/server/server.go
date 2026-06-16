@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
+	loggerPkg "github.com/IBM/ibm-object-csi-driver/pkg/logger"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -45,18 +47,23 @@ func init() {
 }
 
 func setUpLogger() *zap.Logger {
-	// Prepare a new logger
+	// Prepare a new logger with standardized JSON format
 	atom := zap.NewAtomicLevel()
 	encoderCfg := zap.NewProductionEncoderConfig()
 	encoderCfg.TimeKey = "timestamp"
 	encoderCfg.EncodeTime = zapcore.ISO8601TimeEncoder
-	encoderCfg.EncodeLevel = zapcore.CapitalLevelEncoder
+	encoderCfg.EncodeLevel = zapcore.LowercaseLevelEncoder
+	encoderCfg.MessageKey = "msg"
+	encoderCfg.CallerKey = "caller"
+	encoderCfg.LevelKey = "level"
 
 	logger := zap.New(zapcore.NewCore(
-		zapcore.NewConsoleEncoder(encoderCfg),
+		zapcore.NewJSONEncoder(encoderCfg),
 		zapcore.Lock(os.Stdout),
 		atom,
-	), zap.AddCaller()).With(zap.String("ServiceName", "cos-csi-mounter"))
+	), zap.AddCaller()).With(
+		zap.String("service", "cos-csi-mounter"),
+		zap.String("component", "mounter-server"))
 	atom.SetLevel(zap.InfoLevel)
 	return logger
 }
@@ -163,10 +170,10 @@ func main() {
 
 func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Extract request ID from HTTP header
+		// Extract request ID from HTTP header or generate one
 		reqID := c.GetHeader("X-Request-ID")
 		if reqID == "" {
-			reqID = "unknown"
+			reqID = loggerPkg.GenerateRequestID()
 		}
 		log := logger.With(zap.String("request_id", reqID))
 
@@ -209,7 +216,10 @@ func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser)
 		log.Info("Mounting bucket",
 			zap.String("path", request.Path),
 			zap.String("mounter", request.Mounter))
-		err = mounter.FuseMount(request.Path, request.Mounter, args)
+
+		// Create context with request_id for end-to-end tracing
+		ctx := context.WithValue(c.Request.Context(), "request_id", reqID)
+		err = mounter.FuseMount(ctx, request.Path, request.Mounter, args)
 		if err != nil {
 			log.Error("Mount failed", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("[%s] mount failed: %v", reqID, err)})
@@ -225,10 +235,10 @@ func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser)
 
 func handleCosUnmount(mounter mounterUtils.MounterUtils) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Extract request ID from HTTP header
+		// Extract request ID from HTTP header or generate one
 		reqID := c.GetHeader("X-Request-ID")
 		if reqID == "" {
-			reqID = "unknown"
+			reqID = loggerPkg.GenerateRequestID()
 		}
 		log := logger.With(zap.String("request_id", reqID))
 
@@ -245,7 +255,10 @@ func handleCosUnmount(mounter mounterUtils.MounterUtils) gin.HandlerFunc {
 		log.Info("New unmount request", zap.String("path", request.Path))
 
 		log.Info("Unmounting bucket", zap.String("path", request.Path))
-		err := mounter.FuseUnmount(request.Path)
+
+		// Create context with request_id for end-to-end tracing
+		ctx := context.WithValue(c.Request.Context(), "request_id", reqID)
+		err := mounter.FuseUnmount(ctx, request.Path)
 		if err != nil {
 			log.Error("Unmount failed", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("[%s] unmount failed: %v", reqID, err)})

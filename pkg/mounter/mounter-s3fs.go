@@ -199,7 +199,7 @@ func (s3fs *S3fsMounter) Mount(ctx context.Context, source string, target string
 	}
 
 	logger.Info(ctx, s3fs.logger, "NodeServer mounting")
-	err = s3fs.MounterUtils.FuseMount(target, constants.S3FS, args)
+	err = s3fs.MounterUtils.FuseMount(ctx, target, constants.S3FS, args)
 	if err != nil {
 		logger.Error(ctx, s3fs.logger, "FuseMount failed", zap.Error(err))
 	} else {
@@ -229,7 +229,7 @@ func (s3fs *S3fsMounter) Unmount(ctx context.Context, target string) error {
 
 	logger.Info(ctx, s3fs.logger, "NodeServer unmounting")
 
-	err := s3fs.MounterUtils.FuseUnmount(target)
+	err := s3fs.MounterUtils.FuseUnmount(ctx, target)
 	if err != nil {
 		logger.Error(ctx, s3fs.logger, "FuseUnmount failed", zap.Error(err))
 		return err

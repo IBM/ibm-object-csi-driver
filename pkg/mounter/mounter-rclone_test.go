@@ -138,7 +138,7 @@ func TestRcloneMount_NodeServer_Positive(t *testing.T) {
 		UID:        "testUID",
 		logger:     zap.NewNop(),
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseMountFn: func(path, comm string, args []string) error {
+			FuseMountFn: func(ctx context.Context, path, comm string, args []string) error {
 				return nil
 			},
 		}),
@@ -178,7 +178,7 @@ func TestRcloneMount_WorkerNode_Positive(t *testing.T) {
 		ObjectPath: "testObjectPath",
 		logger:     zap.NewNop(),
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseMountFn: func(path, comm string, args []string) error {
+			FuseMountFn: func(ctx context.Context, path, comm string, args []string) error {
 				return nil
 			},
 		}),
@@ -207,7 +207,7 @@ func TestRcloneMount_WorkerNode_Negative(t *testing.T) {
 		ObjectPath: "testObjectPath",
 		logger:     zap.NewNop(),
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseMountFn: func(path, comm string, args []string) error {
+			FuseMountFn: func(ctx context.Context, path, comm string, args []string) error {
 				return nil
 			},
 		}),
@@ -233,7 +233,7 @@ func TestRcloneUnmount_NodeServer(t *testing.T) {
 	rclone := &RcloneMounter{
 		logger: zap.NewNop(),
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseUnmountFn: func(path string) error {
+			FuseUnmountFn: func(ctx context.Context, path string) error {
 				return nil
 			},
 		}),
@@ -251,7 +251,7 @@ func TestRcloneUnmount_WorkerNode(t *testing.T) {
 	rclone := &RcloneMounter{
 		logger: zap.NewNop(),
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseUnmountFn: func(path string) error {
+			FuseUnmountFn: func(ctx context.Context, path string) error {
 				return nil
 			},
 		})}
@@ -270,7 +270,7 @@ func TestRcloneUnmount_WorkerNode_Negative(t *testing.T) {
 	rclone := &RcloneMounter{
 		logger: zap.NewNop(),
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseUnmountFn: func(path string) error {
+			FuseUnmountFn: func(ctx context.Context, path string) error {
 				return nil
 			},
 		}),
@@ -293,7 +293,7 @@ func TestRcloneUnmount_NodeServer_Negative(t *testing.T) {
 	rclone := &RcloneMounter{
 		logger: zap.NewNop(),
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseUnmountFn: func(path string) error {
+			FuseUnmountFn: func(ctx context.Context, path string) error {
 				return errors.New("failed to unmount")
 			},
 		}),

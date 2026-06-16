@@ -59,18 +59,23 @@ func getOptions() *Options {
 }
 
 func getZapLogger() *zap.Logger {
-	// Prepare a new logger
+	// Prepare a new logger with standardized JSON format
 	atom := zap.NewAtomicLevel()
 	encoderCfg := zap.NewProductionEncoderConfig()
 	encoderCfg.TimeKey = "timestamp"
 	encoderCfg.EncodeTime = zapcore.ISO8601TimeEncoder
-	encoderCfg.EncodeLevel = zapcore.CapitalLevelEncoder
+	encoderCfg.EncodeLevel = zapcore.LowercaseLevelEncoder
+	encoderCfg.MessageKey = "msg"
+	encoderCfg.CallerKey = "caller"
+	encoderCfg.LevelKey = "level"
 
 	logger := zap.New(zapcore.NewCore(
-		zapcore.NewConsoleEncoder(encoderCfg),
+		zapcore.NewJSONEncoder(encoderCfg),
 		zapcore.Lock(os.Stdout),
 		atom,
-	), zap.AddCaller()).With(zap.String("name", config.CSIPluginGithubName)).With(zap.String("CSIDriverName", "IBM CSI Object Driver"))
+	), zap.AddCaller()).With(
+		zap.String("service", "ibm-object-csi-driver"),
+		zap.String("component", "csi-driver"))
 
 	atom.SetLevel(zap.InfoLevel)
 	return logger

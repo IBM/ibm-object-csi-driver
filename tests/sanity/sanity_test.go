@@ -229,11 +229,11 @@ func (v providerIDGenerator) GenerateUniqueValidVolumeID() string {
 type FakeNewMounterOptsUtils struct {
 }
 
-func (su *FakeNewMounterOptsUtils) FuseUnmount(path string) error {
+func (su *FakeNewMounterOptsUtils) FuseUnmount(ctx context.Context, path string) error {
 	return nil
 }
 
-func (m *FakeNewMounterOptsUtils) FuseMount(path string, comm string, args []string) error {
+func (m *FakeNewMounterOptsUtils) FuseMount(ctx context.Context, path string, comm string, args []string) error {
 	return nil
 }
 

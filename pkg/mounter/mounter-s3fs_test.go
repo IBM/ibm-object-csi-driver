@@ -84,7 +84,7 @@ func TestS3FSMount_NodeServer_Positive(t *testing.T) {
 
 	s3fs := &S3fsMounter{
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseMountFn: func(path, comm string, args []string) error {
+			FuseMountFn: func(ctx context.Context, path, comm string, args []string) error {
 				return nil
 			},
 		}),
@@ -113,7 +113,7 @@ func TestS3FSMount_WorkerNode_Positive(t *testing.T) {
 
 	s3fs := &S3fsMounter{
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseMountFn: func(path, comm string, args []string) error {
+			FuseMountFn: func(ctx context.Context, path, comm string, args []string) error {
 				return nil
 			},
 		}),
@@ -186,7 +186,7 @@ func TestUnmount_NodeServer(t *testing.T) {
 	s3fs := &S3fsMounter{
 		logger: zap.NewNop(),
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseUnmountFn: func(path string) error {
+			FuseUnmountFn: func(ctx context.Context, path string) error {
 				return nil
 			},
 		}),
@@ -204,7 +204,7 @@ func TestUnmount_WorkerNode(t *testing.T) {
 	s3fs := &S3fsMounter{
 		logger: zap.NewNop(),
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseUnmountFn: func(path string) error {
+			FuseUnmountFn: func(ctx context.Context, path string) error {
 				return nil
 			},
 		}),
@@ -224,7 +224,7 @@ func TestUnmount_WorkerNode_Negative(t *testing.T) {
 	s3fs := &S3fsMounter{
 		logger: zap.NewNop(),
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseUnmountFn: func(path string) error {
+			FuseUnmountFn: func(ctx context.Context, path string) error {
 				return nil
 			},
 		}),
@@ -247,7 +247,7 @@ func TestUnmount_NodeServer_Negative(t *testing.T) {
 	s3fs := &S3fsMounter{
 		logger: zap.NewNop(),
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseUnmountFn: func(path string) error {
+			FuseUnmountFn: func(ctx context.Context, path string) error {
 				return errors.New("failed to unmount")
 			},
 		}),
