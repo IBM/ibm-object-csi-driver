@@ -20,6 +20,13 @@ import (
 	k8sMountUtils "k8s.io/mount-utils"
 )
 
+// contextKey is a custom type for context keys to avoid collisions
+type contextKey string
+
+const (
+	requestIDKey contextKey = "request_id"
+)
+
 var unmount = syscall.Unmount
 var commandWithCtx = exec.CommandContext
 
@@ -38,7 +45,7 @@ func getRequestIDFromContext(ctx context.Context) string {
 	if ctx == nil {
 		return "unknown"
 	}
-	if reqID, ok := ctx.Value("request_id").(string); ok && reqID != "" {
+	if reqID, ok := ctx.Value(requestIDKey).(string); ok && reqID != "" {
 		return reqID
 	}
 	return "unknown"

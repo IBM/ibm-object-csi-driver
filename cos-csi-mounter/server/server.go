@@ -24,6 +24,13 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// contextKey is a custom type for context keys to avoid collisions
+type contextKey string
+
+const (
+	requestIDKey contextKey = "request_id"
+)
+
 var (
 	logger             *zap.Logger
 	MakeDir            = os.MkdirAll
@@ -218,7 +225,7 @@ func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser)
 			zap.String("mounter", request.Mounter))
 
 		// Create context with request_id for end-to-end tracing
-		ctx := context.WithValue(c.Request.Context(), "request_id", reqID)
+		ctx := context.WithValue(c.Request.Context(), requestIDKey, reqID)
 		err = mounter.FuseMount(ctx, request.Path, request.Mounter, args)
 		if err != nil {
 			log.Error("Mount failed", zap.Error(err))
@@ -257,7 +264,7 @@ func handleCosUnmount(mounter mounterUtils.MounterUtils) gin.HandlerFunc {
 		log.Info("Unmounting bucket", zap.String("path", request.Path))
 
 		// Create context with request_id for end-to-end tracing
-		ctx := context.WithValue(c.Request.Context(), "request_id", reqID)
+		ctx := context.WithValue(c.Request.Context(), requestIDKey, reqID)
 		err := mounter.FuseUnmount(ctx, request.Path)
 		if err != nil {
 			log.Error("Unmount failed", zap.Error(err))
