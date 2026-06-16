@@ -29,6 +29,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kubernetes-csi/csi-test/v5/pkg/sanity"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -182,8 +183,12 @@ type FakeS3fsMounterFactory struct {
 }
 
 func FakeNewS3fsMounterFactory() *FakeS3fsMounterFactory {
-	// Create a no-op logger for tests
-	logger, _ := zap.NewDevelopment()
+	// Create a JSON logger for tests
+	config := zap.NewProductionConfig()
+	config.EncoderConfig.TimeKey = "timestamp"
+	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	config.EncoderConfig.EncodeLevel = zapcore.LowercaseLevelEncoder
+	logger, _ := config.Build()
 	return &FakeS3fsMounterFactory{logger: logger}
 }
 

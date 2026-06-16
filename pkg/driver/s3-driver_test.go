@@ -36,8 +36,13 @@ const defaultMode = "controller"
 
 // GetTestLogger ...
 func GetTestLogger(t *testing.T) (logger *zap.Logger, teardown func()) {
-	config := zap.NewDevelopmentConfig()
-	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	config := zap.NewProductionConfig()
+	config.EncoderConfig.TimeKey = "timestamp"
+	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	config.EncoderConfig.EncodeLevel = zapcore.LowercaseLevelEncoder
+	config.EncoderConfig.MessageKey = "msg"
+	config.EncoderConfig.CallerKey = "caller"
+	config.EncoderConfig.LevelKey = "level"
 	buf := &bytes.Buffer{}
 
 	logger, _ = config.Build()
