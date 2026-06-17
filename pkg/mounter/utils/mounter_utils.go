@@ -20,8 +20,11 @@ import (
 	k8sMountUtils "k8s.io/mount-utils"
 )
 
+// ContextKey is a custom type for context keys to avoid collisions
+type ContextKey string
+
 // RequestIDKey is the context key for request ID (exported for use by other packages)
-const RequestIDKey = "ibm-cos-csi-request-id"
+const RequestIDKey ContextKey = "ibm-cos-csi-request-id"
 
 var unmount = syscall.Unmount
 var commandWithCtx = exec.CommandContext
