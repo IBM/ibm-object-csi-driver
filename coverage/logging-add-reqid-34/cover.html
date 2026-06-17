@@ -801,6 +801,7 @@ func (args S3FSArgs) Validate(targetPath string) error <span class="cov10" title
 package main
 
 import (
+        "context"
         "flag"
         "fmt"
         "net"
@@ -815,7 +816,6 @@ import (
         "github.com/IBM/ibm-object-csi-driver/pkg/constants"
         loggerPkg "github.com/IBM/ibm-object-csi-driver/pkg/logger"
         mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
-        "github.com/IBM/ibm-object-csi-driver/pkg/requestid"
         "github.com/gin-gonic/gin"
         "go.uber.org/zap"
         "go.uber.org/zap/zapcore"
@@ -1015,7 +1015,7 @@ func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser)
                         zap.String("mounter", request.Mounter))
 
                 // Create context with request_id for end-to-end tracing
-                ctx := requestid.WithRequestID(c.Request.Context(), reqID)
+                ctx := context.WithValue(c.Request.Context(), mounterUtils.RequestIDKey, reqID)
                 err = mounter.FuseMount(ctx, request.Path, request.Mounter, args)
                 if err != nil </span><span class="cov1" title="1">{
                         log.Error("Mount failed", zap.Error(err))
@@ -1054,7 +1054,7 @@ func handleCosUnmount(mounter mounterUtils.MounterUtils) gin.HandlerFunc <span c
                 log.Info("Unmounting bucket", zap.String("path", request.Path))
 
                 // Create context with request_id for end-to-end tracing
-                ctx := requestid.WithRequestID(c.Request.Context(), reqID)
+                ctx := context.WithValue(c.Request.Context(), mounterUtils.RequestIDKey, reqID)
                 err := mounter.FuseUnmount(ctx, request.Path)
                 if err != nil </span><span class="cov1" title="1">{
                         log.Error("Unmount failed", zap.Error(err))
