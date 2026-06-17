@@ -18,11 +18,12 @@ import (
 	"github.com/google/uuid"
 )
 
-type contextKey string
+// ContextKey is a custom type for context keys to avoid collisions
+type ContextKey string
 
 const (
 	// RequestIDKey is the context key for storing request IDs
-	RequestIDKey contextKey = "request-id"
+	RequestIDKey ContextKey = "request-id"
 )
 
 // Generate creates a new UUID v4 request ID
@@ -56,7 +57,7 @@ func GetOrGenerate(ctx context.Context) (context.Context, string) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	
+
 	requestID := FromContext(ctx)
 	if requestID == "" {
 		requestID = Generate()
@@ -74,5 +75,3 @@ func MustGet(ctx context.Context) string {
 	}
 	return requestID
 }
-
-
