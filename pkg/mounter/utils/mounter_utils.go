@@ -106,7 +106,7 @@ func (su *MounterOptsUtils) FuseMount(ctx context.Context, path string, comm str
 		log.Info("FuseMount: waitForMount() goroutine start",
 			zap.String("mounter", comm),
 			zap.String("path", path))
-		mountCh <- waitForMount(mountCtx, path, 2*time.Second, 30*time.Second) // kubelet retries NodePublishVolume after 120 seconds
+		mountCh <- waitForMount(mountCtx, log, path, 2*time.Second, 30*time.Second) // kubelet retries NodePublishVolume after 120 seconds
 		log.Info("FuseMount: waitForMount() goroutine end",
 			zap.String("mounter", comm),
 			zap.String("path", path))
@@ -121,7 +121,7 @@ func (su *MounterOptsUtils) FuseMount(ctx context.Context, path string, comm str
 				zap.Error(err))
 			log.Info("FuseMount: checking if path already exists and is a mountpoint",
 				zap.String("path", path))
-			if isMount, err1 := isMountpoint(path); err1 == nil && isMount { // check if bucket already got mounted
+			if isMount, err1 := isMountpoint(log, path); err1 == nil && isMount { // check if bucket already got mounted
 				log.Info("Bucket is already mounted", zap.String("mounter", comm))
 				mounted = true
 				return nil
@@ -154,7 +154,7 @@ func (su *MounterOptsUtils) FuseUnmount(ctx context.Context, path string) error 
 
 	log.Info("FuseUnmount started", zap.String("path", path))
 	// check if mountpoint exists
-	isMount, checkMountErr := isMountpoint(path)
+	isMount, checkMountErr := isMountpoint(log, path)
 	if isMount || checkMountErr != nil {
 		log.Info("isMountpoint check", zap.Bool("is_mount", isMount))
 		err := unmount(path, 0)
@@ -186,7 +186,7 @@ func (su *MounterOptsUtils) FuseUnmount(ctx context.Context, path string) error 
 	}
 
 	// as fuse quits immediately, we will try to wait until the process is done
-	process, err := findFuseMountProcess(path)
+	process, err := findFuseMountProcess(log, path)
 	if err != nil {
 		log.Info("Error getting PID of fuse mount", zap.Error(err))
 		return nil
@@ -200,7 +200,7 @@ func (su *MounterOptsUtils) FuseUnmount(ctx context.Context, path string) error 
 		zap.Int("pid", process.Pid),
 		zap.String("path", path))
 
-	err = waitForProcess(process, 1)
+	err = waitForProcess(log, process, 1)
 	if errors.Is(err, ErrTimeoutWaitProcess) {
 		log.Info("Timeout waiting for pid to end, killing process",
 			zap.Int("pid", process.Pid))
@@ -210,12 +210,12 @@ func (su *MounterOptsUtils) FuseUnmount(ctx context.Context, path string) error 
 	return err
 }
 
-func isMountpoint(pathname string) (bool, error) {
-	mounterUtilLogger.Info("Checking if path is mountpoint", zap.String("pathname", pathname))
+func isMountpoint(log *zap.Logger, pathname string) (bool, error) {
+	log.Info("Checking if path is mountpoint", zap.String("pathname", pathname))
 
 	out, err := exec.Command("mountpoint", pathname).CombinedOutput()
 	outStr := strings.ToLower(strings.TrimSpace(string(out)))
-	mounterUtilLogger.Info("Mountpoint status",
+	log.Info("Mountpoint status",
 		zap.String("path", pathname),
 		zap.Error(err),
 		zap.String("output", string(out)))
@@ -224,24 +224,24 @@ func isMountpoint(pathname string) (bool, error) {
 			return true, nil
 		}
 		if strings.HasSuffix(outStr, "is not a mountpoint") {
-			mounterUtilLogger.Info("Path is NOT a mountpoint", zap.String("pathname", pathname))
+			log.Info("Path is NOT a mountpoint", zap.String("pathname", pathname))
 			return false, nil
 		}
-		mounterUtilLogger.Error("Failed to check mountpoint for path",
+		log.Error("Failed to check mountpoint for path",
 			zap.String("path", pathname),
 			zap.Error(err),
 			zap.String("output", string(out)))
 		return false, fmt.Errorf("failed to check mountpoint for path '%s', error: %v, output: %s", pathname, err, string(out))
 	}
 	if strings.HasSuffix(outStr, "is a mountpoint") {
-		mounterUtilLogger.Info("Path is a mountpoint", zap.String("pathname", pathname))
+		log.Info("Path is a mountpoint", zap.String("pathname", pathname))
 		return true, nil
 	}
 
 	return false, nil
 }
 
-func waitForMount(ctx context.Context, path string, initialDelay, timeout time.Duration) error {
+func waitForMount(ctx context.Context, log *zap.Logger, path string, initialDelay, timeout time.Duration) error {
 	if initialDelay > 0 {
 		time.Sleep(initialDelay)
 	}
@@ -251,16 +251,16 @@ func waitForMount(ctx context.Context, path string, initialDelay, timeout time.D
 		select {
 		case <-ctx.Done():
 			err := ctx.Err()
-			mounterUtilLogger.Info("waitForMount: context is done", zap.Error(err))
+			log.Info("waitForMount: context is done", zap.Error(err))
 			return err
 		default:
 			isMount, err := k8sMountUtils.New("").IsMountPoint(path)
 			if err == nil && isMount {
-				mounterUtilLogger.Info("Path is a mountpoint", zap.String("pathname", path))
+				log.Info("Path is a mountpoint", zap.String("pathname", path))
 				return nil
 			}
 
-			mounterUtilLogger.Info("Mountpoint check in progress",
+			log.Info("Mountpoint check in progress",
 				zap.Int("attempt", attempt),
 				zap.String("path", path),
 				zap.Bool("is_mount", isMount),
@@ -276,7 +276,7 @@ func waitForMount(ctx context.Context, path string, initialDelay, timeout time.D
 	}
 }
 
-func findFuseMountProcess(path string) (*os.Process, error) {
+func findFuseMountProcess(log *zap.Logger, path string) (*os.Process, error) {
 	processes, err := ps.Processes()
 	if err != nil {
 		return nil, err
@@ -284,13 +284,13 @@ func findFuseMountProcess(path string) (*os.Process, error) {
 	for _, p := range processes {
 		cmdLine, err := getCmdLine(p.Pid())
 		if err != nil {
-			mounterUtilLogger.Error("Unable to get cmdline of PID",
+			log.Error("Unable to get cmdline of PID",
 				zap.Int("pid", p.Pid()),
 				zap.Error(err))
 			continue
 		}
 		if strings.Contains(cmdLine, path) {
-			mounterUtilLogger.Info("Found matching pid on path",
+			log.Info("Found matching pid on path",
 				zap.Int("pid", p.Pid()),
 				zap.String("path", path))
 			return os.FindProcess(p.Pid())
@@ -308,14 +308,14 @@ func getCmdLine(pid int) (string, error) {
 	return string(cmdLine), nil
 }
 
-func waitForProcess(p *os.Process, backoff int) error {
+func waitForProcess(log *zap.Logger, p *os.Process, backoff int) error {
 	// totally it waits 60 seconds before force killing the process
 	if backoff == 120 {
 		return ErrTimeoutWaitProcess
 	}
 	cmdLine, err := getCmdLine(p.Pid)
 	if err != nil {
-		mounterUtilLogger.Warn("Error checking cmdline of PID, assuming it is dead",
+		log.Warn("Error checking cmdline of PID, assuming it is dead",
 			zap.Int("pid", p.Pid),
 			zap.Error(err))
 		return nil
@@ -324,17 +324,17 @@ func waitForProcess(p *os.Process, backoff int) error {
 		// ignore defunct processes
 		// TODO: debug why this happens in the first place
 		// seems to only happen on k8s, not on local docker
-		mounterUtilLogger.Warn("Fuse process seems dead, returning")
+		log.Warn("Fuse process seems dead, returning")
 		return nil
 	}
 	if err := p.Signal(syscall.Signal(0)); err != nil {
-		mounterUtilLogger.Warn("Fuse process does not seem active or we are unprivileged",
+		log.Warn("Fuse process does not seem active or we are unprivileged",
 			zap.Error(err))
 		return nil
 	}
-	mounterUtilLogger.Info("Fuse process still active, waiting",
+	log.Info("Fuse process still active, waiting",
 		zap.Int("pid", p.Pid),
 		zap.Int("backoff", backoff))
 	time.Sleep(time.Duration(500) * time.Millisecond)
-	return waitForProcess(p, backoff+1)
+	return waitForProcess(log, p, backoff+1)
 }
