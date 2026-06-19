@@ -221,17 +221,17 @@ func parseAndClassifyMountOption(optionStr string, knownOptions *pkgutils.Set) (
 	if optionStr == "" {
 		return "", "", false
 	}
-	
+
 	opts := strings.SplitN(optionStr, "=", 2)
 	optName := strings.TrimSpace(opts[0])
-	
+
 	if len(opts) == 2 {
 		optValue := strings.TrimSpace(opts[1])
 		return optName, optValue, knownOptions.Contains(optName)
 	} else if len(opts) == 1 {
 		return optName, optName, knownOptions.Contains(optName)
 	}
-	
+
 	return "", "", false
 }
 
