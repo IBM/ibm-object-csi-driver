@@ -8,6 +8,7 @@ import (
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
+	pkgutils "github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -123,7 +124,7 @@ func TestNewMounter(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			factory := &CSIMounterFactory{}
 
-			result := factory.NewMounter(test.attrib, test.secretMap, test.mountOptions, nil)
+			result := factory.NewMounter(test.attrib, test.secretMap, test.mountOptions, GetKnownS3FSOptions(), nil)
 
 			if s3fs, ok := result.(*S3fsMounter); ok {
 				expected := test.expected.(*S3fsMounter)
@@ -152,7 +153,7 @@ func TestNewMounter(t *testing.T) {
 }
 
 func TestParseAndClassifyMountOption(t *testing.T) {
-	knownOptions := map[string]bool{"cipher_suites": true, "allow_other": true}
+	knownOptions := pkgutils.NewSetWithValues("cipher_suites", "allow_other")
 
 	tests := []struct {
 		opt       string
@@ -230,7 +231,7 @@ func TestUpdateS3FSMountOptionsWithUnknownOptions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, addMountParam := updateS3FSMountOptions(tt.defaultMountOp, tt.secretMap, map[string]string{})
+			_, addMountParam := updateS3FSMountOptions(tt.defaultMountOp, tt.secretMap, GetKnownS3FSOptions(), map[string]string{})
 			hasUnknown := addMountParam != ""
 			if hasUnknown != tt.wantUnknownNotEmpty {
 				t.Errorf("got addMountParam=%q, wantUnknownNotEmpty=%v", addMountParam, tt.wantUnknownNotEmpty)

@@ -22,6 +22,7 @@ import (
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
+	pkgutils "github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"k8s.io/klog/v2"
 )
 
@@ -51,7 +52,7 @@ var (
 	removeFile    = removeS3FSCredFile
 )
 
-func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils, defaultParams map[string]string) Mounter {
+func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils, knownS3FSOptions *pkgutils.Set, defaultParams map[string]string) Mounter {
 	klog.Info("-newS3fsMounter-")
 
 	var (
@@ -104,7 +105,7 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 	klog.Infof("newS3fsMounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]\n\tkpRootKeyCrn: [%s]",
 		mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType, mounter.KpRootKeyCrn)
 
-	updatedOptions, addMountParam := updateS3FSMountOptions(mountOptions, secretMap, defaultParams)
+	updatedOptions, addMountParam := updateS3FSMountOptions(mountOptions, secretMap, knownS3FSOptions, defaultParams)
 	mounter.MountOptions = updatedOptions
 	mounter.AddMountParam = addMountParam
 
@@ -215,7 +216,7 @@ func (s3fs *S3fsMounter) Unmount(target string) error {
 }
 
 // parseAndClassifyMountOption parses and classifies mount options as known or unknown
-func parseAndClassifyMountOption(optionStr string, knownOptions map[string]bool) (string, string, bool) {
+func parseAndClassifyMountOption(optionStr string, knownOptions *pkgutils.Set) (string, string, bool) {
 	optionStr = strings.TrimSpace(optionStr)
 	if optionStr == "" {
 		return "", "", false
@@ -226,55 +227,62 @@ func parseAndClassifyMountOption(optionStr string, knownOptions map[string]bool)
 	
 	if len(opts) == 2 {
 		optValue := strings.TrimSpace(opts[1])
-		return optName, optValue, knownOptions[optName]
+		return optName, optValue, knownOptions.Contains(optName)
 	} else if len(opts) == 1 {
-		return optName, optName, knownOptions[optName]
+		return optName, optName, knownOptions.Contains(optName)
 	}
 	
 	return "", "", false
 }
 
-func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string, defaultParams map[string]string) ([]string, string) {
-	knownS3FSOptions := map[string]bool{
-		"allow_other": true, "auto_cache": true, "cipher_suites": true,
-		"connect_timeout": true, "curldbg": true, "dbglevel": true,
-		"default_acl": true, "disable_noobj_cache": true, "endpoint": true,
-		"gid": true, "ibm_iam_auth": true, "ibm_iam_endpoint": true,
-		"instance_name": true, "kernel_cache": true, "max_background": true,
-		"max_dirty_data": true, "max_stat_cache_size": true, "mp_umask": true,
-		"multipart_size": true, "multireq_max": true, "parallel_count": true,
-		"passwd_file": true, "ro": true, "readwrite_timeout": true,
-		"retries": true, "sigv2": true, "sigv4": true,
-		"stat_cache_expire": true, "uid": true, "umask": true,
-		"url": true, "use_path_request_style": true, "use_xattr": true,
-		"tmpdir": true, "use_cache": true,
-	}
+// GetKnownS3FSOptions returns a Set of known s3fs mount option names used to
+// classify options as known (standard s3fs) or unknown (custom for addMountParam)
+func GetKnownS3FSOptions() *pkgutils.Set {
+	return pkgutils.NewSetWithValues(
+		"allow_other", "auto_cache", "cipher_suites",
+		"connect_timeout", "curldbg", "dbglevel",
+		"default_acl", "disable_noobj_cache", "endpoint",
+		"gid", "ibm_iam_auth", "ibm_iam_endpoint",
+		"instance_name", "kernel_cache", "max_background",
+		"max_dirty_data", "max_stat_cache_size", "mp_umask",
+		"multipart_size", "multireq_max", "parallel_count",
+		"passwd_file", "ro", "readwrite_timeout",
+		"retries", "sigv2", "sigv4",
+		"stat_cache_expire", "uid", "umask",
+		"url", "use_path_request_style", "use_xattr",
+		"tmpdir", "use_cache",
+	)
+}
 
-	mountOptsMap := make(map[string]string)
-	unknownOptionsMap := make(map[string]string)
-
-	for _, val := range defaultMountOp {
-		optName, optValue, isKnown := parseAndClassifyMountOption(val, knownS3FSOptions)
+// classifyMountOptions separates mount options into known and unknown categories by checking against knownOptions Set
+func classifyMountOptions(options []string, knownOptions *pkgutils.Set, knownMap, unknownMap map[string]string) {
+	for _, opt := range options {
+		optName, optValue, isKnown := parseAndClassifyMountOption(opt, knownOptions)
 		if optName == "" {
+			if strings.TrimSpace(opt) != "" {
+				klog.Infof("Invalid mount option: %s", opt)
+			}
 			continue
 		}
-		
+
 		if isKnown {
-			mountOptsMap[optName] = optValue
+			knownMap[optName] = optValue
 		} else {
-			unknownOptionsMap[optName] = optValue
+			unknownMap[optName] = optValue
 		}
 	}
+}
 
-	if val, check := secretMap["tmpdir"]; check {
+func applySecretOverrides(secretMap, mountOptsMap map[string]string) {
+	if val, ok := secretMap["tmpdir"]; ok {
 		mountOptsMap["tmpdir"] = val
 	}
 
-	if val, check := secretMap["use_cache"]; check {
+	if val, ok := secretMap["use_cache"]; ok {
 		mountOptsMap["use_cache"] = val
 	}
 
-	if val, check := secretMap["gid"]; check {
+	if val, ok := secretMap["gid"]; ok {
 		mountOptsMap["gid"] = val
 	}
 
@@ -283,61 +291,49 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 	} else if secretMap["uid"] != "" {
 		mountOptsMap["uid"] = secretMap["uid"]
 	}
+}
 
-	stringData, ok := secretMap["mountOptions"]
-	if !ok {
-		klog.Infof("No new mountOptions found. Using default mountOptions: %v", mountOptsMap)
-	} else {
-		lines := strings.Split(stringData, "\n")
-		for _, line := range lines {
-			optName, optValue, isKnown := parseAndClassifyMountOption(line, knownS3FSOptions)
-			if optName == "" {
-				if strings.TrimSpace(line) != "" {
-					klog.Infof("Invalid mount option: %s\n", line)
-				}
-				continue
-			}
-			
-			if isKnown {
-				mountOptsMap[optName] = optValue
-			} else {
-				unknownOptionsMap[optName] = optValue
-			}
-		}
-	}
+func buildMountOptionsArray(mountOptsMap, secretMap, defaultParams map[string]string) []string {
+	updatedOptions := make([]string, 0, len(mountOptsMap)+len(defaultParams))
 
-	// Create array out of map
-	updatedOptions := []string{}
 	for key, val := range mountOptsMap {
-		option := fmt.Sprintf("%s=%s", key, val)
-		isKeyValuePair := true
-
-		if key == val {
-			isKeyValuePair = false
-			option = val
-		}
-
-		if newVal, check := secretMap[key]; check {
-			if isKeyValuePair {
-				option = fmt.Sprintf("%s=%s", key, newVal)
-			} else {
-				option = newVal
-			}
-		}
-
+		option := formatMountOption(key, val, secretMap)
 		updatedOptions = append(updatedOptions, option)
 	}
 
 	for key, value := range defaultParams {
 		if value != "" {
-			if _, ok := mountOptsMap[key]; !ok {
-				option := fmt.Sprintf("%s=%s", key, value)
-				updatedOptions = append(updatedOptions, option)
+			if _, exists := mountOptsMap[key]; !exists {
+				updatedOptions = append(updatedOptions, fmt.Sprintf("%s=%s", key, value))
 			}
 		}
 	}
 
-	var unknownOptionsList []string
+	return updatedOptions
+}
+
+func formatMountOption(key, val string, secretMap map[string]string) string {
+	isKeyValuePair := key != val
+
+	if newVal, ok := secretMap[key]; ok {
+		if isKeyValuePair {
+			return fmt.Sprintf("%s=%s", key, newVal)
+		}
+		return newVal
+	}
+
+	if isKeyValuePair {
+		return fmt.Sprintf("%s=%s", key, val)
+	}
+	return val
+}
+
+func buildAddMountParam(unknownOptionsMap map[string]string) string {
+	if len(unknownOptionsMap) == 0 {
+		return ""
+	}
+
+	unknownOptionsList := make([]string, 0, len(unknownOptionsMap))
 	for optName, optValue := range unknownOptionsMap {
 		if optName == optValue {
 			unknownOptionsList = append(unknownOptionsList, fmt.Sprintf("-o %s", optName))
@@ -345,7 +341,27 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 			unknownOptionsList = append(unknownOptionsList, fmt.Sprintf("-o %s=%s", optName, optValue))
 		}
 	}
-	addMountParam := strings.Join(unknownOptionsList, " ")
+
+	return strings.Join(unknownOptionsList, " ")
+}
+
+func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string, knownS3FSOptions *pkgutils.Set, defaultParams map[string]string) ([]string, string) {
+	mountOptsMap := make(map[string]string)
+	unknownOptionsMap := make(map[string]string)
+
+	// Classify all mount options into known (standard s3fs) and unknown (custom) categories
+	classifyMountOptions(defaultMountOp, knownS3FSOptions, mountOptsMap, unknownOptionsMap)
+	applySecretOverrides(secretMap, mountOptsMap)
+
+	if stringData, ok := secretMap["mountOptions"]; ok {
+		lines := strings.Split(stringData, "\n")
+		classifyMountOptions(lines, knownS3FSOptions, mountOptsMap, unknownOptionsMap)
+	} else {
+		klog.Infof("No new mountOptions found. Using default mountOptions: %v", mountOptsMap)
+	}
+
+	updatedOptions := buildMountOptionsArray(mountOptsMap, secretMap, defaultParams)
+	addMountParam := buildAddMountParam(unknownOptionsMap)
 
 	klog.Infof("updated S3fsMounter Options: %v", updatedOptions)
 	if addMountParam != "" {
