@@ -134,6 +134,8 @@ func TestNewNodeServer(t *testing.T) {
 				assert.Equal(t, ns.Region, testRegion)
 				assert.Equal(t, ns.Zone, testZone)
 				assert.Equal(t, ns.NodeID, nodeID)
+				assert.NotNil(t, ns.KnownS3FSOptions, "KnownS3FSOptions should be initialized")
+				assert.True(t, ns.KnownS3FSOptions.Contains("allow_other"), "Set should contain known s3fs options")
 			},
 			expectedErr: nil,
 		},
