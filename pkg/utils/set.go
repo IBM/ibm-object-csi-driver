@@ -62,4 +62,3 @@ func (s *Set) Size() int {
 	return len(s.m)
 }
 
-// Made with Bob
