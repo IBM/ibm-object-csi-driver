@@ -336,13 +336,13 @@ func buildAddMountParam(unknownOptionsMap map[string]string) string {
 	unknownOptionsList := make([]string, 0, len(unknownOptionsMap))
 	for optName, optValue := range unknownOptionsMap {
 		if optName == optValue {
-			unknownOptionsList = append(unknownOptionsList, fmt.Sprintf("-o %s", optName))
+			unknownOptionsList = append(unknownOptionsList, optName)
 		} else {
-			unknownOptionsList = append(unknownOptionsList, fmt.Sprintf("-o %s=%s", optName, optValue))
+			unknownOptionsList = append(unknownOptionsList, fmt.Sprintf("%s=%s", optName, optValue))
 		}
 	}
 
-	return strings.Join(unknownOptionsList, " ")
+	return strings.Join(unknownOptionsList, ",")
 }
 
 func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string, knownS3FSOptions *pkgutils.Set, defaultParams map[string]string) ([]string, string) {
