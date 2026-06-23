@@ -8,7 +8,6 @@ import (
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
-	pkgutils "github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"github.com/stretchr/testify/assert"
 )
 
