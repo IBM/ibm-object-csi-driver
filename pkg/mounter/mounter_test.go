@@ -152,31 +152,6 @@ func TestNewMounter(t *testing.T) {
 	}
 }
 
-func TestParseAndClassifyMountOption(t *testing.T) {
-	knownOptions := pkgutils.NewSetWithValues("cipher_suites", "allow_other")
-
-	tests := []struct {
-		opt       string
-		wantName  string
-		wantValue string
-		wantKnown bool
-	}{
-		{"cipher_suites=default", "cipher_suites", "default", true},
-		{"allow_other", "allow_other", "allow_other", true},
-		{"enable_content_md5=true", "enable_content_md5", "true", false},
-		{"", "", "", false},
-		{"key=value=extra", "key", "value=extra", false},
-	}
-
-	for _, tt := range tests {
-		name, value, isKnown := parseAndClassifyMountOption(tt.opt, knownOptions)
-		if name != tt.wantName || value != tt.wantValue || isKnown != tt.wantKnown {
-			t.Errorf("parseAndClassifyMountOption(%q) = (%q, %q, %v), want (%q, %q, %v)",
-				tt.opt, name, value, isKnown, tt.wantName, tt.wantValue, tt.wantKnown)
-		}
-	}
-}
-
 func TestUpdateS3FSMountOptionsWithUnknownOptions(t *testing.T) {
 	tests := []struct {
 		name              string

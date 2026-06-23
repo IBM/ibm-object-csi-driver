@@ -288,31 +288,6 @@ func TestRemoveS3FSCredFile_Negative(t *testing.T) {
 	assert.Equal(t, maxRetries, called)
 }
 
-func TestParseAndClassifyMountOption_S3FS(t *testing.T) {
-	knownOpts := pkgutils.NewSetWithValues("allow_other", "parallel_count")
-	
-	tests := []struct {
-		opt, name, val string
-		known          bool
-	}{
-		{"allow_other", "allow_other", "allow_other", true},
-		{"parallel_count=20", "parallel_count", "20", true},
-		{"enable_content_md5", "enable_content_md5", "enable_content_md5", false},
-		{"mime=/etc/mime.types", "mime", "/etc/mime.types", false},
-		{"", "", "", false},
-		{"  ", "", "", false},
-		{"opt=val1=val2", "opt", "val1=val2", false},
-		{" kernel_cache ", "kernel_cache", "kernel_cache", false},
-	}
-
-	for _, tt := range tests {
-		name, val, known := parseAndClassifyMountOption(tt.opt, knownOpts)
-		assert.Equal(t, tt.name, name)
-		assert.Equal(t, tt.val, val)
-		assert.Equal(t, tt.known, known)
-	}
-}
-
 func TestAddMountParam_Integration(t *testing.T) {
 	tests := []struct {
 		name           string
