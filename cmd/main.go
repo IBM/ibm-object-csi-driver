@@ -73,9 +73,7 @@ func getZapLogger() *zap.Logger {
 		zapcore.NewJSONEncoder(encoderCfg),
 		zapcore.Lock(os.Stdout),
 		atom,
-	), zap.AddCaller()).With(
-		zap.String("service", "ibm-object-csi-driver"),
-		zap.String("component", "csi-driver"))
+	), zap.AddCaller())
 
 	atom.SetLevel(zap.InfoLevel)
 	return logger

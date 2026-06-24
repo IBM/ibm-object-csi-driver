@@ -38,10 +38,6 @@ func NewJSONLogger(serviceName string) (*zap.Logger, error) {
 		atom,
 	), zap.AddCaller())
 
-	if serviceName != "" {
-		logger = logger.With(zap.String("service", serviceName))
-	}
-
 	atom.SetLevel(zap.InfoLevel)
 	return logger, nil
 }
@@ -74,10 +70,6 @@ func NewConsoleLogger(serviceName string) (*zap.Logger, error) {
 		zapcore.Lock(os.Stdout),
 		atom,
 	), zap.AddCaller())
-
-	if serviceName != "" {
-		logger = logger.With(zap.String("service", serviceName))
-	}
 
 	atom.SetLevel(zap.InfoLevel)
 	return logger, nil
