@@ -136,17 +136,18 @@ func writePass(pwFileName string, pwFileContent string) error {
 
 func createCOSCSIMounterRequest(ctx context.Context, payload string, url string, log *zap.Logger) error {
 	reqID := requestid.FromContext(ctx)
+	logWithReqID := log.With(zap.String("request_id", reqID))
 
 	// Get socket path
 	socketPath := os.Getenv(constants.COSCSIMounterSocketPathEnv)
 	if socketPath == "" {
 		socketPath = constants.COSCSIMounterSocketPath
 	}
-	log.Info(fmt.Sprintf("[%s] COS CSI Mounter Socket Path", reqID), zap.String("socket_path", socketPath))
+	logWithReqID.Info("COS CSI Mounter Socket Path", zap.String("socket_path", socketPath))
 
 	err := isGRPCServerAvailable(socketPath)
 	if err != nil {
-		log.Error(fmt.Sprintf("[%s] COS CSI Mounter service not available", reqID), zap.Error(err))
+		logWithReqID.Error("COS CSI Mounter service not available", zap.Error(err))
 		return err
 	}
 
@@ -166,33 +167,33 @@ func createCOSCSIMounterRequest(ctx context.Context, payload string, url string,
 	// Create POST request
 	req, err := http.NewRequest("POST", url, strings.NewReader(payload))
 	if err != nil {
-		log.Error(fmt.Sprintf("[%s] Failed to create HTTP request", reqID), zap.Error(err))
+		logWithReqID.Error("Failed to create HTTP request", zap.Error(err))
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Request-ID", reqID) // Add request ID to HTTP header
 
-	log.Info(fmt.Sprintf("[%s] Sending request to cos-csi-mounter", reqID), zap.String("url", url))
+	logWithReqID.Info("Sending request to cos-csi-mounter", zap.String("url", url))
 	response, err := client.Do(req)
 	if err != nil {
-		log.Error(fmt.Sprintf("[%s] Failed to send request to cos-csi-mounter", reqID), zap.Error(err))
+		logWithReqID.Error("Failed to send request to cos-csi-mounter", zap.Error(err))
 		return err
 	}
 
 	defer func() {
 		if err := response.Body.Close(); err != nil {
-			log.Error(fmt.Sprintf("[%s] Failed to close response body", reqID), zap.Error(err))
+			logWithReqID.Error("Failed to close response body", zap.Error(err))
 		}
 	}()
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		log.Error(fmt.Sprintf("[%s] Failed to read response body", reqID), zap.Error(err))
+		logWithReqID.Error("Failed to read response body", zap.Error(err))
 		return err
 	}
 
 	responseBody := string(body)
-	log.Info(fmt.Sprintf("[%s] Response from cos-csi-mounter", reqID),
+	logWithReqID.Info("Response from cos-csi-mounter",
 		zap.String("response_body", responseBody),
 		zap.Int("status_code", response.StatusCode))
 
