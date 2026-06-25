@@ -173,3 +173,49 @@ Collect logs using below commands to check failure messages
 
 1.  `oc logs cos-s3-csi-controller-0 -c cos-csi-provisioner`
 2.  `oc logs cos-s3-csi-driver-xxx -c cos-csi-driver`
+
+## Request ID Tracking
+
+The IBM Object CSI Driver implements comprehensive request ID tracking for end-to-end tracing of operations. Every CSI operation is assigned a unique UUID v4 identifier that flows through all components.
+
+### Key Features
+- **Automatic Request ID Generation**: Every gRPC request gets a unique UUID v4
+- **End-to-End Propagation**: Request ID flows through CSI → S3Client → Mounter → cos-csi-mounter
+- **Structured Logging**: All logs include request ID in both message text and structured fields
+- **Cross-Component Tracing**: Track operations across controller, node, and mounter services
+
+### Quick Start
+
+Filter logs by request ID:
+```bash
+# Get logs for specific request
+kubectl logs <pod-name> -n kube-system | grep "550e8400-e29b-41d4-a716-446655440000"
+
+# Using jq for JSON logs
+kubectl logs <pod-name> -n kube-system | jq 'select(.request_id == "550e8400-...")'
+```
+
+Track complete operation flow:
+```bash
+# Extract request ID from initial log
+REQUEST_ID=$(kubectl logs <pod-name> -n kube-system | \
+  jq -r 'select(.msg | contains("CreateVolume started")) | .request_id' | head -1)
+
+# View all logs for that request
+kubectl logs <pod-name> -n kube-system | jq "select(.request_id == \"$REQUEST_ID\")"
+```
+
+### Documentation
+For comprehensive documentation on request ID tracking, troubleshooting, and best practices, see:
+- [Request ID Tracking Guide](docs/REQUEST_ID_TRACKING.md)
+
+### Example Log Output
+```json
+{
+  "level": "info",
+  "timestamp": "2024-01-15T10:30:45.123Z",
+  "msg": "[550e8400-e29b-41d4-a716-446655440000] CreateVolume started",
+  "request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "volume_name": "pvc-abc123"
+}
+```

@@ -1,12 +1,17 @@
+//go:build linux
+// +build linux
+
 package mounter
 
 import (
+	"context"
 	"errors"
 	"os"
 	"testing"
 
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 )
 
 var (
@@ -131,8 +136,9 @@ func TestRcloneMount_NodeServer_Positive(t *testing.T) {
 		EndPoint:   "testEndpoint",
 		GID:        "testGID",
 		UID:        "testUID",
+		logger:     zap.NewNop(),
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseMountFn: func(path, comm string, args []string) error {
+			FuseMountFn: func(ctx context.Context, path, comm string, args []string) error {
 				return nil
 			},
 		}),
@@ -142,18 +148,20 @@ func TestRcloneMount_NodeServer_Positive(t *testing.T) {
 		return nil
 	}
 
-	err := rclone.Mount(source, target)
+	err := rclone.Mount(context.Background(), source, target)
 	assert.NoError(t, err)
 }
 
 func TestRcloneMount_CreateConfigFails_Negative(t *testing.T) {
-	rclone := &RcloneMounter{}
+	rclone := &RcloneMounter{
+		logger: zap.NewNop(),
+	}
 
 	createConfigWrap = func(_ string, _ *RcloneMounter) error {
 		return errors.New("failed to create config file")
 	}
 
-	err := rclone.Mount(source, target)
+	err := rclone.Mount(context.Background(), source, target)
 	assert.Error(t, err)
 	assert.EqualError(t, err, "failed to create config file")
 }
@@ -168,8 +176,9 @@ func TestRcloneMount_WorkerNode_Positive(t *testing.T) {
 		GID:        "testGID",
 		UID:        "testUID",
 		ObjectPath: "testObjectPath",
+		logger:     zap.NewNop(),
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseMountFn: func(path, comm string, args []string) error {
+			FuseMountFn: func(ctx context.Context, path, comm string, args []string) error {
 				return nil
 			},
 		}),
@@ -178,11 +187,11 @@ func TestRcloneMount_WorkerNode_Positive(t *testing.T) {
 	createConfigWrap = func(_ string, _ *RcloneMounter) error {
 		return nil
 	}
-	mounterRequest = func(_, _ string) error {
+	mounterRequest = func(_ context.Context, _, _ string, _ *zap.Logger) error {
 		return nil
 	}
 
-	err := rclone.Mount(source, target)
+	err := rclone.Mount(context.Background(), source, target)
 	assert.NoError(t, err)
 }
 
@@ -196,8 +205,9 @@ func TestRcloneMount_WorkerNode_Negative(t *testing.T) {
 		GID:        "testGID",
 		UID:        "testUID",
 		ObjectPath: "testObjectPath",
+		logger:     zap.NewNop(),
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseMountFn: func(path, comm string, args []string) error {
+			FuseMountFn: func(ctx context.Context, path, comm string, args []string) error {
 				return nil
 			},
 		}),
@@ -206,11 +216,11 @@ func TestRcloneMount_WorkerNode_Negative(t *testing.T) {
 	createConfigWrap = func(_ string, _ *RcloneMounter) error {
 		return nil
 	}
-	mounterRequest = func(_, _ string) error {
+	mounterRequest = func(_ context.Context, _, _ string, _ *zap.Logger) error {
 		return errors.New("failed to create http request")
 	}
 
-	err := rclone.Mount(source, target)
+	err := rclone.Mount(context.Background(), source, target)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create http request")
 }
@@ -220,13 +230,16 @@ func TestRcloneUnmount_NodeServer(t *testing.T) {
 
 	removeConfigFile = func(_, _ string) {}
 
-	rclone := &RcloneMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-		FuseUnmountFn: func(path string) error {
-			return nil
-		},
-	})}
+	rclone := &RcloneMounter{
+		logger: zap.NewNop(),
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseUnmountFn: func(ctx context.Context, path string) error {
+				return nil
+			},
+		}),
+	}
 
-	err := rclone.Unmount(target)
+	err := rclone.Unmount(context.Background(), target)
 	assert.NoError(t, err)
 }
 
@@ -235,34 +248,39 @@ func TestRcloneUnmount_WorkerNode(t *testing.T) {
 
 	removeConfigFile = func(_, _ string) {}
 
-	rclone := &RcloneMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-		FuseUnmountFn: func(path string) error {
-			return nil
-		},
-	})}
+	rclone := &RcloneMounter{
+		logger: zap.NewNop(),
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseUnmountFn: func(ctx context.Context, path string) error {
+				return nil
+			},
+		})}
 
-	mounterRequest = func(_, _ string) error {
+	mounterRequest = func(_ context.Context, _, _ string, _ *zap.Logger) error {
 		return nil
 	}
 
-	err := rclone.Unmount(target)
+	err := rclone.Unmount(context.Background(), target)
 	assert.NoError(t, err)
 }
 
 func TestRcloneUnmount_WorkerNode_Negative(t *testing.T) {
 	mountWorker = true
 
-	rclone := &RcloneMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-		FuseUnmountFn: func(path string) error {
-			return nil
-		},
-	})}
+	rclone := &RcloneMounter{
+		logger: zap.NewNop(),
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseUnmountFn: func(ctx context.Context, path string) error {
+				return nil
+			},
+		}),
+	}
 
-	mounterRequest = func(_, _ string) error {
+	mounterRequest = func(_ context.Context, _, _ string, _ *zap.Logger) error {
 		return errors.New("failed to create http request")
 	}
 
-	err := rclone.Unmount(target)
+	err := rclone.Unmount(context.Background(), target)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create http request")
 }
@@ -272,13 +290,16 @@ func TestRcloneUnmount_NodeServer_Negative(t *testing.T) {
 
 	removeConfigFile = func(_, _ string) {}
 
-	rclone := &RcloneMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-		FuseUnmountFn: func(path string) error {
-			return errors.New("failed to unmount")
-		},
-	})}
+	rclone := &RcloneMounter{
+		logger: zap.NewNop(),
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseUnmountFn: func(ctx context.Context, path string) error {
+				return errors.New("failed to unmount")
+			},
+		}),
+	}
 
-	err := rclone.Unmount(target)
+	err := rclone.Unmount(context.Background(), target)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to unmount")
 }

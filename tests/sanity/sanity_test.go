@@ -12,6 +12,7 @@
 package sanity
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -28,13 +29,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/kubernetes-csi/csi-test/v5/pkg/sanity"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/klog/v2"
 )
 
 var (
@@ -150,53 +151,63 @@ func (f *FakeObjectStorageSessionFactory) NewObjectStorageSession(endpoint, loca
 	}
 }
 
-func (s *fakeObjectStorageSession) CheckBucketAccess(bucket string) error {
+func (s *fakeObjectStorageSession) CheckBucketAccess(ctx context.Context, bucket string) error {
 	return nil
 }
 
-func (s *fakeObjectStorageSession) SetBucketVersioning(bucketName string, enable bool) error {
+func (s *fakeObjectStorageSession) SetBucketVersioning(ctx context.Context, bucketName string, enable bool) error {
 	s.logger.Info(fmt.Sprintf("Fake SetBucketVersioning called for bucket %s with enable=%t", bucketName, enable))
 	return nil
 }
 
-func (s *fakeObjectStorageSession) CheckObjectPathExistence(bucket, objectpath string) (bool, error) {
+func (s *fakeObjectStorageSession) CheckObjectPathExistence(ctx context.Context, bucket, objectpath string) (bool, error) {
 	return true, nil
 }
 
-func (s *fakeObjectStorageSession) CreateBucket(bucket, kpRootKeyCrn string) (string, error) {
+func (s *fakeObjectStorageSession) CreateBucket(ctx context.Context, bucket, kpRootKeyCrn string) (string, error) {
 	return "", nil
 }
 
-func (s *fakeObjectStorageSession) DeleteBucket(bucket string) error {
+func (s *fakeObjectStorageSession) DeleteBucket(ctx context.Context, bucket string) error {
 	return nil
 }
 
-func (s *fakeObjectStorageSession) UpdateQuotaLimit(quota int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error {
+func (s *fakeObjectStorageSession) UpdateQuotaLimit(ctx context.Context, quota int64, apiKey, bucketName, cosEndpoint, iamEndpoint string) error {
 	s.logger.Info(fmt.Sprintf("Fake UpdateQuotaLimit called for bucket %s with quota %d", bucketName, quota))
 	return nil
 }
 
 // Fake NewMounterFactory
-type FakeS3fsMounterFactory struct{}
+type FakeS3fsMounterFactory struct {
+	logger *zap.Logger
+}
 
 func FakeNewS3fsMounterFactory() *FakeS3fsMounterFactory {
-	return &FakeS3fsMounterFactory{}
+	// Create a JSON logger for tests
+	config := zap.NewProductionConfig()
+	config.EncoderConfig.TimeKey = "timestamp"
+	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	config.EncoderConfig.EncodeLevel = zapcore.LowercaseLevelEncoder
+	logger, _ := config.Build()
+	return &FakeS3fsMounterFactory{logger: logger}
 }
 
-type Fakes3fsMounter struct{}
+type Fakes3fsMounter struct {
+	logger *zap.Logger
+}
 
 func (s *FakeS3fsMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string, defaultMOMap map[string]string) mounter.Mounter {
-	klog.Info("-New S3FS Fake Mounter-")
-	return &Fakes3fsMounter{}
+	s.logger.Info("New S3FS Fake Mounter")
+	return &Fakes3fsMounter{logger: s.logger}
 }
 
-func (s3fs *Fakes3fsMounter) Mount(source string, target string) error {
-	klog.Info("-S3FSMounter Mount-")
+func (s3fs *Fakes3fsMounter) Mount(ctx context.Context, source string, target string) error {
+	s3fs.logger.Info("S3FSMounter Mount", zap.String("source", source), zap.String("target", target))
 	return nil
 }
 
-func (s3fs *Fakes3fsMounter) Unmount(target string) error {
-	klog.Info("-S3FSMounter Unmount-")
+func (s3fs *Fakes3fsMounter) Unmount(ctx context.Context, target string) error {
+	s3fs.logger.Info("S3FSMounter Unmount", zap.String("target", target))
 	return nil
 }
 
@@ -223,11 +234,11 @@ func (v providerIDGenerator) GenerateUniqueValidVolumeID() string {
 type FakeNewMounterOptsUtils struct {
 }
 
-func (su *FakeNewMounterOptsUtils) FuseUnmount(path string) error {
+func (su *FakeNewMounterOptsUtils) FuseUnmount(ctx context.Context, path string) error {
 	return nil
 }
 
-func (m *FakeNewMounterOptsUtils) FuseMount(path string, comm string, args []string) error {
+func (m *FakeNewMounterOptsUtils) FuseMount(ctx context.Context, path string, comm string, args []string) error {
 	return nil
 }
 

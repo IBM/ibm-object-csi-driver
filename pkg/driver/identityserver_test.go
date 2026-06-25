@@ -59,9 +59,16 @@ func TestGetPluginInfo(t *testing.T) {
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		identityServer := &identityServer{
-			S3Driver: tc.s3Driver,
+		// Ensure S3Driver has a logger if it's not nil
+		s3Driver := tc.s3Driver
+		if s3Driver != nil && s3Driver.logger == nil {
+			s3Driver.logger = zap.NewNop()
 		}
+
+		identityServer := &identityServer{
+			S3Driver: s3Driver,
+		}
+
 		actualResp, actualErr := identityServer.GetPluginInfo(ctx, tc.req)
 
 		if tc.expectedErr != nil {
@@ -112,7 +119,9 @@ func TestGetPluginCapabilities(t *testing.T) {
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		identityServer := &identityServer{}
+		identityServer := &identityServer{
+			S3Driver: &S3Driver{logger: zap.NewNop()},
+		}
 		actualResp, actualErr := identityServer.GetPluginCapabilities(ctx, tc.req)
 
 		if tc.expectedErr != nil {
@@ -146,7 +155,9 @@ func TestProbe(t *testing.T) {
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		identityServer := &identityServer{}
+		identityServer := &identityServer{
+			S3Driver: &S3Driver{logger: zap.NewNop()},
+		}
 		actualResp, actualErr := identityServer.Probe(ctx, tc.req)
 
 		if tc.expectedErr != nil {

@@ -15,13 +15,14 @@ import (
 	"fmt"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
+	"github.com/IBM/ibm-object-csi-driver/pkg/logger"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"k8s.io/klog/v2"
 )
 
 // Implements Node Server csi.NodeServer
@@ -42,66 +43,91 @@ type NodeServerConfig struct {
 	TLSCipherSuite    string
 }
 
-func (ns *nodeServer) NodeStageVolume(_ context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	klog.V(2).Infof("CSINodeServer-NodeStageVolume: Request %+v", req)
+func (ns *nodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
+
+	logger.Info(ctx, ns.logger, "NodeStageVolume started")
+	logger.Debug(ctx, ns.logger, "NodeStageVolume request", zap.Any("request", req))
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
+		logger.Error(ctx, ns.logger, "Volume ID missing in request")
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 
 	stagingTargetPath := req.GetStagingTargetPath()
 	if len(stagingTargetPath) == 0 {
+		logger.Error(ctx, ns.logger, "Target path missing in request")
 		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
 	}
 
+	logger.Info(ctx, ns.logger, "NodeStageVolume completed",
+		zap.String("volume_id", volumeID),
+		zap.String("staging_target_path", stagingTargetPath))
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
-func (ns *nodeServer) NodeUnstageVolume(_ context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-	klog.V(2).Infof("CSINodeServer-NodeUnstageVolume: Request %+v", req)
+func (ns *nodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
+
+	logger.Info(ctx, ns.logger, "NodeUnstageVolume started")
+	logger.Debug(ctx, ns.logger, "NodeUnstageVolume request", zap.Any("request", req))
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
+		logger.Error(ctx, ns.logger, "Volume ID missing in request")
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 
 	stagingTargetPath := req.GetStagingTargetPath()
 	if len(stagingTargetPath) == 0 {
+		logger.Error(ctx, ns.logger, "Target path missing in request")
 		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
 	}
 
+	logger.Info(ctx, ns.logger, "NodeUnstageVolume completed",
+		zap.String("volume_id", volumeID),
+		zap.String("staging_target_path", stagingTargetPath))
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
-func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
-	}
-	klog.V(2).Infof("CSINodeServer-NodePublishVolume: Request %v", modifiedRequest.(*csi.NodePublishVolumeRequest))
-
-	volumeMountGroup := req.GetVolumeCapability().GetMount().GetVolumeMountGroup()
-	klog.V(2).Infof("CSINodeServer-NodePublishVolume-: volumeMountGroup: %v", volumeMountGroup)
+func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
+		logger.Error(ctx, ns.logger, "Volume ID missing in request")
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 
 	targetPath := req.GetTargetPath()
 	if len(targetPath) == 0 {
+		logger.Error(ctx, ns.logger, "Target path missing in request")
 		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
 	}
 
+	logger.Info(ctx, ns.logger, "NodePublishVolume started",
+		zap.String("volume_id", volumeID),
+		zap.String("target_path", targetPath))
+
+	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
+	if err != nil {
+		logger.Error(ctx, ns.logger, "Error modifying request", zap.Error(err))
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests: %v", err))
+	}
+	logger.Debug(ctx, ns.logger, "NodePublishVolume request", zap.Any("request", modifiedRequest.(*csi.NodePublishVolumeRequest)))
+
+	volumeMountGroup := req.GetVolumeCapability().GetMount().GetVolumeMountGroup()
+	logger.Debug(ctx, ns.logger, "Volume mount group", zap.String("volume_mount_group", volumeMountGroup))
+
 	if req.GetVolumeCapability() == nil {
+		logger.Error(ctx, ns.logger, "Volume capability missing in request")
 		return nil, status.Error(codes.InvalidArgument, "Volume capability missing in request")
 	}
 
+	logger.Info(ctx, ns.logger, "Checking mount point", zap.String("target_path", targetPath))
 	err = ns.Stats.CheckMount(targetPath)
 	if err != nil {
-		klog.Errorf("Can not validate target mount point: %s %v", targetPath, err)
-		return nil, status.Error(codes.Internal, err.Error())
+		logger.Error(ctx, ns.logger, "Cannot validate target mount point",
+			zap.String("target_path", targetPath), zap.Error(err))
+		return nil, status.Error(codes.Internal, fmt.Sprintf("%v", err.Error()))
 	}
 
 	deviceID := ""
@@ -112,11 +138,17 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 	readOnly := req.GetReadonly()
 	attrib := req.GetVolumeContext()
 	mountFlags := req.GetVolumeCapability().GetMount().GetMountFlags()
-	klog.V(2).Infof("-NodePublishVolume-: targetPath: %v\ndeviceID: %v\nreadonly: %v\nvolumeId: %v\nattributes: %v\nmountFlags: %v\n",
-		targetPath, deviceID, readOnly, volumeID, attrib, mountFlags)
+	logger.Debug(ctx, ns.logger, "NodePublishVolume parameters",
+		zap.String("target_path", targetPath),
+		zap.String("device_id", deviceID),
+		zap.Bool("readonly", readOnly),
+		zap.String("volume_id", volumeID),
+		zap.Any("attributes", attrib),
+		zap.Strings("mount_flags", mountFlags))
 
 	secretMap := req.GetSecrets()
-	klog.V(2).Infof("-NodePublishVolume-: length of req.GetSecrets() length: %v", len(secretMap))
+	logger.Info(ctx, ns.logger, "Secrets received", zap.Int("secret_count", len(secretMap)))
+
 	secretMapCopy := make(map[string]string)
 	for k, v := range secretMap {
 		if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
@@ -125,132 +157,163 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		}
 		secretMapCopy[k] = v
 	}
-	klog.V(2).Infof("-NodePublishVolume-: secretMap: %v", secretMapCopy)
+	logger.Debug(ctx, ns.logger, "Secret map (sanitized)", zap.Any("secret_map", secretMapCopy))
+
 	if volumeMountGroup != "" {
 		secretMap["gid"] = volumeMountGroup
+		logger.Debug(ctx, ns.logger, "Added volume mount group to secrets", zap.String("gid", volumeMountGroup))
 	}
 
 	if len(secretMap["cosEndpoint"]) == 0 {
 		secretMap["cosEndpoint"] = attrib["cosEndpoint"]
+		logger.Debug(ctx, ns.logger, "Using cosEndpoint from attributes", zap.String("cos_endpoint", secretMap["cosEndpoint"]))
 	}
 
 	if len(secretMap["locationConstraint"]) == 0 {
 		secretMap["locationConstraint"] = attrib["locationConstraint"]
+		logger.Debug(ctx, ns.logger, "Using locationConstraint from attributes", zap.String("location_constraint", secretMap["locationConstraint"]))
 	}
 
 	if len(secretMap["cosEndpoint"]) == 0 {
+		logger.Error(ctx, ns.logger, "S3 Service endpoint not provided")
 		return nil, status.Error(codes.InvalidArgument, "S3 Service endpoint not provided")
 	}
 
 	if len(secretMap["iamEndpoint"]) == 0 {
 		secretMap["iamEndpoint"] = ns.iamEndpoint
+		logger.Debug(ctx, ns.logger, "Using default IAM endpoint", zap.String("iam_endpoint", ns.iamEndpoint))
 	}
 
 	// If bucket name wasn't provided by user, we use temp bucket created for volume.
 	if secretMap["bucketName"] == "" {
+		logger.Info(ctx, ns.logger, "Bucket name not provided, fetching from PV")
 		tempBucketName, err := ns.Stats.GetBucketNameFromPV(volumeID)
 		if err != nil {
-			klog.Errorf("Unable to fetch pv %v", err)
-			return nil, status.Error(codes.Internal, err.Error())
+			logger.Error(ctx, ns.logger, "Unable to fetch PV", zap.String("volume_id", volumeID), zap.Error(err))
+			return nil, status.Error(codes.Internal, fmt.Sprintf("%v", err.Error()))
 		}
 
 		if tempBucketName == "" {
-			klog.Errorf("Unable to fetch bucket name from pv")
+			logger.Error(ctx, ns.logger, "Unable to fetch bucket name from PV")
 			return nil, status.Error(codes.Internal, "unable to fetch bucket name from pv")
 		}
 
 		secretMap["bucketName"] = tempBucketName
+		logger.Info(ctx, ns.logger, "Using bucket from PV", zap.String("bucket_name", tempBucketName))
 	}
 
 	var defaultParamsMap = map[string]string{
 		constants.CipherSuitesKey: ns.TLSCipherSuite,
 	}
 
+	logger.Info(ctx, ns.logger, "Creating mounter object")
 	mounterObj := ns.Mounter.NewMounter(attrib, secretMap, mountFlags, defaultParamsMap)
 
-	klog.Info("-NodePublishVolume-: Mount")
-	if err = mounterObj.Mount("", targetPath); err != nil {
-		klog.Info("-Mount-: Error: ", err)
+	logger.Info(ctx, ns.logger, "Mounting volume",
+		zap.String("bucket_name", secretMap["bucketName"]),
+		zap.String("target_path", targetPath))
+	if err = mounterObj.Mount(ctx, "", targetPath); err != nil {
+		logger.Error(ctx, ns.logger, "Mount failed", zap.Error(err))
 		return nil, err
 	}
 
-	klog.Infof("s3: bucket %s successfully mounted to %s", secretMap["bucketName"], targetPath)
+	logger.Info(ctx, ns.logger, "NodePublishVolume completed successfully",
+		zap.String("volume_id", volumeID),
+		zap.String("target_path", targetPath),
+		zap.String("bucket_name", secretMap["bucketName"]))
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
-func (ns *nodeServer) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
-	klog.V(2).Infof("CSINodeServer-NodeUnpublishVolume: Request: %+v", req)
+func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
+		logger.Error(ctx, ns.logger, "Volume ID missing in request")
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 
 	targetPath := req.GetTargetPath()
 	if len(targetPath) == 0 {
+		logger.Error(ctx, ns.logger, "Target path missing in request")
 		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
 	}
-	klog.Infof("Unmounting target path %s", targetPath)
+
+	logger.Info(ctx, ns.logger, "NodeUnpublishVolume started",
+		zap.String("volume_id", volumeID),
+		zap.String("target_path", targetPath))
+	logger.Debug(ctx, ns.logger, "NodeUnpublishVolume request", zap.Any("request", req))
+
+	logger.Info(ctx, ns.logger, "Unmounting target path", zap.String("target_path", targetPath))
 
 	attrib, err := ns.Stats.GetPVAttributes(volumeID)
 	if err != nil {
+		logger.Error(ctx, ns.logger, "Failed to get PV details", zap.String("volume_id", volumeID), zap.Error(err))
 		return nil, status.Error(codes.NotFound, "Failed to get PV details")
 	}
 
 	mounterObj := ns.Mounter.NewMounter(attrib, nil, nil, nil)
 
-	klog.Info("-NodeUnpublishVolume-: Unmount")
-	if err = mounterObj.Unmount(targetPath); err != nil {
+	logger.Info(ctx, ns.logger, "Unmounting volume")
+	if err = mounterObj.Unmount(ctx, targetPath); err != nil {
 		//TODO: Need to handle the case with non existing mount separately - https://github.com/IBM/ibm-object-csi-driver/issues/46
-		klog.Infof("UNMOUNT ERROR: %v", err)
-		return nil, status.Error(codes.Internal, err.Error())
+		logger.Error(ctx, ns.logger, "Unmount failed", zap.String("target_path", targetPath), zap.Error(err))
+		return nil, status.Error(codes.Internal, fmt.Sprintf("%v", err.Error()))
 	}
 
-	klog.Infof("Successfully unmounted  target path %s", targetPath)
+	logger.Info(ctx, ns.logger, "NodeUnpublishVolume completed successfully",
+		zap.String("volume_id", volumeID),
+		zap.String("target_path", targetPath))
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
-func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-	klog.V(2).Infof("NodeGetVolumeStats: Request: %+v", req)
+func (ns *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+
+	logger.Info(ctx, ns.logger, "NodeGetVolumeStats started")
+	logger.Debug(ctx, ns.logger, "NodeGetVolumeStats request", zap.Any("request", req))
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
+		logger.Error(ctx, ns.logger, "Volume ID missing in request")
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 
 	volumePath := req.VolumePath
 	if volumePath == "" {
+		logger.Error(ctx, ns.logger, "Volume path doesn't exist")
 		return nil, status.Error(codes.InvalidArgument, "Path Doesn't exist")
 	}
 
-	klog.V(2).Info("NodeGetVolumeStats: Start getting Stats")
+	logger.Debug(ctx, ns.logger, "Getting filesystem stats", zap.String("volume_path", volumePath))
 	//  Making direct call to fs library for the sake of simplicity. That way we don't need to initialize VolumeStatsUtils. If there is a need for VolumeStatsUtils to grow bigger then we can use it
 	_, capacity, _, inodes, inodesFree, inodesUsed, err := ns.Stats.FSInfo(volumePath)
 
 	if err != nil {
-		data := map[string]string{"VolumeId": volumeID, "Error": err.Error()}
-		klog.Error("NodeGetVolumeStats: error occurred while getting volume stats ", data)
+		logger.Error(ctx, ns.logger, "Error getting volume stats",
+			zap.String("volume_id", volumeID), zap.Error(err))
 		return &csi.NodeGetVolumeStatsResponse{
 			VolumeCondition: &csi.VolumeCondition{
 				Abnormal: true,
-				Message:  err.Error(),
+				Message:  fmt.Sprintf("%v", err.Error()),
 			},
 		}, nil
 	}
 
 	totalCap, err := ns.Stats.GetTotalCapacityFromPV(volumeID)
 	if err != nil {
+		logger.Error(ctx, ns.logger, "Error getting total capacity from PV", zap.Error(err))
 		return nil, err
 	}
 
 	capAsInt64, converted := totalCap.AsInt64()
 	if !converted {
 		capAsInt64 = capacity
+		logger.Warn(ctx, ns.logger, "Could not convert capacity, using filesystem capacity", zap.Int64("capacity", capacity))
 	}
-	klog.Info("NodeGetVolumeStats: Total Capacity of Volume: ", capAsInt64)
+	logger.Info(ctx, ns.logger, "Total capacity of volume", zap.Int64("capacity", capAsInt64))
 
 	capUsed, err := ns.Stats.GetBucketUsage(volumeID)
 	if err != nil {
+		logger.Error(ctx, ns.logger, "Error getting bucket usage", zap.Error(err))
 		return nil, err
 	}
 
@@ -274,16 +337,24 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 		},
 	}
 
-	klog.V(2).Info("NodeGetVolumeStats: Volume Stats ", resp)
+	logger.Info(ctx, ns.logger, "NodeGetVolumeStats completed",
+		zap.Int64("total_bytes", capAsInt64),
+		zap.Int64("used_bytes", capUsed),
+		zap.Int64("total_inodes", inodes),
+		zap.Int64("used_inodes", inodesUsed))
 	return resp, nil
 }
 
-func (ns *nodeServer) NodeExpandVolume(_ context.Context, _ *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
+func (ns *nodeServer) NodeExpandVolume(ctx context.Context, _ *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
+
+	logger.Info(ctx, ns.logger, "NodeExpandVolume not implemented")
 	return &csi.NodeExpandVolumeResponse{}, status.Error(codes.Unimplemented, "NodeExpandVolume is not implemented")
 }
 
-func (ns *nodeServer) NodeGetCapabilities(_ context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-	klog.V(2).Infof("NodeGetCapabilities: Request: %+v", req)
+func (ns *nodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
+	logger.Info(ctx, ns.logger, "NodeGetCapabilities started")
+	logger.Debug(ctx, ns.logger, "NodeGetCapabilities request", zap.Any("request", req))
+
 	var caps []*csi.NodeServiceCapability
 	for _, cap := range nodeServerCapabilities {
 		c := &csi.NodeServiceCapability{
@@ -295,11 +366,14 @@ func (ns *nodeServer) NodeGetCapabilities(_ context.Context, req *csi.NodeGetCap
 		}
 		caps = append(caps, c)
 	}
+
+	logger.Info(ctx, ns.logger, "NodeGetCapabilities completed", zap.Int("capability_count", len(caps)))
 	return &csi.NodeGetCapabilitiesResponse{Capabilities: caps}, nil
 }
 
-func (ns *nodeServer) NodeGetInfo(_ context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
-	klog.V(3).Infof("NodeGetInfo: called with args %+v", req)
+func (ns *nodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+	logger.Info(ctx, ns.logger, "NodeGetInfo started")
+	logger.Debug(ctx, ns.logger, "NodeGetInfo request", zap.Any("request", req))
 
 	topology := &csi.Topology{
 		Segments: map[string]string{
@@ -312,6 +386,11 @@ func (ns *nodeServer) NodeGetInfo(_ context.Context, req *csi.NodeGetInfoRequest
 		MaxVolumesPerNode:  ns.MaxVolumesPerNode,
 		AccessibleTopology: topology,
 	}
-	klog.V(2).Info("NodeGetInfo: ", resp)
+
+	logger.Info(ctx, ns.logger, "NodeGetInfo completed",
+		zap.String("node_id", ns.NodeID),
+		zap.Int64("max_volumes_per_node", ns.MaxVolumesPerNode),
+		zap.String("region", ns.Region),
+		zap.String("zone", ns.Zone))
 	return resp, nil
 }

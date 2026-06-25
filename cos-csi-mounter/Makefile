@@ -1,5 +1,5 @@
 NAME := cos-csi-mounter
-APP_VERSION := 1.0.5
+APP_VERSION := 0.12.39
 BUILD_DIR := $(NAME)-$(APP_VERSION)
 BIN_DIR := bin
 
@@ -107,3 +107,5 @@ clean:
 
 packages:
 packages: deb-build rpm-build tar-package clean
+
+#testing

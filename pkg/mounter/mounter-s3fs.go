@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 /*******************************************************************************
  * IBM Confidential
  * OCO Source Materials
@@ -12,6 +15,7 @@
 package mounter
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -21,8 +25,10 @@ import (
 	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
+	"github.com/IBM/ibm-object-csi-driver/pkg/logger"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
-	"k8s.io/klog/v2"
+	"github.com/IBM/ibm-object-csi-driver/pkg/requestid"
+	"go.uber.org/zap"
 )
 
 // Mounter interface defined in mounter.go
@@ -38,6 +44,7 @@ type S3fsMounter struct {
 	KpRootKeyCrn  string
 	MountOptions  []string
 	MounterUtils  utils.MounterUtils
+	logger        *zap.Logger
 }
 
 const (
@@ -48,11 +55,16 @@ const (
 var (
 	writePassWrap = writePass
 	removeFile    = removeS3FSCredFile
+	// s3fsLogger is used for package-level logging where context is not available
+	s3fsLogger *zap.Logger
 )
 
-func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils, defaultParams map[string]string) Mounter {
-	klog.Info("-newS3fsMounter-")
+func init() {
+	s3fsLogger = logger.NewJSONLoggerOrNop("s3fs-mounter")
+	s3fsLogger = s3fsLogger.With(zap.String("component", "s3fs-mounter"))
+}
 
+func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils, defaultParams map[string]string) Mounter {
 	var (
 		val       string
 		check     bool
@@ -100,20 +112,23 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 		mounter.AuthType = "hmac"
 	}
 
-	klog.Infof("newS3fsMounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]\n\tkpRootKeyCrn: [%s]",
-		mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType, mounter.KpRootKeyCrn)
-
 	updatedOptions := updateS3FSMountOptions(mountOptions, secretMap, defaultParams)
 	mounter.MountOptions = updatedOptions
 
 	mounter.MounterUtils = mounterUtils
 
+	// Initialize logger - use JSON logger or fallback to nop
+	mounter.logger = logger.NewJSONLoggerOrNop("s3fs-mounter")
+	mounter.logger = mounter.logger.With(zap.String("component", "s3fs-mounter"))
+
 	return mounter
 }
 
-func (s3fs *S3fsMounter) Mount(source string, target string) error {
-	klog.Info("-S3FSMounter Mount-")
-	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
+func (s3fs *S3fsMounter) Mount(ctx context.Context, source string, target string) error {
+	logger.Info(ctx, s3fs.logger, "S3FSMounter Mount started",
+		zap.String("source", source), zap.String("target", target))
+
+	reqID := requestid.FromContext(ctx) // Still needed for error messages
 
 	var s3fsCredDir string
 	if mountWorker {
@@ -129,22 +144,23 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	metaPath := path.Join(s3fsCredDir, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 
 	if pathExist, err = checkPath(metaPath); err != nil {
-		klog.Errorf("S3FSMounter Mount: Cannot stat directory %s: %v", metaPath, err)
-		return fmt.Errorf("S3FSMounter Mount: Cannot stat directory %s: %v", metaPath, err)
+		logger.Error(ctx, s3fs.logger, "Cannot stat directory", zap.String("meta_path", metaPath), zap.Error(err))
+		return fmt.Errorf("[%s] S3FSMounter Mount: Cannot stat directory %s: %v", reqID, metaPath, err)
 	}
 
 	if !pathExist {
+		logger.Debug(ctx, s3fs.logger, "Creating meta directory", zap.String("meta_path", metaPath))
 		if err = MakeDir(metaPath, 0755); // #nosec G301: used for s3fs
 		err != nil {
-			klog.Errorf("S3FSMounter Mount: Cannot create directory %s: %v", metaPath, err)
-			return fmt.Errorf("S3FSMounter Mount: Cannot create directory %s: %v", metaPath, err)
+			logger.Error(ctx, s3fs.logger, "Cannot create directory", zap.String("meta_path", metaPath), zap.Error(err))
+			return fmt.Errorf("[%s] S3FSMounter Mount: Cannot create directory %s: %v", reqID, metaPath, err)
 		}
 	}
 
 	passwdFile := path.Join(metaPath, passFile)
 	if err = writePassWrap(passwdFile, s3fs.AccessKeys); err != nil {
-		klog.Errorf("S3FSMounter Mount: Cannot create file %s: %v", passwdFile, err)
-		return fmt.Errorf("S3FSMounter Mount: Cannot create file %s: %v", passwdFile, err)
+		logger.Error(ctx, s3fs.logger, "Cannot create password file", zap.String("passwd_file", passwdFile), zap.Error(err))
+		return fmt.Errorf("[%s] S3FSMounter Mount: Cannot create file %s: %v", reqID, passwdFile, err)
 	}
 
 	if s3fs.ObjectPath != "" {
@@ -157,58 +173,72 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 		bucketName = s3fs.BucketName
 	}
 
+	logger.Info(ctx, s3fs.logger, "Formulating mount options",
+		zap.String("bucket_name", bucketName),
+		zap.String("auth_type", s3fs.AuthType))
 	args, wnOp := s3fs.formulateMountOptions(bucketName, target, passwdFile)
 
 	if mountWorker {
-		klog.Info(" Mount on Worker started...")
+		logger.Info(ctx, s3fs.logger, "Mount on Worker started")
 
 		jsonData, err := json.Marshal(wnOp)
 		if err != nil {
-			klog.Fatalf("Error marshalling data: %v", err)
+			logger.Error(ctx, s3fs.logger, "Error marshalling data", zap.Error(err))
 			return err
 		}
 
 		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.S3FS, jsonData)
 
-		klog.Info("Worker Mounting Payload...", payload)
+		logger.Debug(ctx, s3fs.logger, "Worker mounting payload", zap.String("payload", payload))
 
-		err = mounterRequest(payload, "http://unix/api/cos/mount")
+		err = mounterRequest(ctx, payload, "http://unix/api/cos/mount", s3fs.logger)
 		if err != nil {
-			klog.Error("failed to mount on  worker...", err)
+			logger.Error(ctx, s3fs.logger, "Failed to mount on worker", zap.Error(err))
 			return err
 		}
+		logger.Info(ctx, s3fs.logger, "S3FSMounter Mount completed successfully on worker")
 		return nil
 	}
-	klog.Info("NodeServer Mounting...")
-	return s3fs.MounterUtils.FuseMount(target, constants.S3FS, args)
+
+	logger.Info(ctx, s3fs.logger, "NodeServer mounting")
+	err = s3fs.MounterUtils.FuseMount(ctx, target, constants.S3FS, args)
+	if err != nil {
+		logger.Error(ctx, s3fs.logger, "FuseMount failed", zap.Error(err))
+	} else {
+		logger.Info(ctx, s3fs.logger, "S3FSMounter Mount completed successfully")
+	}
+	return err
 }
 
-func (s3fs *S3fsMounter) Unmount(target string) error {
-	klog.Info("-S3FSMounter Unmount-")
-	klog.Infof("Unmount args:\n\ttarget: <%s>", target)
+func (s3fs *S3fsMounter) Unmount(ctx context.Context, target string) error {
+	logger.Info(ctx, s3fs.logger, "S3FSMounter Unmount started", zap.String("target", target))
 
 	if mountWorker {
-		klog.Info("Unmount on Worker started...")
+		logger.Info(ctx, s3fs.logger, "Unmount on Worker started")
 
 		payload := fmt.Sprintf(`{"path":"%s"}`, target)
 
-		err := mounterRequest(payload, "http://unix/api/cos/unmount")
+		err := mounterRequest(ctx, payload, "http://unix/api/cos/unmount", s3fs.logger)
 		if err != nil {
-			klog.Error("failed to unmount on  worker...", err)
+			logger.Error(ctx, s3fs.logger, "Failed to unmount on worker", zap.Error(err))
 			return err
 		}
 
 		removeFile(constants.MounterConfigPathOnHost, target)
+		logger.Info(ctx, s3fs.logger, "S3FSMounter Unmount completed successfully on worker")
 		return nil
 	}
-	klog.Info("NodeServer Unmounting...")
 
-	err := s3fs.MounterUtils.FuseUnmount(target)
+	logger.Info(ctx, s3fs.logger, "NodeServer unmounting")
+
+	err := s3fs.MounterUtils.FuseUnmount(ctx, target)
 	if err != nil {
+		logger.Error(ctx, s3fs.logger, "FuseUnmount failed", zap.Error(err))
 		return err
 	}
 
 	removeFile(constants.MounterConfigPathOnPodS3fs, target)
+	logger.Info(ctx, s3fs.logger, "S3FSMounter Unmount completed successfully")
 	return nil
 }
 
@@ -248,7 +278,7 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 
 	stringData, ok := secretMap["mountOptions"]
 	if !ok {
-		klog.Infof("No new mountOptions found. Using default mountOptions: %v", mountOptsMap)
+		s3fsLogger.Info("No new mountOptions found. Using default mountOptions", zap.Any("default_mount_options", mountOptsMap))
 	} else {
 		lines := strings.Split(stringData, "\n")
 		// Update map
@@ -262,7 +292,7 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 			} else if len(opts) == 1 {
 				mountOptsMap[strings.TrimSpace(opts[0])] = strings.TrimSpace(opts[0])
 			} else {
-				klog.Infof("Invalid mount option: %s\n", line)
+				s3fsLogger.Info("Invalid mount option", zap.String("line", line))
 			}
 		}
 	}
@@ -299,7 +329,7 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 		}
 	}
 
-	klog.Infof("updated S3fsMounter Options: %v", updatedOptions)
+	s3fsLogger.Info("updated S3fsMounter Options", zap.Any("updated_options", updatedOptions))
 	return updatedOptions
 }
 
@@ -361,21 +391,21 @@ func removeS3FSCredFile(credDir, target string) {
 		_, err := Stat(metaPath)
 		if err != nil {
 			if os.IsNotExist(err) {
-				klog.Infof("removeS3FSCredFile: Password file directory does not exist: %s", metaPath)
+				s3fsLogger.Info("removeS3FSCredFile: Password file directory does not exist", zap.String("path", metaPath))
 				return
 			}
-			klog.Errorf("removeS3FSCredFile: Attempt %d - Failed to stat path %s: %v", retry, metaPath, err)
+			s3fsLogger.Error("removeS3FSCredFile: Failed to stat path", zap.Int("attempt", retry), zap.String("path", metaPath), zap.Error(err))
 			time.Sleep(constants.Interval)
 			continue
 		}
 		err = RemoveAll(metaPath)
 		if err != nil {
-			klog.Errorf("removeS3FSCredFile: Attempt %d - Failed to remove password file path %s: %v", retry, metaPath, err)
+			s3fsLogger.Error("removeS3FSCredFile: Failed to remove password file path", zap.Int("attempt", retry), zap.String("path", metaPath), zap.Error(err))
 			time.Sleep(constants.Interval)
 			continue
 		}
-		klog.Infof("removeS3FSCredFile: Successfully removed password file path: %s", metaPath)
+		s3fsLogger.Info("removeS3FSCredFile: Successfully removed password file path", zap.String("path", metaPath))
 		return
 	}
-	klog.Errorf("removeS3FSCredFile: Failed to remove password file after %d attempts", maxRetries)
+	s3fsLogger.Error("removeS3FSCredFile: Failed to remove password file after max attempts", zap.Int("max_attempts", maxRetries))
 }

@@ -1,6 +1,10 @@
+//go:build linux
+// +build linux
+
 package mounter
 
 import (
+	"context"
 	"errors"
 	"os"
 	"testing"
@@ -8,6 +12,7 @@ import (
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 )
 
 var (
@@ -79,16 +84,17 @@ func TestS3FSMount_NodeServer_Positive(t *testing.T) {
 
 	s3fs := &S3fsMounter{
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseMountFn: func(path, comm string, args []string) error {
+			FuseMountFn: func(ctx context.Context, path, comm string, args []string) error {
 				return nil
 			},
 		}),
 		LocConstraint: "test-location",
 		MountOptions:  mountOptions,
 		ObjectPath:    "test-objectPath",
+		logger:        zap.NewNop(),
 	}
 
-	err := s3fs.Mount(source, target)
+	err := s3fs.Mount(context.Background(), source, target)
 	assert.NoError(t, err)
 }
 
@@ -101,31 +107,34 @@ func TestS3FSMount_WorkerNode_Positive(t *testing.T) {
 	writePassWrap = func(_, _ string) error {
 		return nil
 	}
-	mounterRequest = func(_, _ string) error {
+	mounterRequest = func(_ context.Context, _, _ string, _ *zap.Logger) error {
 		return nil
 	}
 
 	s3fs := &S3fsMounter{
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseMountFn: func(path, comm string, args []string) error {
+			FuseMountFn: func(ctx context.Context, path, comm string, args []string) error {
 				return nil
 			},
 		}),
 		AuthType: "hmac",
+		logger:   zap.NewNop(),
 	}
 
-	err := s3fs.Mount(source, target)
+	err := s3fs.Mount(context.Background(), source, target)
 	assert.NoError(t, err)
 }
 
 func TestMount_CreateDirFails_Negative(t *testing.T) {
-	s3fs := &S3fsMounter{}
+	s3fs := &S3fsMounter{
+		logger: zap.NewNop(),
+	}
 
 	MakeDir = func(path string, perm os.FileMode) error {
 		return errors.New("failed to create directory")
 	}
 
-	err := s3fs.Mount(source, target)
+	err := s3fs.Mount(context.Background(), source, target)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Cannot create directory")
 }
@@ -138,9 +147,11 @@ func TestMount_FailedToCreatePassFile_Negative(t *testing.T) {
 		return errors.New("failed to create file")
 	}
 
-	s3fs := &S3fsMounter{}
+	s3fs := &S3fsMounter{
+		logger: zap.NewNop(),
+	}
 
-	err := s3fs.Mount(source, target)
+	err := s3fs.Mount(context.Background(), source, target)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create file")
 }
@@ -154,13 +165,15 @@ func TestS3FSMount_WorkerNode_Negative(t *testing.T) {
 	writePassWrap = func(_, _ string) error {
 		return nil
 	}
-	mounterRequest = func(_, _ string) error {
+	mounterRequest = func(_ context.Context, _, _ string, _ *zap.Logger) error {
 		return errors.New("failed to perform http request")
 	}
 
-	s3fs := &S3fsMounter{}
+	s3fs := &S3fsMounter{
+		logger: zap.NewNop(),
+	}
 
-	err := s3fs.Mount(source, target)
+	err := s3fs.Mount(context.Background(), source, target)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to perform http request")
 }
@@ -170,13 +183,16 @@ func TestUnmount_NodeServer(t *testing.T) {
 
 	removeFile = func(_, _ string) {}
 
-	s3fs := &S3fsMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-		FuseUnmountFn: func(path string) error {
-			return nil
-		},
-	})}
+	s3fs := &S3fsMounter{
+		logger: zap.NewNop(),
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseUnmountFn: func(ctx context.Context, path string) error {
+				return nil
+			},
+		}),
+	}
 
-	err := s3fs.Unmount(target)
+	err := s3fs.Unmount(context.Background(), target)
 	assert.NoError(t, err)
 }
 
@@ -185,34 +201,40 @@ func TestUnmount_WorkerNode(t *testing.T) {
 
 	removeFile = func(_, _ string) {}
 
-	s3fs := &S3fsMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-		FuseUnmountFn: func(path string) error {
-			return nil
-		},
-	})}
+	s3fs := &S3fsMounter{
+		logger: zap.NewNop(),
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseUnmountFn: func(ctx context.Context, path string) error {
+				return nil
+			},
+		}),
+	}
 
-	mounterRequest = func(_, _ string) error {
+	mounterRequest = func(_ context.Context, _, _ string, _ *zap.Logger) error {
 		return nil
 	}
 
-	err := s3fs.Unmount(target)
+	err := s3fs.Unmount(context.Background(), target)
 	assert.NoError(t, err)
 }
 
 func TestUnmount_WorkerNode_Negative(t *testing.T) {
 	mountWorker = true
 
-	s3fs := &S3fsMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-		FuseUnmountFn: func(path string) error {
-			return nil
-		},
-	})}
+	s3fs := &S3fsMounter{
+		logger: zap.NewNop(),
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseUnmountFn: func(ctx context.Context, path string) error {
+				return nil
+			},
+		}),
+	}
 
-	mounterRequest = func(_, _ string) error {
+	mounterRequest = func(_ context.Context, _, _ string, _ *zap.Logger) error {
 		return errors.New("failed to create http request")
 	}
 
-	err := s3fs.Unmount(target)
+	err := s3fs.Unmount(context.Background(), target)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create http request")
 }
@@ -222,13 +244,16 @@ func TestUnmount_NodeServer_Negative(t *testing.T) {
 
 	removeFile = func(_, _ string) {}
 
-	s3fs := &S3fsMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-		FuseUnmountFn: func(path string) error {
-			return errors.New("failed to unmount")
-		},
-	})}
+	s3fs := &S3fsMounter{
+		logger: zap.NewNop(),
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+			FuseUnmountFn: func(ctx context.Context, path string) error {
+				return errors.New("failed to unmount")
+			},
+		}),
+	}
 
-	err := s3fs.Unmount(target)
+	err := s3fs.Unmount(context.Background(), target)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to unmount")
 }

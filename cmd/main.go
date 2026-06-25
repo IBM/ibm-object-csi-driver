@@ -31,7 +31,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"k8s.io/klog/v2"
 )
 
 // Options is the combined set of options for all operating modes.
@@ -60,17 +59,23 @@ func getOptions() *Options {
 }
 
 func getZapLogger() *zap.Logger {
-	// Prepare a new logger
+	// Prepare a new logger with standardized JSON format
 	atom := zap.NewAtomicLevel()
 	encoderCfg := zap.NewProductionEncoderConfig()
 	encoderCfg.TimeKey = "timestamp"
 	encoderCfg.EncodeTime = zapcore.ISO8601TimeEncoder
+	encoderCfg.EncodeLevel = zapcore.LowercaseLevelEncoder
+	encoderCfg.MessageKey = "msg"
+	encoderCfg.CallerKey = "caller"
+	encoderCfg.LevelKey = "level"
 
 	logger := zap.New(zapcore.NewCore(
 		zapcore.NewJSONEncoder(encoderCfg),
 		zapcore.Lock(os.Stdout),
 		atom,
-	), zap.AddCaller()).With(zap.String("name", config.CSIPluginGithubName)).With(zap.String("CSIDriverName", "IBM CSI Object Driver"))
+	), zap.AddCaller()).With(
+		zap.String("service", "ibm-object-csi-driver"),
+		zap.String("component", "csi-driver"))
 
 	atom.SetLevel(zap.InfoLevel)
 	return logger
@@ -91,14 +96,15 @@ func getConfigBool(envKey string, defaultConf bool, logger zap.Logger) bool {
 }
 
 func main() {
-	klog.InitFlags(nil)
-	defer klog.Flush()
-
 	logger := getZapLogger()
+	defer func() {
+		_ = logger.Sync() // #nosec G104: Best effort sync
+	}()
+
 	loggerLevel := zap.NewAtomicLevel()
 	options := getOptions()
 
-	klog.V(1).Info("Starting Server...")
+	logger.Info("Starting Server...")
 
 	debugTrace := getConfigBool("DEBUG_TRACE", false, *logger)
 	if debugTrace {

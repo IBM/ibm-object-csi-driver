@@ -1,8 +1,10 @@
 package utils
 
+import "context"
+
 type FakeMounterUtilsFuncStruct struct {
-	FuseMountFn   func(path string, comm string, args []string) error
-	FuseUnmountFn func(path string) error
+	FuseMountFn   func(ctx context.Context, path string, comm string, args []string) error
+	FuseUnmountFn func(ctx context.Context, path string) error
 }
 
 type FakeMounterUtilsFuncStructImpl struct {
@@ -15,16 +17,16 @@ func NewFakeMounterUtilsImpl(reqFn FakeMounterUtilsFuncStruct) *FakeMounterUtils
 	}
 }
 
-func (m *FakeMounterUtilsFuncStructImpl) FuseMount(path string, comm string, args []string) error {
+func (m *FakeMounterUtilsFuncStructImpl) FuseMount(ctx context.Context, path string, comm string, args []string) error {
 	if m.FuncStruct.FuseMountFn != nil {
-		return m.FuncStruct.FuseMountFn(path, comm, args)
+		return m.FuncStruct.FuseMountFn(ctx, path, comm, args)
 	}
 	panic("requested method should not be nil")
 }
 
-func (m *FakeMounterUtilsFuncStructImpl) FuseUnmount(path string) error {
+func (m *FakeMounterUtilsFuncStructImpl) FuseUnmount(ctx context.Context, path string) error {
 	if m.FuncStruct.FuseUnmountFn != nil {
-		return m.FuncStruct.FuseUnmountFn(path)
+		return m.FuncStruct.FuseUnmountFn(ctx, path)
 	}
 	panic("requested method should not be nil")
 }
