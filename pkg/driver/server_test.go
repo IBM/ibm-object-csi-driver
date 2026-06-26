@@ -17,6 +17,7 @@
 package driver
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"reflect"
@@ -24,7 +25,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
