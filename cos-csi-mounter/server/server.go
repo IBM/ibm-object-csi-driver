@@ -14,6 +14,7 @@ import (
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
+	"github.com/coreos/go-systemd/v22/daemon"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -145,14 +146,95 @@ func startService(setupSocketFunc func() (net.Listener, error), router http.Hand
 	return nil
 }
 
+func performHealthCheck() error {
+	socketPath := filepath.Join(constants.SocketDir, constants.SocketFile)
+
+	if _, err := os.Stat(socketPath); err != nil {
+		return fmt.Errorf("socket file not accessible: %w", err)
+	}
+
+	conn, err := net.DialTimeout("unix", socketPath, 5*time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to connect to socket: %w", err)
+	}
+	defer func() {
+		if closeErr := conn.Close(); closeErr != nil {
+			logger.Warn("Failed to close health check connection", zap.Error(closeErr))
+		}
+	}()
+
+	return nil
+}
+
+func notifySystemd(notification string) {
+	sent, err := daemon.SdNotify(false, notification)
+	if err != nil {
+		logger.Error("Failed to send systemd notification", zap.String("notification", notification), zap.Error(err))
+	} else if sent {
+		logger.Info("Systemd notification sent", zap.String("notification", notification))
+	} else {
+		logger.Info("Systemd notifications not supported (not running under systemd)")
+	}
+}
+
+// watchdogLoop sends periodic keepalive signals to systemd
+func watchdogLoop() {
+	interval, err := daemon.SdWatchdogEnabled(false)
+	if err != nil || interval == 0 {
+		logger.Info("Systemd watchdog not enabled")
+		return
+	}
+
+	// Send keepalive at half the watchdog interval for safety margin
+	ticker := time.NewTicker(interval / 2)
+	defer ticker.Stop()
+
+	logger.Info("Starting systemd watchdog", zap.Duration("interval", interval), zap.Duration("keepalive_interval", interval/2))
+
+	for range ticker.C {
+		if err := performHealthCheck(); err != nil {
+			logger.Error("Health check failed, not sending watchdog keepalive", zap.Error(err))
+			continue
+		}
+
+		notifySystemd(daemon.SdNotifyWatchdog)
+		logger.Debug("Watchdog keepalive sent")
+	}
+}
+
 func main() {
+	startTime := time.Now()
+
 	if len(os.Args) > 1 && os.Args[1] == "version" {
 		fmt.Printf("Version: %s\nGit Commit: %s\n", Version, GitCommit)
 		return
 	}
-	err := startService(setupSocket, newRouter(), handleSignals)
+
+	logger.Info("Starting cos-csi-mounter", zap.Time("start_time", startTime))
+
+	serviceDone := make(chan error, 1)
+	go func() {
+		serviceDone <- startService(setupSocket, newRouter(), handleSignals)
+	}()
+
+	logger.Info("Waiting for service initialization", zap.Duration("elapsed", time.Since(startTime)))
+	time.Sleep(2 * time.Second)
+
+	logger.Info("Performing health check", zap.Duration("elapsed", time.Since(startTime)))
+	if err := performHealthCheck(); err != nil {
+		logger.Error("Service failed to start", zap.Error(err), zap.Duration("elapsed", time.Since(startTime)))
+		os.Exit(1)
+	}
+	logger.Info("Service is healthy and ready", zap.Duration("elapsed", time.Since(startTime)))
+
+	notifySystemd(daemon.SdNotifyReady)
+	logger.Info("READY notification sent", zap.Duration("elapsed", time.Since(startTime)))
+
+	go watchdogLoop()
+
+	err := <-serviceDone
 	if err != nil {
-		logger.Error("cos-csi-mounter exited with error", zap.Error(err))
+		logger.Error("cos-csi-mounter exited with error", zap.Error(err), zap.Duration("elapsed", time.Since(startTime)))
 		os.Exit(1)
 	}
 }
