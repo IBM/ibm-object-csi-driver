@@ -287,18 +287,11 @@ func applySecretOverrides(secretMap, mountOptsMap map[string]string) {
 	}
 }
 
-func buildMountOptionsSlice(mountOptsMap, secretMap, defaultParams map[string]string) []string {
+func buildMountOptionsSlice(mountOptsMap, defaultParams map[string]string) []string {
 	updatedOptions := make([]string, 0, len(mountOptsMap)+len(defaultParams))
 
 	for key, val := range mountOptsMap {
-		if newVal, check := secretMap[key]; check {
-			if key != val {
-				val = fmt.Sprintf("%s=%s", key, newVal)
-			} else {
-				val = newVal
-			}
-			updatedOptions = append(updatedOptions, val)
-		} else if key != val {
+		if key != val {
 			updatedOptions = append(updatedOptions, fmt.Sprintf("%s=%s", key, val))
 		} else {
 			updatedOptions = append(updatedOptions, val)
@@ -349,7 +342,7 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 		klog.Infof("No new mountOptions found. Using default mountOptions: %v", mountOptsMap)
 	}
 
-	updatedOptions := buildMountOptionsSlice(mountOptsMap, secretMap, defaultParams)
+	updatedOptions := buildMountOptionsSlice(mountOptsMap, defaultParams)
 	addMountParam := buildAddMountParam(unknownOptionsMap)
 
 	klog.Infof("updated S3fsMounter Options: %v", updatedOptions)
