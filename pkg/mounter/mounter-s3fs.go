@@ -336,7 +336,7 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 		klog.Infof("No new mountOptions found. Using default mountOptions: %v", mountOptsMap)
 	}
 
-	updatedOptions := buildMountOptionsSlice(mountOptsMap, secretMap, defaultParams)
+	updatedOptions := buildMountOptionsArray(mountOptsMap, defaultParams)
 	addMountParam := buildAddMountParam(unknownOptionsMap)
 
 	klog.Infof("updated S3fsMounter Options: %v", updatedOptions)
