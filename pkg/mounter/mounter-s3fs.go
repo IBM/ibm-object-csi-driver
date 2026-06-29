@@ -29,17 +29,17 @@ import (
 // Mounter interface defined in mounter.go
 // s3fsMounter Implements Mounter
 type S3fsMounter struct {
-	BucketName     string //From Secret in SC
-	ObjectPath     string //From Secret in SC
-	EndPoint       string //From Secret in SC
-	LocConstraint  string //From Secret in SC
-	AuthType       string
-	AccessKeys     string
-	IAMEndpoint    string
-	KpRootKeyCrn   string
-	MountOptions   []string
-	AddMountParam  string
-	MounterUtils   utils.MounterUtils
+	BucketName    string //From Secret in SC
+	ObjectPath    string //From Secret in SC
+	EndPoint      string //From Secret in SC
+	LocConstraint string //From Secret in SC
+	AuthType      string
+	AccessKeys    string
+	IAMEndpoint   string
+	KpRootKeyCrn  string
+	MountOptions  []string
+	AddMountParam string
+	MounterUtils  utils.MounterUtils
 }
 
 const (
@@ -54,18 +54,18 @@ var (
 
 func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils, knownS3FSOptions *pkgutils.Set, defaultParams map[string]string) Mounter {
 	klog.Info("-newS3fsMounter-")
-
+	mounter := &S3fsMounter{}
+	mounter.MounterUtils = mounterUtils
+	if secretMap == nil && mountOptions == nil && knownS3FSOptions == nil && defaultParams == nil { // For unmount request
+		return mounter
+	}
 	var (
 		val       string
 		check     bool
 		accessKey string
 		secretKey string
 		apiKey    string
-		mounter   *S3fsMounter
 	)
-
-	mounter = &S3fsMounter{}
-
 	if val, check = secretMap["cosEndpoint"]; check {
 		mounter.EndPoint = val
 	}
@@ -93,7 +93,6 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 	if val, check = secretMap["iamEndpoint"]; check {
 		mounter.IAMEndpoint = val
 	}
-
 	if apiKey != "" {
 		mounter.AccessKeys = fmt.Sprintf(":%s", apiKey)
 		mounter.AuthType = "iam"
@@ -101,16 +100,11 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 		mounter.AccessKeys = fmt.Sprintf("%s:%s", accessKey, secretKey)
 		mounter.AuthType = "hmac"
 	}
-
 	klog.Infof("newS3fsMounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]\n\tkpRootKeyCrn: [%s]",
 		mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType, mounter.KpRootKeyCrn)
-
 	updatedOptions, addMountParam := updateS3FSMountOptions(mountOptions, secretMap, knownS3FSOptions, defaultParams)
 	mounter.MountOptions = updatedOptions
 	mounter.AddMountParam = addMountParam
-
-	mounter.MounterUtils = mounterUtils
-
 	return mounter
 }
 
@@ -287,15 +281,12 @@ func applySecretOverrides(secretMap, mountOptsMap map[string]string) {
 	}
 }
 
-func buildMountOptionsSlice(mountOptsMap, defaultParams map[string]string) []string {
+func buildMountOptionsSlice(mountOptsMap, secretMap, defaultParams map[string]string) []string {
 	updatedOptions := make([]string, 0, len(mountOptsMap)+len(defaultParams))
 
 	for key, val := range mountOptsMap {
-		if key != val {
-			updatedOptions = append(updatedOptions, fmt.Sprintf("%s=%s", key, val))
-		} else {
-			updatedOptions = append(updatedOptions, val)
-		}
+		option := formatMountOption(key, val, secretMap)
+		updatedOptions = append(updatedOptions, option)
 	}
 
 	for key, value := range defaultParams {
@@ -307,6 +298,22 @@ func buildMountOptionsSlice(mountOptsMap, defaultParams map[string]string) []str
 	}
 
 	return updatedOptions
+}
+
+func formatMountOption(key, val string, secretMap map[string]string) string {
+	isKeyValuePair := key != val
+
+	if newVal, ok := secretMap[key]; ok {
+		if isKeyValuePair {
+			return fmt.Sprintf("%s=%s", key, newVal)
+		}
+		return newVal
+	}
+
+	if isKeyValuePair {
+		return fmt.Sprintf("%s=%s", key, val)
+	}
+	return val
 }
 
 func buildAddMountParam(unknownOptionsMap map[string]string) string {
@@ -342,7 +349,7 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 		klog.Infof("No new mountOptions found. Using default mountOptions: %v", mountOptsMap)
 	}
 
-	updatedOptions := buildMountOptionsSlice(mountOptsMap, defaultParams)
+	updatedOptions := buildMountOptionsSlice(mountOptsMap, secretMap, defaultParams)
 	addMountParam := buildAddMountParam(unknownOptionsMap)
 
 	klog.Infof("updated S3fsMounter Options: %v", updatedOptions)
