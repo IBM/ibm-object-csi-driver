@@ -281,12 +281,15 @@ func applySecretOverrides(secretMap, mountOptsMap map[string]string) {
 	}
 }
 
-func buildMountOptionsSlice(mountOptsMap, secretMap, defaultParams map[string]string) []string {
+func buildMountOptionsSlice(mountOptsMap, defaultParams map[string]string) []string {
 	updatedOptions := make([]string, 0, len(mountOptsMap)+len(defaultParams))
 
 	for key, val := range mountOptsMap {
-		option := formatMountOption(key, val, secretMap)
-		updatedOptions = append(updatedOptions, option)
+		if key != val {
+			updatedOptions = append(updatedOptions, fmt.Sprintf("%s=%s", key, val))
+		} else {
+			updatedOptions = append(updatedOptions, val)
+		}
 	}
 
 	for key, value := range defaultParams {
@@ -298,22 +301,6 @@ func buildMountOptionsSlice(mountOptsMap, secretMap, defaultParams map[string]st
 	}
 
 	return updatedOptions
-}
-
-func formatMountOption(key, val string, secretMap map[string]string) string {
-	isKeyValuePair := key != val
-
-	if newVal, ok := secretMap[key]; ok {
-		if isKeyValuePair {
-			return fmt.Sprintf("%s=%s", key, newVal)
-		}
-		return newVal
-	}
-
-	if isKeyValuePair {
-		return fmt.Sprintf("%s=%s", key, val)
-	}
-	return val
 }
 
 func buildAddMountParam(unknownOptionsMap map[string]string) string {
