@@ -54,7 +54,8 @@ func TestNewMounter(t *testing.T) {
 				AccessKeys:    ":test-api-key",
 				AuthType:      "iam",
 				KpRootKeyCrn:  "test-kp-root-key-crn",
-				MountOptions:  []string{"opt1=val1", "cipher_suites=default"},
+				MountOptions:  []string{"cipher_suites=default"},
+				AddMountParam: "opt1=val1",
 				MounterUtils:  &mounterUtils.MounterOptsUtils{},
 			},
 			expectedErr: nil,
@@ -121,7 +122,7 @@ func TestNewMounter(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			factory := &CSIMounterFactory{}
 
-			result := factory.NewMounter(test.attrib, test.secretMap, test.mountOptions, nil)
+			result := factory.NewMounter(test.attrib, test.secretMap, test.mountOptions, GetKnownS3FSOptions(), nil)
 
 			if s3fs, ok := result.(*S3fsMounter); ok {
 				expected := test.expected.(*S3fsMounter)
