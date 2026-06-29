@@ -287,11 +287,18 @@ func applySecretOverrides(secretMap, mountOptsMap map[string]string) {
 	}
 }
 
-func buildMountOptionsArray(mountOptsMap, defaultParams map[string]string) []string {
+func buildMountOptionsSlice(mountOptsMap, secretMap, defaultParams map[string]string) []string {
 	updatedOptions := make([]string, 0, len(mountOptsMap)+len(defaultParams))
 
 	for key, val := range mountOptsMap {
-		if key != val {
+		if newVal, check := secretMap[key]; check {
+			if key != val {
+				val = fmt.Sprintf("%s=%s", key, newVal)
+			} else {
+				val = newVal
+			}
+			updatedOptions = append(updatedOptions, val)
+		} else if key != val {
 			updatedOptions = append(updatedOptions, fmt.Sprintf("%s=%s", key, val))
 		} else {
 			updatedOptions = append(updatedOptions, val)
@@ -330,18 +337,19 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 	mountOptsMap := make(map[string]string)
 	unknownOptionsMap := make(map[string]string)
 
-	// Classify all mount options into known (standard s3fs) and unknown (custom) categories
+	// Classify StorageClass's mount options into known (standard s3fs) and unknown (custom) categories
 	classifyMountOptions(defaultMountOp, knownS3FSOptions, mountOptsMap, unknownOptionsMap)
 	applySecretOverrides(secretMap, mountOptsMap)
 
 	if stringData, ok := secretMap["mountOptions"]; ok {
 		lines := strings.Split(stringData, "\n")
+		// Classify secret's mount options into known (standard s3fs) and unknown (custom) categories
 		classifyMountOptions(lines, knownS3FSOptions, mountOptsMap, unknownOptionsMap)
 	} else {
 		klog.Infof("No new mountOptions found. Using default mountOptions: %v", mountOptsMap)
 	}
 
-	updatedOptions := buildMountOptionsArray(mountOptsMap, defaultParams)
+	updatedOptions := buildMountOptionsSlice(mountOptsMap, secretMap, defaultParams)
 	addMountParam := buildAddMountParam(unknownOptionsMap)
 
 	klog.Infof("updated S3fsMounter Options: %v", updatedOptions)

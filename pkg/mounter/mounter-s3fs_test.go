@@ -402,3 +402,69 @@ func TestUpdateS3FSMountOptions_DefaultParams(t *testing.T) {
 	assert.Contains(t, optsStr, "cipher_suites=AESGCM")
 	assert.NotContains(t, optsStr, "empty_param")
 }
+
+func TestUpdateS3FSMountOptionsWithUnknownOptions(t *testing.T) {
+	tests := []struct {
+		name                        string
+		defaultMountOp              []string
+		secretMap                   map[string]string
+		expectAddMountParamPresent  bool
+		expectAddMountParamContains string
+	}{
+		{
+			name:           "Known and unknown options",
+			defaultMountOp: []string{"allow_other", "enable_content_md5=true"},
+			secretMap:      map[string]string{"mountOptions": "cipher_suites=default"},
+			expectAddMountParamPresent:  true,
+			expectAddMountParamContains: "enable_content_md5=true",
+		},
+		{
+			name:           "Only known options",
+			defaultMountOp: []string{"allow_other"},
+			secretMap:      map[string]string{},
+			expectAddMountParamPresent:  false,
+			expectAddMountParamContains: "",
+		},
+		{
+			name:           "Unknown option without value",
+			defaultMountOp: []string{"custom_flag"},
+			secretMap:      map[string]string{},
+			expectAddMountParamPresent:  true,
+			expectAddMountParamContains: "custom_flag",
+		},
+		{
+			name:           "Multiple unknown options from secretMap",
+			defaultMountOp: []string{},
+			secretMap:      map[string]string{"mountOptions": "unknown1=val1\nunknown2=val2"},
+			expectAddMountParamPresent:  true,
+			expectAddMountParamContains: "unknown1=val1",
+		},
+		{
+			name:           "Empty line in mountOptions",
+			defaultMountOp: []string{},
+			secretMap:      map[string]string{"mountOptions": "allow_other\n\nunknown_opt=test"},
+			expectAddMountParamPresent:  true,
+			expectAddMountParamContains: "unknown_opt=test",
+		},
+		{
+			name:           "Invalid option in defaultMountOp",
+			defaultMountOp: []string{"", "allow_other"},
+			secretMap:      map[string]string{},
+			expectAddMountParamPresent:  false,
+			expectAddMountParamContains: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, addMountParam := updateS3FSMountOptions(tt.defaultMountOp, tt.secretMap, GetKnownS3FSOptions(), map[string]string{})
+			hasUnknown := addMountParam != ""
+			if hasUnknown != tt.expectAddMountParamPresent {
+				t.Errorf("got addMountParam=%q, expectAddMountParamPresent=%v", addMountParam, tt.expectAddMountParamPresent)
+			}
+			if tt.expectAddMountParamContains != "" && !strings.Contains(addMountParam, tt.expectAddMountParamContains) {
+				t.Errorf("addMountParam=%q does not contain %q", addMountParam, tt.expectAddMountParamContains)
+			}
+		})
+	}
+}

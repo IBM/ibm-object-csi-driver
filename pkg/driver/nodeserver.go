@@ -40,7 +40,7 @@ type NodeServerConfig struct {
 	Zone              string
 	NodeID            string
 	TLSCipherSuite    string
-	KnownS3FSOptions  *utils.Set // Set of known s3fs mount option names used to classify options as known vs unknown
+	KnownS3FSOptions  *utils.Set // Set of known (to cos-csi-mounter systemd service) s3fs mount option names used to classify options as known vs unknown
 }
 
 func (ns *nodeServer) NodeStageVolume(_ context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
@@ -198,7 +198,7 @@ func (ns *nodeServer) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpubl
 		return nil, status.Error(codes.NotFound, "Failed to get PV details")
 	}
 
-	mounterObj := ns.Mounter.NewMounter(attrib, nil, nil, ns.KnownS3FSOptions, nil)
+	mounterObj := ns.Mounter.NewMounter(attrib, nil, nil, nil, nil)
 
 	klog.Info("-NodeUnpublishVolume-: Unmount")
 	if err = mounterObj.Unmount(targetPath); err != nil {
