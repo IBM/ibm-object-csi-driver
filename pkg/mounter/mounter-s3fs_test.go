@@ -88,8 +88,8 @@ func TestNewS3fsMounter_WithReadonlyFlag(t *testing.T) {
 	assert.Equal(t, s3fsMounter.EndPoint, secretMapWithRO["cosEndpoint"])
 	assert.Equal(t, s3fsMounter.LocConstraint, secretMapWithRO["locationConstraint"])
 
-	// Verify that readonly flag is in mount options
-	assert.Contains(t, s3fsMounter.MountOptions, "ro")
+	// Verify that readonly flag is in mount options (formatted as "ro=true")
+	assert.Contains(t, s3fsMounter.MountOptions, "ro=true")
 }
 
 func TestNewS3fsMounter_WithoutReadonlyFlag(t *testing.T) {
@@ -109,7 +109,10 @@ func TestNewS3fsMounter_WithoutReadonlyFlag(t *testing.T) {
 	assert.True(t, ok)
 
 	// Verify that readonly flag is NOT in mount options
-	assert.NotContains(t, s3fsMounter.MountOptions, "ro")
+	// Check that no option starts with "ro"
+	for _, opt := range s3fsMounter.MountOptions {
+		assert.NotContains(t, opt, "ro=")
+	}
 }
 
 func TestS3FSMount_NodeServer_Positive(t *testing.T) {
