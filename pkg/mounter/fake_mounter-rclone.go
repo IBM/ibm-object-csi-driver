@@ -1,6 +1,12 @@
+//go:build linux
+// +build linux
+
 package mounter
 
-import "errors"
+import (
+	"context"
+	"errors"
+)
 
 type fakercloneMounter struct {
 	bucketName    string
@@ -33,14 +39,14 @@ func fakenewRcloneMounter(isFailedMount, isFailedUnmount bool) Mounter {
 	}
 }
 
-func (rclone *fakercloneMounter) Mount(source string, target string) error {
+func (rclone *fakercloneMounter) Mount(ctx context.Context, source string, target string) error {
 	if rclone.isFailedMount {
 		return errors.New("failed to mount rclone")
 	}
 	return nil
 }
 
-func (rclone *fakercloneMounter) Unmount(target string) error {
+func (rclone *fakercloneMounter) Unmount(ctx context.Context, target string) error {
 	if rclone.isFailedUnmount {
 		return errors.New("failed to unmount rclone")
 	}

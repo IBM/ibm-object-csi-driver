@@ -24,7 +24,6 @@ import (
 	pkgUtils "github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"go.uber.org/zap"
-	"k8s.io/klog/v2"
 )
 
 var (
@@ -183,7 +182,7 @@ func (driver *S3Driver) NewS3CosDriver(nodeID string, endpoint string, s3cosSess
 	if err != nil {
 		return nil, err
 	}
-	klog.Infof("iam endpoint: %v", iamEP)
+	driver.logger.Info("IAM endpoint", zap.String("iam_endpoint", iamEP))
 	driver.iamEndpoint = iamEP
 
 	driver.endpoint = endpoint

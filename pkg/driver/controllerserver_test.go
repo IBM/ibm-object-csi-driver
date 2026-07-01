@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
+	"github.com/IBM/ibm-object-csi-driver/pkg/requestid"
 	"github.com/IBM/ibm-object-csi-driver/pkg/s3client"
 	"github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -37,7 +38,8 @@ import (
 )
 
 var (
-	ctx = context.Background()
+	// Create context with request ID for testing
+	ctx = requestid.WithRequestID(context.Background(), "test-request-id")
 
 	driverName    = "testDriver"
 	driverVersion = "testDriverVersion"
@@ -405,7 +407,7 @@ func TestCreateVolume(t *testing.T) {
 				},
 			}),
 			expectedResp: nil,
-			expectedErr:  errors.New("could not fetch the secret"),
+			expectedErr:  errors.New("secretName annotation 'cos.csi.driver/secret' not specified in the PVC annotations"),
 		},
 		{
 			testCaseName: "Negative: Secret and PVC Names Different, Failed to get Secret",
@@ -735,6 +737,7 @@ func TestCreateVolume(t *testing.T) {
 			},
 			cosSession: tc.cosSession,
 			Stats:      tc.driverStatsUtils,
+			Logger:     zap.NewNop(),
 		}
 		actualResp, actualErr := controllerServer.CreateVolume(ctx, tc.req)
 
@@ -983,7 +986,7 @@ func TestDeleteVolume(t *testing.T) {
 
 func TestControllerPublishVolume(t *testing.T) {
 	t.Run("UnImplemented Method", func(t *testing.T) {
-		controllerServer := &controllerServer{}
+		controllerServer := &controllerServer{Logger: zap.NewNop()}
 		actualResp, actualErr := controllerServer.ControllerPublishVolume(ctx, &csi.ControllerPublishVolumeRequest{})
 		assert.Nil(t, actualResp)
 		assert.Error(t, actualErr)
@@ -993,7 +996,7 @@ func TestControllerPublishVolume(t *testing.T) {
 
 func TestControllerUnpublishVolume(t *testing.T) {
 	t.Run("UnImplemented Method", func(t *testing.T) {
-		controllerServer := &controllerServer{}
+		controllerServer := &controllerServer{Logger: zap.NewNop()}
 		actualResp, actualErr := controllerServer.ControllerUnpublishVolume(ctx, &csi.ControllerUnpublishVolumeRequest{})
 		assert.Nil(t, actualResp)
 		assert.Error(t, actualErr)
@@ -1070,7 +1073,7 @@ func TestValidateVolumeCapabilities(t *testing.T) {
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		controllerServer := &controllerServer{}
+		controllerServer := &controllerServer{Logger: zap.NewNop()}
 		actualResp, actualErr := controllerServer.ValidateVolumeCapabilities(ctx, tc.req)
 
 		if tc.expectedErr != nil {
@@ -1088,7 +1091,7 @@ func TestValidateVolumeCapabilities(t *testing.T) {
 
 func TestListVolumes(t *testing.T) {
 	t.Run("UnImplemented Method", func(t *testing.T) {
-		controllerServer := &controllerServer{}
+		controllerServer := &controllerServer{Logger: zap.NewNop()}
 		actualResp, actualErr := controllerServer.ListVolumes(ctx, &csi.ListVolumesRequest{})
 		assert.Nil(t, actualResp)
 		assert.Error(t, actualErr)
@@ -1098,7 +1101,7 @@ func TestListVolumes(t *testing.T) {
 
 func TestGetCapacity(t *testing.T) {
 	t.Run("UnImplemented Method", func(t *testing.T) {
-		controllerServer := &controllerServer{}
+		controllerServer := &controllerServer{Logger: zap.NewNop()}
 		actualResp, actualErr := controllerServer.GetCapacity(ctx, &csi.GetCapacityRequest{})
 		assert.Nil(t, actualResp)
 		assert.Error(t, actualErr)
@@ -1134,7 +1137,7 @@ func TestControllerGetCapabilities(t *testing.T) {
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		controllerServer := &controllerServer{}
+		controllerServer := &controllerServer{Logger: zap.NewNop()}
 		actualResp, actualErr := controllerServer.ControllerGetCapabilities(ctx, tc.req)
 
 		if tc.expectedErr != nil {
@@ -1152,7 +1155,7 @@ func TestControllerGetCapabilities(t *testing.T) {
 
 func TestCreateSnapshot(t *testing.T) {
 	t.Run("UnImplemented Method", func(t *testing.T) {
-		controllerServer := &controllerServer{}
+		controllerServer := &controllerServer{Logger: zap.NewNop()}
 		actualResp, actualErr := controllerServer.CreateSnapshot(ctx, &csi.CreateSnapshotRequest{})
 		assert.Nil(t, actualResp)
 		assert.Error(t, actualErr)
@@ -1162,7 +1165,7 @@ func TestCreateSnapshot(t *testing.T) {
 
 func TestDeleteSnapshot(t *testing.T) {
 	t.Run("UnImplemented Method", func(t *testing.T) {
-		controllerServer := &controllerServer{}
+		controllerServer := &controllerServer{Logger: zap.NewNop()}
 		actualResp, actualErr := controllerServer.DeleteSnapshot(ctx, &csi.DeleteSnapshotRequest{})
 		assert.Nil(t, actualResp)
 		assert.Error(t, actualErr)
@@ -1172,7 +1175,7 @@ func TestDeleteSnapshot(t *testing.T) {
 
 func TestListSnapshots(t *testing.T) {
 	t.Run("UnImplemented Method", func(t *testing.T) {
-		controllerServer := &controllerServer{}
+		controllerServer := &controllerServer{Logger: zap.NewNop()}
 		actualResp, actualErr := controllerServer.ListSnapshots(ctx, &csi.ListSnapshotsRequest{})
 		assert.Nil(t, actualResp)
 		assert.Error(t, actualErr)
@@ -1182,7 +1185,7 @@ func TestListSnapshots(t *testing.T) {
 
 func TestControllerExpandVolume(t *testing.T) {
 	t.Run("UnImplemented Method", func(t *testing.T) {
-		controllerServer := &controllerServer{}
+		controllerServer := &controllerServer{Logger: zap.NewNop()}
 		actualResp, actualErr := controllerServer.ControllerExpandVolume(ctx, &csi.ControllerExpandVolumeRequest{})
 		assert.Nil(t, actualResp)
 		assert.Error(t, actualErr)
@@ -1192,7 +1195,7 @@ func TestControllerExpandVolume(t *testing.T) {
 
 func TestControllerGetVolume(t *testing.T) {
 	t.Run("UnImplemented Method", func(t *testing.T) {
-		controllerServer := &controllerServer{}
+		controllerServer := &controllerServer{Logger: zap.NewNop()}
 		actualResp, actualErr := controllerServer.ControllerGetVolume(ctx, &csi.ControllerGetVolumeRequest{})
 		assert.Nil(t, actualResp)
 		assert.Error(t, actualErr)
@@ -1202,7 +1205,7 @@ func TestControllerGetVolume(t *testing.T) {
 
 func TestControllerModifyVolume(t *testing.T) {
 	t.Run("UnImplemented Method", func(t *testing.T) {
-		controllerServer := &controllerServer{}
+		controllerServer := &controllerServer{Logger: zap.NewNop()}
 		actualResp, actualErr := controllerServer.ControllerModifyVolume(ctx, &csi.ControllerModifyVolumeRequest{})
 		assert.Nil(t, actualResp)
 		assert.Error(t, actualErr)

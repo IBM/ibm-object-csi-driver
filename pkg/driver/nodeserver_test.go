@@ -67,7 +67,9 @@ func TestNodeStageVolume(t *testing.T) {
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		nodeServer := nodeServer{}
+		nodeServer := nodeServer{
+			S3Driver: &S3Driver{logger: zap.NewNop()},
+		}
 		actualResp, actualErr := nodeServer.NodeStageVolume(ctx, tc.req)
 
 		if tc.expectedErr != nil {
@@ -118,7 +120,9 @@ func TestNodeUnstageVolume(t *testing.T) {
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		nodeServer := nodeServer{}
+		nodeServer := nodeServer{
+			S3Driver: &S3Driver{logger: zap.NewNop()},
+		}
 		actualResp, actualErr := nodeServer.NodeUnstageVolume(ctx, tc.req)
 
 		if tc.expectedErr != nil {
@@ -349,6 +353,7 @@ func TestNodePublishVolume(t *testing.T) {
 		nodeServer := nodeServer{
 			S3Driver: &S3Driver{
 				iamEndpoint: constants.PublicIAMEndpoint,
+				logger:      zap.NewNop(),
 			},
 			Stats:   tc.driverStatsUtils,
 			Mounter: tc.Mounter,
@@ -451,8 +456,9 @@ func TestNodeUnpublishVolume(t *testing.T) {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
 		nodeServer := nodeServer{
-			Stats:   tc.driverStatsUtils,
-			Mounter: tc.Mounter,
+			S3Driver: &S3Driver{logger: zap.NewNop()},
+			Stats:    tc.driverStatsUtils,
+			Mounter:  tc.Mounter,
 		}
 		actualResp, actualErr := nodeServer.NodeUnpublishVolume(ctx, tc.req)
 
@@ -587,7 +593,8 @@ func TestNodeGetVolumeStats(t *testing.T) {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
 		nodeServer := nodeServer{
-			Stats: tc.driverStatsUtils,
+			S3Driver: &S3Driver{logger: zap.NewNop()},
+			Stats:    tc.driverStatsUtils,
 		}
 		actualResp, actualErr := nodeServer.NodeGetVolumeStats(ctx, tc.req)
 
@@ -606,7 +613,9 @@ func TestNodeGetVolumeStats(t *testing.T) {
 
 func TestNodeExpandVolume(t *testing.T) {
 	t.Run("UnImplemented Method", func(t *testing.T) {
-		nodeServer := nodeServer{}
+		nodeServer := nodeServer{
+			S3Driver: &S3Driver{logger: zap.NewNop()},
+		}
 		actualResp, actualErr := nodeServer.NodeExpandVolume(ctx, &csi.NodeExpandVolumeRequest{})
 		assert.Equal(t, &csi.NodeExpandVolumeResponse{}, actualResp)
 		assert.Error(t, actualErr)
@@ -656,7 +665,9 @@ func TestNodeGetCapabilities(t *testing.T) {
 	for _, tc := range testCases {
 		t.Log("Testcase being executed", zap.String("testcase", tc.testCaseName))
 
-		nodeServer := nodeServer{}
+		nodeServer := nodeServer{
+			S3Driver: &S3Driver{logger: zap.NewNop()},
+		}
 		actualResp, actualErr := nodeServer.NodeGetCapabilities(ctx, tc.req)
 
 		if tc.expectedErr != nil {
@@ -678,6 +689,7 @@ func TestNodeGetInfo(t *testing.T) {
 	testZone := "test-zone"
 
 	nodeServer := nodeServer{
+		S3Driver: &S3Driver{logger: zap.NewNop()},
 		NodeServerConfig: NodeServerConfig{
 			MaxVolumesPerNode: testMaxVolumesPerNode,
 			Region:            testRegion,

@@ -1,6 +1,10 @@
+//go:build linux
+// +build linux
+
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net"
@@ -13,6 +17,7 @@ import (
 	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
+	loggerPkg "github.com/IBM/ibm-object-csi-driver/pkg/logger"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -42,17 +47,23 @@ func init() {
 }
 
 func setUpLogger() *zap.Logger {
-	// Prepare a new logger
+	// Prepare a new logger with standardized JSON format
 	atom := zap.NewAtomicLevel()
 	encoderCfg := zap.NewProductionEncoderConfig()
 	encoderCfg.TimeKey = "timestamp"
 	encoderCfg.EncodeTime = zapcore.ISO8601TimeEncoder
+	encoderCfg.EncodeLevel = zapcore.LowercaseLevelEncoder
+	encoderCfg.MessageKey = "msg"
+	encoderCfg.CallerKey = "caller"
+	encoderCfg.LevelKey = "level"
 
 	logger := zap.New(zapcore.NewCore(
 		zapcore.NewJSONEncoder(encoderCfg),
 		zapcore.Lock(os.Stdout),
 		atom,
-	), zap.AddCaller()).With(zap.String("ServiceName", "cos-csi-mounter"))
+	), zap.AddCaller()).With(
+		zap.String("service", "cos-csi-mounter"),
+		zap.String("component", "mounter-server"))
 	atom.SetLevel(zap.InfoLevel)
 	return logger
 }
@@ -159,71 +170,102 @@ func main() {
 
 func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Extract request ID from HTTP header or generate one
+		reqID := c.GetHeader("X-Request-ID")
+		if reqID == "" {
+			reqID = loggerPkg.GenerateRequestID()
+		}
+		log := logger.With(zap.String("request_id", reqID))
+
 		var request MountRequest
 
 		if err := c.BindJSON(&request); err != nil {
-			logger.Error("invalid request: ", zap.Error(err))
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+			log.Error("Invalid request", zap.Error(err))
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("[%s] invalid request", reqID)})
 			return
 		}
 
-		logger.Info("New mount request with values:", zap.String("Bucket", request.Bucket), zap.String("Path", request.Path), zap.String("Mounter", request.Mounter), zap.Any("Args", request.Args))
+		log.Info("New mount request",
+			zap.String("bucket", request.Bucket),
+			zap.String("path", request.Path),
+			zap.String("mounter", request.Mounter),
+			zap.Any("args", request.Args))
 
 		if request.Mounter != constants.S3FS && request.Mounter != constants.RClone {
-			logger.Error("invalid mounter", zap.Any("mounter", request.Mounter))
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid mounter"})
+			log.Error("Invalid mounter", zap.String("mounter", request.Mounter))
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("[%s] invalid mounter", reqID)})
 			return
 		}
 
 		if request.Bucket == "" {
-			logger.Error("missing bucket in request")
-			c.JSON(http.StatusBadRequest, gin.H{"error": "missing bucket"})
+			log.Error("Missing bucket in request")
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("[%s] missing bucket", reqID)})
 			return
 		}
 
 		// validate mounter args
+		log.Debug("Parsing mounter args")
 		args, err := parser.Parse(request)
 		if err != nil {
-			logger.Error("failed to parse mounter args", zap.Any("mounter", request.Mounter), zap.Error(err))
-
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid args for mounter: %v", err)})
+			log.Error("Failed to parse mounter args",
+				zap.String("mounter", request.Mounter), zap.Error(err))
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("[%s] invalid args for mounter: %v", reqID, err)})
 			return
 		}
 
-		err = mounter.FuseMount(request.Path, request.Mounter, args)
+		log.Info("Mounting bucket",
+			zap.String("path", request.Path),
+			zap.String("mounter", request.Mounter))
+
+		// Create context with request_id for end-to-end tracing
+		ctx := context.WithValue(c.Request.Context(), mounterUtils.RequestIDKey, reqID)
+		err = mounter.FuseMount(ctx, request.Path, request.Mounter, args)
 		if err != nil {
-			logger.Error("mount failed: ", zap.Error(err))
-			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("mount failed: %v", err)})
+			log.Error("Mount failed", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("[%s] mount failed: %v", reqID, err)})
 			return
 		}
 
-		logger.Info("bucket mount is successful", zap.Any("bucket", request.Bucket), zap.Any("path", request.Path))
+		log.Info("Bucket mount successful",
+			zap.String("bucket", request.Bucket),
+			zap.String("path", request.Path))
 		c.JSON(http.StatusOK, gin.H{"status": "success"})
 	}
 }
 
 func handleCosUnmount(mounter mounterUtils.MounterUtils) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Extract request ID from HTTP header or generate one
+		reqID := c.GetHeader("X-Request-ID")
+		if reqID == "" {
+			reqID = loggerPkg.GenerateRequestID()
+		}
+		log := logger.With(zap.String("request_id", reqID))
+
 		var request struct {
 			Path string `json:"path"`
 		}
 
 		if err := c.BindJSON(&request); err != nil {
-			logger.Error("invalid request: ", zap.Error(err))
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+			log.Error("Invalid request", zap.Error(err))
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("[%s] invalid request", reqID)})
 			return
 		}
 
-		logger.Info("New unmount request with values: ", zap.String("Path", request.Path))
+		log.Info("New unmount request", zap.String("path", request.Path))
 
-		err := mounter.FuseUnmount(request.Path)
+		log.Info("Unmounting bucket", zap.String("path", request.Path))
+
+		// Create context with request_id for end-to-end tracing
+		ctx := context.WithValue(c.Request.Context(), mounterUtils.RequestIDKey, reqID)
+		err := mounter.FuseUnmount(ctx, request.Path)
 		if err != nil {
-			logger.Error("unmount failed: ", zap.Error(err))
-			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("unmount failed :%v", err)})
+			log.Error("Unmount failed", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("[%s] unmount failed: %v", reqID, err)})
 			return
 		}
 
-		logger.Info("bucket unmount is successful", zap.Any("path", request.Path))
+		log.Info("Bucket unmount successful", zap.String("path", request.Path))
 		c.JSON(http.StatusOK, gin.H{"status": "success"})
 	}
 }

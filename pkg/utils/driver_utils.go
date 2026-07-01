@@ -11,16 +11,24 @@ import (
 	"github.com/IBM/go-sdk-core/v5/core"
 	rc "github.com/IBM/ibm-cos-sdk-go-config/v2/resourceconfigurationv1"
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
+	"github.com/IBM/ibm-object-csi-driver/pkg/logger"
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume/util/fs"
 )
+
+var utilLogger *zap.Logger
+
+func init() {
+	utilLogger = logger.NewJSONLoggerOrNop("ibm-object-csi-driver")
+	utilLogger = utilLogger.With(zap.String("component", "driver-utils"))
+}
 
 type StatsUtils interface {
 	BucketToDelete(volumeID string) (string, error)
@@ -93,17 +101,17 @@ func (su *DriverStatsUtils) BucketToDelete(volumeID string) (string, error) {
 
 	pv, err := clientset.CoreV1().PersistentVolumes().Get(context.Background(), volumeID, metav1.GetOptions{})
 	if err != nil {
-		klog.Errorf("Unable to fetch bucket %v", err)
+		utilLogger.Error("Unable to fetch bucket", zap.Error(err))
 		return "", err
 	}
 
-	klog.Infof("***Attributes: %v", pv.Spec.CSI.VolumeAttributes)
+	utilLogger.Info("Volume attributes", zap.Any("attributes", pv.Spec.CSI.VolumeAttributes))
 	if pv.Spec.CSI.VolumeAttributes["userProvidedBucket"] != "true" {
-		klog.Infof("Bucket will be deleted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
+		utilLogger.Info("Bucket will be deleted", zap.String("bucket_name", pv.Spec.CSI.VolumeAttributes["bucketName"]))
 		return pv.Spec.CSI.VolumeAttributes["bucketName"], nil
 	}
 
-	klog.Infof("Bucket will be persisted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
+	utilLogger.Info("Bucket will be persisted", zap.String("bucket_name", pv.Spec.CSI.VolumeAttributes["bucketName"]))
 	return "", nil
 }
 
@@ -115,10 +123,10 @@ func (su *DriverStatsUtils) CheckMount(targetPath string) error {
 	out, err := exec.Command("mountpoint", targetPath).CombinedOutput()
 	outStr := strings.TrimSpace(string(out))
 	if err != nil {
-		klog.V(3).Infof("Check if mountPath exists: Output string- %+v", outStr)
+		utilLogger.Debug("Check if mountPath exists", zap.String("output", outStr))
 		if strings.HasSuffix(outStr, "No such file or directory") {
 			if err = os.MkdirAll(targetPath, 0750); err != nil {
-				klog.V(2).Infof("checkMount: Error: %+v", err)
+				utilLogger.Debug("checkMount: Error", zap.Error(err))
 				return err
 			}
 		} else {
@@ -161,7 +169,7 @@ func (su *DriverStatsUtils) GetBucketUsage(volumeID string) (int64, error) {
 	}
 	resourceConfig, err := rc.NewResourceConfigurationV1(rcOptions)
 	if err != nil {
-		klog.Error("Failed to create resource config")
+		utilLogger.Error("Failed to create resource config")
 		return 0, err
 	}
 
@@ -171,7 +179,7 @@ func (su *DriverStatsUtils) GetBucketUsage(volumeID string) (int64, error) {
 
 	res, _, err := resourceConfig.GetBucketConfig(bucketOptions)
 	if err != nil {
-		klog.Error("Failed to get bucket config")
+		utilLogger.Error("Failed to get bucket config")
 		return 0, err
 	}
 
@@ -205,7 +213,7 @@ func (su *DriverStatsUtils) GetPVC(pvcName, pvcNamespace string) (*v1.Persistent
 
 	pvc, err := k8sClient.CoreV1().PersistentVolumeClaims(pvcNamespace).Get(context.TODO(), pvcName, metav1.GetOptions{})
 	if err != nil {
-		klog.Errorf("Unable to fetch pvc %v", err)
+		utilLogger.Error("Unable to fetch pvc", zap.Error(err))
 		return nil, fmt.Errorf("error getting PVC: %v", err)
 	}
 
@@ -234,7 +242,7 @@ func (su *DriverStatsUtils) GetPV(volumeID string) (*v1.PersistentVolume, error)
 
 	pv, err := k8sClient.CoreV1().PersistentVolumes().Get(context.Background(), volumeID, metav1.GetOptions{})
 	if err != nil {
-		klog.Errorf("Unable to fetch pv %v", err)
+		utilLogger.Error("Unable to fetch pv", zap.Error(err))
 		return nil, fmt.Errorf("error getting PV: %v", err)
 	}
 
@@ -315,14 +323,14 @@ func CreateK8sClient() (*kubernetes.Clientset, error) {
 	// Create a Kubernetes client configuration
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		klog.Error("Error creating Kubernetes client configuration: ", err)
+		utilLogger.Error("Error creating Kubernetes client configuration", zap.Error(err))
 		return nil, err
 	}
 
 	// Create a Kubernetes clientset
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		klog.Error("Error creating Kubernetes clientset: ", err)
+		utilLogger.Error("Error creating Kubernetes clientset", zap.Error(err))
 		return nil, err
 	}
 
@@ -348,7 +356,7 @@ func getClusterType() (string, error) {
 	}
 
 	clusterType := clusterConfig["cluster_type"]
-	klog.Info("Cluster Type ", clusterType)
+	utilLogger.Info("Cluster Type", zap.String("cluster_type", clusterType))
 	return clusterType, nil
 }
 
@@ -357,7 +365,7 @@ func fetchSecretUsingPV(volumeID string, su *DriverStatsUtils) (*v1.Secret, erro
 	if err != nil {
 		return nil, err
 	}
-	klog.Info("secret fetched from PV:\n\t", pv.Spec.CSI.NodePublishSecretRef)
+	utilLogger.Info("Secret fetched from PV", zap.String("secret_name", pv.Spec.CSI.NodePublishSecretRef.Name), zap.String("secret_namespace", pv.Spec.CSI.NodePublishSecretRef.Namespace))
 
 	secretName := pv.Spec.CSI.NodePublishSecretRef.Name
 	secretNamespace := pv.Spec.CSI.NodePublishSecretRef.Namespace
@@ -367,7 +375,7 @@ func fetchSecretUsingPV(volumeID string, su *DriverStatsUtils) (*v1.Secret, erro
 	}
 
 	if secretNamespace == "" {
-		klog.Info("secret Namespace not found. trying to fetch the secret in default namespace")
+		utilLogger.Info("Secret namespace not found, trying to fetch the secret in default namespace")
 		secretNamespace = constants.DefaultNamespace
 	}
 
@@ -380,7 +388,7 @@ func fetchSecretUsingPV(volumeID string, su *DriverStatsUtils) (*v1.Secret, erro
 		return nil, fmt.Errorf("secret not found with name: %v", secretNamespace)
 	}
 
-	klog.Info("secret details found. secretName: ", secret.Name)
+	utilLogger.Info("Secret details found", zap.String("secret_name", secret.Name))
 	return secret, nil
 }
 

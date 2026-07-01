@@ -13,10 +13,11 @@ package driver
 import (
 	"context"
 
+	"github.com/IBM/ibm-object-csi-driver/pkg/requestid"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"k8s.io/klog/v2"
 )
 
 // Implements Identity Sever csi.IdentityServe
@@ -25,11 +26,16 @@ type identityServer struct {
 	csi.UnimplementedIdentityServer
 }
 
-func (csiIdentity *identityServer) GetPluginInfo(_ context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
-	klog.V(3).Infof("identityServer-GetPluginInfo: Request: %+v", req)
+func (csiIdentity *identityServer) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
+	reqID := requestid.FromContext(ctx)
+
+	// Check if S3Driver is nil before accessing its logger
 	if csiIdentity.S3Driver == nil {
 		return nil, status.Error(codes.InvalidArgument, "Driver not configured")
 	}
+
+	log := csiIdentity.logger.With(zap.String("request_id", reqID))
+	log.Debug("identityServer-GetPluginInfo", zap.Any("request", req))
 
 	return &csi.GetPluginInfoResponse{
 		Name:          csiIdentity.name,
@@ -37,8 +43,11 @@ func (csiIdentity *identityServer) GetPluginInfo(_ context.Context, req *csi.Get
 	}, nil
 }
 
-func (csiIdentity *identityServer) GetPluginCapabilities(_ context.Context, req *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
-	klog.V(3).Infof("identityServer-GetPluginCapabilities: Request %+v", req)
+func (csiIdentity *identityServer) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
+	reqID := requestid.FromContext(ctx)
+	log := csiIdentity.logger.With(zap.String("request_id", reqID))
+
+	log.Debug("identityServer-GetPluginCapabilities", zap.Any("request", req))
 	return &csi.GetPluginCapabilitiesResponse{
 		Capabilities: []*csi.PluginCapability{
 			{
@@ -66,7 +75,10 @@ func (csiIdentity *identityServer) GetPluginCapabilities(_ context.Context, req 
 	}, nil
 }
 
-func (csiIdentity *identityServer) Probe(_ context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
-	klog.V(3).Infof("identityServer-Probe: Request %+v", req)
+func (csiIdentity *identityServer) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
+	reqID := requestid.FromContext(ctx)
+	log := csiIdentity.logger.With(zap.String("request_id", reqID))
+
+	log.Debug("identityServer-Probe", zap.Any("request", req))
 	return &csi.ProbeResponse{}, nil
 }
