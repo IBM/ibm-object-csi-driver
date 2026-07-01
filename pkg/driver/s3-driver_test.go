@@ -62,8 +62,13 @@ func TestAddVolumeCapabilityAccessModes(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	// After our changes, volumeCapabilities should have 3 modes: RWO, RWX, ROX
+	expectedCapCount := 3
+	if len(driver.vcap) != expectedCapCount {
+		t.Errorf("expected %d volume capabilities, got %d", expectedCapCount, len(driver.vcap))
+	}
 	if len(driver.vcap) != len(volumeCapabilities) {
-		t.Errorf("expected %d volume capabilities, got %d", len(volumeCapabilities), len(driver.vcap))
+		t.Errorf("expected %d volume capabilities from volumeCapabilities array, got %d", len(volumeCapabilities), len(driver.vcap))
 	}
 }
 
