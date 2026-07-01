@@ -126,6 +126,18 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		secretMapCopy[k] = v
 	}
 	klog.V(2).Infof("-NodePublishVolume-: secretMap: %v", secretMapCopy)
+
+	// Check access mode and set readonly flag if needed
+	accessMode := req.GetVolumeCapability().GetAccessMode().GetMode()
+	if accessMode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY {
+		secretMap["ro"] = "true"
+		klog.V(2).Infof("-NodePublishVolume-: Setting readonly mount for access mode: MULTI_NODE_READER_ONLY")
+	} else if readOnly {
+		// Also respect the readonly boolean flag from Pod spec
+		secretMap["ro"] = "true"
+		klog.V(2).Infof("-NodePublishVolume-: Setting readonly mount from readonly flag")
+	}
+
 	if volumeMountGroup != "" {
 		secretMap["gid"] = volumeMountGroup
 	}

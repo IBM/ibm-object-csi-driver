@@ -67,6 +67,54 @@ func TestNewS3fsMounter_Success_Hmac(t *testing.T) {
 	assert.Equal(t, s3fsMounter.LocConstraint, secretMap["locationConstraint"])
 }
 
+func TestNewS3fsMounter_WithReadonlyFlag(t *testing.T) {
+	secretMapWithRO := map[string]string{
+		"cosEndpoint":        "test-endpoint",
+		"locationConstraint": "test-loc-constraint",
+		"bucketName":         "test-bucket-name",
+		"objectPath":         "test-obj-path",
+		"accessKey":          "test-access-key",
+		"secretKey":          "test-secret-key",
+		"ro":                 "true", // Readonly flag
+	}
+
+	mounter := NewS3fsMounter(secretMapWithRO, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}), map[string]string{constants.CipherSuitesKey: "default"})
+
+	s3fsMounter, ok := mounter.(*S3fsMounter)
+	assert.True(t, ok)
+
+	assert.Equal(t, s3fsMounter.BucketName, secretMapWithRO["bucketName"])
+	assert.Equal(t, s3fsMounter.ObjectPath, secretMapWithRO["objectPath"])
+	assert.Equal(t, s3fsMounter.EndPoint, secretMapWithRO["cosEndpoint"])
+	assert.Equal(t, s3fsMounter.LocConstraint, secretMapWithRO["locationConstraint"])
+
+	// Verify that readonly flag is in mount options (formatted as "ro=true")
+	assert.Contains(t, s3fsMounter.MountOptions, "ro=true")
+}
+
+func TestNewS3fsMounter_WithoutReadonlyFlag(t *testing.T) {
+	secretMapWithoutRO := map[string]string{
+		"cosEndpoint":        "test-endpoint",
+		"locationConstraint": "test-loc-constraint",
+		"bucketName":         "test-bucket-name",
+		"objectPath":         "test-obj-path",
+		"accessKey":          "test-access-key",
+		"secretKey":          "test-secret-key",
+		// No "ro" flag
+	}
+
+	mounter := NewS3fsMounter(secretMapWithoutRO, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}), map[string]string{constants.CipherSuitesKey: "default"})
+
+	s3fsMounter, ok := mounter.(*S3fsMounter)
+	assert.True(t, ok)
+
+	// Verify that readonly flag is NOT in mount options
+	// Check that no option starts with "ro"
+	for _, opt := range s3fsMounter.MountOptions {
+		assert.NotContains(t, opt, "ro=")
+	}
+}
+
 func TestS3FSMount_NodeServer_Positive(t *testing.T) {
 	mountWorker = false
 

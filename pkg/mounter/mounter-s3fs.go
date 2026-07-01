@@ -246,6 +246,12 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 		mountOptsMap["uid"] = secretMap["uid"]
 	}
 
+	// Add readonly flag if specified
+	if val, ok := secretMap["ro"]; ok && val == "true" {
+		mountOptsMap["ro"] = ""
+		klog.V(2).Infof("Adding readonly flag to s3fs mount options")
+	}
+
 	stringData, ok := secretMap["mountOptions"]
 	if !ok {
 		klog.Infof("No new mountOptions found. Using default mountOptions: %v", mountOptsMap)
