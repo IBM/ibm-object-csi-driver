@@ -72,6 +72,7 @@ func TestNewRcloneMounter_Only_GID(t *testing.T) {
 	assert.Equal(t, rCloneMounter.EndPoint, secretMap["cosEndpoint"])
 	assert.Equal(t, rCloneMounter.LocConstraint, secretMap["locationConstraint"])
 	assert.Equal(t, rCloneMounter.GID, secretMap["gid"])
+	assert.Equal(t, rCloneMounter.UID, secretMap["gid"]) // uid auto-set from gid when uid absent
 }
 
 func TestNewRcloneMounter_MountOptsInSecret_HMAC(t *testing.T) {
@@ -471,4 +472,116 @@ func TestRemoveRcloneConfigFile_Negative(t *testing.T) {
 
 	removeRcloneConfigFile("/test", target)
 	assert.Equal(t, maxRetries, called)
+}
+
+func TestNewRcloneMounter_GidParam(t *testing.T) {
+	tests := []struct {
+		name    string
+		secret  map[string]string
+		gid     string
+		wantGID string
+		wantUID string
+	}{
+		{
+			name:    "gid param overrides secretMap gid",
+			secret:  map[string]string{"gid": "1000"},
+			gid:     "2000",
+			wantGID: "2000",
+			wantUID: "2000", // auto-set from gid param since no uid in secret
+		},
+		{
+			name:    "gid param sets uid when uid absent",
+			secret:  map[string]string{},
+			gid:     "3000",
+			wantGID: "3000",
+			wantUID: "3000",
+		},
+		{
+			name:    "gid param does not override explicit secretMap uid",
+			secret:  map[string]string{"uid": "5000"},
+			gid:     "4000",
+			wantGID: "4000",
+			wantUID: "5000", // secretMap uid takes precedence
+		},
+		{
+			name:    "no gid param and no secret gid — neither set",
+			secret:  map[string]string{},
+			gid:     "",
+			wantGID: "",
+			wantUID: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mounter := NewRcloneMounter(RcloneMounterParams{
+				SecretMap:    tt.secret,
+				MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+				Gid:          tt.gid,
+			})
+
+			rCloneMounter, ok := mounter.(*RcloneMounter)
+			assert.True(t, ok)
+			assert.Equal(t, tt.wantGID, rCloneMounter.GID)
+			assert.Equal(t, tt.wantUID, rCloneMounter.UID)
+		})
+	}
+}
+
+func TestNewRcloneMounter_ReadOnly(t *testing.T) {
+	tests := []struct {
+		name     string
+		readOnly bool
+		wantRO   bool
+	}{
+		{
+			name:     "readOnly true sets ReadOnly flag and --read-only in mount args",
+			readOnly: true,
+			wantRO:   true,
+		},
+		{
+			name:     "readOnly false does not set ReadOnly flag",
+			readOnly: false,
+			wantRO:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mounter := NewRcloneMounter(RcloneMounterParams{
+				SecretMap:    map[string]string{},
+				MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+				ReadOnly:     tt.readOnly,
+			})
+
+			rCloneMounter, ok := mounter.(*RcloneMounter)
+			assert.True(t, ok)
+			assert.Equal(t, tt.wantRO, rCloneMounter.ReadOnly)
+
+			nodeOp, workerOp := rCloneMounter.formulateMountOptions("bucket", "/target", "/config")
+			if tt.wantRO {
+				assert.Contains(t, nodeOp, "--read-only")
+				assert.Equal(t, "true", workerOp["read-only"])
+			} else {
+				assert.NotContains(t, nodeOp, "--read-only")
+				_, exists := workerOp["read-only"]
+				assert.False(t, exists)
+			}
+		})
+	}
+}
+
+func TestFormulateRcloneMountOptions_GidUid(t *testing.T) {
+	rclone := &RcloneMounter{
+		GID:      "1000",
+		UID:      "1000",
+		EndPoint: "test-endpoint",
+	}
+
+	nodeOp, workerOp := rclone.formulateMountOptions("bucket", "/target", "/config")
+
+	assert.Contains(t, nodeOp, "--gid=1000")
+	assert.Contains(t, nodeOp, "--uid=1000")
+	assert.Equal(t, "1000", workerOp["gid"])
+	assert.Equal(t, "1000", workerOp["uid"])
 }
