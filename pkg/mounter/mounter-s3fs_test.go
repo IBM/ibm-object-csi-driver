@@ -414,6 +414,93 @@ func TestUpdateS3FSMountOptions_DefaultParams(t *testing.T) {
 	assert.NotContains(t, optsStr, "empty_param")
 }
 
+func TestUpdateS3FSMountOptions_ReadOnly(t *testing.T) {
+	tests := []struct {
+		name     string
+		readOnly bool
+		wantRO   bool
+	}{
+		{
+			name:     "readOnly true sets ro=true",
+			readOnly: true,
+			wantRO:   true,
+		},
+		{
+			name:     "readOnly false does not set ro",
+			readOnly: false,
+			wantRO:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts, _ := updateS3FSMountOptions(nil, map[string]string{}, GetKnownS3FSOptions(), nil, "", tt.readOnly)
+			optsStr := strings.Join(opts, " ")
+			if tt.wantRO {
+				assert.Contains(t, optsStr, "ro=true")
+			} else {
+				assert.NotContains(t, optsStr, "ro=true")
+			}
+		})
+	}
+}
+
+func TestUpdateS3FSMountOptions_GidParam(t *testing.T) {
+	tests := []struct {
+		name        string
+		secret      map[string]string
+		gid         string
+		wantGID     string
+		wantUID     string
+	}{
+		{
+			name:    "gid param overrides secretMap gid",
+			secret:  map[string]string{"gid": "1000"},
+			gid:     "2000",
+			wantGID: "gid=2000",
+			wantUID: "uid=2000", // auto-set from gid param since no uid in secret
+		},
+		{
+			name:    "gid param sets uid when uid absent",
+			secret:  map[string]string{},
+			gid:     "3000",
+			wantGID: "gid=3000",
+			wantUID: "uid=3000",
+		},
+		{
+			name:    "gid param does not override explicit secretMap uid",
+			secret:  map[string]string{"uid": "5000"},
+			gid:     "4000",
+			wantGID: "gid=4000",
+			wantUID: "uid=5000", // secretMap uid takes precedence
+		},
+		{
+			name:    "no gid param and no secret gid — neither set",
+			secret:  map[string]string{},
+			gid:     "",
+			wantGID: "",
+			wantUID: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts, _ := updateS3FSMountOptions(nil, tt.secret, GetKnownS3FSOptions(), nil, tt.gid, false)
+			optsStr := strings.Join(opts, " ")
+			if tt.wantGID != "" {
+				assert.Contains(t, optsStr, tt.wantGID)
+			} else {
+				assert.NotContains(t, optsStr, "gid=")
+			}
+			if tt.wantUID != "" {
+				assert.Contains(t, optsStr, tt.wantUID)
+			} else {
+				assert.NotContains(t, optsStr, "uid=")
+			}
+		})
+	}
+}
+
 func TestUpdateS3FSMountOptionsWithUnknownOptions(t *testing.T) {
 	tests := []struct {
 		name                        string

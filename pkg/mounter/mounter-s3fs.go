@@ -276,26 +276,6 @@ func classifyMountOptions(options []string, knownOptions *pkgutils.Set, knownMap
 	}
 }
 
-func applySecretOverrides(secretMap, mountOptsMap map[string]string) {
-	if val, check := secretMap["tmpdir"]; check {
-		mountOptsMap["tmpdir"] = val
-	}
-
-	if val, check := secretMap["use_cache"]; check {
-		mountOptsMap["use_cache"] = val
-	}
-
-	if val, check := secretMap["gid"]; check {
-		mountOptsMap["gid"] = val
-	}
-
-	if secretMap["gid"] != "" && secretMap["uid"] == "" {
-		mountOptsMap["uid"] = secretMap["gid"]
-	} else if secretMap["uid"] != "" {
-		mountOptsMap["uid"] = secretMap["uid"]
-	}
-}
-
 func buildMountOptionsSlice(mountOptsMap, defaultParams map[string]string) []string {
 	updatedOptions := make([]string, 0, len(mountOptsMap)+len(defaultParams))
 
@@ -341,14 +321,43 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 
 	// Classify StorageClass's mount options into known (standard s3fs) and unknown (custom) categories
 	classifyMountOptions(defaultMountOp, knownS3FSOptions, mountOptsMap, unknownOptionsMap)
-	applySecretOverrides(secretMap, mountOptsMap)
 
 	if stringData, ok := secretMap["mountOptions"]; ok {
 		lines := strings.Split(stringData, "\n")
 		// Classify secret's mount options into known (standard s3fs) and unknown (custom) categories
 		classifyMountOptions(lines, knownS3FSOptions, mountOptsMap, unknownOptionsMap)
 	} else {
-		klog.Infof("No new mountOptions found. Using default mountOptions: %v", mountOptsMap)
+		klog.Infof("No new mountOptions found. Using default mountOptions from storageclass: %v", mountOptsMap)
+	}
+
+	// To mount the bucket in read-only mode using s3fs based on PVC accessMode "ReadOnlyMany"
+	if readOnly {
+		mountOptsMap["ro"] = "true"
+	}
+
+	// set uid and gid params, if present in csi secret "data" section
+	if secretMap["uid"] != "" {
+		mountOptsMap["uid"] = secretMap["uid"]
+	}
+
+	if secretMap["gid"] != "" {
+		mountOptsMap["gid"] = secretMap["gid"]
+	}
+
+	if gid != "" { // override gid, based on fsGroup defined in securityContext of the workload pod, if defined
+		mountOptsMap["gid"] = gid
+	}
+
+	if mountOptsMap["gid"] != "" && mountOptsMap["uid"] == "" {
+		mountOptsMap["uid"] = mountOptsMap["gid"]
+	}
+
+	// retaining explicit handling for following 2 options for backward compatibility
+	if val, check := secretMap["tmpdir"]; check {
+		mountOptsMap["tmpdir"] = val
+	}
+	if val, check := secretMap["use_cache"]; check {
+		mountOptsMap["use_cache"] = val
 	}
 
 	updatedOptions := buildMountOptionsSlice(mountOptsMap, defaultParams)
