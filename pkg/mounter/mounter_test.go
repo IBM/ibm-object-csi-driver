@@ -122,7 +122,12 @@ func TestNewMounter(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			factory := &CSIMounterFactory{}
 
-			result := factory.NewMounter(test.attrib, test.secretMap, test.mountOptions, GetKnownS3FSOptions(), nil)
+			result := factory.NewMounter(MounterParams{
+				Attrib:           test.attrib,
+				SecretMap:        test.secretMap,
+				MountFlags:       test.mountOptions,
+				KnownS3FSOptions: GetKnownS3FSOptions(),
+			})
 
 			if s3fs, ok := result.(*S3fsMounter); ok {
 				expected := test.expected.(*S3fsMounter)

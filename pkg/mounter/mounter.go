@@ -38,15 +38,30 @@ type Mounter interface {
 
 type CSIMounterFactory struct{}
 
+type MounterParams struct {
+	Attrib          map[string]string
+	SecretMap       map[string]string
+	MountFlags      []string
+	KnownS3FSOptions *pkgutils.Set
+	DefaultMOMap    map[string]string
+	Gid             string
+	ReadOnly        bool
+}
+
 type NewMounterFactory interface {
-	NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string, knownS3FSOptions *pkgutils.Set, defaultMOMap map[string]string) Mounter
+	NewMounter(params MounterParams) Mounter
 }
 
 func NewCSIMounterFactory() *CSIMounterFactory {
 	return &CSIMounterFactory{}
 }
 
-func (s *CSIMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string, knownS3FSOptions *pkgutils.Set, defaultMOMap map[string]string) Mounter {
+func (s *CSIMounterFactory) NewMounter(params MounterParams) Mounter {
+	attrib := params.Attrib
+	secretMap := params.SecretMap
+	mountFlags := params.MountFlags
+	knownS3FSOptions := params.KnownS3FSOptions
+	defaultMOMap := params.DefaultMOMap
 	klog.Info("-NewMounter-")
 	var mounter, val string
 	var check bool

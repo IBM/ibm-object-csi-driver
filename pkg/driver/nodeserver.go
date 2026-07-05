@@ -167,7 +167,13 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		constants.CipherSuitesKey: ns.TLSCipherSuite,
 	}
 
-	mounterObj := ns.Mounter.NewMounter(attrib, secretMap, mountFlags, ns.KnownS3FSOptions, defaultParamsMap)
+	mounterObj := ns.Mounter.NewMounter(mounter.MounterParams{
+		Attrib:           attrib,
+		SecretMap:        secretMap,
+		MountFlags:       mountFlags,
+		KnownS3FSOptions: ns.KnownS3FSOptions,
+		DefaultMOMap:     defaultParamsMap,
+	})
 
 	klog.Info("-NodePublishVolume-: Mount")
 	if err = mounterObj.Mount("", targetPath); err != nil {
@@ -198,7 +204,9 @@ func (ns *nodeServer) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpubl
 		return nil, status.Error(codes.NotFound, "Failed to get PV details")
 	}
 
-	mounterObj := ns.Mounter.NewMounter(attrib, nil, nil, nil, nil)
+	mounterObj := ns.Mounter.NewMounter(mounter.MounterParams{
+		Attrib: attrib,
+	})
 
 	klog.Info("-NodeUnpublishVolume-: Unmount")
 	if err = mounterObj.Unmount(targetPath); err != nil {
