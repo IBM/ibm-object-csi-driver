@@ -87,12 +87,34 @@ func (s *CSIMounterFactory) NewMounter(params MounterParams) Mounter {
 
 	switch mounter {
 	case constants.S3FS:
-		return NewS3fsMounter(secretMap, mountFlags, mounterUtils, knownS3FSOptions, defaultMOMap)
+		return NewS3fsMounter(S3fsMounterParams{
+			SecretMap:        secretMap,
+			MountOptions:     mountFlags,
+			MounterUtils:     mounterUtils,
+			KnownS3FSOptions: knownS3FSOptions,
+			DefaultParams:    defaultMOMap,
+			Gid:              params.Gid,
+			ReadOnly:         params.ReadOnly,
+		})
 	case constants.RClone:
-		return NewRcloneMounter(secretMap, mountFlags, mounterUtils)
+		return NewRcloneMounter(RcloneMounterParams{
+			SecretMap:    secretMap,
+			MountOptions: mountFlags,
+			MounterUtils: mounterUtils,
+			Gid:          params.Gid,
+			ReadOnly:     params.ReadOnly,
+		})
 	default:
 		// default to s3fs
-		return NewS3fsMounter(secretMap, mountFlags, mounterUtils, knownS3FSOptions, defaultMOMap)
+		return NewS3fsMounter(S3fsMounterParams{
+			SecretMap:        secretMap,
+			MountOptions:     mountFlags,
+			MounterUtils:     mounterUtils,
+			KnownS3FSOptions: knownS3FSOptions,
+			DefaultParams:    defaultMOMap,
+			Gid:              params.Gid,
+			ReadOnly:         params.ReadOnly,
+		})
 	}
 }
 

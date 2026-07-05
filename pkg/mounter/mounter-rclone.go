@@ -56,7 +56,18 @@ var (
 	removeConfigFile = removeRcloneConfigFile
 )
 
-func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
+type RcloneMounterParams struct {
+	SecretMap    map[string]string
+	MountOptions []string
+	MounterUtils utils.MounterUtils
+	Gid          string
+	ReadOnly     bool
+}
+
+func NewRcloneMounter(params RcloneMounterParams) Mounter {
+	secretMap := params.SecretMap
+	mountOptions := params.MountOptions
+	mounterUtils := params.MounterUtils
 	klog.Info("-newRcloneMounter-")
 
 	var (

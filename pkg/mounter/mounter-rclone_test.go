@@ -30,7 +30,11 @@ var (
 )
 
 func TestNewRcloneMounter_Success(t *testing.T) {
-	mounter := NewRcloneMounter(secretMapRClone, mountOptionsRClone, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
+	mounter := NewRcloneMounter(RcloneMounterParams{
+		SecretMap:    secretMapRClone,
+		MountOptions: mountOptionsRClone,
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+	})
 
 	rCloneMounter, ok := mounter.(*RcloneMounter)
 	assert.True(t, ok)
@@ -54,7 +58,11 @@ func TestNewRcloneMounter_Only_GID(t *testing.T) {
 		"kpRootKeyCRN":       "test-kp-root-key-crn",
 		"gid":                "1001",
 	}
-	mounter := NewRcloneMounter(secretMap, mountOptionsRClone, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
+	mounter := NewRcloneMounter(RcloneMounterParams{
+		SecretMap:    secretMap,
+		MountOptions: mountOptionsRClone,
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+	})
 
 	rCloneMounter, ok := mounter.(*RcloneMounter)
 	assert.True(t, ok)
@@ -79,7 +87,11 @@ func TestNewRcloneMounter_MountOptsInSecret_HMAC(t *testing.T) {
 		"uid":                "1001",
 		"mountOptions":       "\nupload_concurrency\nkey=value",
 	}
-	mounter := NewRcloneMounter(secretMap, mountOptionsRClone, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
+	mounter := NewRcloneMounter(RcloneMounterParams{
+		SecretMap:    secretMap,
+		MountOptions: mountOptionsRClone,
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+	})
 
 	rCloneMounter, ok := mounter.(*RcloneMounter)
 	assert.True(t, ok)
@@ -107,7 +119,11 @@ func TestNewRcloneMounter_MountOptsInSecret_IAM(t *testing.T) {
 		"mountOptions":       "\nupload_concurrency\nkey=value",
 		"iamEndpoint":        "test-iam-endpoint",
 	}
-	mounter := NewRcloneMounter(secretMap, mountOptionsRClone, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
+	mounter := NewRcloneMounter(RcloneMounterParams{
+		SecretMap:    secretMap,
+		MountOptions: mountOptionsRClone,
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+	})
 
 	rCloneMounter, ok := mounter.(*RcloneMounter)
 	assert.True(t, ok)

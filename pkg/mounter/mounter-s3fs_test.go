@@ -28,7 +28,13 @@ var (
 )
 
 func TestNewS3fsMounter_Success(t *testing.T) {
-	mounter := NewS3fsMounter(secretMap, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}), GetKnownS3FSOptions(), map[string]string{constants.CipherSuitesKey: "default"})
+	mounter := NewS3fsMounter(S3fsMounterParams{
+		SecretMap:        secretMap,
+		MountOptions:     mountOptions,
+		MounterUtils:     mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+		KnownS3FSOptions: GetKnownS3FSOptions(),
+		DefaultParams:    map[string]string{constants.CipherSuitesKey: "default"},
+	})
 
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	assert.True(t, ok)
@@ -57,7 +63,12 @@ func TestNewS3fsMounter_Success_Hmac(t *testing.T) {
 
 	mountOptions := []string{"opt1=val1", "opt2=val2", " ", "opt3"}
 
-	mounter := NewS3fsMounter(secretMap, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}), GetKnownS3FSOptions(), nil)
+	mounter := NewS3fsMounter(S3fsMounterParams{
+		SecretMap:        secretMap,
+		MountOptions:     mountOptions,
+		MounterUtils:     mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+		KnownS3FSOptions: GetKnownS3FSOptions(),
+	})
 
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	assert.True(t, ok)
@@ -312,7 +323,7 @@ func TestAddMountParam_Integration(t *testing.T) {
 				secret["mountOptions"] = tt.secretOpts
 			}
 
-			opts, addParam := updateS3FSMountOptions(tt.defaultOpts, secret, GetKnownS3FSOptions(), nil)
+			opts, addParam := updateS3FSMountOptions(tt.defaultOpts, secret, GetKnownS3FSOptions(), nil, "", false)
 			assert.NotNil(t, opts)
 
 			if tt.wantEmpty {
@@ -376,7 +387,7 @@ func TestUpdateS3FSMountOptions_SpecialSecretFields(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			opts, _ := updateS3FSMountOptions(tt.defaultOpts, tt.secret, GetKnownS3FSOptions(), nil)
+			opts, _ := updateS3FSMountOptions(tt.defaultOpts, tt.secret, GetKnownS3FSOptions(), nil, "", false)
 			assert.NotNil(t, opts)
 			
 			optsStr := strings.Join(opts, " ")
@@ -396,7 +407,7 @@ func TestUpdateS3FSMountOptions_DefaultParams(t *testing.T) {
 		"empty_param":   "",
 	}
 	
-	opts, _ := updateS3FSMountOptions(nil, map[string]string{}, GetKnownS3FSOptions(), defaultParams)
+	opts, _ := updateS3FSMountOptions(nil, map[string]string{}, GetKnownS3FSOptions(), defaultParams, "", false)
 	
 	optsStr := strings.Join(opts, " ")
 	assert.Contains(t, optsStr, "cipher_suites=AESGCM")
@@ -457,7 +468,7 @@ func TestUpdateS3FSMountOptionsWithUnknownOptions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, addMountParam := updateS3FSMountOptions(tt.defaultMountOp, tt.secretMap, GetKnownS3FSOptions(), map[string]string{})
+			_, addMountParam := updateS3FSMountOptions(tt.defaultMountOp, tt.secretMap, GetKnownS3FSOptions(), map[string]string{}, "", false)
 			hasUnknown := addMountParam != ""
 			if hasUnknown != tt.expectAddMountParamPresent {
 				t.Errorf("got addMountParam=%q, expectAddMountParamPresent=%v", addMountParam, tt.expectAddMountParamPresent)

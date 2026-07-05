@@ -127,9 +127,6 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		secretMapCopy[k] = v
 	}
 	klog.V(2).Infof("-NodePublishVolume-: secretMap: %v", secretMapCopy)
-	if volumeMountGroup != "" {
-		secretMap["gid"] = volumeMountGroup
-	}
 
 	if len(secretMap["cosEndpoint"]) == 0 {
 		secretMap["cosEndpoint"] = attrib["cosEndpoint"]
@@ -173,6 +170,8 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		MountFlags:       mountFlags,
 		KnownS3FSOptions: ns.KnownS3FSOptions,
 		DefaultMOMap:     defaultParamsMap,
+		Gid:              volumeMountGroup,
+		ReadOnly:         readOnly,
 	})
 
 	klog.Info("-NodePublishVolume-: Mount")

@@ -52,7 +52,22 @@ var (
 	removeFile    = removeS3FSCredFile
 )
 
-func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils, knownS3FSOptions *pkgutils.Set, defaultParams map[string]string) Mounter {
+type S3fsMounterParams struct {
+	SecretMap        map[string]string
+	MountOptions     []string
+	MounterUtils     utils.MounterUtils
+	KnownS3FSOptions *pkgutils.Set
+	DefaultParams    map[string]string
+	Gid              string
+	ReadOnly         bool
+}
+
+func NewS3fsMounter(params S3fsMounterParams) Mounter {
+	secretMap := params.SecretMap
+	mountOptions := params.MountOptions
+	mounterUtils := params.MounterUtils
+	knownS3FSOptions := params.KnownS3FSOptions
+	defaultParams := params.DefaultParams
 	klog.Info("-newS3fsMounter-")
 	mounter := &S3fsMounter{}
 	mounter.MounterUtils = mounterUtils
@@ -102,7 +117,7 @@ func NewS3fsMounter(secretMap map[string]string, mountOptions []string, mounterU
 	}
 	klog.Infof("newS3fsMounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]\n\tkpRootKeyCrn: [%s]",
 		mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType, mounter.KpRootKeyCrn)
-	updatedOptions, addMountParam := updateS3FSMountOptions(mountOptions, secretMap, knownS3FSOptions, defaultParams)
+	updatedOptions, addMountParam := updateS3FSMountOptions(mountOptions, secretMap, knownS3FSOptions, defaultParams, params.Gid, params.ReadOnly)
 	mounter.MountOptions = updatedOptions
 	mounter.AddMountParam = addMountParam
 	return mounter
@@ -320,7 +335,7 @@ func buildAddMountParam(unknownOptionsMap map[string]string) string {
 	return strings.Join(unknownOptionsList, ",")
 }
 
-func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string, knownS3FSOptions *pkgutils.Set, defaultParams map[string]string) ([]string, string) {
+func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string, knownS3FSOptions *pkgutils.Set, defaultParams map[string]string, gid string, readOnly bool) ([]string, string) {
 	mountOptsMap := make(map[string]string)
 	unknownOptionsMap := make(map[string]string)
 
