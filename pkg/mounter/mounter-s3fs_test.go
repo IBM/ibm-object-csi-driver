@@ -28,7 +28,13 @@ var (
 )
 
 func TestNewS3fsMounter_Success(t *testing.T) {
-	mounter := NewS3fsMounter(secretMap, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}), GetKnownS3FSOptions(), map[string]string{constants.CipherSuitesKey: "default"})
+	mounter := NewS3fsMounter(S3fsMounterParams{
+		SecretMap:        secretMap,
+		MountOptions:     mountOptions,
+		MounterUtils:     mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+		KnownS3FSOptions: GetKnownS3FSOptions(),
+		DefaultParams:    map[string]string{constants.CipherSuitesKey: "default"},
+	})
 
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	assert.True(t, ok)
@@ -57,7 +63,12 @@ func TestNewS3fsMounter_Success_Hmac(t *testing.T) {
 
 	mountOptions := []string{"opt1=val1", "opt2=val2", " ", "opt3"}
 
-	mounter := NewS3fsMounter(secretMap, mountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}), GetKnownS3FSOptions(), nil)
+	mounter := NewS3fsMounter(S3fsMounterParams{
+		SecretMap:        secretMap,
+		MountOptions:     mountOptions,
+		MounterUtils:     mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+		KnownS3FSOptions: GetKnownS3FSOptions(),
+	})
 
 	s3fsMounter, ok := mounter.(*S3fsMounter)
 	assert.True(t, ok)
@@ -312,7 +323,7 @@ func TestAddMountParam_Integration(t *testing.T) {
 				secret["mountOptions"] = tt.secretOpts
 			}
 
-			opts, addParam := updateS3FSMountOptions(tt.defaultOpts, secret, GetKnownS3FSOptions(), nil)
+			opts, addParam := updateS3FSMountOptions(tt.defaultOpts, secret, GetKnownS3FSOptions(), nil, "", false)
 			assert.NotNil(t, opts)
 
 			if tt.wantEmpty {
@@ -376,7 +387,7 @@ func TestUpdateS3FSMountOptions_SpecialSecretFields(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			opts, _ := updateS3FSMountOptions(tt.defaultOpts, tt.secret, GetKnownS3FSOptions(), nil)
+			opts, _ := updateS3FSMountOptions(tt.defaultOpts, tt.secret, GetKnownS3FSOptions(), nil, "", false)
 			assert.NotNil(t, opts)
 			
 			optsStr := strings.Join(opts, " ")
@@ -396,11 +407,98 @@ func TestUpdateS3FSMountOptions_DefaultParams(t *testing.T) {
 		"empty_param":   "",
 	}
 	
-	opts, _ := updateS3FSMountOptions(nil, map[string]string{}, GetKnownS3FSOptions(), defaultParams)
+	opts, _ := updateS3FSMountOptions(nil, map[string]string{}, GetKnownS3FSOptions(), defaultParams, "", false)
 	
 	optsStr := strings.Join(opts, " ")
 	assert.Contains(t, optsStr, "cipher_suites=AESGCM")
 	assert.NotContains(t, optsStr, "empty_param")
+}
+
+func TestUpdateS3FSMountOptions_ReadOnly(t *testing.T) {
+	tests := []struct {
+		name     string
+		readOnly bool
+		wantRO   bool
+	}{
+		{
+			name:     "readOnly true sets ro=true",
+			readOnly: true,
+			wantRO:   true,
+		},
+		{
+			name:     "readOnly false does not set ro",
+			readOnly: false,
+			wantRO:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts, _ := updateS3FSMountOptions(nil, map[string]string{}, GetKnownS3FSOptions(), nil, "", tt.readOnly)
+			optsStr := strings.Join(opts, " ")
+			if tt.wantRO {
+				assert.Contains(t, optsStr, "ro=true")
+			} else {
+				assert.NotContains(t, optsStr, "ro=true")
+			}
+		})
+	}
+}
+
+func TestUpdateS3FSMountOptions_GidParam(t *testing.T) {
+	tests := []struct {
+		name        string
+		secret      map[string]string
+		gid         string
+		wantGID     string
+		wantUID     string
+	}{
+		{
+			name:    "gid param overrides secretMap gid",
+			secret:  map[string]string{"gid": "1000"},
+			gid:     "2000",
+			wantGID: "gid=2000",
+			wantUID: "uid=2000", // auto-set from gid param since no uid in secret
+		},
+		{
+			name:    "gid param sets uid when uid absent",
+			secret:  map[string]string{},
+			gid:     "3000",
+			wantGID: "gid=3000",
+			wantUID: "uid=3000",
+		},
+		{
+			name:    "gid param does not override explicit secretMap uid",
+			secret:  map[string]string{"uid": "5000"},
+			gid:     "4000",
+			wantGID: "gid=4000",
+			wantUID: "uid=5000", // secretMap uid takes precedence
+		},
+		{
+			name:    "no gid param and no secret gid — neither set",
+			secret:  map[string]string{},
+			gid:     "",
+			wantGID: "",
+			wantUID: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts, _ := updateS3FSMountOptions(nil, tt.secret, GetKnownS3FSOptions(), nil, tt.gid, false)
+			optsStr := strings.Join(opts, " ")
+			if tt.wantGID != "" {
+				assert.Contains(t, optsStr, tt.wantGID)
+			} else {
+				assert.NotContains(t, optsStr, "gid=")
+			}
+			if tt.wantUID != "" {
+				assert.Contains(t, optsStr, tt.wantUID)
+			} else {
+				assert.NotContains(t, optsStr, "uid=")
+			}
+		})
+	}
 }
 
 func TestUpdateS3FSMountOptionsWithUnknownOptions(t *testing.T) {
@@ -457,7 +555,7 @@ func TestUpdateS3FSMountOptionsWithUnknownOptions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, addMountParam := updateS3FSMountOptions(tt.defaultMountOp, tt.secretMap, GetKnownS3FSOptions(), map[string]string{})
+			_, addMountParam := updateS3FSMountOptions(tt.defaultMountOp, tt.secretMap, GetKnownS3FSOptions(), map[string]string{}, "", false)
 			hasUnknown := addMountParam != ""
 			if hasUnknown != tt.expectAddMountParamPresent {
 				t.Errorf("got addMountParam=%q, expectAddMountParamPresent=%v", addMountParam, tt.expectAddMountParamPresent)
