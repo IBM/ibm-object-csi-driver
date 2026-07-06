@@ -40,6 +40,7 @@ type NodeServerConfig struct {
 	Zone              string
 	NodeID            string
 	TLSCipherSuite    string
+	KnownS3FSOptions  *utils.Set // Set of known (to cos-csi-mounter systemd service) s3fs mount option names used to classify options as known vs unknown
 }
 
 func (ns *nodeServer) NodeStageVolume(_ context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
@@ -109,7 +110,18 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		deviceID = req.GetPublishContext()[deviceID]
 	}
 
-	readOnly := req.GetReadonly()
+	readOnly := false
+	// Get access mode from volume capability
+	// | Kubernetes PVC    | CSI Driver Constant         | readOnly |
+	// |-------------------|-----------------------------|----------|
+	// | ReadWriteOnce     | SINGLE_NODE_WRITER          | false    |
+	// | ReadWriteMany     | MULTI_NODE_MULTI_WRITER     | false    |
+	// | ReadOnlyMany      | MULTI_NODE_READER_ONLY      | true     |
+	accessMode := req.GetVolumeCapability().GetAccessMode().GetMode()
+
+	if accessMode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY {
+		readOnly = true
+	}
 	attrib := req.GetVolumeContext()
 	mountFlags := req.GetVolumeCapability().GetMount().GetMountFlags()
 	klog.V(2).Infof("-NodePublishVolume-: targetPath: %v\ndeviceID: %v\nreadonly: %v\nvolumeId: %v\nattributes: %v\nmountFlags: %v\n",
@@ -126,9 +138,6 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		secretMapCopy[k] = v
 	}
 	klog.V(2).Infof("-NodePublishVolume-: secretMap: %v", secretMapCopy)
-	if volumeMountGroup != "" {
-		secretMap["gid"] = volumeMountGroup
-	}
 
 	if len(secretMap["cosEndpoint"]) == 0 {
 		secretMap["cosEndpoint"] = attrib["cosEndpoint"]
@@ -166,7 +175,15 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		constants.CipherSuitesKey: ns.TLSCipherSuite,
 	}
 
-	mounterObj := ns.Mounter.NewMounter(attrib, secretMap, mountFlags, defaultParamsMap)
+	mounterObj := ns.Mounter.NewMounter(mounter.MounterParams{
+		Attrib:           attrib,
+		SecretMap:        secretMap,
+		MountFlags:       mountFlags,
+		KnownS3FSOptions: ns.KnownS3FSOptions,
+		DefaultMOMap:     defaultParamsMap,
+		Gid:              volumeMountGroup,
+		ReadOnly:         readOnly,
+	})
 
 	klog.Info("-NodePublishVolume-: Mount")
 	if err = mounterObj.Mount("", targetPath); err != nil {
@@ -197,7 +214,9 @@ func (ns *nodeServer) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpubl
 		return nil, status.Error(codes.NotFound, "Failed to get PV details")
 	}
 
-	mounterObj := ns.Mounter.NewMounter(attrib, nil, nil, nil)
+	mounterObj := ns.Mounter.NewMounter(mounter.MounterParams{
+		Attrib: attrib,
+	})
 
 	klog.Info("-NodeUnpublishVolume-: Unmount")
 	if err = mounterObj.Unmount(targetPath); err != nil {

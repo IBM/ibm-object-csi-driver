@@ -14,6 +14,7 @@ import (
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
+	pkgutils "github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
@@ -37,15 +38,30 @@ type Mounter interface {
 
 type CSIMounterFactory struct{}
 
+type MounterParams struct {
+	Attrib          map[string]string
+	SecretMap       map[string]string
+	MountFlags      []string
+	KnownS3FSOptions *pkgutils.Set
+	DefaultMOMap    map[string]string
+	Gid             string
+	ReadOnly        bool
+}
+
 type NewMounterFactory interface {
-	NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string, defaultMOMap map[string]string) Mounter
+	NewMounter(params MounterParams) Mounter
 }
 
 func NewCSIMounterFactory() *CSIMounterFactory {
 	return &CSIMounterFactory{}
 }
 
-func (s *CSIMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string, defaultMOMap map[string]string) Mounter {
+func (s *CSIMounterFactory) NewMounter(params MounterParams) Mounter {
+	attrib := params.Attrib
+	secretMap := params.SecretMap
+	mountFlags := params.MountFlags
+	knownS3FSOptions := params.KnownS3FSOptions
+	defaultMOMap := params.DefaultMOMap
 	klog.Info("-NewMounter-")
 	var mounter, val string
 	var check bool
@@ -71,12 +87,34 @@ func (s *CSIMounterFactory) NewMounter(attrib map[string]string, secretMap map[s
 
 	switch mounter {
 	case constants.S3FS:
-		return NewS3fsMounter(secretMap, mountFlags, mounterUtils, defaultMOMap)
+		return NewS3fsMounter(S3fsMounterParams{
+			SecretMap:        secretMap,
+			MountOptions:     mountFlags,
+			MounterUtils:     mounterUtils,
+			KnownS3FSOptions: knownS3FSOptions,
+			DefaultParams:    defaultMOMap,
+			Gid:              params.Gid,
+			ReadOnly:         params.ReadOnly,
+		})
 	case constants.RClone:
-		return NewRcloneMounter(secretMap, mountFlags, mounterUtils)
+		return NewRcloneMounter(RcloneMounterParams{
+			SecretMap:    secretMap,
+			MountOptions: mountFlags,
+			MounterUtils: mounterUtils,
+			Gid:          params.Gid,
+			ReadOnly:     params.ReadOnly,
+		})
 	default:
 		// default to s3fs
-		return NewS3fsMounter(secretMap, mountFlags, mounterUtils, defaultMOMap)
+		return NewS3fsMounter(S3fsMounterParams{
+			SecretMap:        secretMap,
+			MountOptions:     mountFlags,
+			MounterUtils:     mounterUtils,
+			KnownS3FSOptions: knownS3FSOptions,
+			DefaultParams:    defaultMOMap,
+			Gid:              params.Gid,
+			ReadOnly:         params.ReadOnly,
+		})
 	}
 }
 

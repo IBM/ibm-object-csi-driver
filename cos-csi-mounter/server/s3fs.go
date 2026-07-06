@@ -43,6 +43,9 @@ type S3FSArgs struct {
 	URL                     string `json:"url,omitempty"`
 	UsePathRequestStyle     string `json:"use_path_request_style,omitempty"`
 	UseXattr                string `json:"use_xattr,string,omitempty"`
+	// AddMountParam allows passing additional s3fs mount options as comma-separated string
+	// Example: "enable_content_md5,use_sse=AES256,mime=/etc/mime.types"
+	AddMountParam string `json:"add-mount-param,omitempty"`
 }
 
 func (args S3FSArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, error) {
@@ -78,11 +81,28 @@ func (args S3FSArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, err
 	}
 
 	for k, v := range m {
+		// Skip add-mount-param as it's processed separately below
+		if k == "add-mount-param" {
+			continue
+		}
 		result = append(result, "-o")
 		if strings.ToLower(strings.TrimSpace(v)) == "true" {
 			result = append(result, k) // -o, key
 		} else {
 			result = append(result, fmt.Sprintf("%s=%v", k, v)) // -o, key=value
+		}
+	}
+
+	// Parse and append additional mount parameters from add-mount-param
+	// This allows users to pass ANY s3fs option without requiring code changes
+	// Example: "enable_content_md5,use_sse=AES256" becomes: -o enable_content_md5 -o use_sse=AES256
+	if args.AddMountParam != "" {
+		paramSlice := strings.Split(args.AddMountParam, ",")
+		for _, value := range paramSlice {
+			value = strings.TrimSpace(value)
+			if value != "" {
+				result = append(result, "-o", value)
+			}
 		}
 	}
 
