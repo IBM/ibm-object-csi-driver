@@ -110,7 +110,18 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		deviceID = req.GetPublishContext()[deviceID]
 	}
 
-	readOnly := req.GetReadonly()
+	readOnly := false
+	// Get access mode from volume capability
+	// | Kubernetes PVC    | CSI Driver Constant         | readOnly |
+	// |-------------------|-----------------------------|----------|
+	// | ReadWriteOnce     | SINGLE_NODE_WRITER          | false    |
+	// | ReadWriteMany     | MULTI_NODE_MULTI_WRITER     | false    |
+	// | ReadOnlyMany      | MULTI_NODE_READER_ONLY      | true     |
+	accessMode := req.GetVolumeCapability().GetAccessMode().GetMode()
+
+	if accessMode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY {
+		readOnly = true
+	}
 	attrib := req.GetVolumeContext()
 	mountFlags := req.GetVolumeCapability().GetMount().GetMountFlags()
 	klog.V(2).Infof("-NodePublishVolume-: targetPath: %v\ndeviceID: %v\nreadonly: %v\nvolumeId: %v\nattributes: %v\nmountFlags: %v\n",
