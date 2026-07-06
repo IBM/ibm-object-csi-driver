@@ -112,6 +112,11 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 
 	readOnly := req.GetReadonly()
 	// Get access mode from volume capability
+	// | Kubernetes PVC    | CSI Driver Constant         | readOnly |
+	// |-------------------|-----------------------------|----------|
+	// | ReadWriteOnce     | SINGLE_NODE_WRITER          | false    |
+	// | ReadWriteMany     | MULTI_NODE_MULTI_WRITER     | false    |
+	// | ReadOnlyMany      | MULTI_NODE_READER_ONLY      | true     |
 	accessMode := req.GetVolumeCapability().GetAccessMode().GetMode()
 
 	if accessMode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY {
