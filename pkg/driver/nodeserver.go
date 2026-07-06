@@ -111,6 +111,15 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 	}
 
 	readOnly := req.GetReadonly()
+
+	// Get access mode from volume capability
+	volumeCapability := req.GetVolumeCapability()
+	accessMode := volumeCapability.GetAccessMode().GetMode()
+
+	if accessMode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY {
+		readOnly = true
+	}
+
 	attrib := req.GetVolumeContext()
 	mountFlags := req.GetVolumeCapability().GetMount().GetMountFlags()
 	klog.V(2).Infof("-NodePublishVolume-: targetPath: %v\ndeviceID: %v\nreadonly: %v\nvolumeId: %v\nattributes: %v\nmountFlags: %v\n",
