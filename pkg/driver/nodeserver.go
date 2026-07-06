@@ -113,8 +113,7 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 	readOnly := req.GetReadonly()
 
 	// Get access mode from volume capability
-	volumeCapability := req.GetVolumeCapability()
-	accessMode := volumeCapability.GetAccessMode().GetMode()
+	accessMode := req.GetVolumeCapability().GetAccessMode().GetMode()
 
 	if accessMode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY {
 		readOnly = true

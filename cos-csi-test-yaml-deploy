@@ -1,0 +1,53 @@
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: balraj-cos-secret
+  namespace: default
+type: cos-s3-csi-driver
+data:
+  accessKey: Y2RlODQ4YzZhNWE3NDQ4YTk1M2Q2NTU5YTNkMzQzNjA=
+  secretKey: ODQzN2VmNDhmZTZmNjI3MmJkYWE2OThkMGYxNGE0YjE1OTlmYmEzYzdmZDdjZjFk
+stringData:
+  bucketName: "ba-test-bucket"
+EOF
+
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: balraj-cos-pvc
+  namespace: default
+  annotations:
+    cos.csi.driver/secret: "balraj-cos-secret"
+    cos.csi.driver/secret-namespace: "default"
+spec:
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      storage: 256Mi
+  storageClassName: ibm-object-storage-standard-s3fs
+EOF
+
+
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: balraj-cos-test-pod
+  namespace: default
+spec:
+  containers:
+    - name: nginx-app
+      image: nginx:latest
+      imagePullPolicy: IfNotPresent
+      volumeMounts:
+        - mountPath: "/data/s3fs"
+          name: cos-csi-volume
+          readOnly: true
+  volumes:
+    - name: cos-csi-volume
+      persistentVolumeClaim:
+        claimName: balraj-cos-pvc
+EOF
