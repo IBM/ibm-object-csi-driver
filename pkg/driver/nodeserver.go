@@ -110,7 +110,7 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		deviceID = req.GetPublishContext()[deviceID]
 	}
 
-	readOnly := req.GetReadonly()
+	readOnly := false
 	// Get access mode from volume capability
 	// | Kubernetes PVC    | CSI Driver Constant         | readOnly |
 	// |-------------------|-----------------------------|----------|
