@@ -331,8 +331,13 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 	}
 
 	// To mount the bucket in read-only mode using s3fs based on PVC accessMode "ReadOnlyMany"
+	// Check both the readOnly parameter and the "ro" flag in secretMap
 	if readOnly {
 		mountOptsMap["ro"] = "true"
+	}
+	if val, check := secretMap["ro"]; check && val == "true" {
+		mountOptsMap["ro"] = "true"
+		klog.V(2).Infof("Adding read-only mount option from secretMap")
 	}
 
 	// set uid and gid params, if present in csi secret "data" section

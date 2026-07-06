@@ -113,10 +113,21 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 	readOnly := req.GetReadonly()
 	attrib := req.GetVolumeContext()
 	mountFlags := req.GetVolumeCapability().GetMount().GetMountFlags()
-	klog.V(2).Infof("-NodePublishVolume-: targetPath: %v\ndeviceID: %v\nreadonly: %v\nvolumeId: %v\nattributes: %v\nmountFlags: %v\n",
-		targetPath, deviceID, readOnly, volumeID, attrib, mountFlags)
+
+	// Get access mode from volume capability
+	volumeCapability := req.GetVolumeCapability()
+	accessMode := volumeCapability.GetAccessMode().GetMode()
+
+	klog.V(2).Infof("-NodePublishVolume-: targetPath: %v\ndeviceID: %v\nreadonly: %v\nvolumeId: %v\nattributes: %v\nmountFlags: %v\naccessMode: %v\n",
+		targetPath, deviceID, readOnly, volumeID, attrib, mountFlags, accessMode)
 
 	secretMap := req.GetSecrets()
+
+	// Check if volume should be mounted read-only based on access mode or readonly flag
+	if accessMode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY || readOnly {
+		secretMap["ro"] = "true"
+		klog.V(2).Infof("-NodePublishVolume-: Setting read-only mount for volume %s (accessMode: %v, readOnly: %v)", volumeID, accessMode, readOnly)
+	}
 	klog.V(2).Infof("-NodePublishVolume-: length of req.GetSecrets() length: %v", len(secretMap))
 	secretMapCopy := make(map[string]string)
 	for k, v := range secretMap {

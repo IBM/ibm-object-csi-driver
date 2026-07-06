@@ -142,7 +142,12 @@ func NewRcloneMounter(params RcloneMounterParams) Mounter {
 	}
 
 	// To mount the bucket in read-only mode based on PVC accessMode "ReadOnlyMany"
+	// Check both the ReadOnly parameter and the "ro" flag in secretMap
 	mounter.ReadOnly = params.ReadOnly
+	if val, check := secretMap["ro"]; check && val == "true" {
+		mounter.ReadOnly = true
+		klog.V(2).Infof("Setting read-only mount from secretMap for rclone")
+	}
 
 	klog.Infof("newRcloneMounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
 		mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType)
