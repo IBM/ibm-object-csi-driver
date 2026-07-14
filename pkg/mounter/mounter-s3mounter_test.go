@@ -755,16 +755,19 @@ func TestParseMountpointS3Options(t *testing.T) {
 			name: "Parse allow-overwrite and incremental-upload",
 			opts: []string{"--allow-overwrite", "--incremental-upload"},
 			expectedMounter: &MountpointS3Mounter{
-				AllowOverwrite:    true,
+				// allow-overwrite is now hardcoded — parsed value is ignored.
+				AllowOverwrite:    false,
 				IncrementalUpload: true,
 			},
 			expectedRemaining: []string{},
 		},
 		{
 			name: "Parse log-directory",
-			opts: []string{"--log-directory=/var/log/mount-s3"},
+			// log-directory is now hardcoded — any user-supplied value is ignored and
+			// the struct is always set to the fixed path s3MountLogDirectory.
+			opts: []string{"--log-directory=/some/custom/path"},
 			expectedMounter: &MountpointS3Mounter{
-				LogDirectory: "/var/log/mount-s3",
+				LogDirectory: s3MountLogDirectory,
 			},
 			expectedRemaining: []string{},
 		},
@@ -832,22 +835,25 @@ func TestNewMountpointS3Mounter_MountOptionsPrecedence(t *testing.T) {
 		"mountOptions": `max-threads=128
 maximum-throughput-gbps=25`,
 	}
-	
+
+	// --allow-delete is now hardcoded — it must not appear in passthrough MountOptions.
 	scMountOptions := []string{"--max-threads=32", "--maximum-throughput-gbps=10", "--allow-delete"}
 
 	mounter := NewMountpointS3Mounter(secretMap, scMountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
 
 	s3Mounter, ok := mounter.(*MountpointS3Mounter)
 	assert.True(t, ok)
-	
-	// Secret options should override SC options for same keys
+
+	// Secret options should override SC options for same keys.
 	assert.Contains(t, s3Mounter.MountOptions, "--max-threads=128")
 	assert.Contains(t, s3Mounter.MountOptions, "--maximum-throughput-gbps=25")
 	assert.NotContains(t, s3Mounter.MountOptions, "--max-threads=32")
 	assert.NotContains(t, s3Mounter.MountOptions, "--maximum-throughput-gbps=10")
-	
-	// SC-only options should be preserved
-	assert.Contains(t, s3Mounter.MountOptions, "--allow-delete")
+
+	// allow-delete is now hardcoded — it must NOT appear in the passthrough slice.
+	assert.NotContains(t, s3Mounter.MountOptions, "--allow-delete")
+	// But it is always enabled via the struct field.
+	assert.True(t, s3Mounter.AllowDelete)
 }
 
 // Test read-only priority resolution in Mount
@@ -874,17 +880,19 @@ func TestMountpointS3Mount_ReadOnlyPriority(t *testing.T) {
 		AccessKey:         "test-access-key",
 		SecretKey:         "test-secret-key",
 		ReadOnly:          true,
-		AllowOverwrite:    true, // Should be cleared
-		IncrementalUpload: true, // Should be cleared
-		MountOptions:      []string{"--allow-delete", "--max-threads=32"}, // allow-delete should be removed
+		AllowDelete:       true,  // Should be cleared by read-only
+		AllowOverwrite:    true,  // Should be cleared by read-only
+		IncrementalUpload: true,  // Should be cleared by read-only
+		MountOptions:      []string{"--max-threads=32"},
 	}
 
 	err := s3Mounter.Mount(source, target)
 	assert.NoError(t, err)
-	
-	// Verify read-only priority cleared conflicting options
+
+	// Verify read-only priority cleared all write-enabling flags.
+	assert.False(t, s3Mounter.AllowDelete)
 	assert.False(t, s3Mounter.AllowOverwrite)
 	assert.False(t, s3Mounter.IncrementalUpload)
-	assert.NotContains(t, s3Mounter.MountOptions, "--allow-delete")
+	// Passthrough options unrelated to write-access are preserved.
 	assert.Contains(t, s3Mounter.MountOptions, "--max-threads=32")
 }
