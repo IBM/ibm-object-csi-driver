@@ -29,8 +29,9 @@ type MountpointS3Mounter struct {
 	UID string
 	GID string
 
-	LogLevel string
-	CacheDir string
+	LogLevel     string
+	LogDirectory string
+	CacheDir     string
 
 	ReadOnly          bool
 	AllowDelete       bool
@@ -257,8 +258,10 @@ func parseMountpointS3Options(mounter *MountpointS3Mounter, opts []string) []str
 				mounter.LogLevel = value
 			}
 		case "log-directory":
-			// Hardcoded — user-supplied value is ignored.
+			// Hardcoded — user-supplied value is ignored; the struct field is set
+			// to the fixed path so callers can read it back consistently.
 			klog.Warningf("parseMountpointS3Options: 'log-directory' is hardcoded to %q and cannot be overridden. Ignoring.", s3MountLogDirectory)
+			mounter.LogDirectory = s3MountLogDirectory
 		case "force-path-style":
 			// Hardcoded — always enabled for IBM COS compatibility.
 			klog.Warningf("parseMountpointS3Options: 'force-path-style' is hardcoded and cannot be overridden. Ignoring.")
