@@ -31,8 +31,12 @@ type s3MounterArgs struct {
 
 	// Write operations - conflict resolution applied when read-only is set.
 	ReadOnly          string `json:"read-only,omitempty"`
+	AllowDelete       string `json:"allow-delete,omitempty"`
 	AllowOverwrite    string `json:"allow-overwrite,omitempty"`
 	IncrementalUpload string `json:"incremental-upload,omitempty"`
+
+	// ForcePathStyle is always true for IBM COS compatibility.
+	ForcePathStyle string `json:"force-path-style,omitempty"`
 
 	// Passthrough flags — user-supplied flags not handled by structured fields.
 	// Secret flags override SC flags when the same key appears in both.
@@ -52,8 +56,12 @@ func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string
 		args.IncrementalUpload = ""
 	}
 
-	// Read-only priority resolution.
+	// Read-only priority resolution: suppress write-enabling flags.
 	if args.ReadOnly == "true" {
+		if args.AllowDelete == "true" {
+			logger.Warn("read-only is set, clearing allow-delete")
+			args.AllowDelete = ""
+		}
 		if args.AllowOverwrite == "true" {
 			logger.Warn("read-only is set, clearing allow-overwrite")
 			args.AllowOverwrite = ""
@@ -69,6 +77,9 @@ func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string
 	}
 	if args.ReadOnly == "true" {
 		result = append(result, "--read-only")
+	}
+	if args.AllowDelete == "true" {
+		result = append(result, "--allow-delete")
 	}
 	if args.AllowOverwrite == "true" {
 		result = append(result, "--allow-overwrite")
@@ -110,6 +121,9 @@ func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string
 	}
 	if args.CacheDir != "" {
 		result = append(result, "--cache="+args.CacheDir)
+	}
+	if args.ForcePathStyle == "true" {
+		result = append(result, "--force-path-style")
 	}
 
 	// Passthrough flags appended last — already deduplicated by node server.
@@ -156,6 +170,12 @@ func (args s3MounterArgs) Validate(targetPath string) error {
 		if isBool := isBoolString(args.ReadOnly); !isBool {
 			logger.Error("cannot convert value of read-only into boolean", zap.Any("read-only", args.ReadOnly))
 			return fmt.Errorf("cannot convert value of read-only into boolean: %v", args.ReadOnly)
+		}
+	}
+	if args.AllowDelete != "" {
+		if isBool := isBoolString(args.AllowDelete); !isBool {
+			logger.Error("cannot convert value of allow-delete into boolean", zap.Any("allow-delete", args.AllowDelete))
+			return fmt.Errorf("cannot convert value of allow-delete into boolean: %v", args.AllowDelete)
 		}
 	}
 	if args.AllowOverwrite != "" {
