@@ -85,6 +85,11 @@ func (args S3FSArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, err
 		if k == "add-mount-param" {
 			continue
 		}
+		// Skip cipher_suites=default — "default" is not a valid s3fs/libcurl cipher suite value
+		// and causes mount failures (curlCode 59). Silently drop it so s3fs uses its own defaults.
+		if k == "cipher_suites" && strings.ToLower(strings.TrimSpace(v)) == "default" {
+			continue
+		}
 		result = append(result, "-o")
 		if strings.ToLower(strings.TrimSpace(v)) == "true" {
 			result = append(result, k) // -o, key

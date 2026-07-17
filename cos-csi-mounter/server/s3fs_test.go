@@ -4,6 +4,7 @@ import (
 	"errors"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -145,4 +146,39 @@ func TestS3FSValidate_StatCacheExpireSecondsThanZero(t *testing.T) {
 	err := args.Validate(testTargetPath)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "value of stat_cache_expire should be >= 0")
+}
+
+func TestS3FSPopulateArgsSlice_SkipCipherSuitesDefault(t *testing.T) {
+	tests := []struct {
+		name         string
+		args         S3FSArgs
+		expectAbsent string
+		expectPresent string
+	}{
+		{
+			name:         "cipher_suites=default is not passed to s3fs",
+			args:         S3FSArgs{CipherSuites: "default", PasswdFilePath: testPasswdFilePath, URL: testURL},
+			expectAbsent: "cipher_suites=default",
+		},
+		{
+			name:          "cipher_suites with non-default value is passed to s3fs",
+			args:          S3FSArgs{CipherSuites: "AESGCM", PasswdFilePath: testPasswdFilePath, URL: testURL},
+			expectPresent: "cipher_suites=AESGCM",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := tt.args.PopulateArgsSlice(testBucket, testTargetPath)
+			assert.NoError(t, err)
+			resultStr := strings.Join(result, " ")
+			if tt.expectAbsent != "" {
+				assert.NotContains(t, resultStr, tt.expectAbsent,
+					"cipher_suites=default must not be forwarded to s3fs command")
+			}
+			if tt.expectPresent != "" {
+				assert.Contains(t, resultStr, tt.expectPresent)
+			}
+		})
+	}
 }
