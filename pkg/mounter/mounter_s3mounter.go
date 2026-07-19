@@ -134,7 +134,11 @@ func NewMountpointS3Mounter(secretMap map[string]string, mountOptions []string, 
 	} else if val := secretMap["uid"]; val != "" {
 		mounter.UID = val
 	}
-	mounter.GID = gid
+	if val := secretMap["gid"]; val != "" {
+		mounter.GID = val
+	} else {
+		mounter.GID = gid
+	}
 
 	mounter.ReadOnly = readOnly
 
