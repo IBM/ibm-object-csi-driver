@@ -17,9 +17,7 @@ var (
 		"accessKey":          "test-access-key",
 		"secretKey":          "test-secret-key",
 		"uid":                "1000",
-		"gid":                "1000",
 		"mountOptions": `log-level=debug
-read-only
 cache=/tmp/cache`,
 	}
 
@@ -27,7 +25,7 @@ cache=/tmp/cache`,
 )
 
 func TestNewMountpointS3Mounter_Success(t *testing.T) {
-	mounter := NewMountpointS3Mounter(s3MounterSecretMap, s3MounterMountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
+	mounter := NewMountpointS3Mounter(s3MounterSecretMap, s3MounterMountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}), "1000", true)
 
 	s3Mounter, ok := mounter.(*MountpointS3Mounter)
 	assert.True(t, ok)
@@ -39,7 +37,7 @@ func TestNewMountpointS3Mounter_Success(t *testing.T) {
 	assert.Equal(t, s3MounterSecretMap["accessKey"], s3Mounter.AccessKey)
 	assert.Equal(t, s3MounterSecretMap["secretKey"], s3Mounter.SecretKey)
 	assert.Equal(t, s3MounterSecretMap["uid"], s3Mounter.UID)
-	assert.Equal(t, s3MounterSecretMap["gid"], s3Mounter.GID)
+	assert.Equal(t, "1000", s3Mounter.GID)
 	assert.Equal(t, "debug", s3Mounter.LogLevel)
 	assert.True(t, s3Mounter.ReadOnly)
 	assert.Equal(t, "/tmp/cache", s3Mounter.CacheDir)
@@ -50,14 +48,13 @@ func TestNewMountpointS3Mounter_Success(t *testing.T) {
 }
 
 func TestNewMountpointS3Mounter_GidWithoutUid(t *testing.T) {
-	secretMap := map[string]string{
-		"gid": "2000",
-	}
+	secretMap := map[string]string{}
 
-	mounter := NewMountpointS3Mounter(secretMap, nil, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
+	mounter := NewMountpointS3Mounter(secretMap, nil, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}), "2000", false)
 
 	s3Mounter, ok := mounter.(*MountpointS3Mounter)
 	assert.True(t, ok)
+	// When gid is set and no uid in secretMap, UID is also set to gid value.
 	assert.Equal(t, "2000", s3Mounter.UID)
 	assert.Equal(t, "2000", s3Mounter.GID)
 }
@@ -65,13 +62,13 @@ func TestNewMountpointS3Mounter_GidWithoutUid(t *testing.T) {
 func TestNewMountpointS3Mounter_UidOverridesGid(t *testing.T) {
 	secretMap := map[string]string{
 		"uid": "1000",
-		"gid": "2000",
 	}
 
-	mounter := NewMountpointS3Mounter(secretMap, nil, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
+	mounter := NewMountpointS3Mounter(secretMap, nil, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}), "2000", false)
 
 	s3Mounter, ok := mounter.(*MountpointS3Mounter)
 	assert.True(t, ok)
+	// uid from secretMap takes precedence over gid param for the UID field.
 	assert.Equal(t, "1000", s3Mounter.UID)
 	assert.Equal(t, "2000", s3Mounter.GID)
 }
@@ -739,7 +736,8 @@ func TestParseMountpointS3Options(t *testing.T) {
 				GID:      "2000",
 				LogLevel: "debug",
 				CacheDir: "/tmp/cache",
-				ReadOnly: true,
+				// read-only is now set via MounterParams.ReadOnly, not parsed from flags.
+				ReadOnly: false,
 			},
 			expectedRemaining: []string{},
 		},
@@ -815,7 +813,7 @@ func TestNewMountpointS3Mounter_IncrementalUploadBlocked(t *testing.T) {
 allow-overwrite`,
 	}
 
-	mounter := NewMountpointS3Mounter(secretMap, nil, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
+	mounter := NewMountpointS3Mounter(secretMap, nil, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}), "", false)
 
 	s3Mounter, ok := mounter.(*MountpointS3Mounter)
 	assert.True(t, ok)
@@ -839,7 +837,7 @@ maximum-throughput-gbps=25`,
 	// --allow-delete is now hardcoded — it must not appear in passthrough MountOptions.
 	scMountOptions := []string{"--max-threads=32", "--maximum-throughput-gbps=10", "--allow-delete"}
 
-	mounter := NewMountpointS3Mounter(secretMap, scMountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
+	mounter := NewMountpointS3Mounter(secretMap, scMountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}), "", false)
 
 	s3Mounter, ok := mounter.(*MountpointS3Mounter)
 	assert.True(t, ok)
