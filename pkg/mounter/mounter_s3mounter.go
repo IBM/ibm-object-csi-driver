@@ -105,7 +105,7 @@ type envMounter interface {
 //
 // For passthrough flags, deduplication is applied: if the same flag key appears
 // in both SC and secret, the SC entry is dropped and the secret entry is kept.
-func NewMountpointS3Mounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
+func NewMountpointS3Mounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils, gid string, readOnly bool) Mounter {
 	klog.Info("-newMountpointS3Mounter-")
 
 	mounter := &MountpointS3Mounter{}
@@ -129,14 +129,14 @@ func NewMountpointS3Mounter(secretMap map[string]string, mountOptions []string, 
 		mounter.LocConstraint = val
 	}
 
-	if secretMap["gid"] != "" && secretMap["uid"] == "" {
-		mounter.UID = secretMap["gid"]
+	if gid != "" && secretMap["uid"] == "" {
+		mounter.UID = gid
 	} else if val := secretMap["uid"]; val != "" {
 		mounter.UID = val
 	}
-	if val := secretMap["gid"]; val != "" {
-		mounter.GID = val
-	}
+	mounter.GID = gid
+
+	mounter.ReadOnly = readOnly
 
 	mounter.AuthType = "hmac"
 
@@ -270,7 +270,8 @@ func parseMountpointS3Options(mounter *MountpointS3Mounter, opts []string) []str
 				mounter.CacheDir = value
 			}
 		case "read-only":
-			mounter.ReadOnly = true
+			// read-only is now set directly from MounterParams.ReadOnly — ignore if passed via flags.
+			klog.Warningf("parseMountpointS3Options: 'read-only' is set via MounterParams and cannot be overridden via mount options. Ignoring.")
 		case "allow-delete":
 			// Hardcoded — always enabled unless read-only. User override ignored.
 			klog.Warningf("parseMountpointS3Options: 'allow-delete' is hardcoded and cannot be overridden. Ignoring.")
