@@ -566,3 +566,53 @@ func TestUpdateS3FSMountOptionsWithUnknownOptions(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdateS3FSMountOptions_SkipCipherSuitesDefault(t *testing.T) {
+	tests := []struct {
+		name           string
+		defaultMountOp []string
+		secretMap      map[string]string
+	}{
+		{
+			name:           "cipher_suites=default in defaultMountOp is dropped",
+			defaultMountOp: []string{"cipher_suites=default"},
+			secretMap:      map[string]string{},
+		},
+		{
+			name:           "cipher_suites=default in secret mountOptions is dropped",
+			defaultMountOp: []string{},
+			secretMap:      map[string]string{"mountOptions": "cipher_suites=default"},
+		},
+		{
+			name:           "cipher_suites=default case-insensitive (DEFAULT) is dropped",
+			defaultMountOp: []string{"cipher_suites=DEFAULT"},
+			secretMap:      map[string]string{},
+		},
+		{
+			name:           "cipher_suites=default dropped but other options retained",
+			defaultMountOp: []string{"cipher_suites=default", "dbglevel=warn"},
+			secretMap:      map[string]string{},
+		},
+		{
+			name:           "cipher_suites with non-default value is NOT dropped",
+			defaultMountOp: []string{"cipher_suites=AESGCM"},
+			secretMap:      map[string]string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts, _ := updateS3FSMountOptions(tt.defaultMountOp, tt.secretMap, GetKnownS3FSOptions(), map[string]string{}, "", false)
+			optsStr := strings.Join(opts, " ")
+
+			if strings.Contains(tt.name, "NOT dropped") {
+				assert.Contains(t, optsStr, "cipher_suites=AESGCM")
+			} else {
+				assert.NotContains(t, optsStr, "cipher_suites=default",
+					"cipher_suites=default must not be passed to s3fs")
+				assert.NotContains(t, optsStr, "cipher_suites=DEFAULT",
+					"cipher_suites=DEFAULT must not be passed to s3fs")
+			}
+		})
+	}
+}
