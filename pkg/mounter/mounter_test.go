@@ -45,7 +45,7 @@ func TestNewMounter(t *testing.T) {
 				"apiKey":             "test-api-key",
 				"kpRootKeyCRN":       "test-kp-root-key-crn",
 			},
-			mountOptions: []string{"opt1=val1", "cipher_suites=default"},
+			mountOptions: []string{"opt1=val1", "cipher_suites=tes-suite"},
 			expected: &S3fsMounter{
 				BucketName:    "test-bucket-name",
 				ObjectPath:    "test-obj-path",
@@ -102,7 +102,7 @@ func TestNewMounter(t *testing.T) {
 				"secretKey":          "test-secret-key",
 				"kpRootKeyCRN":       "test-kp-root-key-crn",
 			},
-			mountOptions: []string{"cipher_suites=default"},
+			mountOptions: []string{"cipher_suites=tes-suite"},
 			expected: &S3fsMounter{
 				BucketName:    "test-bucket-name",
 				ObjectPath:    "test-obj-path",
