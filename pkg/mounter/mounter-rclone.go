@@ -40,6 +40,7 @@ type RcloneMounter struct {
 	IAMEndpoint       string
 	UID               string
 	GID               string
+	ReadOnly          bool
 	MountOptions      []string
 	MounterUtils      utils.MounterUtils
 }
@@ -56,7 +57,18 @@ var (
 	removeConfigFile = removeRcloneConfigFile
 )
 
-func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils) Mounter {
+type RcloneMounterParams struct {
+	SecretMap    map[string]string
+	MountOptions []string
+	MounterUtils utils.MounterUtils
+	Gid          string
+	ReadOnly     bool
+}
+
+func NewRcloneMounter(params RcloneMounterParams) Mounter {
+	secretMap := params.SecretMap
+	mountOptions := params.MountOptions
+	mounterUtils := params.MounterUtils
 	klog.Info("-newRcloneMounter-")
 
 	var (
@@ -111,14 +123,26 @@ func NewRcloneMounter(secretMap map[string]string, mountOptions []string, mounte
 		mounter.AuthType = "hmac"
 	}
 
-	if val, check = secretMap["gid"]; check {
-		mounter.GID = val
-	}
-	if secretMap["gid"] != "" && secretMap["uid"] == "" {
-		mounter.UID = secretMap["gid"]
-	} else if secretMap["uid"] != "" {
+	// set uid and gid, if present in csi secret "data" section
+	if secretMap["uid"] != "" {
 		mounter.UID = secretMap["uid"]
 	}
+	if secretMap["gid"] != "" {
+		mounter.GID = secretMap["gid"]
+	}
+
+	// override gid, based on fsGroup defined in securityContext of the workload pod, if defined
+	if params.Gid != "" {
+		mounter.GID = params.Gid
+	}
+
+	// if gid is set but uid is not, default uid to gid
+	if mounter.GID != "" && mounter.UID == "" {
+		mounter.UID = mounter.GID
+	}
+
+	// To mount the bucket in read-only mode based on PVC accessMode "ReadOnlyMany"
+	mounter.ReadOnly = params.ReadOnly
 
 	klog.Infof("newRcloneMounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
 		mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType)
@@ -359,16 +383,16 @@ func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWit
 	}
 
 	if rclone.GID != "" {
-		gidOpt := "--gid=" + rclone.GID
-		nodeServerOp = append(nodeServerOp, gidOpt)
-
+		nodeServerOp = append(nodeServerOp, "--gid="+rclone.GID)
 		workerNodeOp["gid"] = rclone.GID
 	}
 	if rclone.UID != "" {
-		uidOpt := "--uid=" + rclone.UID
-		nodeServerOp = append(nodeServerOp, uidOpt)
-
+		nodeServerOp = append(nodeServerOp, "--uid="+rclone.UID)
 		workerNodeOp["uid"] = rclone.UID
+	}
+	if rclone.ReadOnly {
+		nodeServerOp = append(nodeServerOp, "--read-only")
+		workerNodeOp["read-only"] = "true"
 	}
 	return
 }

@@ -1,6 +1,8 @@
 package mounter
 
-import "github.com/IBM/ibm-object-csi-driver/pkg/constants"
+import (
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
+)
 
 const (
 	bucketName = "fakeBucketName"
@@ -17,7 +19,7 @@ type FakeMounterFactory struct {
 	IsFailedUnmount bool
 }
 
-func (f *FakeMounterFactory) NewMounter(attrib map[string]string, secretMap map[string]string, mountFlags []string, defaultParams map[string]string) Mounter {
+func (f *FakeMounterFactory) NewMounter(params MounterParams) Mounter {
 	switch f.Mounter {
 	case constants.S3FS:
 		return fakenewS3fsMounter(f.IsFailedMount, f.IsFailedUnmount)
