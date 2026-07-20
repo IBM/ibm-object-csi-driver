@@ -923,6 +923,9 @@ func TestDeleteVolume(t *testing.T) {
 				GetPVFn: func(volumeID string) (*v1.PersistentVolume, error) {
 					return &v1.PersistentVolume{
 						Spec: v1.PersistentVolumeSpec{
+							ClaimRef: &v1.ObjectReference{
+								Namespace: testPVCNs,
+							},
 							PersistentVolumeSource: v1.PersistentVolumeSource{
 								CSI: &v1.CSIPersistentVolumeSource{
 									NodePublishSecretRef: &v1.SecretReference{

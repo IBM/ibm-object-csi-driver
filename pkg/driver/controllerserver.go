@@ -368,8 +368,8 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 		}
 
 		if secretNamespace == "" {
-			klog.Info("secret Namespace not found. trying to fetch the secret in default namespace")
-			secretNamespace = constants.DefaultNamespace
+			klog.Info("secret Namespace not found. trying to fetch the secret in PVC namespace")
+			secretNamespace = pv.Spec.ClaimRef.Namespace
 		}
 
 		endPoint = pv.Spec.CSI.VolumeAttributes["cosEndpoint"]
