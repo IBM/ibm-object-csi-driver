@@ -11,11 +11,13 @@
 package driver
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,7 +27,6 @@ import (
 	"github.com/aws/smithy-go"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"go.uber.org/zap"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	v1 "k8s.io/api/core/v1"
@@ -50,6 +51,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		pvcName            string
 		pvcNamespace       string
 		bucketVersioning   string
+		quotaLimitEnabled  bool
 	)
 
 	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
@@ -60,7 +62,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 
 	volumeName, err := sanitizeVolumeID(req.GetName())
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in sanitizeVolumeID  %v", err))
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in sanitizeVolumeID %v", err))
 	}
 	volumeID := volumeName
 	if len(volumeID) == 0 {
@@ -113,26 +115,52 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		pvcAnnotations := pvcRes.Annotations
 
 		customSecretName = pvcAnnotations[constants.SecretNameKey]
-		secretNamespace := pvcAnnotations[constants.SecretNamespaceKey]
 
 		if customSecretName == "" {
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("secretName annotation 'cos.csi.driver/secret' not specified in the PVC annotations, could not fetch the secret %v", err))
 		}
 
-		if secretNamespace == "" {
-			klog.Info("secretNamespace annotation 'cos.csi.driver/secret-namespace' not specified in PVC annotations:\t", pvcRes.Annotations, "\t trying to fetch the secret in default namespace")
-			secretNamespace = constants.DefaultNamespace
-		}
+		secretNamespace := pvcNamespace
+		klog.Infof("Using secret '%s' from PVC namespace '%s'", customSecretName, secretNamespace)
 
 		secret, err := cs.Stats.GetSecret(customSecretName, secretNamespace)
 		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret resource not found %v", err))
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("error getting Secret: %v", err))
 		}
 
 		secretMapCustom := parseCustomSecret(secret)
 		klog.Info("custom secret parameters parsed successfully, length of custom secret: ", len(secretMapCustom))
 
+		if objectPath, exists := secretMapCustom["objectPath"]; exists {
+			klog.Infof("volume_id:%q objectPath found in secret: %q", volumeID, objectPath)
+			params["objectPath"] = objectPath
+		} else {
+			klog.Infof("volume_id:%q no objectPath in secret (mounting bucket root)", volumeID)
+		}
+
 		secretMap = secretMapCustom
+	}
+	if quotaLimitStr, ok := secretMap[constants.QuotaLimitKey]; ok && quotaLimitStr != "" {
+		klog.Infof("quotaLimit from secretMap: %q", quotaLimitStr)
+		quotaLimitEnabled, err = strconv.ParseBool(quotaLimitStr)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument,
+				fmt.Sprintf("invalid quotaLimit value %q: must be 'true' or 'false'", quotaLimitStr))
+		}
+
+		if quotaLimitEnabled {
+			if secretMap[constants.ResourceConfigApiKey] == "" {
+				return nil, status.Error(codes.InvalidArgument,
+					"resourceConfigApiKey missing in secret, cannot set quota limit for bucket")
+			}
+
+			quotaBytes := req.GetCapacityRange().GetRequiredBytes()
+			if quotaBytes <= 0 {
+				return nil, status.Error(codes.InvalidArgument,
+					"enable quotaLimit requested but no positive storage size requested in PVC")
+			}
+			klog.Infof("enable quota limit requested with %d bytes", quotaBytes)
+		}
 	}
 
 	endPoint = secretMap["cosEndpoint"]
@@ -209,6 +237,24 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			klog.Infof("Created bucket: %s", bucketName)
 		}
 
+		if quotaLimitEnabled {
+			quotaBytes := req.GetCapacityRange().GetRequiredBytes()
+			resConfApikey := secretMap[constants.ResourceConfigApiKey]
+
+			klog.Infof("Applying hard quota of %d bytes to bucket %s", quotaBytes, bucketName)
+			err = sess.UpdateQuotaLimit(quotaBytes, resConfApikey, bucketName, endPoint, creds.IAMEndpoint)
+			if err != nil {
+				klog.Errorf("Failed to set quota limit on bucket %s: %v", bucketName, err)
+				if params["userProvidedBucket"] == "false" {
+					if delErr := sess.DeleteBucket(bucketName); delErr != nil {
+						klog.Errorf("Failed to delete bucket %s after quota limit failure: %v", bucketName, delErr)
+					}
+				}
+				return nil, status.Error(codes.Internal, fmt.Sprintf("failed to set bucket quota limit: %v", err))
+			}
+			klog.Infof("Successfully applied hard quota %d bytes to bucket %s", quotaBytes, bucketName)
+		}
+
 		if bucketVersioning != "" {
 			enable := strings.ToLower(strings.TrimSpace(bucketVersioning)) == "true"
 			klog.Infof("Bucket versioning value evaluated to: %t", enable)
@@ -238,6 +284,22 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		err = createBucket(sess, tempBucketName, kpRootKeyCrn)
 		if err != nil {
 			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", err, tempBucketName))
+		}
+
+		if quotaLimitEnabled {
+			quotaBytes := req.GetCapacityRange().GetRequiredBytes()
+			resConfApikey := secretMap[constants.ResourceConfigApiKey]
+
+			klog.Infof("Applying hard quota of %d bytes to temp bucket %s", quotaBytes, tempBucketName)
+			err = sess.UpdateQuotaLimit(quotaBytes, resConfApikey, tempBucketName, endPoint, creds.IAMEndpoint)
+			if err != nil {
+				klog.Errorf("Failed to set quota limit on temp bucket %s: %v", tempBucketName, err)
+				if delErr := sess.DeleteBucket(tempBucketName); delErr != nil {
+					klog.Errorf("Failed to delete temp bucket %s after quota limit failure: %v", tempBucketName, delErr)
+				}
+				return nil, status.Error(codes.Internal, fmt.Sprintf("failed to set bucket quota limit: %v", err))
+			}
+			klog.Infof("Successfully applied hard quota %d bytes to temp bucket %s", quotaBytes, tempBucketName)
 		}
 
 		if bucketVersioning != "" {
@@ -306,8 +368,8 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 		}
 
 		if secretNamespace == "" {
-			klog.Info("secret Namespace not found. trying to fetch the secret in default namespace")
-			secretNamespace = constants.DefaultNamespace
+			klog.Info("secret Namespace not found. trying to fetch the secret in PVC namespace")
+			secretNamespace = pv.Spec.ClaimRef.Namespace
 		}
 
 		endPoint = pv.Spec.CSI.VolumeAttributes["cosEndpoint"]
@@ -317,7 +379,7 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 
 		secret, err := cs.Stats.GetSecret(secretName, secretNamespace)
 		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret resource not found %v", err))
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("error getting Secret: %v", err))
 		}
 
 		secretMapCustom := parseCustomSecret(secret)
@@ -497,6 +559,9 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 		cosEndpoint        string
 		locationConstraint string
 		bucketVersioning   string
+		objectPath         string
+		resConfApiKey      string
+		quotaLimit         string
 	)
 
 	if bytesVal, ok := secret.Data["accessKey"]; ok {
@@ -539,6 +604,17 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 		bucketVersioning = string(bytesVal)
 	}
 
+	if bytesVal, ok := secret.Data["objectPath"]; ok {
+		objectPath = string(bytesVal)
+	}
+
+	if bytesVal, ok := secret.Data[constants.ResourceConfigApiKey]; ok {
+		resConfApiKey = string(bytesVal)
+	}
+	if bytesVal, ok := secret.Data[constants.QuotaLimitKey]; ok {
+		quotaLimit = string(bytesVal)
+	}
+
 	secretMapCustom["accessKey"] = accessKey
 	secretMapCustom["secretKey"] = secretKey
 	secretMapCustom["apiKey"] = apiKey
@@ -549,6 +625,9 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 	secretMapCustom["cosEndpoint"] = cosEndpoint
 	secretMapCustom["locationConstraint"] = locationConstraint
 	secretMapCustom[constants.BucketVersioning] = bucketVersioning
+	secretMapCustom["objectPath"] = objectPath
+	secretMapCustom[constants.ResourceConfigApiKey] = resConfApiKey
+	secretMapCustom[constants.QuotaLimitKey] = quotaLimit
 
 	return secretMapCustom
 }

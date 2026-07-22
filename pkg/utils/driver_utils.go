@@ -115,7 +115,7 @@ func (su *DriverStatsUtils) CheckMount(targetPath string) error {
 	out, err := exec.Command("mountpoint", targetPath).CombinedOutput()
 	outStr := strings.TrimSpace(string(out))
 	if err != nil {
-		klog.V(3).Infof("Check if mountPath exists: Output string %+v", outStr)
+		klog.V(3).Infof("Check if mountPath exists: Output string- %+v", outStr)
 		if strings.HasSuffix(outStr, "No such file or directory") {
 			if err = os.MkdirAll(targetPath, 0750); err != nil {
 				klog.V(2).Infof("checkMount: Error: %+v", err)
@@ -220,7 +220,7 @@ func (su *DriverStatsUtils) GetSecret(secretName, secretNamespace string) (*v1.S
 
 	secret, err := k8sClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("error getting Secret: %v", err)
+		return nil, err
 	}
 
 	return secret, nil

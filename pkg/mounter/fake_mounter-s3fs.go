@@ -4,7 +4,7 @@ import "errors"
 
 type fakes3fsMounter struct {
 	bucketName    string
-	objPath       string
+	objectPath    string
 	endPoint      string
 	locConstraint string
 	authType      string
@@ -18,7 +18,7 @@ type fakes3fsMounter struct {
 func fakenewS3fsMounter(isFailedMount, isFailedUnmount bool) Mounter {
 	return &fakes3fsMounter{
 		bucketName:      bucketName,
-		objPath:         objPath,
+		objectPath:      objectPath,
 		endPoint:        endPoint,
 		locConstraint:   region,
 		accessKeys:      keys,

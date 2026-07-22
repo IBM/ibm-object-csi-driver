@@ -14,11 +14,12 @@ var (
 		"cosEndpoint":        "test-endpoint",
 		"locationConstraint": "test-loc-constraint",
 		"bucketName":         "test-bucket-name",
-		"objPath":            "test-obj-path",
+		"objectPath":         "test-obj-path",
 		"accessKey":          "test-access-key",
 		"secretKey":          "test-secret-key",
 		"apiKey":             "test-api-key",
 		"kpRootKeyCRN":       "test-kp-root-key-crn",
+		"serviceId":          "test-service-id",
 		"gid":                "fake-gid",
 		"uid":                "fake-uid",
 	}
@@ -29,13 +30,17 @@ var (
 )
 
 func TestNewRcloneMounter_Success(t *testing.T) {
-	mounter := NewRcloneMounter(secretMapRClone, mountOptionsRClone, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
+	mounter := NewRcloneMounter(RcloneMounterParams{
+		SecretMap:    secretMapRClone,
+		MountOptions: mountOptionsRClone,
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+	})
 
 	rCloneMounter, ok := mounter.(*RcloneMounter)
 	assert.True(t, ok)
 
 	assert.Equal(t, rCloneMounter.BucketName, secretMapRClone["bucketName"])
-	assert.Equal(t, rCloneMounter.ObjPath, secretMapRClone["objPath"])
+	assert.Equal(t, rCloneMounter.ObjectPath, secretMapRClone["objectPath"])
 	assert.Equal(t, rCloneMounter.EndPoint, secretMapRClone["cosEndpoint"])
 	assert.Equal(t, rCloneMounter.LocConstraint, secretMapRClone["locationConstraint"])
 	assert.Equal(t, rCloneMounter.UID, secretMapRClone["uid"])
@@ -47,50 +52,91 @@ func TestNewRcloneMounter_Only_GID(t *testing.T) {
 		"cosEndpoint":        "test-endpoint",
 		"locationConstraint": "test-loc-constraint",
 		"bucketName":         "test-bucket-name",
-		"objPath":            "test-obj-path",
+		"objectPath":         "test-obj-path",
 		"accessKey":          "test-access-key",
 		"secretKey":          "test-secret-key",
-		"apiKey":             "test-api-key",
 		"kpRootKeyCRN":       "test-kp-root-key-crn",
 		"gid":                "1001",
 	}
-	mounter := NewRcloneMounter(secretMap, mountOptionsRClone, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
+	mounter := NewRcloneMounter(RcloneMounterParams{
+		SecretMap:    secretMap,
+		MountOptions: mountOptionsRClone,
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+	})
 
 	rCloneMounter, ok := mounter.(*RcloneMounter)
 	assert.True(t, ok)
 
 	assert.Equal(t, rCloneMounter.BucketName, secretMap["bucketName"])
-	assert.Equal(t, rCloneMounter.ObjPath, secretMap["objPath"])
+	assert.Equal(t, rCloneMounter.ObjectPath, secretMap["objectPath"])
 	assert.Equal(t, rCloneMounter.EndPoint, secretMap["cosEndpoint"])
 	assert.Equal(t, rCloneMounter.LocConstraint, secretMap["locationConstraint"])
 	assert.Equal(t, rCloneMounter.GID, secretMap["gid"])
+	assert.Equal(t, rCloneMounter.UID, secretMap["gid"]) // uid auto-set from gid when uid absent
 }
 
-func TestNewRcloneMounter_MountOptsInSecret(t *testing.T) {
+func TestNewRcloneMounter_MountOptsInSecret_HMAC(t *testing.T) {
 	secretMap := map[string]string{
 		"cosEndpoint":        "test-endpoint",
 		"locationConstraint": "test-loc-constraint",
 		"bucketName":         "test-bucket-name",
-		"objPath":            "test-obj-path",
+		"objectPath":         "test-obj-path",
 		"accessKey":          "test-access-key",
 		"secretKey":          "test-secret-key",
-		"apiKey":             "test-api-key",
 		"kpRootKeyCRN":       "test-kp-root-key-crn",
 		"gid":                "1001",
 		"uid":                "1001",
 		"mountOptions":       "\nupload_concurrency\nkey=value",
 	}
-	mounter := NewRcloneMounter(secretMap, mountOptionsRClone, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}))
+	mounter := NewRcloneMounter(RcloneMounterParams{
+		SecretMap:    secretMap,
+		MountOptions: mountOptionsRClone,
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+	})
 
 	rCloneMounter, ok := mounter.(*RcloneMounter)
 	assert.True(t, ok)
 
 	assert.Equal(t, rCloneMounter.BucketName, secretMap["bucketName"])
-	assert.Equal(t, rCloneMounter.ObjPath, secretMap["objPath"])
+	assert.Equal(t, rCloneMounter.ObjectPath, secretMap["objectPath"])
 	assert.Equal(t, rCloneMounter.EndPoint, secretMap["cosEndpoint"])
 	assert.Equal(t, rCloneMounter.LocConstraint, secretMap["locationConstraint"])
 	assert.Equal(t, rCloneMounter.UID, secretMap["uid"])
 	assert.Equal(t, rCloneMounter.GID, secretMap["gid"])
+	assert.Equal(t, rCloneMounter.AuthType, "hmac")
+}
+
+func TestNewRcloneMounter_MountOptsInSecret_IAM(t *testing.T) {
+	secretMap := map[string]string{
+		"cosEndpoint":        "test-endpoint",
+		"locationConstraint": "test-loc-constraint",
+		"bucketName":         "test-bucket-name",
+		"objectPath":         "test-obj-path",
+		"apiKey":             "test-api-key",
+		"serviceId":          "test-service-id",
+		"kpRootKeyCRN":       "test-kp-root-key-crn",
+		"gid":                "1001",
+		"uid":                "1001",
+		"mountOptions":       "\nupload_concurrency\nkey=value",
+		"iamEndpoint":        "test-iam-endpoint",
+	}
+	mounter := NewRcloneMounter(RcloneMounterParams{
+		SecretMap:    secretMap,
+		MountOptions: mountOptionsRClone,
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+	})
+
+	rCloneMounter, ok := mounter.(*RcloneMounter)
+	assert.True(t, ok)
+
+	assert.Equal(t, rCloneMounter.BucketName, secretMap["bucketName"])
+	assert.Equal(t, rCloneMounter.ObjectPath, secretMap["objectPath"])
+	assert.Equal(t, rCloneMounter.EndPoint, secretMap["cosEndpoint"])
+	assert.Equal(t, rCloneMounter.LocConstraint, secretMap["locationConstraint"])
+	assert.Equal(t, rCloneMounter.UID, secretMap["uid"])
+	assert.Equal(t, rCloneMounter.GID, secretMap["gid"])
+	assert.Equal(t, rCloneMounter.AuthType, "iam")
+
 }
 
 func TestRcloneMount_NodeServer_Positive(t *testing.T) {
@@ -138,7 +184,7 @@ func TestRcloneMount_WorkerNode_Positive(t *testing.T) {
 		EndPoint:   "testEndpoint",
 		GID:        "testGID",
 		UID:        "testUID",
-		ObjPath:    "testObjPath",
+		ObjectPath: "testObjectPath",
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path, comm string, args []string) error {
 				return nil
@@ -166,7 +212,7 @@ func TestRcloneMount_WorkerNode_Negative(t *testing.T) {
 		EndPoint:   "testEndpoint",
 		GID:        "testGID",
 		UID:        "testUID",
-		ObjPath:    "testObjPath",
+		ObjectPath: "testObjectPath",
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path, comm string, args []string) error {
 				return nil
@@ -254,14 +300,77 @@ func TestRcloneUnmount_NodeServer_Negative(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to unmount")
 }
 
-func TestCreateConfig_Success(t *testing.T) {
+func TestCreateConfig_Success_HMAC(t *testing.T) {
 	rclone := &RcloneMounter{
-		AccessKeys:    "accessKey:secretKey",
+		AccessKeys:    "testAccessKey:testSecretKey",
+		EndPoint:      "test-endpoint",
 		LocConstraint: "us-south",
+		AuthType:      "hmac",
+		MountOptions:  []string{"upload_concurrency=16"},
 	}
 
-	err := createConfig("/tmp/testconfig", rclone)
-	assert.Nil(t, err)
+	// Create a temporary directory for the test
+	tmpDir := t.TempDir()
+
+	err := createConfig(tmpDir, rclone)
+	assert.NoError(t, err)
+
+	// Read the generated config file and verify HMAC parameters
+	configFilePath := tmpDir + "/rclone.conf"
+	content, err := os.ReadFile(configFilePath)
+	assert.NoError(t, err)
+
+	configStr := string(content)
+
+	// Verify HMAC-specific configuration parameters
+	assert.Contains(t, configStr, "[ibmcos]")
+	assert.Contains(t, configStr, "type = s3")
+	assert.Contains(t, configStr, "endpoint = test-endpoint")
+	assert.Contains(t, configStr, "provider = IBMCOS")
+	assert.Contains(t, configStr, "env_auth = true")
+	assert.Contains(t, configStr, "v2_auth = false")
+	assert.Contains(t, configStr, "access_key_id = testAccessKey")
+	assert.Contains(t, configStr, "secret_access_key = testSecretKey")
+	assert.Contains(t, configStr, "location_constraint = us-south")
+	assert.Contains(t, configStr, "upload_concurrency=16")
+}
+
+func TestCreateConfig_Success_IAM(t *testing.T) {
+	rclone := &RcloneMounter{
+		AccessKeys:        "testApiKey",
+		serviceInstanceID: "test-service-instance-id",
+		EndPoint:          "test-endpoint",
+		LocConstraint:     "us-south",
+		IAMEndpoint:       "test-iam-endpoint",
+		AuthType:          "iam",
+		MountOptions:      []string{"vfs-cache-mode=writes"},
+	}
+
+	// Create a temporary directory for the test
+	tmpDir := t.TempDir()
+
+	err := createConfig(tmpDir, rclone)
+	assert.NoError(t, err)
+
+	// Read the generated config file and verify IAM parameters
+	configFilePath := tmpDir + "/rclone.conf"
+	content, err := os.ReadFile(configFilePath)
+	assert.NoError(t, err)
+
+	configStr := string(content)
+
+	// Verify IAM-specific configuration parameters
+	assert.Contains(t, configStr, "[ibmcos]")
+	assert.Contains(t, configStr, "type = s3")
+	assert.Contains(t, configStr, "endpoint = test-endpoint")
+	assert.Contains(t, configStr, "provider = IBMCOS")
+	assert.Contains(t, configStr, "env_auth = false")
+	assert.Contains(t, configStr, "v2_auth = true")
+	assert.Contains(t, configStr, "ibm_api_key = testApiKey")
+	assert.Contains(t, configStr, "ibm_resource_instance_id = test-service-instance-id")
+	assert.Contains(t, configStr, "ibm_iam_endpoint = test-iam-endpoint")
+	assert.Contains(t, configStr, "location_constraint = us-south")
+	assert.Contains(t, configStr, "vfs-cache-mode=writes")
 }
 
 func TestCreateConfig_MakeDirFails(t *testing.T) {
@@ -363,4 +472,116 @@ func TestRemoveRcloneConfigFile_Negative(t *testing.T) {
 
 	removeRcloneConfigFile("/test", target)
 	assert.Equal(t, maxRetries, called)
+}
+
+func TestNewRcloneMounter_GidParam(t *testing.T) {
+	tests := []struct {
+		name    string
+		secret  map[string]string
+		gid     string
+		wantGID string
+		wantUID string
+	}{
+		{
+			name:    "gid param overrides secretMap gid",
+			secret:  map[string]string{"gid": "1000"},
+			gid:     "2000",
+			wantGID: "2000",
+			wantUID: "2000", // auto-set from gid param since no uid in secret
+		},
+		{
+			name:    "gid param sets uid when uid absent",
+			secret:  map[string]string{},
+			gid:     "3000",
+			wantGID: "3000",
+			wantUID: "3000",
+		},
+		{
+			name:    "gid param does not override explicit secretMap uid",
+			secret:  map[string]string{"uid": "5000"},
+			gid:     "4000",
+			wantGID: "4000",
+			wantUID: "5000", // secretMap uid takes precedence
+		},
+		{
+			name:    "no gid param and no secret gid — neither set",
+			secret:  map[string]string{},
+			gid:     "",
+			wantGID: "",
+			wantUID: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mounter := NewRcloneMounter(RcloneMounterParams{
+				SecretMap:    tt.secret,
+				MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+				Gid:          tt.gid,
+			})
+
+			rCloneMounter, ok := mounter.(*RcloneMounter)
+			assert.True(t, ok)
+			assert.Equal(t, tt.wantGID, rCloneMounter.GID)
+			assert.Equal(t, tt.wantUID, rCloneMounter.UID)
+		})
+	}
+}
+
+func TestNewRcloneMounter_ReadOnly(t *testing.T) {
+	tests := []struct {
+		name     string
+		readOnly bool
+		wantRO   bool
+	}{
+		{
+			name:     "readOnly true sets ReadOnly flag and --read-only in mount args",
+			readOnly: true,
+			wantRO:   true,
+		},
+		{
+			name:     "readOnly false does not set ReadOnly flag",
+			readOnly: false,
+			wantRO:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mounter := NewRcloneMounter(RcloneMounterParams{
+				SecretMap:    map[string]string{},
+				MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+				ReadOnly:     tt.readOnly,
+			})
+
+			rCloneMounter, ok := mounter.(*RcloneMounter)
+			assert.True(t, ok)
+			assert.Equal(t, tt.wantRO, rCloneMounter.ReadOnly)
+
+			nodeOp, workerOp := rCloneMounter.formulateMountOptions("bucket", "/target", "/config")
+			if tt.wantRO {
+				assert.Contains(t, nodeOp, "--read-only")
+				assert.Equal(t, "true", workerOp["read-only"])
+			} else {
+				assert.NotContains(t, nodeOp, "--read-only")
+				_, exists := workerOp["read-only"]
+				assert.False(t, exists)
+			}
+		})
+	}
+}
+
+func TestFormulateRcloneMountOptions_GidUid(t *testing.T) {
+	rclone := &RcloneMounter{
+		GID:      "1000",
+		UID:      "1000",
+		EndPoint: "test-endpoint",
+	}
+
+	nodeOp, workerOp := rclone.formulateMountOptions("bucket", "/target", "/config")
+
+	assert.Contains(t, nodeOp, "--gid=1000")
+	assert.Contains(t, nodeOp, "--uid=1000")
+	assert.Equal(t, "1000", workerOp["gid"])
+	assert.Equal(t, "1000", workerOp["uid"])
 }
