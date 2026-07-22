@@ -42,7 +42,7 @@ type S3FSArgs struct {
 	Umask                   string `json:"umask,omitempty"`
 	URL                     string `json:"url,omitempty"`
 	UsePathRequestStyle     string `json:"use_path_request_style,omitempty"`
-	UseXattr                string `json:"use_xattr,string,omitempty"`
+	UseXattr                string `json:"use_xattr,omitempty"`
 	// AddMountParam allows passing additional s3fs mount options as comma-separated string
 	// Example: "enable_content_md5,use_sse=AES256,mime=/etc/mime.types"
 	AddMountParam string `json:"add-mount-param,omitempty"`
