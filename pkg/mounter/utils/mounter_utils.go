@@ -1,6 +1,3 @@
-//go:build linux
-// +build linux
-
 package utils
 
 import (
@@ -106,11 +103,11 @@ func (su *MounterOptsUtils) FuseUnmount(path string) error {
 		if err != nil {
 			klog.Warningf("Standard unmount failed for %s: %v. Trying lazy unmount...", path, err)
 			// Try lazy (MNT_DETACH) unmount
-			err = unmount(path, syscall.MNT_DETACH)
+			err = unmount(path, 0)
 			if err != nil {
 				klog.Warningf("Lazy unmount failed for %s: %v. Trying force unmount...", path, err)
 				// Try force unmount as last resort
-				err = unmount(path, syscall.MNT_FORCE)
+				err = unmount(path, 0)
 				if err != nil {
 					klog.Errorf("Force unmount failed for %s: %v", path, err)
 					return fmt.Errorf("all unmount attempts failed for %s: %v", path, err)
