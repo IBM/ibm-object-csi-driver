@@ -35,7 +35,6 @@ type S3FSArgs struct {
 	ReadOnly                string `json:"ro,omitempty"`
 	ReadwriteTimeoutSeconds string `json:"readwrite_timeout,omitempty"`
 	RetryCount              string `json:"retries,omitempty"`
-	SigV2                   string `json:"sigv2,omitempty"`
 	SigV4                   string `json:"sigv4,omitempty"`
 	StatCacheExpireSeconds  string `json:"stat_cache_expire,omitempty"`
 	UID                     string `json:"uid,omitempty"`
@@ -283,14 +282,6 @@ func (args S3FSArgs) Validate(targetPath string) error {
 		if retryCount < 1 {
 			logger.Error("value of retires should be >= 1")
 			return fmt.Errorf("value of retires should be >= 1")
-		}
-	}
-
-	// Check if value of sigv2 parameter is boolean "true" or "false"
-	if args.SigV2 != "" {
-		if isBool := isBoolString(args.SigV2); !isBool {
-			logger.Error("cannot convert value of sigv2 into boolean", zap.Any("sigv2", args.SigV2))
-			return fmt.Errorf("cannot convert value of sigv2 into boolean: %v", args.SigV2)
 		}
 	}
 

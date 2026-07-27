@@ -74,7 +74,6 @@ func TestS3FSValidate_InvalidS3FSParamValues(t *testing.T) {
 		"ReadOnly",
 		"ReadwriteTimeoutSeconds",
 		"RetryCount",
-		"SigV2",
 		"SigV4",
 		"StatCacheExpireSeconds",
 		"UID",
@@ -150,9 +149,9 @@ func TestS3FSValidate_StatCacheExpireSecondsThanZero(t *testing.T) {
 
 func TestS3FSPopulateArgsSlice_SkipCipherSuitesDefault(t *testing.T) {
 	tests := []struct {
-		name         string
-		args         S3FSArgs
-		expectAbsent string
+		name          string
+		args          S3FSArgs
+		expectAbsent  string
 		expectPresent string
 	}{
 		{
