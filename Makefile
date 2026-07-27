@@ -3,7 +3,7 @@ EXE_DRIVER_NAME=ibm-object-csi-driver
 
 REGISTRY=quay.io/ibm-object-csi-driver
 
-export LINT_VERSION="2.12.2"
+export LINT_VERSION="2.7.2"
 
 COLOR_YELLOW=\033[0;33m
 COLOR_RESET=\033[0m
@@ -33,7 +33,7 @@ test:
 deps:
 	@echo "Installing dependencies ..."
 	@if ! which golangci-lint >/dev/null || [[ "$$(golangci-lint --version)" != *${LINT_VERSION}* ]]; then \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v${LINT_VERSION}/install.sh | \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
 		sh -s -- -b $(shell go env GOPATH)/bin v${LINT_VERSION}; \
 	fi
 
