@@ -236,7 +236,7 @@ func GetKnownS3FSOptions() *pkgutils.Set {
 		"max_dirty_data", "max_stat_cache_size", "mp_umask",
 		"multipart_size", "multireq_max", "parallel_count",
 		"passwd_file", "ro", "readwrite_timeout",
-		"retries", "sigv2", "sigv4",
+		"retries", "sigv4",
 		"stat_cache_expire", "uid", "umask",
 		"url", "use_path_request_style", "use_xattr",
 		"tmpdir", "use_cache",
@@ -383,7 +383,6 @@ func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string
 	nodeServerOp = []string{
 		bucket,
 		target,
-		"-o", "sigv2",
 		"-o", "use_path_request_style",
 		"-o", fmt.Sprintf("passwd_file=%s", passwdFile),
 		"-o", fmt.Sprintf("url=%s", s3fs.EndPoint),
@@ -392,7 +391,6 @@ func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string
 	}
 
 	workerNodeOp = map[string]string{
-		"sigv2":                  "true",
 		"use_path_request_style": "true",
 		"passwd_file":            passwdFile,
 		"url":                    s3fs.EndPoint,
