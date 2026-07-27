@@ -33,7 +33,7 @@ test:
 deps:
 	@echo "Installing dependencies ..."
 	@if ! which golangci-lint >/dev/null || [[ "$$(golangci-lint --version)" != *${LINT_VERSION}* ]]; then \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v${LINT_VERSION}/install.sh | \
 		sh -s -- -b $(shell go env GOPATH)/bin v${LINT_VERSION}; \
 	fi
 
