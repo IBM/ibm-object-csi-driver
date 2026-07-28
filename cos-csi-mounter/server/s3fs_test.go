@@ -150,9 +150,9 @@ func TestS3FSValidate_StatCacheExpireSecondsThanZero(t *testing.T) {
 
 func TestS3FSPopulateArgsSlice_SkipCipherSuitesDefault(t *testing.T) {
 	tests := []struct {
-		name         string
-		args         S3FSArgs
-		expectAbsent string
+		name          string
+		args          S3FSArgs
+		expectAbsent  string
 		expectPresent string
 	}{
 		{

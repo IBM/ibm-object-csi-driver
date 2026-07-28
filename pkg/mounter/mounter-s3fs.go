@@ -383,21 +383,21 @@ func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string
 	nodeServerOp = []string{
 		bucket,
 		target,
-		"-o", "sigv2",
 		"-o", "use_path_request_style",
 		"-o", fmt.Sprintf("passwd_file=%s", passwdFile),
 		"-o", fmt.Sprintf("url=%s", s3fs.EndPoint),
 		"-o", "allow_other",
 		"-o", "mp_umask=002",
+		"-o", fmt.Sprintf("instance_name=%s", target),
 	}
 
 	workerNodeOp = map[string]string{
-		"sigv2":                  "true",
 		"use_path_request_style": "true",
 		"passwd_file":            passwdFile,
 		"url":                    s3fs.EndPoint,
 		"allow_other":            "true",
 		"mp_umask":               "002",
+		"instance_name":          target,
 	}
 
 	if s3fs.LocConstraint != "" {
