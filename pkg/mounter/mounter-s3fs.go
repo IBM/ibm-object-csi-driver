@@ -388,7 +388,7 @@ func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string
 		"-o", fmt.Sprintf("url=%s", s3fs.EndPoint),
 		"-o", "allow_other",
 		"-o", "mp_umask=002",
-		"-o", "instance_name=%s", target,
+		"-o", fmt.Sprintf("instance_name=%s", target),
 	}
 
 	workerNodeOp = map[string]string{
