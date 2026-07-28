@@ -74,6 +74,7 @@ func TestS3FSValidate_InvalidS3FSParamValues(t *testing.T) {
 		"ReadOnly",
 		"ReadwriteTimeoutSeconds",
 		"RetryCount",
+		"SigV2",
 		"SigV4",
 		"StatCacheExpireSeconds",
 		"UID",
