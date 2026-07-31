@@ -8,7 +8,7 @@ require (
 	github.com/IBM/ibm-cos-sdk-go-config/v2 v2.3.0
 	github.com/IBM/ibm-csi-common v1.1.27
 	github.com/IBM/ibmcloud-volume-interface v1.2.21
-	github.com/aws/smithy-go v1.27.4
+	github.com/aws/smithy-go v1.27.6
 	github.com/container-storage-interface/spec v1.12.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
