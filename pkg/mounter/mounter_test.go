@@ -45,7 +45,7 @@ func TestNewMounter(t *testing.T) {
 				"apiKey":             "test-api-key",
 				"kpRootKeyCRN":       "test-kp-root-key-crn",
 			},
-			mountOptions: []string{"opt1=val1", "cipher_suites=default"},
+			mountOptions: []string{"opt1=val1", "cipher_suites=test-suite"},
 			expected: &S3fsMounter{
 				BucketName:    "test-bucket-name",
 				ObjectPath:    "test-obj-path",
@@ -54,7 +54,8 @@ func TestNewMounter(t *testing.T) {
 				AccessKeys:    ":test-api-key",
 				AuthType:      "iam",
 				KpRootKeyCrn:  "test-kp-root-key-crn",
-				MountOptions:  []string{"opt1=val1", "cipher_suites=default"},
+				MountOptions:  []string{"cipher_suites=test-suite"},
+				AddMountParam: "opt1=val1",
 				MounterUtils:  &mounterUtils.MounterOptsUtils{},
 			},
 			expectedErr: nil,
@@ -101,7 +102,7 @@ func TestNewMounter(t *testing.T) {
 				"secretKey":          "test-secret-key",
 				"kpRootKeyCRN":       "test-kp-root-key-crn",
 			},
-			mountOptions: []string{"cipher_suites=default"},
+			mountOptions: []string{"cipher_suites=test-suite"},
 			expected: &S3fsMounter{
 				BucketName:    "test-bucket-name",
 				ObjectPath:    "test-obj-path",
@@ -110,7 +111,7 @@ func TestNewMounter(t *testing.T) {
 				AccessKeys:    "test-access-key:test-secret-key",
 				AuthType:      "hmac",
 				KpRootKeyCrn:  "test-kp-root-key-crn",
-				MountOptions:  []string{"cipher_suites=default"},
+				MountOptions:  []string{"cipher_suites=test-suite"},
 				MounterUtils:  &mounterUtils.MounterOptsUtils{},
 			},
 			expectedErr: nil,
@@ -121,7 +122,12 @@ func TestNewMounter(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			factory := &CSIMounterFactory{}
 
-			result := factory.NewMounter(test.attrib, test.secretMap, test.mountOptions, nil)
+			result := factory.NewMounter(MounterParams{
+				Attrib:           test.attrib,
+				SecretMap:        test.secretMap,
+				MountFlags:       test.mountOptions,
+				KnownS3FSOptions: GetKnownS3FSOptions(),
+			})
 
 			if s3fs, ok := result.(*S3fsMounter); ok {
 				expected := test.expected.(*S3fsMounter)

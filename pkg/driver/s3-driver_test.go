@@ -1,5 +1,5 @@
 /**
- * Copyright 2024 IBM Corp.
+ * Copyright 2026 IBM Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -134,6 +134,8 @@ func TestNewNodeServer(t *testing.T) {
 				assert.Equal(t, ns.Region, testRegion)
 				assert.Equal(t, ns.Zone, testZone)
 				assert.Equal(t, ns.NodeID, nodeID)
+				assert.NotNil(t, ns.KnownS3FSOptions, "KnownS3FSOptions should be initialized")
+				assert.True(t, ns.KnownS3FSOptions.Contains("allow_other"), "Set should contain known s3fs options")
 			},
 			expectedErr: nil,
 		},
