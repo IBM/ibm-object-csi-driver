@@ -6,6 +6,13 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	// Safe base directory for mount-s3 log files.
+	s3MounterSafeLogDir = "/var/log/mount-s3"
+	// Safe base directory for mount-s3 cache files.
+	s3MounterSafeCacheDir = "/tmp"
+)
+
 // s3MounterArgs holds the args sent from the node server for mount-s3.
 // This struct must match the s3MounterArgs in pkg/mounter/mounter_s3mounter.go
 type s3MounterArgs struct {
@@ -191,15 +198,15 @@ func (args s3MounterArgs) Validate(targetPath string) error {
 		}
 	}
 
-	// ensureDir creates the directory if it does not exist.
+	// ensureDir creates the directory if it does not exist, confined to its safe base.
 	if args.CacheDir != "" {
-		if err := ensureDir(args.CacheDir); err != nil {
+		if err := ensureDir(args.CacheDir, s3MounterSafeCacheDir); err != nil {
 			logger.Error("failed to create cache directory", zap.String("cache-dir", args.CacheDir), zap.Error(err))
 			return fmt.Errorf("failed to create cache directory '%s': %w", args.CacheDir, err)
 		}
 	}
 	if args.LogDirectory != "" {
-		if err := ensureDir(args.LogDirectory); err != nil {
+		if err := ensureDir(args.LogDirectory, s3MounterSafeLogDir); err != nil {
 			logger.Error("failed to create log directory", zap.String("log-dir", args.LogDirectory), zap.Error(err))
 			return fmt.Errorf("failed to create log directory '%s': %w", args.LogDirectory, err)
 		}

@@ -126,27 +126,36 @@ func fileExists(path string) (bool, error) {
 	return !info.IsDir(), nil
 }
 
-// ensureDir creates the cache directory if it doesn't exist.
-// It creates the directory with 0755 permissions (rwxr-xr-x).
-func ensureDir(path string) error {
+// ensureDir creates the directory at path if it doesn't exist.
+// It first resolves the absolute path and verifies it is within safeBase
+// to prevent path-traversal attacks before creating the directory.
+func ensureDir(path, safeBase string) error {
+	absPath, err := absPathResolver(path)
+	if err != nil {
+		return fmt.Errorf("failed to resolve absolute path: %v", err)
+	}
+	if !strings.HasPrefix(absPath, safeBase) {
+		return fmt.Errorf("path %v is outside the safe directory", absPath)
+	}
+
 	// Check if directory already exists
-	info, err := os.Stat(path)
+	info, err := os.Stat(absPath)
 	if err == nil {
 		// Path exists, verify it's a directory
 		if !info.IsDir() {
-			return fmt.Errorf("cache path exists but is not a directory: %s", path)
+			return fmt.Errorf("path exists but is not a directory: %s", absPath)
 		}
 		return nil
 	}
 
 	// If error is not "not exist", return it
 	if !os.IsNotExist(err) {
-		return fmt.Errorf("failed to stat cache directory: %w", err)
+		return fmt.Errorf("failed to stat directory: %w", err)
 	}
 
 	// Directory doesn't exist, create it with parent directories
-	if err := os.MkdirAll(path, 0750); err != nil { // #nosec G301 -- cache directory permissions set to 0750 for security
-		return fmt.Errorf("failed to create cache directory: %w", err)
+	if err := os.MkdirAll(absPath, 0750); err != nil { // #nosec G301 -- directory permissions set to 0750 for security
+		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	return nil
