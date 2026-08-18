@@ -330,6 +330,15 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 		klog.Infof("No new mountOptions found. Using default mountOptions from storageclass: %v", mountOptsMap)
 	}
 
+	// If cipher_suites is set to "default", drop it — "default" is not a valid s3fs/libcurl cipher
+	// suite value and causes mount failures (curlCode 59). Users migrating from cos-flex may have
+	// "cipher_suites=default" in their CSI secret mountOptions; silently ignoring it lets s3fs use
+	// its own built-in cipher defaults.
+	if strings.EqualFold(mountOptsMap[constants.CipherSuitesKey], "default") {
+		klog.Infof("Skipping cipher_suites=default: 'default' is not a valid s3fs cipher suite value")
+		delete(mountOptsMap, constants.CipherSuitesKey)
+	}
+
 	// To mount the bucket in read-only mode using s3fs based on PVC accessMode "ReadOnlyMany"
 	if readOnly {
 		mountOptsMap["ro"] = "true"
@@ -374,21 +383,21 @@ func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string
 	nodeServerOp = []string{
 		bucket,
 		target,
-		"-o", "sigv2",
 		"-o", "use_path_request_style",
 		"-o", fmt.Sprintf("passwd_file=%s", passwdFile),
 		"-o", fmt.Sprintf("url=%s", s3fs.EndPoint),
 		"-o", "allow_other",
 		"-o", "mp_umask=002",
+		"-o", fmt.Sprintf("instance_name=%s", target),
 	}
 
 	workerNodeOp = map[string]string{
-		"sigv2":                  "true",
 		"use_path_request_style": "true",
 		"passwd_file":            passwdFile,
 		"url":                    s3fs.EndPoint,
 		"allow_other":            "true",
 		"mp_umask":               "002",
+		"instance_name":          target,
 	}
 
 	if s3fs.LocConstraint != "" {

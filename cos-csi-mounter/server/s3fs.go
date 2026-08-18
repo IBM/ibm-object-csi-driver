@@ -42,7 +42,7 @@ type S3FSArgs struct {
 	Umask                   string `json:"umask,omitempty"`
 	URL                     string `json:"url,omitempty"`
 	UsePathRequestStyle     string `json:"use_path_request_style,omitempty"`
-	UseXattr                string `json:"use_xattr,string,omitempty"`
+	UseXattr                string `json:"use_xattr,omitempty"`
 	// AddMountParam allows passing additional s3fs mount options as comma-separated string
 	// Example: "enable_content_md5,use_sse=AES256,mime=/etc/mime.types"
 	AddMountParam string `json:"add-mount-param,omitempty"`
@@ -83,6 +83,11 @@ func (args S3FSArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, err
 	for k, v := range m {
 		// Skip add-mount-param as it's processed separately below
 		if k == "add-mount-param" {
+			continue
+		}
+		// Skip cipher_suites=default — "default" is not a valid s3fs/libcurl cipher suite value
+		// and causes mount failures (curlCode 59). Silently drop it so s3fs uses its own defaults.
+		if k == "cipher_suites" && strings.ToLower(strings.TrimSpace(v)) == "default" {
 			continue
 		}
 		result = append(result, "-o")

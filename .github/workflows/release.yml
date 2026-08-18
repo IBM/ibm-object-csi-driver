@@ -19,36 +19,36 @@ jobs:
       should_release: ${{ steps.check_release.outputs.should_release }}
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v5
+      - name: Checkout Code
+        uses: actions/checkout@v7
+          
+      - name: Print Go Version
+        run: go version
 
-    - name: Print Go Version
-      run: go version
+      - name: Get last commit message
+        id: check_commit
+        run: |
+          message=$(git log -1 --pretty=%B)
+          message="${message//'%'/'%25'}"  # Escape '%'
+          message="${message//$'\n'/'%0A'}"  # Escape newlines
+          message="${message//$'\r'/'%0D'}"  # Escape carriage returns
+          echo "message=$message" >> "$GITHUB_OUTPUT"
+        shell: bash
 
-    - name: Get last commit message
-      id: check_commit
-      run: |
-        message=$(git log -1 --pretty=%B)
-        message="${message//'%'/'%25'}"  # Escape '%'
-        message="${message//$'\n'/'%0A'}"  # Escape newlines
-        message="${message//$'\r'/'%0D'}"  # Escape carriage returns
-        echo "message=$message" >> "$GITHUB_OUTPUT"
-      shell: bash
+      - name: Check Commit Message
+        run: |
+          echo "Commit Message: ${{ steps.check_commit.outputs.message }}"
 
-    - name: Check Commit Message
-      run: |
-        echo "Commit Message: ${{ steps.check_commit.outputs.message }}"
-
-    - name: Check if release should be triggered
-      id: check_release
-      run: |
-        if [[ "${{ steps.check_commit.outputs.message }}" == *"publish"* ]]; then
-          echo "should_release=true" >> "$GITHUB_OUTPUT"
-          echo "Debian/RPM packages will be created"
-        else
-          echo "should_release=false" >> "$GITHUB_OUTPUT"
-          echo "Debian/RPM packages will not be created"
-        fi
+      - name: Check if release should be triggered
+        id: check_release
+        run: |
+          if [[ "${{ steps.check_commit.outputs.message }}" == *"publish"* ]]; then
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "Debian/RPM packages will be created"
+          else
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "Debian/RPM packages will not be created"
+          fi
 
   build-and-test:
     needs: common-setup
@@ -58,47 +58,47 @@ jobs:
       pull-requests: write # needed to comment on PRs
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v5
-      with:
-        fetch-depth: 0
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
-    - name: Install system dependencies (bc + docker)
-      run: |
-        sudo apt-get update -qq
-        sudo apt-get install -y bc docker-ce-cli
+      - name: Install system dependencies (bc + docker)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y bc docker-ce-cli
 
-    - name: Prepare environment
-      run: |
-        export GO111MODULE=on
-        go mod tidy
-        make deps
+      - name: Prepare environment
+        run: |
+          export GO111MODULE=on
+          go mod tidy
+          make deps
 
-    - name: Check code formatting
-      run: make fmt
+      - name: Check code formatting
+        run: make fmt
 
-    - name: Run unit tests
-      run: make test
+      - name: Run unit tests
+        run: make test
 
-    - name: Generate coverage
-      run: |
-        make coverage
-        ./scripts/calculateCoverage.sh
-        touch "Passing" || touch "Failed"
+      - name: Generate coverage
+        run: |
+          make coverage
+          ./scripts/calculateCoverage.sh
+          touch "Passing" || touch "Failed"
 
-    - name: Build driver image
-      run: |
-        make driver
-      env:
-        RHSM_USER: ${{ secrets.RHSM_USER }}
-        RHSM_PASS: ${{ secrets.RHSM_PASS }}
+      - name: Build driver image
+        run: |
+          make driver
+        env:
+          RHSM_USER: ${{ secrets.RHSM_USER }}
+          RHSM_PASS: ${{ secrets.RHSM_PASS }}
 
-    - name: Publish coverage
-      if: success()
-      env:
-        GHE_TOKEN: ${{ secrets.GHE_TOKEN }}
-      run: |
-        ./scripts/publishCoverage.sh
+      - name: Publish coverage
+        if: success()
+        env:
+          GHE_TOKEN: ${{ secrets.GHE_TOKEN }}
+        run: |
+          ./scripts/publishCoverage.sh
 
   release:
     needs: common-setup
@@ -116,36 +116,36 @@ jobs:
       APP_VERSION: 0.12.50
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v5
+      - name: Checkout Code
+        uses: actions/checkout@v7
 
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
-      with:
-        languages: "go"
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: "go"
+        
+      - name: Build Debian and RPM packages for cos-csi-mounter systemd service
+        run: |
+          cd ${{ matrix.package_dir }}
+          make packages
 
-    - name: Build Debian and RPM packages for cos-csi-mounter systemd service
-      run: |
-        cd ${{ matrix.package_dir }}
-        make packages
+      - name: Latest Version (Tag and Release)
+        if: success()
+        id: release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.deb.tar.gz
+            /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.deb.tar.gz.sha256
+            /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz
+            /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz.sha256
+          tag_name: v0.12.50
+          name: v0.12.50
+          body: |
+            ## 🚀 What’s New
+            - Add support for AddMountParam to pass additional s3fs mount options
+            - AddMountParam allows passing s3fs mount options as a comma-separated string
+          prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
 
-    - name: Latest Version (Tag and Release)
-      if: success()
-      id: release
-      uses: softprops/action-gh-release@v2
-      with:
-        files: |
-          /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.deb.tar.gz
-          /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.deb.tar.gz.sha256
-          /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz
-          /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz.sha256
-        tag_name: v0.12.50
-        name: v0.12.50
-        body: |
-          ## 🚀 What’s New
-          - Testing aws-s3Mounter image
-          - Publishing new testing version
-        prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
-
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
