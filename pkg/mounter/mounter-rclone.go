@@ -234,7 +234,7 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 
 		jsonData, err := json.Marshal(wnOp)
 		if err != nil {
-			klog.Fatalf("Error marshalling data: %v", err)
+			klog.Errorf("Error marshalling data: %v", err)
 			return err
 		}
 
