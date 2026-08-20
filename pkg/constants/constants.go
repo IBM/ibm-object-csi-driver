@@ -14,9 +14,9 @@ const (
 
 	KPEncryptionAlgorithm = "AES256" // https://github.com/IBM/ibm-cos-sdk-go/blob/master/service/s3/api.go#L9130-L9136
 
-	S3FS             = "s3fs"
-	RClone           = "rclone"
-	AMAZONS3MOUNTER  = "mount-s3"
+	S3FS            = "s3fs"
+	RClone          = "rclone"
+	AMAZONS3MOUNTER = "mount-s3"
 
 	DefaultNamespace = "default"
 
@@ -31,16 +31,16 @@ const (
 	NodeRegionLabel = "topology.kubernetes.io/region"
 
 	// Timeout specifies a time limit for requests made by HTTP Client
-	Timeout                      = 3 * time.Minute
-	COSCSIMounterSocketPath      = "/var/lib/coscsi-sock/coscsi.sock"
-	COSCSIMounterSocketPathEnv   = "COS_CSI_MOUNTER_SOCKET"
-	MounterConfigPathOnHost      = "/var/lib/coscsi-config"
-	MounterConfigPathOnPodS3fs   = "/var/lib/ibmc-s3fs"
-    MountpointS3BinaryPath  = "/usr/bin/mount-s3"
+	Timeout                    = 3 * time.Minute
+	COSCSIMounterSocketPath    = "/var/lib/coscsi-sock/coscsi.sock"
+	COSCSIMounterSocketPathEnv = "COS_CSI_MOUNTER_SOCKET"
+	MounterConfigPathOnHost    = "/var/lib/coscsi-config"
+	MounterConfigPathOnPodS3fs = "/var/lib/ibmc-s3fs"
+	MountpointS3BinaryPath     = "/usr/bin/mount-s3"
 
-    // Config paths for mountpoint-s3 (same pattern as rclone)
-    MounterConfigPathOnPodS3Mount  = "/var/lib/coscsi-config/s3mount"
-	MounterConfigPathOnPodRclone = "/root/.config/rclone"
+	// Config paths for mountpoint-s3 (same pattern as rclone)
+	MounterConfigPathOnPodS3Mount = "/var/lib/coscsi-config/s3mount"
+	MounterConfigPathOnPodRclone  = "/root/.config/rclone"
 	// Interval to wait till next loop
 	Interval = 500 * time.Millisecond
 
