@@ -91,8 +91,12 @@ var (
 	removeS3ConfigFile = removeS3MountConfigFile
 )
 
-type envMounter interface {
-	FuseMountWithEnv(path string, comm string, args []string, envVars []string) error
+type MountpointS3MounterParams struct {
+	SecretMap    map[string]string
+	MountOptions []string
+	MounterUtils utils.MounterUtils
+	Gid          string
+	ReadOnly     bool
 }
 
 // NewMountpointS3Mounter creates a new MountpointS3Mounter from the unified
@@ -105,7 +109,13 @@ type envMounter interface {
 //
 // For passthrough flags, deduplication is applied: if the same flag key appears
 // in both SC and secret, the SC entry is dropped and the secret entry is kept.
-func NewMountpointS3Mounter(secretMap map[string]string, mountOptions []string, mounterUtils utils.MounterUtils, gid string, readOnly bool) Mounter {
+func NewMountpointS3Mounter(params MountpointS3MounterParams) Mounter {
+	secretMap := params.SecretMap
+	mountOptions := params.MountOptions
+	mounterUtils := params.MounterUtils
+	gid := params.Gid
+	readOnly := params.ReadOnly
+
 	klog.Info("-newMountpointS3Mounter-")
 
 	mounter := &MountpointS3Mounter{}
@@ -246,6 +256,7 @@ func parseMountpointS3Options(mounter *MountpointS3Mounter, opts []string) []str
 
 		switch key {
 		case "allow-other":
+			klog.Infof("parseMountpointS3Options: 'allow-other' is always enabled and cannot be overridden.")
 		case "umask":
 			klog.Warningf("parseMountpointS3Options: 'umask' is not supported by mount-s3. " +
 				"Use --dir-mode / --file-mode instead. Ignoring.")
@@ -311,10 +322,6 @@ func (s3 *MountpointS3Mounter) Mount(source string, target string) error {
 			klog.Infof("MountpointS3Mounter: read-only set — clearing allow-overwrite")
 			s3.AllowOverwrite = false
 		}
-		if s3.IncrementalUpload {
-			klog.Infof("MountpointS3Mounter: read-only set — clearing incremental-upload")
-			s3.IncrementalUpload = false
-		}
 	}
 
 	// NOTE: No directory validation or creation here.
@@ -367,12 +374,7 @@ func (s3 *MountpointS3Mounter) Mount(source string, target string) error {
 
 	klog.Info("NodeServer Mounting...")
 
-	if m, ok := s3.MounterUtils.(envMounter); ok {
-		return m.FuseMountWithEnv(target, constants.MountpointS3BinaryPath, args, envVars)
-	}
-
-	klog.Warning("MounterUtils does not implement FuseMountWithEnv, falling back to FuseMount.")
-	return s3.MounterUtils.FuseMount(target, constants.MountpointS3BinaryPath, args)
+	return s3.MounterUtils.FuseMountWithEnv(target, constants.MountpointS3BinaryPath, args, envVars)
 }
 
 // Unmount unmounts the S3 bucket.
@@ -442,7 +444,7 @@ func createS3MountConfig(configPathWithVolID string, s3 *MountpointS3Mounter) er
 
 // writeConfigFile writes lines to a file with 0600 permissions.
 func writeConfigFile(filePath string, lines []string) error {
-	f, err := CreateFile(filePath) // #nosec G304 -- file path is constructed from controlled configPathWithVolID and constant filename
+	f, err := OpenFile(filePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600) // #nosec G304 -- file path is constructed from controlled configPathWithVolID and constant filename
 	if err != nil {
 		return fmt.Errorf("cannot create file %s: %w", filePath, err)
 	}
@@ -451,10 +453,6 @@ func writeConfigFile(filePath string, lines []string) error {
 			klog.Errorf("writeConfigFile: cannot close file %s: %v", filePath, cerr)
 		}
 	}()
-
-	if err := Chmod(filePath, 0600); err != nil { // #nosec G302 -- credentials file requires restrictive permissions (owner read/write only)
-		return fmt.Errorf("cannot chmod file %s: %w", filePath, err)
-	}
 
 	w := bufio.NewWriter(f)
 	for _, line := range lines {

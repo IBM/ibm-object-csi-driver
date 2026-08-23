@@ -27,6 +27,7 @@ var ErrTimeoutWaitProcess = errors.New("timeout waiting for process to end")
 type MounterUtils interface {
 	FuseUnmount(path string) error
 	FuseMount(path string, comm string, args []string) error
+	FuseMountWithEnv(path string, comm string, args []string, envVars []string) error
 }
 
 type MounterOptsUtils struct {
@@ -37,8 +38,7 @@ func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) e
 	return su.fuseMountInternal(path, comm, args, nil)
 }
 
-// FuseMountWithEnv — on the concrete struct only, NOT on the interface.
-// envVars are per-subprocess env vars (e.g. AWS_SHARED_CREDENTIALS_FILE)
+// FuseMountWithEnv — envVars are per-subprocess env vars (e.g. AWS_SHARED_CREDENTIALS_FILE)
 func (su *MounterOptsUtils) FuseMountWithEnv(path string, comm string, args []string, envVars []string) error {
 	return su.fuseMountInternal(path, comm, args, envVars)
 }

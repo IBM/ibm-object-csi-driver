@@ -27,6 +27,7 @@ var (
 	MakeDir    = os.MkdirAll
 	CreateFile = os.Create
 	Chmod      = os.Chmod
+	OpenFile   = os.OpenFile
 	Stat       = os.Stat
 	RemoveAll  = os.RemoveAll
 )
@@ -105,7 +106,13 @@ func (s *CSIMounterFactory) NewMounter(params MounterParams) Mounter {
 			ReadOnly:     params.ReadOnly,
 		})
 	case constants.AMAZONS3MOUNTER:
-		return NewMountpointS3Mounter(secretMap, mountFlags, mounterUtils, params.Gid, params.ReadOnly)
+		return NewMountpointS3Mounter(MountpointS3MounterParams{
+			SecretMap:    secretMap,
+			MountOptions: mountFlags,
+			MounterUtils: mounterUtils,
+			Gid:          params.Gid,
+			ReadOnly:     params.ReadOnly,
+		})
 	default:
 		// default to s3fs
 		return NewS3fsMounter(S3fsMounterParams{

@@ -3,10 +3,10 @@ name: CI & Release
 on:
   push:
     branches:
-    - aws-s3mounter
+      - main
   pull_request:
     branches:
-    - aws-s3mounter
+      - main
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       should_release: ${{ steps.check_release.outputs.should_release }}
-
+    
     steps:
       - name: Checkout Code
         uses: actions/checkout@v7
@@ -25,12 +25,9 @@ jobs:
       - name: Print Go Version
         run: go version
 
-    - name: Print Go Version
-      run: go version
-
       - name: Get last commit message
         id: check_commit
-        run: |
+        run:  |
           message=$(git log -1 --pretty=%B)
           message="${message//'%'/'%25'}"  # Escape '%'
           message="${message//$'\n'/'%0A'}"  # Escape newlines
@@ -41,7 +38,7 @@ jobs:
       - name: Check Commit Message
         run: |
           echo "Commit Message: ${{ steps.check_commit.outputs.message }}"
-
+      
       - name: Check if release should be triggered
         id: check_release
         run: |
@@ -57,7 +54,7 @@ jobs:
     needs: common-setup
     runs-on: ubuntu-latest
     permissions:
-      contents: write # needed to push coverage to gh-pages
+      contents: write      # needed to push coverage to gh-pages
       pull-requests: write # needed to comment on PRs
 
     steps:
@@ -66,42 +63,42 @@ jobs:
         with:
           fetch-depth: 0
 
-    - name: Install system dependencies (bc + docker)
-      run: |
-        sudo apt-get update -qq
-        sudo apt-get install -y bc docker-ce-cli
+      - name: Install system dependencies (bc + docker)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y bc docker-ce-cli
 
-    - name: Prepare environment
-      run: |
-        export GO111MODULE=on
-        go mod tidy
-        make deps
+      - name: Prepare environment
+        run: |
+          export GO111MODULE=on
+          go mod tidy
+          make deps
 
-    - name: Check code formatting
-      run: make fmt
+      - name: Check code formatting
+        run: make fmt
 
-    - name: Run unit tests
-      run: make test
+      - name: Run unit tests
+        run: make test
 
-    - name: Generate coverage
-      run: |
-        make coverage
-        ./scripts/calculateCoverage.sh
-        touch "Passing" || touch "Failed"
+      - name: Generate coverage
+        run: |
+          make coverage
+          ./scripts/calculateCoverage.sh
+          touch "Passing" || touch "Failed"
 
-    - name: Build driver image
-      run: |
-        make driver
-      env:
-        RHSM_USER: ${{ secrets.RHSM_USER }}
-        RHSM_PASS: ${{ secrets.RHSM_PASS }}
+      - name: Build driver image
+        run: |
+          make driver
+        env:
+          RHSM_USER: ${{ secrets.RHSM_USER }}
+          RHSM_PASS: ${{ secrets.RHSM_PASS }}
 
-    - name: Publish coverage
-      if: success()
-      env:
-        GHE_TOKEN: ${{ secrets.GHE_TOKEN }}
-      run: |
-        ./scripts/publishCoverage.sh
+      - name: Publish coverage
+        if: success()
+        env:
+          GHE_TOKEN: ${{ secrets.GHE_TOKEN }}
+        run: |
+          ./scripts/publishCoverage.sh
 
   release:
     needs: common-setup
@@ -112,11 +109,11 @@ jobs:
     strategy:
       matrix:
         package_dir:
-        - cos-csi-mounter
+          - cos-csi-mounter
 
     env:
       IS_LATEST_RELEASE: 'true'
-      APP_VERSION: 0.12.50
+      APP_VERSION: 0.12.51
 
     steps:
       - name: Checkout Code
@@ -142,12 +139,12 @@ jobs:
             /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.deb.tar.gz.sha256
             /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz
             /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz.sha256
-          tag_name: v0.12.50
-          name: v0.12.50
+          tag_name: v0.12.51
+          name: v0.12.51
           body: |
             ## 🚀 What’s New
-            - Testing aws-s3Mounter image
-            - Publishing new test version
+            - Add support for AddMountParam to pass additional s3fs mount options
+            - AddMountParam allows passing s3fs mount options as a comma-separated string
           prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
 
       - name: Perform CodeQL Analysis

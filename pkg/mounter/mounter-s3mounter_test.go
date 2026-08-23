@@ -25,7 +25,13 @@ cache=/tmp/cache`,
 )
 
 func TestNewMountpointS3Mounter_Success(t *testing.T) {
-	mounter := NewMountpointS3Mounter(s3MounterSecretMap, s3MounterMountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}), "1000", true)
+	mounter := NewMountpointS3Mounter(MountpointS3MounterParams{
+		SecretMap:    s3MounterSecretMap,
+		MountOptions: s3MounterMountOptions,
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+		Gid:          "1000",
+		ReadOnly:     true,
+	})
 
 	s3Mounter, ok := mounter.(*MountpointS3Mounter)
 	assert.True(t, ok)
@@ -50,7 +56,11 @@ func TestNewMountpointS3Mounter_Success(t *testing.T) {
 func TestNewMountpointS3Mounter_GidWithoutUid(t *testing.T) {
 	secretMap := map[string]string{}
 
-	mounter := NewMountpointS3Mounter(secretMap, nil, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}), "2000", false)
+	mounter := NewMountpointS3Mounter(MountpointS3MounterParams{
+		SecretMap:    secretMap,
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+		Gid:          "2000",
+	})
 
 	s3Mounter, ok := mounter.(*MountpointS3Mounter)
 	assert.True(t, ok)
@@ -64,7 +74,11 @@ func TestNewMountpointS3Mounter_UidOverridesGid(t *testing.T) {
 		"uid": "1000",
 	}
 
-	mounter := NewMountpointS3Mounter(secretMap, nil, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}), "2000", false)
+	mounter := NewMountpointS3Mounter(MountpointS3MounterParams{
+		SecretMap:    secretMap,
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+		Gid:          "2000",
+	})
 
 	s3Mounter, ok := mounter.(*MountpointS3Mounter)
 	assert.True(t, ok)
@@ -79,21 +93,15 @@ func TestMountpointS3Mount_NodeServer_Positive(t *testing.T) {
 	MakeDir = func(path string, perm os.FileMode) error {
 		return nil
 	}
-	CreateFile = func(path string) (*os.File, error) {
+	OpenFile = func(path string, flag int, perm os.FileMode) (*os.File, error) {
 		return os.CreateTemp("", "test")
 	}
-	Chmod = func(path string, perm os.FileMode) error {
-		return nil
-	}
 
-	// Create a mock that implements envMounter interface
-	mockUtils := &mockEnvMounter{
-		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
-			FuseMountFn: func(path, comm string, args []string) error {
-				return nil
-			},
-		}),
-	}
+	mockUtils := mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+		FuseMountWithEnvFn: func(path, comm string, args, envVars []string) error {
+			return nil
+		},
+	})
 
 	s3Mounter := &MountpointS3Mounter{
 		MounterUtils:  mockUtils,
@@ -120,17 +128,15 @@ func TestMountpointS3Mount_NodeServer_WithEnvMounter(t *testing.T) {
 	MakeDir = func(path string, perm os.FileMode) error {
 		return nil
 	}
-	CreateFile = func(path string) (*os.File, error) {
+	OpenFile = func(path string, flag int, perm os.FileMode) (*os.File, error) {
 		return os.CreateTemp("", "test")
 	}
-	Chmod = func(path string, perm os.FileMode) error {
-		return nil
-	}
 
-	// Create a mock that implements envMounter interface
-	mockUtils := &mockEnvMounter{
-		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
-	}
+	mockUtils := mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+		FuseMountWithEnvFn: func(path, comm string, args, envVars []string) error {
+			return nil
+		},
+	})
 
 	s3Mounter := &MountpointS3Mounter{
 		MounterUtils:  mockUtils,
@@ -152,11 +158,8 @@ func TestMountpointS3Mount_WorkerNode_Positive(t *testing.T) {
 	MakeDir = func(path string, perm os.FileMode) error {
 		return nil
 	}
-	CreateFile = func(path string) (*os.File, error) {
+	OpenFile = func(path string, flag int, perm os.FileMode) (*os.File, error) {
 		return os.CreateTemp("", "test")
-	}
-	Chmod = func(path string, perm os.FileMode) error {
-		return nil
 	}
 	mounterRequest = func(payload, url string) error {
 		return nil
@@ -199,7 +202,7 @@ func TestMountpointS3Mount_CreateCredFileFails_Negative(t *testing.T) {
 	MakeDir = func(path string, perm os.FileMode) error {
 		return nil
 	}
-	CreateFile = func(path string) (*os.File, error) {
+	OpenFile = func(path string, flag int, perm os.FileMode) (*os.File, error) {
 		return nil, errors.New("failed to create file")
 	}
 
@@ -220,11 +223,8 @@ func TestMountpointS3Mount_WorkerNode_Negative(t *testing.T) {
 	MakeDir = func(path string, perm os.FileMode) error {
 		return nil
 	}
-	CreateFile = func(path string) (*os.File, error) {
+	OpenFile = func(path string, flag int, perm os.FileMode) (*os.File, error) {
 		return os.CreateTemp("", "test")
-	}
-	Chmod = func(path string, perm os.FileMode) error {
-		return nil
 	}
 	mounterRequest = func(payload, url string) error {
 		return errors.New("failed to perform http request")
@@ -480,11 +480,8 @@ func TestCreateS3MountConfig_Success(t *testing.T) {
 	MakeDir = func(path string, perm os.FileMode) error {
 		return nil
 	}
-	CreateFile = func(path string) (*os.File, error) {
+	OpenFile = func(path string, flag int, perm os.FileMode) (*os.File, error) {
 		return os.CreateTemp("", "test")
-	}
-	Chmod = func(path string, perm os.FileMode) error {
-		return nil
 	}
 
 	s3Mounter := &MountpointS3Mounter{
@@ -517,7 +514,7 @@ func TestCreateS3MountConfig_CreateFileFails(t *testing.T) {
 	MakeDir = func(path string, perm os.FileMode) error {
 		return nil
 	}
-	CreateFile = func(path string) (*os.File, error) {
+	OpenFile = func(path string, flag int, perm os.FileMode) (*os.File, error) {
 		return nil, errors.New("failed to create file")
 	}
 
@@ -530,37 +527,6 @@ func TestCreateS3MountConfig_CreateFileFails(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create file")
 }
-
-func TestCreateS3MountConfig_ChmodFails(t *testing.T) {
-	MakeDir = func(path string, perm os.FileMode) error {
-		return nil
-	}
-	CreateFile = func(path string) (*os.File, error) {
-		return os.CreateTemp("", "test")
-	}
-	Chmod = func(path string, perm os.FileMode) error {
-		return errors.New("failed to chmod")
-	}
-
-	s3Mounter := &MountpointS3Mounter{
-		AccessKey: "test-access-key",
-		SecretKey: "test-secret-key",
-	}
-
-	err := createS3MountConfig("/config/path", s3Mounter)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to chmod")
-}
-
-// mockEnvMounter implements the envMounter interface for testing
-type mockEnvMounter struct {
-	mounterUtils.MounterUtils
-}
-
-func (m *mockEnvMounter) FuseMountWithEnv(path string, comm string, args []string, envVars []string) error {
-	return nil
-}
-
 
 // Test deduplicatePassthrough function
 func TestDeduplicatePassthrough(t *testing.T) {
@@ -861,27 +827,25 @@ func TestMountpointS3Mount_ReadOnlyPriority(t *testing.T) {
 	MakeDir = func(path string, perm os.FileMode) error {
 		return nil
 	}
-	CreateFile = func(path string) (*os.File, error) {
+	OpenFile = func(path string, flag int, perm os.FileMode) (*os.File, error) {
 		return os.CreateTemp("", "test")
 	}
-	Chmod = func(path string, perm os.FileMode) error {
-		return nil
-	}
 
-	mockUtils := &mockEnvMounter{
-		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
-	}
+	mockUtils := mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
+		FuseMountWithEnvFn: func(path, comm string, args, envVars []string) error {
+			return nil
+		},
+	})
 
 	s3Mounter := &MountpointS3Mounter{
-		MounterUtils:      mockUtils,
-		BucketName:        "test-bucket",
-		AccessKey:         "test-access-key",
-		SecretKey:         "test-secret-key",
-		ReadOnly:          true,
-		AllowDelete:       true,  // Should be cleared by read-only
-		AllowOverwrite:    true,  // Should be cleared by read-only
-		IncrementalUpload: true,  // Should be cleared by read-only
-		MountOptions:      []string{"--max-threads=32"},
+		MounterUtils:   mockUtils,
+		BucketName:     "test-bucket",
+		AccessKey:      "test-access-key",
+		SecretKey:      "test-secret-key",
+		ReadOnly:       true,
+		AllowDelete:    true, // Should be cleared by read-only
+		AllowOverwrite: true, // Should be cleared by read-only
+		MountOptions:   []string{"--max-threads=32"},
 	}
 
 	err := s3Mounter.Mount(source, target)
@@ -890,7 +854,6 @@ func TestMountpointS3Mount_ReadOnlyPriority(t *testing.T) {
 	// Verify read-only priority cleared all write-enabling flags.
 	assert.False(t, s3Mounter.AllowDelete)
 	assert.False(t, s3Mounter.AllowOverwrite)
-	assert.False(t, s3Mounter.IncrementalUpload)
 	// Passthrough options unrelated to write-access are preserved.
 	assert.Contains(t, s3Mounter.MountOptions, "--max-threads=32")
 }

@@ -139,18 +139,6 @@ func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string
 	return result, nil
 }
 
-// EnvVars returns the environment variables for the mount-s3 subprocess.
-func (args s3MounterArgs) EnvVars() []string {
-	var envVars []string
-	if args.AwsCredentialsFile != "" {
-		envVars = append(envVars, "AWS_SHARED_CREDENTIALS_FILE="+args.AwsCredentialsFile)
-	}
-	if args.AwsConfigFile != "" {
-		envVars = append(envVars, "AWS_CONFIG_FILE="+args.AwsConfigFile)
-	}
-	return envVars
-}
-
 // Validate checks that required fields are present and values are valid.
 func (args s3MounterArgs) Validate(targetPath string) error {
 	if err := pathValidator(targetPath); err != nil {
