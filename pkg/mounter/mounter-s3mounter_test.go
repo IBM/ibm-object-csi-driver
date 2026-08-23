@@ -779,7 +779,10 @@ func TestNewMountpointS3Mounter_IncrementalUploadBlocked(t *testing.T) {
 allow-overwrite`,
 	}
 
-	mounter := NewMountpointS3Mounter(secretMap, nil, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}), "", false)
+	mounter := NewMountpointS3Mounter(MountpointS3MounterParams{
+		SecretMap:    secretMap,
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+	})
 
 	s3Mounter, ok := mounter.(*MountpointS3Mounter)
 	assert.True(t, ok)
@@ -803,7 +806,11 @@ maximum-throughput-gbps=25`,
 	// --allow-delete is now hardcoded — it must not appear in passthrough MountOptions.
 	scMountOptions := []string{"--max-threads=32", "--maximum-throughput-gbps=10", "--allow-delete"}
 
-	mounter := NewMountpointS3Mounter(secretMap, scMountOptions, mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}), "", false)
+	mounter := NewMountpointS3Mounter(MountpointS3MounterParams{
+		SecretMap:    secretMap,
+		MountOptions: scMountOptions,
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+	})
 
 	s3Mounter, ok := mounter.(*MountpointS3Mounter)
 	assert.True(t, ok)
