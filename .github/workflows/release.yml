@@ -112,7 +112,7 @@ jobs:
           - cos-csi-mounter
 
     env:
-      IS_LATEST_RELEASE: 'true'
+      IS_LATEST_RELEASE: 'false'
       APP_VERSION: 0.12.51
 
     steps:
@@ -145,7 +145,7 @@ jobs:
             ## 🚀 What’s New
             - Add support for AddMountParam to pass additional s3fs mount options
             - AddMountParam allows passing s3fs mount options as a comma-separated string
-          prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
+          prerelease: true
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
