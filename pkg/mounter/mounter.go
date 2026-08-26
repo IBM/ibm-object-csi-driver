@@ -159,7 +159,7 @@ func isCorruptedMnt(err error) bool {
 }
 
 func writePass(pwFileName string, pwFileContent string) error {
-	pwFile, err := os.OpenFile(pwFileName, os.O_RDWR|os.O_CREATE, 0600) // #nosec G304: Value is dynamic
+	pwFile, err := OpenFile(pwFileName, os.O_RDWR|os.O_CREATE, 0600) // #nosec G304: Value is dynamic
 	if err != nil {
 		return err
 	}
