@@ -4,13 +4,26 @@ DefaultDependencies=no
 Requires=network-online.target
 After=network-online.target
 Before=shutdown.target reboot.target halt.target
+StartLimitIntervalSec=0
 
 [Service]
-Type=simple
+Type=notify
 ExecStart=/usr/local/bin/cos-csi-mounter-server
 KillMode=process
-Restart=on-failure
+
+# Restart Configuration - Always restart the service
+Restart=always
 RestartSec=10
+
+# Watchdog Configuration - Service must send keepalive every 30 seconds
+WatchdogSec=30
+NotifyAccess=main
+
+# Timeouts
+TimeoutStartSec=60
+TimeoutStopSec=30
+
+# Logging
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=cos-csi-mounter

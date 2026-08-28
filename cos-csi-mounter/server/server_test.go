@@ -340,3 +340,191 @@ func TestHandleCosUnmount_Success(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "success")
 	mock.AssertExpectations(t)
 }
+
+func TestPerformHealthCheck_Success(t *testing.T) {
+	tmpDir := "/tmp"
+	constants.SocketDir = tmpDir
+	constants.SocketFile = "test-health-success.sock"
+	socketPath := filepath.Join(tmpDir, constants.SocketFile)
+
+	_ = os.Remove(socketPath)
+	defer func() { _ = os.Remove(socketPath) }()
+
+	listener, err := net.Listen("unix", socketPath)
+	if err != nil {
+		t.Skipf("Cannot create Unix socket on this platform: %v", err)
+		return
+	}
+	defer func() { _ = listener.Close() }()
+
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			_ = conn.Close()
+		}
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	err = performHealthCheck()
+	assert.NoError(t, err, "health check should succeed when socket is accessible")
+}
+
+func TestPerformHealthCheck_SocketNotExists(t *testing.T) {
+	tmpDir := t.TempDir()
+	constants.SocketDir = tmpDir
+	constants.SocketFile = "nonexistent.sock"
+
+	err := performHealthCheck()
+	assert.Error(t, err, "health check should fail when socket doesn't exist")
+	assert.Contains(t, err.Error(), "socket file not accessible")
+}
+
+func TestPerformHealthCheck_SocketNotConnectable(t *testing.T) {
+	tmpDir := "/tmp"
+	constants.SocketDir = tmpDir
+	constants.SocketFile = "test-unconnectable.sock"
+	socketPath := filepath.Join(tmpDir, constants.SocketFile)
+
+	_ = os.Remove(socketPath)
+	defer func() { _ = os.Remove(socketPath) }()
+
+	file, err := os.Create(socketPath)
+	assert.NoError(t, err)
+	_ = file.Close()
+
+	err = performHealthCheck()
+	assert.Error(t, err, "health check should fail when socket is not connectable")
+	assert.Contains(t, err.Error(), "failed to connect to socket")
+}
+
+func TestWatchdogLoop_NotEnabled(t *testing.T) {
+	originalWatchdog := os.Getenv("WATCHDOG_USEC")
+	_ = os.Unsetenv("WATCHDOG_USEC")
+	defer func() {
+		if originalWatchdog != "" {
+			_ = os.Setenv("WATCHDOG_USEC", originalWatchdog)
+		}
+	}()
+
+	done := make(chan bool, 1)
+	go func() {
+		watchdogLoop()
+		done <- true
+	}()
+	select {
+	case <-done:
+	case <-time.After(1 * time.Second):
+		t.Fatal("watchdogLoop should return immediately when not enabled")
+	}
+}
+
+func TestWatchdogLoop_Enabled(t *testing.T) {
+	_ = os.Setenv("WATCHDOG_USEC", "30000000")
+	defer func() { _ = os.Unsetenv("WATCHDOG_USEC") }()
+
+	tmpDir := "/tmp"
+	constants.SocketDir = tmpDir
+	constants.SocketFile = "test-watchdog.sock"
+	socketPath := filepath.Join(tmpDir, constants.SocketFile)
+
+	_ = os.Remove(socketPath)
+	defer func() { _ = os.Remove(socketPath) }()
+
+	listener, err := net.Listen("unix", socketPath)
+	if err != nil {
+		t.Skipf("Cannot create Unix socket on this platform: %v", err)
+		return
+	}
+	defer func() { _ = listener.Close() }()
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			_ = conn.Close()
+		}
+	}()
+
+	done := make(chan bool, 1)
+	go func() {
+		watchdogLoop()
+		done <- true
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+	select {
+	case <-done:
+		t.Fatal("watchdogLoop should not return immediately when enabled")
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	_ = listener.Close()
+}
+
+func TestWatchdogLoop_HealthCheckFails(t *testing.T) {
+	_ = os.Setenv("WATCHDOG_USEC", "1000000")
+	defer func() { _ = os.Unsetenv("WATCHDOG_USEC") }()
+
+	tmpDir := t.TempDir()
+	constants.SocketDir = tmpDir
+	constants.SocketFile = "fail-health.sock"
+
+	done := make(chan bool, 1)
+	go func() {
+		watchdogLoop()
+		done <- true
+	}()
+
+	time.Sleep(600 * time.Millisecond)
+
+	select {
+	case <-done:
+		t.Fatal("watchdogLoop should continue running even when health checks fail")
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+func TestPerformHealthCheck_ConcurrentCalls(t *testing.T) {
+	tmpDir := "/tmp"
+	constants.SocketDir = tmpDir
+	constants.SocketFile = "test-concurrent.sock"
+	socketPath := filepath.Join(tmpDir, constants.SocketFile)
+
+	_ = os.Remove(socketPath)
+	defer func() { _ = os.Remove(socketPath) }()
+
+	listener, err := net.Listen("unix", socketPath)
+	if err != nil {
+		t.Skipf("Cannot create Unix socket on this platform: %v", err)
+		return
+	}
+	defer func() { _ = listener.Close() }()
+
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			_ = conn.Close()
+		}
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	const numConcurrent = 10
+	errors := make(chan error, numConcurrent)
+
+	for i := 0; i < numConcurrent; i++ {
+		go func() {
+			errors <- performHealthCheck()
+		}()
+	}
+	for i := 0; i < numConcurrent; i++ {
+		err := <-errors
+		assert.NoError(t, err, "concurrent health check %d should succeed", i)
+	}
+}
