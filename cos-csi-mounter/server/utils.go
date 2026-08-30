@@ -130,7 +130,7 @@ func fileExists(path string) (bool, error) {
 // It first resolves the absolute path and verifies it is within safeBase
 // to prevent path-traversal attacks before creating the directory.
 func ensureDir(path, safeBase string) error {
-	absPath, err := absPathResolver(path)
+	absPath, err := absPathResolver(path) // #nosec G304 -- path is validated against safeBase below to prevent traversal
 	if err != nil {
 		return fmt.Errorf("failed to resolve absolute path: %v", err)
 	}
@@ -139,7 +139,7 @@ func ensureDir(path, safeBase string) error {
 	}
 
 	// Check if directory already exists
-	info, err := os.Stat(absPath)
+	info, err := os.Stat(absPath) // #nosec G304 -- absPath is validated against safeBase above
 	if err == nil {
 		// Path exists, verify it's a directory
 		if !info.IsDir() {
