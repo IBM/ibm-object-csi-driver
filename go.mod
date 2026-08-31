@@ -3,7 +3,7 @@ module github.com/IBM/ibm-object-csi-driver
 go 1.26.6
 
 require (
-	github.com/IBM/go-sdk-core/v5 v5.23.2
+	github.com/IBM/go-sdk-core/v5 v5.23.3
 	github.com/IBM/ibm-cos-sdk-go v1.14.1
 	github.com/IBM/ibm-cos-sdk-go-config/v2 v2.3.0
 	github.com/IBM/ibm-csi-common v1.1.27
@@ -14,7 +14,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/kubernetes-csi/csi-test/v5 v5.5.0
 	github.com/mitchellh/go-ps v1.0.0
-	github.com/onsi/ginkgo/v2 v2.32.0
+	github.com/onsi/ginkgo/v2 v2.32.1
 	github.com/onsi/gomega v1.42.1
 	github.com/prometheus/client_golang v1.24.1
 	github.com/stretchr/testify v1.12.1
