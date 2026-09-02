@@ -3,7 +3,7 @@ name: CI & Release
 on:
   push:
     branches:
-      - main
+      - aws-s3mounter
   pull_request:
     branches:
       - aws-s3mounter
