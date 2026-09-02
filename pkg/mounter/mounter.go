@@ -27,6 +27,7 @@ var (
 	MakeDir    = os.MkdirAll
 	CreateFile = os.Create
 	Chmod      = os.Chmod
+	OpenFile   = os.OpenFile
 	Stat       = os.Stat
 	RemoveAll  = os.RemoveAll
 )
@@ -98,6 +99,14 @@ func (s *CSIMounterFactory) NewMounter(params MounterParams) Mounter {
 		})
 	case constants.RClone:
 		return NewRcloneMounter(RcloneMounterParams{
+			SecretMap:    secretMap,
+			MountOptions: mountFlags,
+			MounterUtils: mounterUtils,
+			Gid:          params.Gid,
+			ReadOnly:     params.ReadOnly,
+		})
+	case constants.AMAZONS3MOUNTER:
+		return NewMountpointS3Mounter(MountpointS3MounterParams{
 			SecretMap:    secretMap,
 			MountOptions: mountFlags,
 			MounterUtils: mounterUtils,
