@@ -181,8 +181,8 @@ func TestS3MounterValidate_InvalidBoolFields(t *testing.T) {
 	}
 
 	tests := []struct {
-		name  string
-		apply func(*s3MounterArgs)
+		name   string
+		apply  func(*s3MounterArgs)
 		errMsg string
 	}{
 		{"invalid read-only", func(a *s3MounterArgs) { a.ReadOnly = "yes" }, "cannot convert value of read-only"},
@@ -306,7 +306,6 @@ func TestParseMounterArgs_AmazonS3_UnknownField(t *testing.T) {
 
 func TestParseMounterArgs_AmazonS3_ValidationFails(t *testing.T) {
 	argsStruct := s3MounterArgs{
-		// Missing aws-credentials-file and aws-config-file
 		AllowOther: "true",
 	}
 	b, _ := json.Marshal(argsStruct)
