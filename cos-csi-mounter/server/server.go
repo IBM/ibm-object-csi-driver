@@ -32,13 +32,6 @@ var (
 	GitCommit = "none"
 )
 
-// envMounter is a local interface for type assertion — allows calling
-// FuseMountWithEnv on the concrete MounterOptsUtils without changing the
-// MounterUtils interface, so other mounters (rclone, s3fs) are unaffected.
-type envMounter interface {
-	FuseMountWithEnv(path string, comm string, args []string, envVars []string) error
-}
-
 func init() {
 	_ = flag.Set("logtostderr", "true") // #nosec G104: Attempt to set flags for logging to stderr only on best-effort basis.Error cannot be usefully handled.
 	logger = setUpLogger()
@@ -200,10 +193,8 @@ func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser)
 		}
 
 		// For mount-s3: pass AWS credential paths as env vars on the subprocess.
-		// FuseMountWithEnv is on the concrete MounterOptsUtils struct only (not the interface),
-		// so we type-assert — other mounters (rclone, s3fs) fall through to plain FuseMount.
-		if em, ok := mounter.(envMounter); ok && request.Mounter == constants.AMAZONS3MOUNTER {
-			err = em.FuseMountWithEnv(request.Path, request.Mounter, args, buildS3EnvVars(request.Args))
+		if request.Mounter == constants.AMAZONS3MOUNTER {
+			err = mounter.FuseMountWithEnv(request.Path, request.Mounter, args, buildS3EnvVars(request.Args))
 		} else {
 			err = mounter.FuseMount(request.Path, request.Mounter, args)
 		}

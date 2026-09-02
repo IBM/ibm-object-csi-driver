@@ -237,7 +237,7 @@ func splitSecretMountOptions(raw string) []string {
 	var opts []string
 	for _, line := range strings.Split(raw, "\n") {
 		line = strings.TrimSpace(line)
-		line = strings.TrimRight(line, ",") // ← ADD THIS
+		line = strings.TrimRight(line, ",")
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}

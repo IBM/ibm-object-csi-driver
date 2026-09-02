@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 
 	"go.uber.org/zap"
 )
@@ -72,10 +73,6 @@ func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string
 		if args.AllowOverwrite == "true" {
 			logger.Warn("read-only is set, clearing allow-overwrite")
 			args.AllowOverwrite = ""
-		}
-		if args.IncrementalUpload == "true" {
-			logger.Warn("read-only is set, clearing incremental-upload")
-			args.IncrementalUpload = ""
 		}
 	}
 
@@ -183,6 +180,25 @@ func (args s3MounterArgs) Validate(targetPath string) error {
 		if isBool := isBoolString(args.IncrementalUpload); !isBool {
 			logger.Error("cannot convert value of incremental-upload into boolean", zap.Any("incremental-upload", args.IncrementalUpload))
 			return fmt.Errorf("cannot convert value of incremental-upload into boolean: %v", args.IncrementalUpload)
+		}
+	}
+
+	if args.UID != "" {
+		if _, err := strconv.Atoi(args.UID); err != nil {
+			logger.Error("uid must be a valid integer", zap.String("uid", args.UID))
+			return fmt.Errorf("uid must be a valid integer: %v", args.UID)
+		}
+	}
+	if args.GID != "" {
+		if _, err := strconv.Atoi(args.GID); err != nil {
+			logger.Error("gid must be a valid integer", zap.String("gid", args.GID))
+			return fmt.Errorf("gid must be a valid integer: %v", args.GID)
+		}
+	}
+	if args.ForcePathStyle != "" {
+		if isBool := isBoolString(args.ForcePathStyle); !isBool {
+			logger.Error("cannot convert value of force-path-style into boolean", zap.Any("force-path-style", args.ForcePathStyle))
+			return fmt.Errorf("cannot convert value of force-path-style into boolean: %v", args.ForcePathStyle)
 		}
 	}
 
