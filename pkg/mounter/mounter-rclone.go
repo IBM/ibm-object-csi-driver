@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 	"time"
 
@@ -63,6 +64,47 @@ type RcloneMounterParams struct {
 	MounterUtils utils.MounterUtils
 	Gid          string
 	ReadOnly     bool
+}
+
+// classifyRcloneParams splits a slice of "key=value" (or bare "key") mount-option
+// strings into two groups using the following regex rules:
+//
+//   - CLI flags  → key starts with "--" (e.g. "--transfers=4")
+//     OR key is a single-letter shorthand prefixed by "-" (e.g. "-v")
+//
+//   - Config-file lines → key contains "_" (e.g. "upload_concurrency=4")
+//     OR key has no leading dash at all (e.g. "storage_class=SMART")
+//
+// Each entry in the returned cliFlags slice is already in "--key=value" form
+// (bare "--key" for boolean flags without a value).
+// Each entry in configLines is passed verbatim into rclone.conf.
+func classifyRcloneParams(options []string) (configLines []string, cliFlags []string) {
+	// matches exactly "--word..." (double-dash)
+	doubleDash := regexp.MustCompile(`^--`)
+	// matches exactly "-<single letter>" (single-dash, one alpha/digit char)
+	singleLetterFlag := regexp.MustCompile(`^-[a-zA-Z0-9]$`)
+
+	for _, opt := range options {
+		opt = strings.TrimSpace(opt)
+		if opt == "" {
+			continue
+		}
+		// Split on first "=" only so values may themselves contain "="
+		parts := strings.SplitN(opt, "=", 2)
+		key := strings.TrimSpace(parts[0])
+
+		if doubleDash.MatchString(key) {
+			// Already formatted as --key or --key=value
+			cliFlags = append(cliFlags, opt)
+		} else if singleLetterFlag.MatchString(key) {
+			// Short flag: "-v" → pass as-is
+			cliFlags = append(cliFlags, opt)
+		} else {
+			// Contains "_" or has no leading dash → config file line
+			configLines = append(configLines, opt)
+		}
+	}
+	return
 }
 
 func NewRcloneMounter(params RcloneMounterParams) Mounter {
@@ -214,8 +256,12 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 		configPath = constants.MounterConfigPathOnPodRclone
 	}
 
+	// Classify freeform mountOptions: config-file lines vs CLI flags
+	extraConfigLines, extraCLIFlags := classifyRcloneParams(rclone.MountOptions)
+	klog.Infof("RcloneMounter Mount: extraConfigLines=%v extraCLIFlags=%v", extraConfigLines, extraCLIFlags)
+
 	configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
-	if err = createConfigWrap(configPathWithVolID, rclone); err != nil {
+	if err = createConfigWrap(configPathWithVolID, rclone, extraConfigLines); err != nil {
 		klog.Errorf("RcloneMounter Mount: Cannot create rclone config file %v", err)
 		return err
 	}
@@ -227,7 +273,7 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 		bucketName = fmt.Sprintf("%s:%s", remote, rclone.BucketName)
 	}
 
-	args, wnOp := rclone.formulateMountOptions(bucketName, target, configPathWithVolID)
+	args, wnOp := rclone.formulateMountOptions(bucketName, target, configPathWithVolID, extraCLIFlags)
 
 	if mountWorker {
 		klog.Info("Mount on Worker started...")
@@ -279,7 +325,10 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 	return nil
 }
 
-func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
+// createConfig writes rclone.conf at configPathWithVolID.
+// extraConfigLines are additional config-file lines (classified from MountOptions)
+// that are appended after the identity/auth block.
+func createConfig(configPathWithVolID string, rclone *RcloneMounter, extraConfigLines []string) error {
 	var accessKey, secretKey, apiKey, envAuth, v2Auth string
 
 	configParams := []string{
@@ -319,7 +368,8 @@ func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
 		configParams = append(configParams, "location_constraint = "+rclone.LocConstraint)
 	}
 
-	configParams = append(configParams, rclone.MountOptions...)
+	// Append config-file lines classified from MountOptions (keys with "_" or no dash prefix)
+	configParams = append(configParams, extraConfigLines...)
 
 	if err := MakeDir(configPathWithVolID, 0755); // #nosec G301: used for rclone
 	err != nil {
@@ -362,7 +412,11 @@ func createConfig(configPathWithVolID string, rclone *RcloneMounter) error {
 	return nil
 }
 
-func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWithVolID string) (nodeServerOp []string, workerNodeOp map[string]string) {
+// formulateMountOptions builds the final CLI args (nodeServerOp) and the
+// worker-node map (workerNodeOp) sent to cos-csi-mounter.
+// extraCLIFlags contains already-prefixed "--key=value" strings classified
+// from MountOptions by classifyRcloneParams; they are appended verbatim.
+func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWithVolID string, extraCLIFlags []string) (nodeServerOp []string, workerNodeOp map[string]string) {
 	nodeServerOp = []string{
 		"mount",
 		bucket,
@@ -394,6 +448,21 @@ func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWit
 		nodeServerOp = append(nodeServerOp, "--read-only")
 		workerNodeOp["read-only"] = "true"
 	}
+
+	// Append extra CLI flags classified from MountOptions (keys with "--" or single "-<letter>")
+	for _, flag := range extraCLIFlags {
+		nodeServerOp = append(nodeServerOp, flag)
+		// Also reflect into workerNodeOp by stripping leading "--" and splitting on first "="
+		stripped := strings.TrimPrefix(flag, "--")
+		stripped = strings.TrimPrefix(stripped, "-")
+		parts := strings.SplitN(stripped, "=", 2)
+		if len(parts) == 2 {
+			workerNodeOp[parts[0]] = parts[1]
+		} else if len(parts) == 1 && parts[0] != "" {
+			workerNodeOp[parts[0]] = "true"
+		}
+	}
+
 	return
 }
 
