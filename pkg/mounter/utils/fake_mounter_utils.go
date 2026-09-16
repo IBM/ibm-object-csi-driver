@@ -1,8 +1,9 @@
 package utils
 
 type FakeMounterUtilsFuncStruct struct {
-	FuseMountFn   func(path string, comm string, args []string) error
-	FuseUnmountFn func(path string) error
+	FuseMountFn        func(path string, comm string, args []string) error
+	FuseUnmountFn      func(path string) error
+	FuseMountWithEnvFn func(path string, comm string, args []string, envVars []string) error
 }
 
 type FakeMounterUtilsFuncStructImpl struct {
@@ -25,6 +26,13 @@ func (m *FakeMounterUtilsFuncStructImpl) FuseMount(path string, comm string, arg
 func (m *FakeMounterUtilsFuncStructImpl) FuseUnmount(path string) error {
 	if m.FuncStruct.FuseUnmountFn != nil {
 		return m.FuncStruct.FuseUnmountFn(path)
+	}
+	panic("requested method should not be nil")
+}
+
+func (m *FakeMounterUtilsFuncStructImpl) FuseMountWithEnv(path string, comm string, args []string, envVars []string) error {
+	if m.FuncStruct.FuseMountWithEnvFn != nil {
+		return m.FuncStruct.FuseMountWithEnvFn(path, comm, args, envVars)
 	}
 	panic("requested method should not be nil")
 }
