@@ -19,6 +19,12 @@ import (
 	k8sMountUtils "k8s.io/mount-utils"
 )
 
+// isTransportEndpointError returns true if the error is ENOTCONN
+// which happens with stale FUSE mounts ("transport endpoint is not connected")
+func isTransportEndpointError(err error) bool {
+	return errors.Is(err, syscall.ENOTCONN)
+}
+
 var unmount = syscall.Unmount
 var commandWithCtx = exec.CommandContext
 
@@ -147,27 +153,24 @@ func (su *MounterOptsUtils) FuseUnmount(path string) error {
 
 func isMountpoint(pathname string) (bool, error) {
 	klog.Infof("Checking if path is mountpoint: Pathname - %s", pathname)
-
-	out, err := exec.Command("mountpoint", pathname).CombinedOutput()
-	outStr := strings.ToLower(strings.TrimSpace(string(out)))
-	klog.Infof("mountpoint status for path '%s', error: %v, output: %s", pathname, err, string(out))
+	isMount, err := k8sMountUtils.New("").IsMountPoint(pathname)
+	klog.Infof("mountpoint status for path '%s', isMount: %v, error: %v", pathname, isMount, err)
 	if err != nil {
-		if strings.HasSuffix(outStr, "transport endpoint is not connected") {
+		// stale FUSE mount — "transport endpoint is not connected"
+		// treat as still mounted so FuseUnmount will clean it up
+		if isTransportEndpointError(err) {
+			klog.Infof("Path has stale FUSE mount (ENOTCONN), treating as mountpoint: pathname - %s", pathname)
 			return true, nil
 		}
-		if strings.HasSuffix(outStr, "is not a mountpoint") {
-			klog.Infof("Path is NOT a mountpoint: pathname - %s", pathname)
-			return false, nil
-		}
-		klog.Errorf("Failed to check mountpoint for path '%s', error: %v, output: %s", pathname, err, string(out))
-		return false, fmt.Errorf("failed to check mountpoint for path '%s', error: %v, output: %s", pathname, err, string(out))
+		klog.Errorf("Failed to check mountpoint for path '%s', error: %v", pathname, err)
+		return false, fmt.Errorf("failed to check mountpoint for path '%s', error: %v", pathname, err)
 	}
-	if strings.HasSuffix(outStr, "is a mountpoint") {
+	if isMount {
 		klog.Infof("Path is a mountpoint: pathname - %s", pathname)
-		return true, nil
+	} else {
+		klog.Infof("Path is NOT a mountpoint: pathname - %s", pathname)
 	}
-
-	return false, nil
+	return isMount, nil
 }
 
 func waitForMount(ctx context.Context, path string, initialDelay, timeout time.Duration) error {

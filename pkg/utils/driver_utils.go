@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
+
+	mountutils "k8s.io/mount-utils"
 
 	"github.com/IBM/go-sdk-core/v5/core"
 	rc "github.com/IBM/ibm-cos-sdk-go-config/v2/resourceconfigurationv1"
@@ -112,16 +113,14 @@ func (su *DriverStatsUtils) FSInfo(path string) (int64, int64, int64, int64, int
 }
 
 func (su *DriverStatsUtils) CheckMount(targetPath string) error {
-	out, err := exec.Command("mountpoint", targetPath).CombinedOutput()
-	outStr := strings.TrimSpace(string(out))
+	exists, err := mountutils.PathExists(targetPath)
 	if err != nil {
-		klog.V(3).Infof("Check if mountPath exists: Output string- %+v", outStr)
-		if strings.HasSuffix(outStr, "No such file or directory") {
-			if err = os.MkdirAll(targetPath, 0750); err != nil {
-				klog.V(2).Infof("checkMount: Error: %+v", err)
-				return err
-			}
-		} else {
+		return err
+	}
+	if !exists {
+		klog.V(3).Infof("CheckMount: path does not exist, creating: %s", targetPath)
+		if err = os.MkdirAll(targetPath, 0750); err != nil {
+			klog.V(2).Infof("CheckMount: Error creating path: %+v", err)
 			return err
 		}
 	}
