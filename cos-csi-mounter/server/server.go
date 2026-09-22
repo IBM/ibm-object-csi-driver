@@ -19,6 +19,52 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// maskSensitive masks sensitive strings for logging
+func maskSensitive(s string) string {
+	if len(s) <= 4 {
+		return "****"
+	}
+	return s[:2] + strings.Repeat("*", len(s)-4) + s[len(s)-2:]
+}
+
+// maskArgs masks sensitive arguments in a slice/map for logging
+func maskArgs(args interface{}) interface{} {
+	// Handle []string
+	if strSlice, ok := args.([]string); ok {
+		masked := make([]string, len(strSlice))
+		for i, arg := range strSlice {
+			if strings.Contains(strings.ToLower(arg), "key") ||
+				strings.Contains(strings.ToLower(arg), "secret") ||
+				strings.Contains(strings.ToLower(arg), "token") ||
+				strings.Contains(strings.ToLower(arg), "password") ||
+				strings.Contains(strings.ToLower(arg), "credential") {
+				masked[i] = maskSensitive(arg)
+			} else {
+				masked[i] = arg
+			}
+		}
+		return masked
+	}
+	// Handle map[string]string
+	if strMap, ok := args.(map[string]string); ok {
+		masked := make(map[string]string)
+		for k, v := range strMap {
+			if strings.Contains(strings.ToLower(k), "key") ||
+				strings.Contains(strings.ToLower(k), "secret") ||
+				strings.Contains(strings.ToLower(k), "token") ||
+				strings.Contains(strings.ToLower(k), "password") ||
+				strings.Contains(strings.ToLower(k), "credential") ||
+				strings.Contains(strings.ToLower(k), "passwd") {
+				masked[k] = maskSensitive(v)
+			} else {
+				masked[k] = v
+			}
+		}
+		return masked
+	}
+	return args
+}
+
 var (
 	logger             *zap.Logger
 	MakeDir            = os.MkdirAll
@@ -167,7 +213,7 @@ func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser)
 			return
 		}
 
-		logger.Info("New mount request with values:", zap.String("Bucket", request.Bucket), zap.String("Path", request.Path), zap.String("Mounter", request.Mounter), zap.Any("Args", request.Args))
+		logger.Info("New mount request with values:", zap.String("Bucket", maskSensitive(request.Bucket)), zap.String("Path", request.Path), zap.String("Mounter", request.Mounter), zap.Any("Args", maskArgs(request.Args)))
 
 		if request.Mounter != constants.S3FS && request.Mounter != constants.RClone {
 			logger.Error("invalid mounter", zap.Any("mounter", request.Mounter))
@@ -197,7 +243,7 @@ func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser)
 			return
 		}
 
-		logger.Info("bucket mount is successful", zap.Any("bucket", request.Bucket), zap.Any("path", request.Path))
+		logger.Info("bucket mount is successful", zap.Any("bucket", maskSensitive(request.Bucket)), zap.Any("path", request.Path))
 		c.JSON(http.StatusOK, gin.H{"status": "success"})
 	}
 }

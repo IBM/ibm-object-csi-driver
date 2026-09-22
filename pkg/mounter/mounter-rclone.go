@@ -145,7 +145,7 @@ func NewRcloneMounter(params RcloneMounterParams) Mounter {
 	mounter.ReadOnly = params.ReadOnly
 
 	klog.Infof("newRcloneMounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
-		mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType)
+		maskSensitive(mounter.BucketName), maskSensitive(mounter.ObjectPath), mounter.EndPoint, mounter.LocConstraint, mounter.AuthType)
 
 	updatedOptions := updateMountOptions(mountOptions, secretMap)
 	mounter.MountOptions = updatedOptions
@@ -195,7 +195,7 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 		updatedOptions = append(updatedOptions, option)
 	}
 
-	klog.Infof("Updated rclone Options: %v", updatedOptions)
+	klog.Infof("Updated rclone Options: %v", maskArgs(updatedOptions))
 
 	return updatedOptions
 }
@@ -238,7 +238,10 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 			return err
 		}
 
-		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.RClone, jsonData)
+		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, maskSensitive(bucketName), constants.RClone, jsonData)
+
+		// Mask sensitive data in payload before logging
+		klog.Info("Worker Mounting Payload...", maskSensitive(payload))
 
 		err = mounterRequest(payload, "http://unix/api/cos/mount")
 		if err != nil {

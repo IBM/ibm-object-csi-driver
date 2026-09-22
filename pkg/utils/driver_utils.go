@@ -22,6 +22,52 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/fs"
 )
 
+// maskSensitive masks sensitive strings for logging
+func maskSensitive(s string) string {
+	if len(s) <= 4 {
+		return "****"
+	}
+	return s[:2] + strings.Repeat("*", len(s)-4) + s[len(s)-2:]
+}
+
+// maskSecretRef masks sensitive fields in SecretReference for logging
+func maskSecretRef(ref *v1.SecretReference) *v1.SecretReference {
+	if ref == nil {
+		return nil
+	}
+	return &v1.SecretReference{
+		Name:      maskSensitive(ref.Name),
+		Namespace: maskSensitive(ref.Namespace),
+	}
+}
+
+// maskParams masks sensitive parameters in a map for logging
+func maskParams(params map[string]string) map[string]string {
+	masked := make(map[string]string)
+	for k, v := range params {
+		if strings.Contains(strings.ToLower(k), "key") ||
+			strings.Contains(strings.ToLower(k), "secret") ||
+			strings.Contains(strings.ToLower(k), "token") ||
+			strings.Contains(strings.ToLower(k), "password") ||
+			strings.Contains(strings.ToLower(k), "credential") ||
+			strings.Contains(strings.ToLower(k), "apikey") ||
+			k == "resourceConfigApiKey" ||
+			k == "quotaLimit" ||
+			k == "bucketName" ||
+			k == "objectPath" ||
+			k == "kpRootKeyCRN" ||
+			k == "serviceId" ||
+			k == "iamEndpoint" ||
+			k == "cosEndpoint" ||
+			k == "locationConstraint" {
+			masked[k] = maskSensitive(v)
+		} else {
+			masked[k] = v
+		}
+	}
+	return masked
+}
+
 type StatsUtils interface {
 	BucketToDelete(volumeID string) (string, error)
 	FSInfo(path string) (int64, int64, int64, int64, int64, int64, error)
@@ -97,13 +143,13 @@ func (su *DriverStatsUtils) BucketToDelete(volumeID string) (string, error) {
 		return "", err
 	}
 
-	klog.Infof("***Attributes: %v", pv.Spec.CSI.VolumeAttributes)
+	klog.Infof("***Attributes: %v", maskParams(pv.Spec.CSI.VolumeAttributes))
 	if pv.Spec.CSI.VolumeAttributes["userProvidedBucket"] != "true" {
-		klog.Infof("Bucket will be deleted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
+		klog.Infof("Bucket will be deleted %v", maskSensitive(pv.Spec.CSI.VolumeAttributes["bucketName"]))
 		return pv.Spec.CSI.VolumeAttributes["bucketName"], nil
 	}
 
-	klog.Infof("Bucket will be persisted %v", pv.Spec.CSI.VolumeAttributes["bucketName"])
+	klog.Infof("Bucket will be persisted %v", maskSensitive(pv.Spec.CSI.VolumeAttributes["bucketName"]))
 	return "", nil
 }
 
@@ -357,7 +403,8 @@ func fetchSecretUsingPV(volumeID string, su *DriverStatsUtils) (*v1.Secret, erro
 	if err != nil {
 		return nil, err
 	}
-	klog.Info("secret fetched from PV:\n\t", pv.Spec.CSI.NodePublishSecretRef)
+	maskedRef := maskSecretRef(pv.Spec.CSI.NodePublishSecretRef)
+	klog.Infof("secret fetched from PV: NodePublishSecretRef.Name=%s, Namespace=%s", maskedRef.Name, maskedRef.Namespace)
 
 	secretName := pv.Spec.CSI.NodePublishSecretRef.Name
 	secretNamespace := pv.Spec.CSI.NodePublishSecretRef.Namespace
@@ -373,14 +420,14 @@ func fetchSecretUsingPV(volumeID string, su *DriverStatsUtils) (*v1.Secret, erro
 
 	secret, err := su.GetSecret(secretName, secretNamespace)
 	if err != nil {
-		return nil, fmt.Errorf("error getting Secret: %v", err)
+		return nil, fmt.Errorf("error getting Secret: %v", maskSensitive(err.Error()))
 	}
 
 	if secret == nil {
 		return nil, fmt.Errorf("secret not found with name: %v", secretNamespace)
 	}
 
-	klog.Info("secret details found. secretName: ", secret.Name)
+	klog.Infof("secret details found. secretName: %s", maskSensitive(secret.Name))
 	return secret, nil
 }
 

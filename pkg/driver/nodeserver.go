@@ -187,11 +187,11 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 
 	klog.Info("-NodePublishVolume-: Mount")
 	if err = mounterObj.Mount("", targetPath); err != nil {
-		klog.Info("-Mount-: Error: ", err)
+		klog.Info("-Mount-: Error: %v", maskSensitive(err.Error()))
 		return nil, err
 	}
 
-	klog.Infof("s3: bucket %s successfully mounted to %s", secretMap["bucketName"], targetPath)
+	klog.Infof("s3: bucket %s successfully mounted to %s", maskSensitive(secretMap["bucketName"]), targetPath)
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
@@ -221,8 +221,8 @@ func (ns *nodeServer) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpubl
 	klog.Info("-NodeUnpublishVolume-: Unmount")
 	if err = mounterObj.Unmount(targetPath); err != nil {
 		//TODO: Need to handle the case with non existing mount separately - https://github.com/IBM/ibm-object-csi-driver/issues/46
-		klog.Infof("UNMOUNT ERROR: %v", err)
-		return nil, status.Error(codes.Internal, err.Error())
+		klog.Infof("UNMOUNT ERROR: %v", maskSensitive(err.Error()))
+		return nil, status.Error(codes.Internal, maskSensitive(err.Error()))
 	}
 
 	klog.Infof("Successfully unmounted  target path %s", targetPath)
@@ -247,12 +247,12 @@ func (ns *nodeServer) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolu
 	_, capacity, _, inodes, inodesFree, inodesUsed, err := ns.Stats.FSInfo(volumePath)
 
 	if err != nil {
-		data := map[string]string{"VolumeId": volumeID, "Error": err.Error()}
+		data := map[string]string{"VolumeId": volumeID, "Error": maskSensitive(err.Error())}
 		klog.Error("NodeGetVolumeStats: error occurred while getting volume stats ", data)
 		return &csi.NodeGetVolumeStatsResponse{
 			VolumeCondition: &csi.VolumeCondition{
 				Abnormal: true,
-				Message:  err.Error(),
+				Message:  maskSensitive(err.Error()),
 			},
 		}, nil
 	}

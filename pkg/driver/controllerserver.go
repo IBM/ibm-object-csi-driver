@@ -33,6 +33,14 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// maskSensitive masks sensitive strings for logging
+func maskSensitive(s string) string {
+	if len(s) <= 4 {
+		return "****"
+	}
+	return s[:2] + strings.Repeat("*", len(s)-4) + s[len(s)-2:]
+}
+
 // Implements Controller csi.ControllerServer
 type controllerServer struct {
 	*S3Driver
@@ -40,6 +48,33 @@ type controllerServer struct {
 	Stats      utils.StatsUtils
 	cosSession s3client.ObjectStorageSessionFactory
 	Logger     *zap.Logger
+}
+
+// maskParams masks sensitive parameters in a map for logging
+func maskParams(params map[string]string) map[string]string {
+	masked := make(map[string]string)
+	for k, v := range params {
+		if strings.Contains(strings.ToLower(k), "key") ||
+			strings.Contains(strings.ToLower(k), "secret") ||
+			strings.Contains(strings.ToLower(k), "token") ||
+			strings.Contains(strings.ToLower(k), "password") ||
+			strings.Contains(strings.ToLower(k), "credential") ||
+			strings.Contains(strings.ToLower(k), "apikey") ||
+			k == "resourceConfigApiKey" ||
+			k == "quotaLimit" ||
+			k == "bucketName" ||
+			k == "objectPath" ||
+			k == "kpRootKeyCRN" ||
+			k == "serviceId" ||
+			k == "iamEndpoint" ||
+			k == "cosEndpoint" ||
+			k == "locationConstraint" {
+			masked[k] = maskSensitive(v)
+		} else {
+			masked[k] = v
+		}
+	}
+	return masked
 }
 
 func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
@@ -85,7 +120,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	if params == nil {
 		params = make(map[string]string)
 	}
-	klog.Info("CreateVolume Parameters:\n\t", params)
+	klog.Info("CreateVolume Parameters:\n\t", maskParams(params))
 
 	secretMap := req.GetSecrets()
 	klog.Info("req.GetSecrets() length:\t", len(secretMap))
@@ -110,7 +145,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("PVC resource not found %v", err))
 		}
 
-		klog.Info("pvc annotations:\n\t", pvcRes.Annotations)
+		klog.Info("pvc annotations:\n\t", maskParams(pvcRes.Annotations))
 
 		pvcAnnotations := pvcRes.Annotations
 
@@ -121,18 +156,18 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		}
 
 		secretNamespace := pvcNamespace
-		klog.Infof("Using secret '%s' from PVC namespace '%s'", customSecretName, secretNamespace)
+		klog.Infof("Using secret '%s' from PVC namespace '%s'", maskSensitive(customSecretName), maskSensitive(secretNamespace))
 
 		secret, err := cs.Stats.GetSecret(customSecretName, secretNamespace)
 		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("error getting Secret: %v", err))
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("error getting Secret: %v", maskSensitive(err.Error())))
 		}
 
 		secretMapCustom := parseCustomSecret(secret)
 		klog.Info("custom secret parameters parsed successfully, length of custom secret: ", len(secretMapCustom))
 
 		if objectPath, exists := secretMapCustom["objectPath"]; exists {
-			klog.Infof("volume_id:%q objectPath found in secret: %q", volumeID, objectPath)
+			klog.Infof("volume_id:%q objectPath found in secret: %q", volumeID, maskSensitive(objectPath))
 			params["objectPath"] = objectPath
 		} else {
 			klog.Infof("volume_id:%q no objectPath in secret (mounting bucket root)", volumeID)
@@ -141,11 +176,11 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		secretMap = secretMapCustom
 	}
 	if quotaLimitStr, ok := secretMap[constants.QuotaLimitKey]; ok && quotaLimitStr != "" {
-		klog.Infof("quotaLimit from secretMap: %q", quotaLimitStr)
+		klog.Infof("quotaLimit from secretMap: %q", maskSensitive(quotaLimitStr))
 		quotaLimitEnabled, err = strconv.ParseBool(quotaLimitStr)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument,
-				fmt.Sprintf("invalid quotaLimit value %q: must be 'true' or 'false'", quotaLimitStr))
+				fmt.Sprintf("invalid quotaLimit value %q: must be 'true' or 'false'", maskSensitive(quotaLimitStr)))
 		}
 
 		if quotaLimitEnabled {
@@ -201,7 +236,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	if val, ok := secretMap[constants.BucketVersioning]; ok && val != "" {
 		enable := strings.ToLower(strings.TrimSpace(val))
 		if enable != "true" && enable != "false" {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Invalid BucketVersioning value in secret: %s. Value set %s. Must be 'true' or 'false'", customSecretName, val))
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Invalid BucketVersioning value in secret: %s. Value set %s. Must be 'true' or 'false'", customSecretName, maskSensitive(val)))
 		}
 		bucketVersioning = enable
 		klog.Infof("BucketVersioning value that will be set via secret: %s", bucketVersioning)
@@ -209,7 +244,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		enable := strings.ToLower(strings.TrimSpace(val))
 		if enable != "true" && enable != "false" {
 			return nil, status.Error(codes.InvalidArgument,
-				fmt.Sprintf("Invalid bucketVersioning value in storage class: %s. Must be 'true' or 'false'", val))
+				fmt.Sprintf("Invalid bucketVersioning value in storage class: %s. Must be 'true' or 'false'", maskSensitive(val)))
 		}
 		bucketVersioning = enable
 		klog.Infof("BucketVersioning value that will be set via storage class params: %s", bucketVersioning)
@@ -217,42 +252,42 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 
 	creds, err := getObjectStorageCredentialsFromSecret(secretMap, cs.iamEndpoint)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", maskSensitive(err.Error())))
 	}
-	klog.Infof("cosEndpoint and locationConstraint getting paased to ObjectStorageSession: %s, %s", endPoint, locationConstraint)
+	klog.Infof("cosEndpoint and locationConstraint getting paased to ObjectStorageSession: %s, %s", maskSensitive(endPoint), maskSensitive(locationConstraint))
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
 
 	params["userProvidedBucket"] = "true"
 	if bucketName != "" {
 		// User Provided bucket. Check its existence and create if not present
-		klog.Infof("Bucket name provided: %v", bucketName)
-		klog.Infof("Check if the provided bucket already exists: %v", bucketName)
+		klog.Infof("Bucket name provided: %v", maskSensitive(bucketName))
+		klog.Infof("Check if the provided bucket already exists: %v", maskSensitive(bucketName))
 		if err := sess.CheckBucketAccess(bucketName); err != nil {
-			klog.Infof("CreateVolume: bucket not accessible: %v, Creating new bucket with given name", err)
+			klog.Infof("CreateVolume: bucket not accessible: %v, Creating new bucket with given name", maskSensitive(err.Error()))
 			err = createBucket(sess, bucketName, kpRootKeyCrn)
 			if err != nil {
-				return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", err, bucketName))
+				return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", maskSensitive(err.Error()), maskSensitive(bucketName)))
 			}
 			params["userProvidedBucket"] = "false"
-			klog.Infof("Created bucket: %s", bucketName)
+			klog.Infof("Created bucket: %s", maskSensitive(bucketName))
 		}
 
 		if quotaLimitEnabled {
 			quotaBytes := req.GetCapacityRange().GetRequiredBytes()
 			resConfApikey := secretMap[constants.ResourceConfigApiKey]
 
-			klog.Infof("Applying hard quota of %d bytes to bucket %s", quotaBytes, bucketName)
+			klog.Infof("Applying hard quota of %d bytes to bucket %s", quotaBytes, maskSensitive(bucketName))
 			err = sess.UpdateQuotaLimit(quotaBytes, resConfApikey, bucketName, endPoint, creds.IAMEndpoint)
 			if err != nil {
-				klog.Errorf("Failed to set quota limit on bucket %s: %v", bucketName, err)
+				klog.Errorf("Failed to set quota limit on bucket %s: %v", maskSensitive(bucketName), maskSensitive(err.Error()))
 				if params["userProvidedBucket"] == "false" {
 					if delErr := sess.DeleteBucket(bucketName); delErr != nil {
-						klog.Errorf("Failed to delete bucket %s after quota limit failure: %v", bucketName, delErr)
+						klog.Errorf("Failed to delete bucket %s after quota limit failure: %v", maskSensitive(bucketName), maskSensitive(delErr.Error()))
 					}
 				}
-				return nil, status.Error(codes.Internal, fmt.Sprintf("failed to set bucket quota limit: %v", err))
+				return nil, status.Error(codes.Internal, fmt.Sprintf("failed to set bucket quota limit: %v", maskSensitive(err.Error())))
 			}
-			klog.Infof("Successfully applied hard quota %d bytes to bucket %s", quotaBytes, bucketName)
+			klog.Infof("Successfully applied hard quota %d bytes to bucket %s", quotaBytes, maskSensitive(bucketName))
 		}
 
 		if bucketVersioning != "" {
@@ -264,12 +299,12 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 				if params["userProvidedBucket"] == "false" {
 					err1 := sess.DeleteBucket(bucketName)
 					if err1 != nil {
-						return nil, status.Error(codes.Internal, fmt.Sprintf("cannot set versioning: %v and cannot delete bucket %s: %v", err, bucketName, err1))
+						return nil, status.Error(codes.Internal, fmt.Sprintf("cannot set versioning: %v and cannot delete bucket %s: %v", maskSensitive(err.Error()), maskSensitive(bucketName), maskSensitive(err1.Error())))
 					}
 				}
-				return nil, status.Error(codes.Internal, fmt.Sprintf("failed to set versioning %t for bucket %s: %v", enable, bucketName, err))
+				return nil, status.Error(codes.Internal, fmt.Sprintf("failed to set versioning %t for bucket %s: %v", enable, maskSensitive(bucketName), maskSensitive(err.Error())))
 			}
-			klog.Infof("Bucket versioning set to %t for bucket %s", enable, bucketName)
+			klog.Infof("Bucket versioning set to %t for bucket %s", enable, maskSensitive(bucketName))
 		}
 
 		params["bucketName"] = bucketName
@@ -279,27 +314,27 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		tempBucketName := getTempBucketName(mounter, volumeID)
 		if tempBucketName == "" {
 			klog.Errorf("CreateVolume: Unable to generate the bucket name")
-			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to access the bucket: %v", tempBucketName))
+			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to access the bucket: %v", maskSensitive(tempBucketName)))
 		}
 		err = createBucket(sess, tempBucketName, kpRootKeyCrn)
 		if err != nil {
-			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", err, tempBucketName))
+			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", maskSensitive(err.Error()), maskSensitive(tempBucketName)))
 		}
 
 		if quotaLimitEnabled {
 			quotaBytes := req.GetCapacityRange().GetRequiredBytes()
 			resConfApikey := secretMap[constants.ResourceConfigApiKey]
 
-			klog.Infof("Applying hard quota of %d bytes to temp bucket %s", quotaBytes, tempBucketName)
+			klog.Infof("Applying hard quota of %d bytes to temp bucket %s", quotaBytes, maskSensitive(tempBucketName))
 			err = sess.UpdateQuotaLimit(quotaBytes, resConfApikey, tempBucketName, endPoint, creds.IAMEndpoint)
 			if err != nil {
-				klog.Errorf("Failed to set quota limit on temp bucket %s: %v", tempBucketName, err)
+				klog.Errorf("Failed to set quota limit on temp bucket %s: %v", maskSensitive(tempBucketName), maskSensitive(err.Error()))
 				if delErr := sess.DeleteBucket(tempBucketName); delErr != nil {
-					klog.Errorf("Failed to delete temp bucket %s after quota limit failure: %v", tempBucketName, delErr)
+					klog.Errorf("Failed to delete temp bucket %s after quota limit failure: %v", maskSensitive(tempBucketName), maskSensitive(delErr.Error()))
 				}
-				return nil, status.Error(codes.Internal, fmt.Sprintf("failed to set bucket quota limit: %v", err))
+				return nil, status.Error(codes.Internal, fmt.Sprintf("failed to set bucket quota limit: %v", maskSensitive(err.Error())))
 			}
-			klog.Infof("Successfully applied hard quota %d bytes to temp bucket %s", quotaBytes, tempBucketName)
+			klog.Infof("Successfully applied hard quota %d bytes to temp bucket %s", quotaBytes, maskSensitive(tempBucketName))
 		}
 
 		if bucketVersioning != "" {
@@ -310,17 +345,17 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 			if err != nil {
 				err1 := sess.DeleteBucket(tempBucketName)
 				if err1 != nil {
-					return nil, status.Error(codes.Internal, fmt.Sprintf("cannot set versioning: %v and cannot delete temp bucket %s: %v", err, tempBucketName, err1))
+					return nil, status.Error(codes.Internal, fmt.Sprintf("cannot set versioning: %v and cannot delete temp bucket %s: %v", maskSensitive(err.Error()), maskSensitive(tempBucketName), maskSensitive(err1.Error())))
 				}
-				return nil, status.Error(codes.Internal, fmt.Sprintf("failed to set versioning %t for temp bucket %s: %v", enable, tempBucketName, err))
+				return nil, status.Error(codes.Internal, fmt.Sprintf("failed to set versioning %t for temp bucket %s: %v", enable, maskSensitive(tempBucketName), maskSensitive(err.Error())))
 			}
-			klog.Infof("Bucket versioning set to %t for temp bucket %s", enable, tempBucketName)
+			klog.Infof("Bucket versioning set to %t for temp bucket %s", enable, maskSensitive(tempBucketName))
 		}
-		klog.Infof("Created temp bucket: %s", tempBucketName)
+		klog.Infof("Created temp bucket: %s", maskSensitive(tempBucketName))
 		params["userProvidedBucket"] = "false"
 		params["bucketName"] = tempBucketName
 	}
-	klog.Infof("create volume: %v", volumeID)
+	klog.Infof("create volume: %v", maskSensitive(volumeID))
 	//COS Endpoint, bucket, access keys will be stored in the csiProvisionerSecretName
 	//The other tunables will be SC Parameters like ibm.io/multireq-max and other
 
@@ -336,15 +371,15 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", maskSensitive(err.Error())))
 	}
-	klog.V(3).Infof("CSIControllerServer-DeleteVolume: Request: %v", modifiedRequest.(*csi.DeleteVolumeRequest))
+	klog.V(3).Infof("CSIControllerServer-DeleteVolume: Request: %v", maskParams(modifiedRequest.(*csi.DeleteVolumeRequest)))
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
-	klog.Infof("Deleting volume %v", volumeID)
+	klog.Infof("Deleting volume %v", maskSensitive(volumeID))
 	secretMap := req.GetSecrets()
 
 	endPoint := secretMap["cosEndpoint"]
@@ -358,13 +393,13 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 			return nil, err
 		}
 
-		klog.Info("pv Resource details:\n\t", pv)
+		klog.Info("pv Resource details:\n\t", maskParams(pv.Spec.CSI.VolumeAttributes))
 
 		secretName := pv.Spec.CSI.NodePublishSecretRef.Name
 		secretNamespace := pv.Spec.CSI.NodePublishSecretRef.Namespace
 
 		if secretName == "" {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret details not found, could not fetch the secret %v", err))
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Secret details not found, could not fetch the secret %v", maskSensitive(err.Error())))
 		}
 
 		if secretNamespace == "" {
@@ -375,11 +410,11 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 		endPoint = pv.Spec.CSI.VolumeAttributes["cosEndpoint"]
 		locationConstraint = pv.Spec.CSI.VolumeAttributes["locationConstraint"]
 
-		klog.Info("secret details found. secret-name: ", secretName, "\tsecret-namespace: ", secretNamespace)
+		klog.Infof("secret details found. secret-name: %s\tsecret-namespace: %s", maskSensitive(secretName), maskSensitive(secretNamespace))
 
 		secret, err := cs.Stats.GetSecret(secretName, secretNamespace)
 		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("error getting Secret: %v", err))
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("error getting Secret: %v", maskSensitive(err.Error())))
 		}
 
 		secretMapCustom := parseCustomSecret(secret)
@@ -389,7 +424,7 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 
 	creds, err := getObjectStorageCredentialsFromSecret(secretMap, cs.iamEndpoint)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", maskSensitive(err.Error())))
 	}
 
 	sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
@@ -402,9 +437,9 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
 	if bucketToDelete != "" {
 		err = sess.DeleteBucket(bucketToDelete)
 		if err != nil {
-			klog.V(3).Infof("Cannot delete temp bucket: %v; error msg: %v", bucketToDelete, err)
+			klog.V(3).Infof("Cannot delete temp bucket: %v; error msg: %v", maskSensitive(bucketToDelete), maskSensitive(err.Error()))
 		}
-		klog.Infof("End of bucket delete for  %v", volumeID)
+		klog.Infof("End of bucket delete for  %v", maskSensitive(volumeID))
 	}
 
 	return &csi.DeleteVolumeResponse{}, nil
@@ -534,6 +569,9 @@ func getObjectStorageCredentialsFromSecret(secretMap map[string]string, iamEP st
 		authType = "hmac"
 	}
 
+	klog.Infof("getObjectStorageCredentialsFromSecret: authType=%s, iamEndpoint=%s, serviceInstanceID=%s, accessKey=%s, apiKey=%s",
+		authType, maskSensitive(iamEndpoint), maskSensitive(serviceInstanceID), maskSensitive(accessKey), maskSensitive(apiKey))
+
 	return &s3client.ObjectStorageCredentials{
 		AuthType:          authType,
 		AccessKey:         accessKey,
@@ -615,6 +653,9 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 		quotaLimit = string(bytesVal)
 	}
 
+	klog.Infof("parseCustomSecret: bucketName=%s, iamEndpoint=%s, cosEndpoint=%s, locationConstraint=%s, bucketVersioning=%s, objectPath=%s",
+		maskSensitive(bucketName), maskSensitive(iamEndpoint), maskSensitive(cosEndpoint), maskSensitive(locationConstraint), bucketVersioning, maskSensitive(objectPath))
+
 	secretMapCustom["accessKey"] = accessKey
 	secretMapCustom["secretKey"] = secretKey
 	secretMapCustom["apiKey"] = apiKey
@@ -644,19 +685,19 @@ func getTempBucketName(mounterType, volumeID string) string {
 func createBucket(sess s3client.ObjectStorageSession, bucketName, kpRootKeyCrn string) error {
 	msg, err := sess.CreateBucket(bucketName, kpRootKeyCrn)
 	if msg != "" {
-		klog.Infof("Info:Create Volume module with user provided Bucket name: %v", msg)
+		klog.Infof("Info:Create Volume module with user provided Bucket name: %v", maskSensitive(msg))
 	}
 	if err != nil {
 		var apiErr smithy.APIError
 		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "BucketAlreadyExists" {
-			klog.Warning(fmt.Sprintf("bucket '%s' already exists", bucketName))
+			klog.Warning(fmt.Sprintf("bucket '%s' already exists", maskSensitive(bucketName)))
 		} else {
-			klog.Errorf("CreateVolume: Unable to create the bucket: %v", err)
+			klog.Errorf("CreateVolume: Unable to create the bucket: %v", maskSensitive(err.Error()))
 			return errors.New("unable to create the bucket")
 		}
 	}
 	if err := sess.CheckBucketAccess(bucketName); err != nil {
-		klog.Errorf("CreateVolume: Unable to access the bucket: %v", err)
+		klog.Errorf("CreateVolume: Unable to access the bucket: %v", maskSensitive(err.Error()))
 		return errors.New("unable to access the bucket")
 	}
 	return nil

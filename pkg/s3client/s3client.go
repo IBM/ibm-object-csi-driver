@@ -32,6 +32,14 @@ import (
 	"go.uber.org/zap"
 )
 
+// maskSensitive masks sensitive strings for logging
+func maskSensitive(s string) string {
+	if len(s) <= 4 {
+		return "****"
+	}
+	return s[:2] + strings.Repeat("*", len(s)-4) + s[len(s)-2:]
+}
+
 // ObjectStorageCredentials holds credentials for accessing an object storage service
 type ObjectStorageCredentials struct {
 	//AuthType
@@ -123,7 +131,7 @@ func (s *COSSession) CheckBucketAccess(bucket string) error {
 }
 
 func (s *COSSession) CheckObjectPathExistence(bucket string, objectpath string) (bool, error) {
-	s.logger.Info("CheckObjectPathExistence args", zap.String("bucket", bucket), zap.String("objectpath", objectpath))
+	s.logger.Info("CheckObjectPathExistence args", zap.String("bucket", maskSensitive(bucket)), zap.String("objectpath", maskSensitive(objectpath)))
 	objectpath = strings.TrimPrefix(objectpath, "/")
 	if !strings.HasSuffix(objectpath, "/") {
 		objectpath = objectpath + "/"
@@ -134,8 +142,8 @@ func (s *COSSession) CheckObjectPathExistence(bucket string, objectpath string) 
 		Prefix:  aws.String(objectpath),
 	})
 	if err != nil {
-		s.logger.Error("cannot list bucket", zap.String("bucket", bucket))
-		return false, fmt.Errorf("cannot list bucket '%s': %v", bucket, err)
+		s.logger.Error("cannot list bucket", zap.String("bucket", maskSensitive(bucket)))
+		return false, fmt.Errorf("cannot list bucket '%s': %v", maskSensitive(bucket), err)
 	}
 	if len(resp.Contents) == 1 {
 		object := *(resp.Contents[0].Key)
@@ -166,8 +174,8 @@ func (s *COSSession) CreateBucket(bucket, kpRootKeyCrn string) (res string, err 
 		// Please select a different name and try again.
 
 		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "BucketAlreadyOwnedByYou" {
-			s.logger.Warn("bucket already exists", zap.String("bucket", bucket))
-			return fmt.Sprintf("bucket '%s' already exists", bucket), nil
+			s.logger.Warn("bucket already exists", zap.String("bucket", maskSensitive(bucket)))
+			return fmt.Sprintf("bucket '%s' already exists", maskSensitive(bucket)), nil
 		}
 		return "", err
 	}
@@ -182,11 +190,11 @@ func (s *COSSession) DeleteBucket(bucket string) error {
 
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "NoSuchBucket" {
-			s.logger.Warn("bucket already deleted", zap.String("bucket", bucket))
+			s.logger.Warn("bucket already deleted", zap.String("bucket", maskSensitive(bucket)))
 			return nil
 		}
 
-		return fmt.Errorf("cannot list bucket '%s': %v", bucket, err)
+		return fmt.Errorf("cannot list bucket '%s': %v", maskSensitive(bucket), err)
 	}
 
 	for _, key := range resp.Contents {
@@ -196,7 +204,7 @@ func (s *COSSession) DeleteBucket(bucket string) error {
 		})
 
 		if err != nil {
-			return fmt.Errorf("cannot delete object %s/%s: %v", bucket, *key.Key, err)
+			return fmt.Errorf("cannot delete object %s/%s: %v", maskSensitive(bucket), maskSensitive(*key.Key), err)
 		}
 	}
 
@@ -212,7 +220,7 @@ func (s *COSSession) SetBucketVersioning(bucket string, enable bool) error {
 	if enable {
 		status = s3.BucketVersioningStatusEnabled
 	}
-	s.logger.Info("Setting versioning for bucket", zap.String("bucket", bucket), zap.Bool("enable", enable))
+	s.logger.Info("Setting versioning for bucket", zap.String("bucket", maskSensitive(bucket)), zap.Bool("enable", enable))
 	_, err := s.svc.PutBucketVersioning(&s3.PutBucketVersioningInput{
 		Bucket: aws.String(bucket),
 		VersioningConfiguration: &s3.VersioningConfiguration{
@@ -220,10 +228,10 @@ func (s *COSSession) SetBucketVersioning(bucket string, enable bool) error {
 		},
 	})
 	if err != nil {
-		s.logger.Error("Failed to set versioning", zap.String("bucket", bucket), zap.Bool("enable", enable), zap.Error(err))
-		return fmt.Errorf("failed to set versioning to %v for bucket '%s': %v", enable, bucket, err)
+		s.logger.Error("Failed to set versioning", zap.String("bucket", maskSensitive(bucket)), zap.Bool("enable", enable), zap.Error(err))
+		return fmt.Errorf("failed to set versioning to %v for bucket '%s': %v", enable, maskSensitive(bucket), err)
 	}
-	s.logger.Info("Versioning set successfully for bucket", zap.String("bucket", bucket), zap.Bool("enable", enable))
+	s.logger.Info("Versioning set successfully for bucket", zap.String("bucket", maskSensitive(bucket)), zap.Bool("enable", enable))
 	return nil
 }
 
@@ -289,7 +297,7 @@ func (s *COSSession) UpdateQuotaLimit(quota int64, apiKey, bucketName, cosEndpoi
 
 	_, err = service.UpdateBucketConfig(options)
 	if err != nil {
-		return fmt.Errorf("failed to update quota for bucket %s to %d bytes: %w", bucketName, quota, err)
+		return fmt.Errorf("failed to update quota for bucket %s to %d bytes: %w", maskSensitive(bucketName), quota, err)
 	}
 
 	return nil

@@ -116,7 +116,7 @@ func NewS3fsMounter(params S3fsMounterParams) Mounter {
 		mounter.AuthType = "hmac"
 	}
 	klog.Infof("newS3fsMounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]\n\tkpRootKeyCrn: [%s]",
-		mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType, mounter.KpRootKeyCrn)
+		maskSensitive(mounter.BucketName), maskSensitive(mounter.ObjectPath), mounter.EndPoint, mounter.LocConstraint, mounter.AuthType, maskSensitive(mounter.KpRootKeyCrn))
 	updatedOptions, addMountParam := updateS3FSMountOptions(mountOptions, secretMap, knownS3FSOptions, defaultParams, params.Gid, params.ReadOnly)
 	mounter.MountOptions = updatedOptions
 	mounter.AddMountParam = addMountParam
@@ -180,9 +180,10 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 			return err
 		}
 
-		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.S3FS, jsonData)
+		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, maskSensitive(bucketName), constants.S3FS, jsonData)
 
-		klog.Info("Worker Mounting Payload...", payload)
+		// Mask sensitive data in payload before logging
+		klog.Info("Worker Mounting Payload...", maskSensitive(payload))
 
 		err = mounterRequest(payload, "http://unix/api/cos/mount")
 		if err != nil {
@@ -372,9 +373,9 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
 	updatedOptions := buildMountOptionsSlice(mountOptsMap, defaultParams)
 	addMountParam := buildAddMountParam(unknownOptionsMap)
 
-	klog.Infof("updated S3fsMounter Options: %v", updatedOptions)
+	klog.Infof("updated S3fsMounter Options: %v", maskArgs(updatedOptions))
 	if addMountParam != "" {
-		klog.Infof("addMountParam (unknown options): %s", addMountParam)
+		klog.Infof("addMountParam (unknown options): %s", maskSensitive(addMountParam))
 	}
 	return updatedOptions, addMountParam
 }
@@ -431,7 +432,7 @@ func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string
 	// Add unknown mount options to workerNodeOp for mounter service
 	if s3fs.AddMountParam != "" {
 		workerNodeOp["add-mount-param"] = s3fs.AddMountParam
-		klog.Infof("Adding unknown mount options to mounter request: %s", s3fs.AddMountParam)
+		klog.Infof("Adding unknown mount options to mounter request: %s", maskSensitive(s3fs.AddMountParam))
 	}
 
 	return

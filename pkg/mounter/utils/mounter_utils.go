@@ -19,6 +19,32 @@ import (
 	k8sMountUtils "k8s.io/mount-utils"
 )
 
+// maskSensitive masks sensitive strings for logging
+func maskSensitive(s string) string {
+	if len(s) <= 4 {
+		return "****"
+	}
+	return s[:2] + strings.Repeat("*", len(s)-4) + s[len(s)-2:]
+}
+
+// maskArgs masks sensitive arguments in a slice for logging
+func maskArgs(args []string) []string {
+	masked := make([]string, len(args))
+	for i, arg := range args {
+		// Mask values that look like credentials, keys, tokens, etc.
+		if strings.Contains(strings.ToLower(arg), "key") ||
+			strings.Contains(strings.ToLower(arg), "secret") ||
+			strings.Contains(strings.ToLower(arg), "token") ||
+			strings.Contains(strings.ToLower(arg), "password") ||
+			strings.Contains(strings.ToLower(arg), "credential") {
+			masked[i] = maskSensitive(arg)
+		} else {
+			masked[i] = arg
+		}
+	}
+	return masked
+}
+
 var unmount = syscall.Unmount
 var commandWithCtx = exec.CommandContext
 
@@ -34,7 +60,7 @@ type MounterOptsUtils struct {
 
 func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) error {
 	klog.Info("-FuseMount-")
-	klog.Infof("FuseMount: params:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%v>", path, comm, args)
+	klog.Infof("FuseMount: params:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%v>", path, comm, maskArgs(args))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	var mounted bool
@@ -47,7 +73,7 @@ func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) e
 	cmd := commandWithCtx(ctx, comm, args...)
 	err := cmd.Start()
 	if err != nil {
-		klog.Errorf("FuseMount: command start failed: mounter=%s, args=%v, error=%v", comm, args, err)
+		klog.Errorf("FuseMount: command start failed: mounter=%s, args=%v, error=%v", comm, maskArgs(args), err)
 		return fmt.Errorf("FuseMount: '%s' command start failed: %v", comm, err)
 	}
 	klog.Infof("FuseMount: command 'start' succeeded for '%s' mounter", comm)
@@ -70,7 +96,7 @@ func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) e
 	select {
 	case err := <-waitCh:
 		if err != nil {
-			klog.Warningf("FuseMount: command 'wait' failed: mounter=%s, args=%v, error=%v", comm, args, err)
+			klog.Warningf("FuseMount: command 'wait' failed: mounter=%s, args=%v, error=%v", comm, maskArgs(args), err)
 			klog.Infof("FuseMount: checking if path already exists and is a mountpoint: path=%s", path)
 			if isMount, err1 := isMountpoint(path); err1 == nil && isMount { // check if bucket already got mounted
 				klog.Infof("bucket is already mounted using '%s' mounter", comm)
