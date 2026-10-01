@@ -4,11 +4,14 @@
 package utils
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -30,6 +33,38 @@ type MounterUtils interface {
 }
 
 type MounterOptsUtils struct {
+}
+
+// passwdFileRe matches passwd_file=<value> in a line, capturing only the key prefix.
+var passwdFileRe = regexp.MustCompile(`(passwd_file=)\S+`)
+
+// redactingWriter intercepts the child process's stderr line by line and
+// replaces passwd_file=<path> with passwd_file=****** before forwarding to
+// the real stderr. This masks the credential file path that s3fs prints in its
+// own startup banner.
+type redactingWriter struct {
+	w   io.Writer
+	buf bytes.Buffer
+}
+
+func (r *redactingWriter) Write(p []byte) (int, error) {
+	r.buf.Write(p)
+	for {
+		line, err := r.buf.ReadBytes('\n')
+		if err != nil {
+			r.buf.Write(line) // incomplete line — hold until next write or flush
+			break
+		}
+		_, _ = r.w.Write(passwdFileRe.ReplaceAll(line, []byte("${1}******")))
+	}
+	return len(p), nil
+}
+
+func (r *redactingWriter) flush() {
+	if r.buf.Len() > 0 {
+		_, _ = r.w.Write(passwdFileRe.ReplaceAll(r.buf.Bytes(), []byte("${1}******")))
+		r.buf.Reset()
+	}
 }
 
 // redactMountArgs returns a copy of args with values for sensitive mount
@@ -65,8 +100,13 @@ func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) e
 		}
 	}()
 
+	rw := &redactingWriter{w: os.Stderr}
 	cmd := commandWithCtx(ctx, comm, args...)
+	cmd.Stderr = rw
 	err := cmd.Start()
+	if err == nil {
+		defer rw.flush()
+	}
 	if err != nil {
 		klog.Errorf("FuseMount: command start failed: mounter=%s, args=%v, error=%v", comm, redactMountArgs(args), err)
 		return fmt.Errorf("FuseMount: '%s' command start failed: %v", comm, err)
