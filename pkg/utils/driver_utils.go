@@ -256,7 +256,7 @@ func ReplaceAndReturnCopy(req interface{}) (interface{}, error) {
 		secretMap := inReq.GetSecrets()
 
 		for k, v := range secretMap {
-			if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
+			if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" || k == "serviceId" || k == constants.ResourceConfigApiKey {
 				newReq.Secrets[k] = "xxxxxxx"
 				continue
 			}
@@ -276,7 +276,7 @@ func ReplaceAndReturnCopy(req interface{}) (interface{}, error) {
 		secretMap := inReq.GetSecrets()
 
 		for k, v := range secretMap {
-			if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
+			if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" || k == "serviceId" || k == constants.ResourceConfigApiKey {
 				newReq.Secrets[k] = "xxxxxxx"
 				continue
 			}
@@ -297,7 +297,29 @@ func ReplaceAndReturnCopy(req interface{}) (interface{}, error) {
 		secretMap := inReq.GetSecrets()
 
 		for k, v := range secretMap {
-			if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
+			if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" || k == "serviceId" || k == constants.ResourceConfigApiKey {
+				newReq.Secrets[k] = "xxxxxxx"
+				continue
+			}
+			newReq.Secrets[k] = v
+		}
+
+		return newReq, nil
+
+	case *csi.NodeStageVolumeRequest:
+		// Create a new NodeStageVolumeRequest and copy the original values
+		var inReq *csi.NodeStageVolumeRequest
+
+		newReq := proto.Clone(r).(*csi.NodeStageVolumeRequest)
+
+		inReq = req.(*csi.NodeStageVolumeRequest)
+
+		// Modify the Secrets map in the new request
+		newReq.Secrets = make(map[string]string)
+		secretMap := inReq.GetSecrets()
+
+		for k, v := range secretMap {
+			if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" || k == "serviceId" || k == constants.ResourceConfigApiKey {
 				newReq.Secrets[k] = "xxxxxxx"
 				continue
 			}

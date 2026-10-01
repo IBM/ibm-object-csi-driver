@@ -44,7 +44,11 @@ type NodeServerConfig struct {
 }
 
 func (ns *nodeServer) NodeStageVolume(_ context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	klog.V(2).Infof("CSINodeServer-NodeStageVolume: Request %+v", req)
+	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
+	}
+	klog.V(2).Infof("CSINodeServer-NodeStageVolume: Request %+v", modifiedRequest.(*csi.NodeStageVolumeRequest))
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
