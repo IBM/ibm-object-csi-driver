@@ -55,14 +55,18 @@ func (r *redactingWriter) Write(p []byte) (int, error) {
 			r.buf.Write(line) // incomplete line — hold until next write or flush
 			break
 		}
-		_, _ = r.w.Write(passwdFileRe.ReplaceAll(line, []byte("${1}******")))
+		if _, werr := r.w.Write(passwdFileRe.ReplaceAll(line, []byte("${1}******"))); werr != nil {
+			return 0, werr
+		}
 	}
 	return len(p), nil
 }
 
 func (r *redactingWriter) flush() {
 	if r.buf.Len() > 0 {
-		_, _ = r.w.Write(passwdFileRe.ReplaceAll(r.buf.Bytes(), []byte("${1}******")))
+		if _, werr := r.w.Write(passwdFileRe.ReplaceAll(r.buf.Bytes(), []byte("${1}******"))); werr != nil {
+			klog.Errorf("redactingWriter: failed to flush: %v", werr)
+		}
 		r.buf.Reset()
 	}
 }
