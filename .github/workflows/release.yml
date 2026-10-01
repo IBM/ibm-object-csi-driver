@@ -6,7 +6,7 @@ on:
       - balraj-security-fix
   pull_request:
     branches:
-      - main
+      - balraj-security-fix
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
