@@ -115,3 +115,24 @@ func fileExists(path string) (bool, error) {
 	}
 	return !info.IsDir(), nil
 }
+
+// redactArgsForLog returns a copy of the raw Args JSON with the value of
+// "passwd_file" replaced by "xxxxx", leaving all other fields unchanged.
+// If the JSON cannot be parsed, the original raw bytes are returned as-is.
+func redactArgsForLog(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 {
+		return raw
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return raw
+	}
+	if _, ok := m["passwd_file"]; ok {
+		m["passwd_file"] = "xxxxx"
+	}
+	redacted, err := json.Marshal(m)
+	if err != nil {
+		return raw
+	}
+	return redacted
+}
