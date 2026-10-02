@@ -10,6 +10,40 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestRedactArgsForLog_MasksPasswdFile(t *testing.T) {
+	raw := json.RawMessage(`{"url":"https://s3.example.com","passwd_file":"/var/lib/coscsi-config/secret.txt","allow_other":"true"}`)
+	result := redactArgsForLog(raw)
+
+	var m map[string]interface{}
+	err := json.Unmarshal(result, &m)
+	assert.NoError(t, err)
+	assert.Equal(t, "xxxxx", m["passwd_file"])
+	assert.Equal(t, "https://s3.example.com", m["url"])
+	assert.Equal(t, "true", m["allow_other"])
+}
+
+func TestRedactArgsForLog_NoPasswdFile(t *testing.T) {
+	raw := json.RawMessage(`{"url":"https://s3.example.com","allow_other":"true"}`)
+	result := redactArgsForLog(raw)
+
+	var m map[string]interface{}
+	err := json.Unmarshal(result, &m)
+	assert.NoError(t, err)
+	assert.NotContains(t, m, "passwd_file")
+	assert.Equal(t, "https://s3.example.com", m["url"])
+}
+
+func TestRedactArgsForLog_EmptyInput(t *testing.T) {
+	result := redactArgsForLog(json.RawMessage{})
+	assert.Empty(t, result)
+}
+
+func TestRedactArgsForLog_InvalidJSON(t *testing.T) {
+	raw := json.RawMessage(`{invalid}`)
+	result := redactArgsForLog(raw)
+	assert.Equal(t, []byte(`{invalid}`), []byte(result))
+}
+
 func TestParse_UnknownMounter(t *testing.T) {
 	req := MountRequest{
 		Mounter: "unknown",

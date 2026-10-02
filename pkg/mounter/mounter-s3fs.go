@@ -115,8 +115,12 @@ func NewS3fsMounter(params S3fsMounterParams) Mounter {
 		mounter.AccessKeys = fmt.Sprintf("%s:%s", accessKey, secretKey)
 		mounter.AuthType = "hmac"
 	}
+	kpRootKeyCrnMasked := ""
+	if mounter.KpRootKeyCrn != "" {
+		kpRootKeyCrnMasked = "xxxxxxx"
+	}
 	klog.Infof("newS3fsMounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]\n\tkpRootKeyCrn: [%s]",
-		mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType, mounter.KpRootKeyCrn)
+		mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType, kpRootKeyCrnMasked)
 	updatedOptions, addMountParam := updateS3FSMountOptions(mountOptions, secretMap, knownS3FSOptions, defaultParams, params.Gid, params.ReadOnly)
 	mounter.MountOptions = updatedOptions
 	mounter.AddMountParam = addMountParam
@@ -155,8 +159,8 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 
 	passwdFile := path.Join(metaPath, passFile)
 	if err = writePassWrap(passwdFile, s3fs.AccessKeys); err != nil {
-		klog.Errorf("S3FSMounter Mount: Cannot create file %s: %v", passwdFile, err)
-		return fmt.Errorf("S3FSMounter Mount: Cannot create file %s: %v", passwdFile, err)
+		klog.Errorf("S3FSMounter Mount: Cannot create password file: %v", err)
+		return fmt.Errorf("S3FSMounter Mount: Cannot create password file: %v", err)
 	}
 
 	if s3fs.ObjectPath != "" {
@@ -182,7 +186,7 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 
 		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.S3FS, jsonData)
 
-		klog.Info("Worker Mounting Payload...", payload)
+		klog.Infof("Worker Mounting Payload: path=%s bucket=%s mounter=%s", target, bucketName, constants.S3FS)
 
 		err = mounterRequest(payload, "http://unix/api/cos/mount")
 		if err != nil {

@@ -44,7 +44,11 @@ type NodeServerConfig struct {
 }
 
 func (ns *nodeServer) NodeStageVolume(_ context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	klog.V(2).Infof("CSINodeServer-NodeStageVolume: Request %+v", req)
+	modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
+	}
+	klog.V(2).Infof("CSINodeServer-NodeStageVolume: Request %+v", modifiedRequest.(*csi.NodeStageVolumeRequest))
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
@@ -131,7 +135,7 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 	klog.V(2).Infof("-NodePublishVolume-: length of req.GetSecrets() length: %v", len(secretMap))
 	secretMapCopy := make(map[string]string)
 	for k, v := range secretMap {
-		if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
+		if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" || k == "serviceId" || k == constants.ResourceConfigApiKey {
 			secretMapCopy[k] = "xxxxxxx"
 			continue
 		}
@@ -187,7 +191,7 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 
 	klog.Info("-NodePublishVolume-: Mount")
 	if err = mounterObj.Mount("", targetPath); err != nil {
-		klog.Info("-Mount-: Error: ", err)
+		klog.Infof("-Mount-: Error mounting bucket to path %s", targetPath)
 		return nil, err
 	}
 

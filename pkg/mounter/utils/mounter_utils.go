@@ -4,11 +4,14 @@
 package utils
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -32,9 +35,66 @@ type MounterUtils interface {
 type MounterOptsUtils struct {
 }
 
+// passwdFileRe matches passwd_file=<value> in a line, capturing only the key prefix.
+var passwdFileRe = regexp.MustCompile(`(passwd_file=)\S+`)
+
+// redactingWriter intercepts the child process's stderr line by line and
+// replaces passwd_file=<path> with passwd_file=****** before forwarding to
+// the real stderr. This masks the credential file path that s3fs prints in its
+// own startup banner.
+type redactingWriter struct {
+	w   io.Writer
+	buf bytes.Buffer
+}
+
+func (r *redactingWriter) Write(p []byte) (int, error) {
+	r.buf.Write(p)
+	for {
+		line, err := r.buf.ReadBytes('\n')
+		if err != nil {
+			r.buf.Write(line) // incomplete line — hold until next write or flush
+			break
+		}
+		if _, werr := r.w.Write(passwdFileRe.ReplaceAll(line, []byte("${1}******"))); werr != nil {
+			return 0, werr
+		}
+	}
+	return len(p), nil
+}
+
+func (r *redactingWriter) flush() {
+	if r.buf.Len() > 0 {
+		if _, werr := r.w.Write(passwdFileRe.ReplaceAll(r.buf.Bytes(), []byte("${1}******"))); werr != nil {
+			klog.Errorf("redactingWriter: failed to flush: %v", werr)
+		}
+		r.buf.Reset()
+	}
+}
+
+// redactMountArgs returns a copy of args with values for sensitive mount
+// options (passwd_file, ibm_api_key, secret_access_key) replaced by "xxxxx".
+func redactMountArgs(args []string) []string {
+	sensitiveOpts := []string{"passwd_file=", "ibm_api_key=", "secret_access_key="}
+	redacted := make([]string, len(args))
+	for i, a := range args {
+		masked := false
+		for _, opt := range sensitiveOpts {
+			if strings.Contains(a, opt) {
+				redacted[i] = opt + "xxxxx"
+				masked = true
+				break
+			}
+		}
+		if !masked {
+			redacted[i] = a
+		}
+	}
+	return redacted
+}
+
 func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) error {
 	klog.Info("-FuseMount-")
-	klog.Infof("FuseMount: params:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%v>", path, comm, args)
+	klog.Infof("FuseMount: params:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%v>", path, comm, redactMountArgs(args))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	var mounted bool
@@ -44,10 +104,15 @@ func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) e
 		}
 	}()
 
+	rw := &redactingWriter{w: os.Stderr}
 	cmd := commandWithCtx(ctx, comm, args...)
+	cmd.Stderr = rw
 	err := cmd.Start()
+	if err == nil {
+		defer rw.flush()
+	}
 	if err != nil {
-		klog.Errorf("FuseMount: command start failed: mounter=%s, args=%v, error=%v", comm, args, err)
+		klog.Errorf("FuseMount: command start failed: mounter=%s, args=%v, error=%v", comm, redactMountArgs(args), err)
 		return fmt.Errorf("FuseMount: '%s' command start failed: %v", comm, err)
 	}
 	klog.Infof("FuseMount: command 'start' succeeded for '%s' mounter", comm)
@@ -70,7 +135,7 @@ func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) e
 	select {
 	case err := <-waitCh:
 		if err != nil {
-			klog.Warningf("FuseMount: command 'wait' failed: mounter=%s, args=%v, error=%v", comm, args, err)
+			klog.Warningf("FuseMount: command 'wait' failed: mounter=%s, args=%v, error=%v", comm, redactMountArgs(args), err)
 			klog.Infof("FuseMount: checking if path already exists and is a mountpoint: path=%s", path)
 			if isMount, err1 := isMountpoint(path); err1 == nil && isMount { // check if bucket already got mounted
 				klog.Infof("bucket is already mounted using '%s' mounter", comm)
