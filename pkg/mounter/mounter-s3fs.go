@@ -159,8 +159,8 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 
 	passwdFile := path.Join(metaPath, passFile)
 	if err = writePassWrap(passwdFile, s3fs.AccessKeys); err != nil {
-		klog.Errorf("S3FSMounter Mount: Cannot create password file: %v", err)
-		return fmt.Errorf("S3FSMounter Mount: Cannot create password file: %v", err)
+		klog.Errorf("S3FSMounter Mount: Cannot create file: %v", err)
+		return fmt.Errorf("S3FSMounter Mount: Cannot create file: %v", err)
 	}
 
 	if s3fs.ObjectPath != "" {

@@ -189,9 +189,9 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		ReadOnly:         readOnly,
 	})
 
-	klog.Info("-NodePublishVolume-: Mount")
+	klog.Info("-NodePublishVolume-: ,Mount")
 	if err = mounterObj.Mount("", targetPath); err != nil {
-		klog.Infof("-Mount-: Error mounting bucket to path %s", targetPath)
+		klog.Errorf("-Mount-: Error mounting bucket to path %s", targetPath)
 		return nil, err
 	}
 
