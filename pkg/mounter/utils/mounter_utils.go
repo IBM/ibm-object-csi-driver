@@ -35,19 +35,19 @@ type MounterOptsUtils struct {
 // redactMountArgs returns a copy of args with values for sensitive mount
 // options (passwd_file, ibm_api_key, secret_access_key) replaced by "xxxxx".
 func redactMountArgs(args []string) []string {
-	sensitiveOpts := []string{"passwd_file=", "ibm_api_key=", "secret_access_key="}
+	sensitiveOpts := []string{"passwd_file="}
 	redacted := make([]string, len(args))
-	for i, a := range args {
+	for i, arg := range args {
 		masked := false
 		for _, opt := range sensitiveOpts {
-			if strings.Contains(a, opt) {
+			if strings.Contains(arg, opt) {
 				redacted[i] = opt + "xxxxx"
 				masked = true
 				break
 			}
 		}
 		if !masked {
-			redacted[i] = a
+			redacted[i] = arg
 		}
 	}
 	return redacted

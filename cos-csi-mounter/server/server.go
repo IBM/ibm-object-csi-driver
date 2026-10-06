@@ -33,6 +33,7 @@ var (
 
 func init() {
 	_ = flag.Set("logtostderr", "true") // #nosec G104: Attempt to set flags for logging to stderr only on best-effort basis.Error cannot be usefully handled.
+	gin.SetMode(gin.ReleaseMode)
 	logger = setUpLogger()
 	defer func() {
 		if err := logger.Sync(); err != nil && !isInvalidSync(err) {
@@ -110,7 +111,8 @@ func newRouter() *gin.Engine {
 	parser := &DefaultMounterArgsParser{}
 
 	// Create gin router
-	router := gin.Default()
+	router := gin.New()
+	router.Use(gin.Recovery())
 	router.POST("/api/cos/mount", handleCosMount(utils, parser))
 	router.POST("/api/cos/unmount", handleCosUnmount(utils))
 	return router
