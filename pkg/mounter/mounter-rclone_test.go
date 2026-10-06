@@ -5,23 +5,24 @@ import (
 	"os"
 	"testing"
 
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/stretchr/testify/assert"
 )
 
 var (
 	secretMapRClone = map[string]string{
-		"cosEndpoint":        "test-endpoint",
-		"locationConstraint": "test-loc-constraint",
-		"bucketName":         "test-bucket-name",
-		"objectPath":         "test-obj-path",
-		"accessKey":          "test-access-key",
-		"secretKey":          "test-secret-key",
-		"apiKey":             "test-api-key",
-		"kpRootKeyCRN":       "test-kp-root-key-crn",
-		"serviceId":          "test-service-id",
-		"gid":                "fake-gid",
-		"uid":                "fake-uid",
+		"cosEndpoint":          "test-endpoint",
+		"locationConstraint":   "test-loc-constraint",
+		"bucketName":           "test-bucket-name",
+		"objectPath":           "test-obj-path",
+		constants.AccessKey:    "test-access-key",
+		constants.SecretKey:    "test-secret-key",
+		constants.ApiKey:       "test-api-key",
+		constants.KpRootKeyCRN: "test-kp-root-key-crn",
+		constants.ServiceId:    "test-service-id",
+		"gid":                  "fake-gid",
+		"uid":                  "fake-uid",
 	}
 
 	mountOptionsRClone = []string{"opt1=val1", "opt2=val2"}
@@ -52,11 +53,11 @@ func TestNewRcloneMounter_Only_GID(t *testing.T) {
 		"cosEndpoint":        "test-endpoint",
 		"locationConstraint": "test-loc-constraint",
 		"bucketName":         "test-bucket-name",
-		"objectPath":         "test-obj-path",
-		"accessKey":          "test-access-key",
-		"secretKey":          "test-secret-key",
-		"kpRootKeyCRN":       "test-kp-root-key-crn",
-		"gid":                "1001",
+		"objectPath":           "test-obj-path",
+		constants.AccessKey:    "test-access-key",
+		constants.SecretKey:    "test-secret-key",
+		constants.KpRootKeyCRN: "test-kp-root-key-crn",
+		"gid":                  "1001",
 	}
 	mounter := NewRcloneMounter(RcloneMounterParams{
 		SecretMap:    secretMap,
@@ -80,11 +81,11 @@ func TestNewRcloneMounter_MountOptsInSecret_HMAC(t *testing.T) {
 		"cosEndpoint":        "test-endpoint",
 		"locationConstraint": "test-loc-constraint",
 		"bucketName":         "test-bucket-name",
-		"objectPath":         "test-obj-path",
-		"accessKey":          "test-access-key",
-		"secretKey":          "test-secret-key",
-		"kpRootKeyCRN":       "test-kp-root-key-crn",
-		"gid":                "1001",
+		"objectPath":           "test-obj-path",
+		constants.AccessKey:    "test-access-key",
+		constants.SecretKey:    "test-secret-key",
+		constants.KpRootKeyCRN: "test-kp-root-key-crn",
+		"gid":                  "1001",
 		"uid":                "1001",
 		"mountOptions":       "\nupload_concurrency\nkey=value",
 	}
@@ -111,11 +112,11 @@ func TestNewRcloneMounter_MountOptsInSecret_IAM(t *testing.T) {
 		"cosEndpoint":        "test-endpoint",
 		"locationConstraint": "test-loc-constraint",
 		"bucketName":         "test-bucket-name",
-		"objectPath":         "test-obj-path",
-		"apiKey":             "test-api-key",
-		"serviceId":          "test-service-id",
-		"kpRootKeyCRN":       "test-kp-root-key-crn",
-		"gid":                "1001",
+		"objectPath":           "test-obj-path",
+		constants.ApiKey:       "test-api-key",
+		constants.ServiceId:    "test-service-id",
+		constants.KpRootKeyCRN: "test-kp-root-key-crn",
+		"gid":                  "1001",
 		"uid":                "1001",
 		"mountOptions":       "\nupload_concurrency\nkey=value",
 		"iamEndpoint":        "test-iam-endpoint",
