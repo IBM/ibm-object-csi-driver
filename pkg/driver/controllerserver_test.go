@@ -576,7 +576,7 @@ func TestCreateVolume(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			testCaseName: "Negative: quotaLimit=true missing resourceConfigApiKey in direct secrets",
+			testCaseName: "Negative: quotaLimit=true missing apiKey/resourceConfigApiKey in direct secrets",
 			req: &csi.CreateVolumeRequest{
 				Name: testVolumeName,
 				VolumeCapabilities: []*csi.VolumeCapability{
@@ -596,7 +596,76 @@ func TestCreateVolume(t *testing.T) {
 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
 			expectedResp:     nil,
 			expectedErr: status.Error(codes.InvalidArgument,
-				"resourceConfigApiKey missing in secret, cannot set quota limit for bucket"),
+				"apiKey is missing in secret, cannot set quota limit for bucket"),
+		},
+		{
+			testCaseName: "Positive: quotaLimit=true with apiKey fallback (direct secrets)",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
+				},
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
+				Secrets: map[string]string{
+					constants.AccessKey:     "testAccessKey",
+					constants.SecretKey:     "testSecretKey",
+					"locationConstraint":    "test-region",
+					"cosEndpoint":           "test-endpoint",
+					"bucketName":            bucketName,
+					constants.QuotaLimitKey: "true",
+					constants.ApiKey:        "fake-api-key",
+				},
+			},
+			cosSession:       &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			expectedResp: &csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					VolumeId:      testVolumeName,
+					CapacityBytes: 1073741824,
+					VolumeContext: map[string]string{
+						"bucketName":         bucketName,
+						"userProvidedBucket": "true",
+						"locationConstraint": "test-region",
+						"cosEndpoint":        "test-endpoint",
+					},
+				},
+			},
+			expectedErr: nil,
+		},
+		{
+			testCaseName: "Positive: quotaLimit=true with resourceConfigApiKey priority when both present (direct secrets)",
+			req: &csi.CreateVolumeRequest{
+				Name: testVolumeName,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{AccessMode: &csi.VolumeCapability_AccessMode{Mode: volumeCapabilities[0]}},
+				},
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 1073741824},
+				Secrets: map[string]string{
+					constants.AccessKey:            "testAccessKey",
+					constants.SecretKey:            "testSecretKey",
+					"locationConstraint":           "test-region",
+					"cosEndpoint":                  "test-endpoint",
+					"bucketName":                   bucketName,
+					constants.QuotaLimitKey:        "true",
+					constants.ApiKey:               "fake-api-key",
+					constants.ResourceConfigApiKey: "fake-res-conf-key",
+				},
+			},
+			cosSession:       &s3client.FakeCOSSessionFactory{},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),
+			expectedResp: &csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					VolumeId:      testVolumeName,
+					CapacityBytes: 1073741824,
+					VolumeContext: map[string]string{
+						"bucketName":         bucketName,
+						"userProvidedBucket": "true",
+						"locationConstraint": "test-region",
+						"cosEndpoint":        "test-endpoint",
+					},
+				},
+			},
+			expectedErr: nil,
 		},
 
 		{
