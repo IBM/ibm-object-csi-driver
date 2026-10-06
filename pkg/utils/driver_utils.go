@@ -152,7 +152,7 @@ func (su *DriverStatsUtils) GetBucketUsage(volumeID string) (int64, error) {
 		return 0, err
 	}
 
-	apiKey := string(secret.Data["apiKey"])
+	apiKey := string(secret.Data[constants.ApiKey])
 	bucketName := string(secret.Data["bucketName"])
 
 	rcOptions := &rc.ResourceConfigurationV1Options{
@@ -259,7 +259,7 @@ func ReplaceAndReturnCopy(req interface{}) (interface{}, error) {
 		secretMap := inReq.GetSecrets()
 
 		for k, v := range secretMap {
-			if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
+			if k == constants.AccessKey || k == constants.SecretKey || k == constants.ApiKey || k == constants.KpRootKeyCRN || k == constants.ServiceId || k == constants.ResourceConfigApiKey {
 				newReq.Secrets[k] = "xxxxxxx"
 				continue
 			}
@@ -279,7 +279,7 @@ func ReplaceAndReturnCopy(req interface{}) (interface{}, error) {
 		secretMap := inReq.GetSecrets()
 
 		for k, v := range secretMap {
-			if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
+			if k == constants.AccessKey || k == constants.SecretKey || k == constants.ApiKey || k == constants.KpRootKeyCRN || k == constants.ServiceId || k == constants.ResourceConfigApiKey {
 				newReq.Secrets[k] = "xxxxxxx"
 				continue
 			}
@@ -300,7 +300,29 @@ func ReplaceAndReturnCopy(req interface{}) (interface{}, error) {
 		secretMap := inReq.GetSecrets()
 
 		for k, v := range secretMap {
-			if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
+			if k == constants.AccessKey || k == constants.SecretKey || k == constants.ApiKey || k == constants.KpRootKeyCRN || k == constants.ServiceId || k == constants.ResourceConfigApiKey {
+				newReq.Secrets[k] = "xxxxxxx"
+				continue
+			}
+			newReq.Secrets[k] = v
+		}
+
+		return newReq, nil
+
+	case *csi.NodeStageVolumeRequest:
+		// Create a new NodeStageVolumeRequest and copy the original values
+		var inReq *csi.NodeStageVolumeRequest
+
+		newReq := proto.Clone(r).(*csi.NodeStageVolumeRequest)
+
+		inReq = req.(*csi.NodeStageVolumeRequest)
+
+		// Modify the Secrets map in the new request
+		newReq.Secrets = make(map[string]string)
+		secretMap := inReq.GetSecrets()
+
+		for k, v := range secretMap {
+			if k == constants.AccessKey || k == constants.SecretKey || k == constants.ApiKey || k == constants.KpRootKeyCRN || k == constants.ServiceId || k == constants.ResourceConfigApiKey {
 				newReq.Secrets[k] = "xxxxxxx"
 				continue
 			}

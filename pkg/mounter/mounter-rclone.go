@@ -95,22 +95,22 @@ func NewRcloneMounter(params RcloneMounterParams) Mounter {
 	if val, check = secretMap["objectPath"]; check {
 		mounter.ObjectPath = val
 	}
-	if val, check = secretMap["accessKey"]; check {
+	if val, check = secretMap[constants.AccessKey]; check {
 		accessKey = val
 	}
-	if val, check = secretMap["secretKey"]; check {
+	if val, check = secretMap[constants.SecretKey]; check {
 		secretKey = val
 	}
-	if val, check = secretMap["kpRootKeyCRN"]; check {
+	if val, check = secretMap[constants.KpRootKeyCRN]; check {
 		mounter.KpRootKeyCrn = val
 	}
 	if val, check = secretMap["iamEndpoint"]; check {
 		mounter.IAMEndpoint = val
 	}
-	if val, check = secretMap["apiKey"]; check {
+	if val, check = secretMap[constants.ApiKey]; check {
 		apiKey = val
 	}
-	if val, check = secretMap["serviceId"]; check {
+	if val, check = secretMap[constants.ServiceId]; check {
 		serviceId = val
 	}
 

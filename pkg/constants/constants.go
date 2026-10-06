@@ -46,6 +46,11 @@ const (
 	BucketVersioning     = "bucketVersioning"
 	QuotaLimitKey        = "quotaLimit"
 	ResourceConfigApiKey = "resourceConfigApiKey" // #nosec G101 -- this is just a map key name, not a real credential
+	AccessKey            = "accessKey"            // #nosec G101 -- this is just a map key name, not a real credential
+	SecretKey            = "secretKey"            // #nosec G101 -- this is just a map key name, not a real credential
+	ApiKey               = "apiKey"               // #nosec G101 -- this is just a map key name, not a real credential
+	KpRootKeyCRN         = "kpRootKeyCRN"         // #nosec G101 -- this is just a map key name, not a real credential
+	ServiceId            = "serviceId"            // #nosec G101 -- this is just a map key name, not a real credential
 
 	IsNodeServer         = "IS_NODE_SERVER"
 	KubeNodeName         = "KUBE_NODE_NAME"
