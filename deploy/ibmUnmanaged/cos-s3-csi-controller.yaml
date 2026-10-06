@@ -32,9 +32,6 @@ rules:
   - apiGroups: [""]
     resources: ["nodes"]
     verbs: ["get", "list", "watch"]
-  - apiGroups: [""]
-    resources: ["configmaps"]
-    verbs: ["get", "list"]
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -96,6 +93,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+            - name: IAM_ENDPOINT
+              value: "https://private.iam.cloud.ibm.com"
+            - name: COS_RESOURCE_CONFIG_ENDPOINT
+              value: "https://config.direct.cloud-object-storage.cloud.ibm.com/v1"
           imagePullPolicy: "Always"
           volumeMounts:
             - mountPath: /csi

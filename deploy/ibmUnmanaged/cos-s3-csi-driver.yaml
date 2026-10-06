@@ -27,9 +27,6 @@ rules:
     resources: ["volumeattachments"]
     verbs: ["get", "list", "watch", "update"]
   - apiGroups: [""]
-    resources: ["configmaps"]
-    verbs: ["get", "list"]
-  - apiGroups: [""]
     resources: ["events"]
     verbs: ["get", "list", "watch", "create", "update", "patch"]
   - apiGroups: [""]
@@ -111,6 +108,10 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
+            - name: IAM_ENDPOINT
+              value: "https://private.iam.cloud.ibm.com"
+            - name: COS_RESOURCE_CONFIG_ENDPOINT
+              value: "https://config.direct.cloud-object-storage.cloud.ibm.com/v1"
           imagePullPolicy: Always
           volumeMounts:
             - name: plugin-dir

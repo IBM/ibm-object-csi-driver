@@ -2,7 +2,6 @@ package utils
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -70,19 +69,23 @@ func (su *DriverStatsUtils) GetClusterNodeData(nodeName string) (*ClusterNodeDat
 	return data, nil
 }
 
-// GetEndpoints return IAMEndpoint, COSResourceConfigEndpoint, error
+// GetEndpoints returns IAMEndpoint and COSResourceConfigEndpoint read from the
+// IAM_ENDPOINT and COS_RESOURCE_CONFIG_ENDPOINT environment variables.
+// If a variable is not set, the defaults are used.
 func (su *DriverStatsUtils) GetEndpoints() (string, string, error) {
-	clusterType, err := getClusterType()
-	if err != nil {
-		return "", "", err
+	iamEP := os.Getenv(constants.IAMEndpointEnv)
+	if iamEP == "" {
+		klog.Infof("%s not set, defaulting to %s", constants.IAMEndpointEnv, constants.PrivateIAMEndpoint)
+		iamEP = constants.PrivateIAMEndpoint // default for VPC cluster
 	}
 
-	if strings.Contains(strings.ToLower(clusterType), "vpc") {
-		// Use private iam endpoint for VPC clusters
-		return constants.PrivateIAMEndpoint, constants.ResourceConfigEPDirect, nil
+	cosEP := os.Getenv(constants.COSResourceConfigEndpointEnv)
+	if cosEP == "" {
+		klog.Infof("%s not set, defaulting to %s", constants.COSResourceConfigEndpointEnv, constants.ResourceConfigEPDirect)
+		cosEP = constants.ResourceConfigEPDirect // default for VPC cluster
 	}
-	// Use public iam endpoint for classic clusters
-	return constants.PublicIAMEndpoint, constants.ResourceConfigEPPrivate, nil
+
+	return iamEP, cosEP, nil
 }
 
 func (su *DriverStatsUtils) BucketToDelete(volumeID string) (string, error) {
@@ -327,29 +330,6 @@ func CreateK8sClient() (*kubernetes.Clientset, error) {
 	}
 
 	return clientset, nil
-}
-
-func getClusterType() (string, error) {
-	k8sClient, err := CreateK8sClient()
-	if err != nil {
-		return "", err
-	}
-
-	configMap, err := k8sClient.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "cluster-info", metav1.GetOptions{})
-	if err != nil {
-		return "", fmt.Errorf("error getting ConfigMap: %v", err)
-	}
-
-	clusterConfigStr := configMap.Data["cluster-config.json"]
-
-	var clusterConfig map[string]string
-	if err = json.Unmarshal([]byte(clusterConfigStr), &clusterConfig); err != nil {
-		return "", fmt.Errorf("error unmarshalling cluster config: %v", err)
-	}
-
-	clusterType := clusterConfig["cluster_type"]
-	klog.Info("Cluster Type ", clusterType)
-	return clusterType, nil
 }
 
 func fetchSecretUsingPV(volumeID string, su *DriverStatsUtils) (*v1.Secret, error) {
