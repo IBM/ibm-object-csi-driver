@@ -21,23 +21,23 @@ import (
 
 // sensitiveKeys lists every secret field that must never appear in logs.
 var sensitiveKeys = []string{
-	"accessKey",
-	"secretKey",
-	"apiKey",
-	"kpRootKeyCRN",
-	"serviceId",
+	constants.AccessKey,
+	constants.SecretKey,
+	constants.ApiKey,
+	constants.KpRootKeyCRN,
+	constants.ServiceId,
 	constants.ResourceConfigApiKey, // "resourceConfigApiKey"
 }
 
 // allSecrets is a complete secret map with values matching their key names so
 // that any unmasked field is trivially detectable.
 var allSecrets = map[string]string{
-	"accessKey":                      "val-accessKey",
-	"secretKey":                      "val-secretKey",
-	"apiKey":                         "val-apiKey",
-	"kpRootKeyCRN":                   "val-kpRootKeyCRN",
-	"serviceId":                      "val-serviceId",
-	constants.ResourceConfigApiKey:   "val-resourceConfigApiKey",
+	constants.AccessKey:            "val-accessKey",
+	constants.SecretKey:            "val-secretKey",
+	constants.ApiKey:               "val-apiKey",
+	constants.KpRootKeyCRN:         "val-kpRootKeyCRN",
+	constants.ServiceId:            "val-serviceId",
+	constants.ResourceConfigApiKey: "val-resourceConfigApiKey",
 	// Non-sensitive fields that must pass through unchanged.
 	"cosEndpoint":        "https://s3.us-south.cloud-object-storage.appdomain.cloud",
 	"locationConstraint": "us-south-standard",
@@ -78,7 +78,7 @@ func TestReplaceAndReturnCopy_CreateVolume_MasksSensitiveFields(t *testing.T) {
 	assertSecretsMasked(t, got.Secrets)
 
 	// Original request must not be mutated.
-	assert.Equal(t, "val-accessKey", req.Secrets["accessKey"], "original request must not be mutated")
+	assert.Equal(t, "val-accessKey", req.Secrets[constants.AccessKey], "original request must not be mutated")
 }
 
 func TestReplaceAndReturnCopy_CreateVolume_EmptySecrets(t *testing.T) {
@@ -104,7 +104,7 @@ func TestReplaceAndReturnCopy_DeleteVolume_MasksSensitiveFields(t *testing.T) {
 	require.True(t, ok)
 	assertSecretsMasked(t, got.Secrets)
 
-	assert.Equal(t, "val-secretKey", req.Secrets["secretKey"], "original request must not be mutated")
+	assert.Equal(t, "val-secretKey", req.Secrets[constants.SecretKey], "original request must not be mutated")
 }
 
 func TestReplaceAndReturnCopy_DeleteVolume_EmptySecrets(t *testing.T) {
@@ -131,7 +131,7 @@ func TestReplaceAndReturnCopy_NodePublish_MasksSensitiveFields(t *testing.T) {
 	require.True(t, ok)
 	assertSecretsMasked(t, got.Secrets)
 
-	assert.Equal(t, "val-apiKey", req.Secrets["apiKey"], "original request must not be mutated")
+	assert.Equal(t, "val-apiKey", req.Secrets[constants.ApiKey], "original request must not be mutated")
 }
 
 func TestReplaceAndReturnCopy_NodePublish_EmptySecrets(t *testing.T) {
@@ -158,7 +158,7 @@ func TestReplaceAndReturnCopy_NodeStage_MasksSensitiveFields(t *testing.T) {
 	require.True(t, ok)
 	assertSecretsMasked(t, got.Secrets)
 
-	assert.Equal(t, "val-kpRootKeyCRN", req.Secrets["kpRootKeyCRN"], "original request must not be mutated")
+	assert.Equal(t, "val-kpRootKeyCRN", req.Secrets[constants.KpRootKeyCRN], "original request must not be mutated")
 }
 
 func TestReplaceAndReturnCopy_NodeStage_EmptySecrets(t *testing.T) {

@@ -149,7 +149,7 @@ func (su *DriverStatsUtils) GetBucketUsage(volumeID string) (int64, error) {
 		return 0, err
 	}
 
-	apiKey := string(secret.Data["apiKey"])
+	apiKey := string(secret.Data[constants.ApiKey])
 	bucketName := string(secret.Data["bucketName"])
 
 	rcOptions := &rc.ResourceConfigurationV1Options{
@@ -256,7 +256,7 @@ func ReplaceAndReturnCopy(req interface{}) (interface{}, error) {
 		secretMap := inReq.GetSecrets()
 
 		for k, v := range secretMap {
-			if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" || k == "serviceId" || k == constants.ResourceConfigApiKey {
+			if k == constants.AccessKey || k == constants.SecretKey || k == constants.ApiKey || k == constants.KpRootKeyCRN || k == constants.ServiceId || k == constants.ResourceConfigApiKey {
 				newReq.Secrets[k] = "xxxxxxx"
 				continue
 			}
@@ -276,7 +276,7 @@ func ReplaceAndReturnCopy(req interface{}) (interface{}, error) {
 		secretMap := inReq.GetSecrets()
 
 		for k, v := range secretMap {
-			if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" || k == "serviceId" || k == constants.ResourceConfigApiKey {
+			if k == constants.AccessKey || k == constants.SecretKey || k == constants.ApiKey || k == constants.KpRootKeyCRN || k == constants.ServiceId || k == constants.ResourceConfigApiKey {
 				newReq.Secrets[k] = "xxxxxxx"
 				continue
 			}
@@ -297,7 +297,7 @@ func ReplaceAndReturnCopy(req interface{}) (interface{}, error) {
 		secretMap := inReq.GetSecrets()
 
 		for k, v := range secretMap {
-			if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" || k == "serviceId" || k == constants.ResourceConfigApiKey {
+			if k == constants.AccessKey || k == constants.SecretKey || k == constants.ApiKey || k == constants.KpRootKeyCRN || k == constants.ServiceId || k == constants.ResourceConfigApiKey {
 				newReq.Secrets[k] = "xxxxxxx"
 				continue
 			}
@@ -319,7 +319,7 @@ func ReplaceAndReturnCopy(req interface{}) (interface{}, error) {
 		secretMap := inReq.GetSecrets()
 
 		for k, v := range secretMap {
-			if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" || k == "serviceId" || k == constants.ResourceConfigApiKey {
+			if k == constants.AccessKey || k == constants.SecretKey || k == constants.ApiKey || k == constants.KpRootKeyCRN || k == constants.ServiceId || k == constants.ResourceConfigApiKey {
 				newReq.Secrets[k] = "xxxxxxx"
 				continue
 			}

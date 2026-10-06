@@ -229,13 +229,13 @@ func TestNodePublishVolume(t *testing.T) {
 					},
 				},
 				Secrets: map[string]string{
-					"accessKey":    "testAccessKey",
-					"secretKey":    "testSecretKey",
-					"apiKey":       "testApiKey", // pragma: allowlist secret
-					"serviceId":    "testServiceId",
-					"kpRootKeyCRN": "testKpRootKeyCRN",
-					"iamEndpoint":  "testIamEndpoint",
-					"bucketName":   bucketName,
+					constants.AccessKey:    "testAccessKey",
+					constants.SecretKey:    "testSecretKey",
+					constants.ApiKey:       "testApiKey", // pragma: allowlist secret
+					constants.ServiceId:    "testServiceId",
+					constants.KpRootKeyCRN: "testKpRootKeyCRN",
+					"iamEndpoint":          "testIamEndpoint",
+					"bucketName":           bucketName,
 				},
 			},
 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
@@ -258,8 +258,8 @@ func TestNodePublishVolume(t *testing.T) {
 					},
 				},
 				Secrets: map[string]string{
-					"accessKey":          "testAccessKey",
-					"secretKey":          "testSecretKey",
+					constants.AccessKey:  "testAccessKey",
+					constants.SecretKey:  "testSecretKey",
 					"locationConstraint": "test-region",
 					"cosEndpoint":        "test-endpoint",
 				},
@@ -289,8 +289,8 @@ func TestNodePublishVolume(t *testing.T) {
 					},
 				},
 				Secrets: map[string]string{
-					"accessKey":          "testAccessKey",
-					"secretKey":          "testSecretKey",
+					constants.AccessKey:  "testAccessKey",
+					constants.SecretKey:  "testSecretKey",
 					"locationConstraint": "test-region",
 					"cosEndpoint":        "test-endpoint",
 				},
@@ -320,8 +320,8 @@ func TestNodePublishVolume(t *testing.T) {
 					},
 				},
 				Secrets: map[string]string{
-					"accessKey":          "testAccessKey",
-					"secretKey":          "testSecretKey",
+					constants.AccessKey:  "testAccessKey",
+					constants.SecretKey:  "testSecretKey",
 					"locationConstraint": "test-region",
 					"cosEndpoint":        "test-endpoint",
 				},
@@ -734,11 +734,11 @@ func TestNodePublishVolume_SecretMapMasking(t *testing.T) {
 	// key and confirming the call reaches the masking block without panicking.
 	// The actual masked values are asserted via the helper below.
 	sensitiveSecrets := map[string]string{
-		"accessKey":                    "real-access-key",
-		"secretKey":                    "real-secret-key",
-		"apiKey":                       "real-api-key", // pragma: allowlist secret
-		"kpRootKeyCRN":                 "real-kp-root-key-crn",
-		"serviceId":                    "real-service-id",
+		constants.AccessKey:            "real-access-key",
+		constants.SecretKey:            "real-secret-key",
+		constants.ApiKey:               "real-api-key", // pragma: allowlist secret
+		constants.KpRootKeyCRN:         "real-kp-root-key-crn",
+		constants.ServiceId:            "real-service-id",
 		constants.ResourceConfigApiKey: "real-rc-api-key",
 		// non-sensitive – must pass through unchanged
 		"cosEndpoint":        "https://s3.us-south.cloud-object-storage.appdomain.cloud",
@@ -748,7 +748,7 @@ func TestNodePublishVolume_SecretMapMasking(t *testing.T) {
 
 	masked := make(map[string]string)
 	for k, v := range sensitiveSecrets {
-		if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" || k == "serviceId" || k == constants.ResourceConfigApiKey {
+		if k == constants.AccessKey || k == constants.SecretKey || k == constants.ApiKey || k == constants.KpRootKeyCRN || k == constants.ServiceId || k == constants.ResourceConfigApiKey {
 			masked[k] = "xxxxxxx"
 			continue
 		}
@@ -756,7 +756,7 @@ func TestNodePublishVolume_SecretMapMasking(t *testing.T) {
 	}
 
 	// Assert sensitive fields are masked.
-	for _, key := range []string{"accessKey", "secretKey", "apiKey", "kpRootKeyCRN", "serviceId", constants.ResourceConfigApiKey} {
+	for _, key := range []string{constants.AccessKey, constants.SecretKey, constants.ApiKey, constants.KpRootKeyCRN, constants.ServiceId, constants.ResourceConfigApiKey} {
 		assert.Equal(t, "xxxxxxx", masked[key], "sensitive key %q must be masked", key)
 	}
 	// Assert non-sensitive fields are preserved.

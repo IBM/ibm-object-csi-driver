@@ -135,7 +135,7 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 	klog.V(2).Infof("-NodePublishVolume-: length of req.GetSecrets() length: %v", len(secretMap))
 	secretMapCopy := make(map[string]string)
 	for k, v := range secretMap {
-		if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" || k == "serviceId" || k == constants.ResourceConfigApiKey {
+		if k == constants.AccessKey || k == constants.SecretKey || k == constants.ApiKey || k == constants.KpRootKeyCRN || k == constants.ServiceId || k == constants.ResourceConfigApiKey {
 			secretMapCopy[k] = "xxxxxxx"
 			continue
 		}
