@@ -9,12 +9,12 @@ require (
 	github.com/IBM/ibm-csi-common v1.1.27
 	github.com/IBM/ibmcloud-volume-interface v1.2.21
 	github.com/aws/smithy-go v1.27.4
-	github.com/container-storage-interface/spec v1.12.0
+	github.com/container-storage-interface/spec v1.13.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
-	github.com/kubernetes-csi/csi-test/v5 v5.5.0
+	github.com/kubernetes-csi/csi-test/v5 v5.6.0
 	github.com/mitchellh/go-ps v1.0.0
-	github.com/onsi/ginkgo/v2 v2.32.0
+	github.com/onsi/ginkgo/v2 v2.32.1
 	github.com/onsi/gomega v1.42.1
 	github.com/prometheus/client_golang v1.24.1
 	github.com/stretchr/testify v1.12.1
