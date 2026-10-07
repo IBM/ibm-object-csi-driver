@@ -56,6 +56,9 @@ const (
 	KubeNodeName         = "KUBE_NODE_NAME"
 	MaxVolumesPerNodeEnv = "MAX_VOLUMES_PER_NODE"
 
+	IAMEndpointEnv              = "IAM_ENDPOINT"
+	COSResourceConfigEndpointEnv = "COS_RESOURCE_CONFIG_ENDPOINT"
+
 	CipherSuitesKey = "cipher_suites"
 )
 
