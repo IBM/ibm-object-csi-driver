@@ -599,7 +599,7 @@ func TestCreateVolume(t *testing.T) {
 				"apiKey is missing in secret, cannot set quota limit for bucket"),
 		},
 		{
-			testCaseName: "Positive: quotaLimit=true with apiKey fallback (direct secrets)",
+			testCaseName: "Positive: quotaLimit=true with apiKey (direct secrets)",
 			req: &csi.CreateVolumeRequest{
 				Name: testVolumeName,
 				VolumeCapabilities: []*csi.VolumeCapability{
@@ -633,7 +633,7 @@ func TestCreateVolume(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			testCaseName: "Positive: quotaLimit=true with resourceConfigApiKey priority when both present (direct secrets)",
+			testCaseName: "Positive: quotaLimit=true with apiKey priority when both present (direct secrets)",
 			req: &csi.CreateVolumeRequest{
 				Name: testVolumeName,
 				VolumeCapabilities: []*csi.VolumeCapability{
