@@ -149,9 +149,13 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		}
 
 		if quotaLimitEnabled {
-			if secretMap[constants.ResourceConfigApiKey] == "" {
+			apiKeyVal := secretMap[constants.ApiKey]
+			if apiKeyVal == "" {
+				apiKeyVal = secretMap[constants.ResourceConfigApiKey]
+			}
+			if apiKeyVal == "" {
 				return nil, status.Error(codes.InvalidArgument,
-					"resourceConfigApiKey missing in secret, cannot set quota limit for bucket")
+					"apiKey is missing in secret, cannot set quota limit for bucket")
 			}
 
 			quotaBytes := req.GetCapacityRange().GetRequiredBytes()
@@ -239,10 +243,13 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 
 		if quotaLimitEnabled {
 			quotaBytes := req.GetCapacityRange().GetRequiredBytes()
-			resConfApikey := secretMap[constants.ResourceConfigApiKey]
+			apiKey := secretMap[constants.ApiKey]
+			if apiKey == "" {
+				apiKey = secretMap[constants.ResourceConfigApiKey]
+			}
 
 			klog.Infof("Applying hard quota of %d bytes to bucket %s", quotaBytes, bucketName)
-			err = sess.UpdateQuotaLimit(quotaBytes, resConfApikey, bucketName, endPoint, creds.IAMEndpoint)
+			err = sess.UpdateQuotaLimit(quotaBytes, apiKey, bucketName, endPoint, creds.IAMEndpoint)
 			if err != nil {
 				klog.Errorf("Failed to set quota limit on bucket %s: %v", bucketName, err)
 				if params["userProvidedBucket"] == "false" {
@@ -288,10 +295,13 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 
 		if quotaLimitEnabled {
 			quotaBytes := req.GetCapacityRange().GetRequiredBytes()
-			resConfApikey := secretMap[constants.ResourceConfigApiKey]
+			apiKey := secretMap[constants.ApiKey]
+			if apiKey == "" {
+				apiKey = secretMap[constants.ResourceConfigApiKey]
+			}
 
 			klog.Infof("Applying hard quota of %d bytes to temp bucket %s", quotaBytes, tempBucketName)
-			err = sess.UpdateQuotaLimit(quotaBytes, resConfApikey, tempBucketName, endPoint, creds.IAMEndpoint)
+			err = sess.UpdateQuotaLimit(quotaBytes, apiKey, tempBucketName, endPoint, creds.IAMEndpoint)
 			if err != nil {
 				klog.Errorf("Failed to set quota limit on temp bucket %s: %v", tempBucketName, err)
 				if delErr := sess.DeleteBucket(tempBucketName); delErr != nil {
