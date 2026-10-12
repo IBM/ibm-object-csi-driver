@@ -1,6 +1,7 @@
 package mounter
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"strings"
@@ -615,4 +616,167 @@ func TestUpdateS3FSMountOptions_SkipCipherSuitesDefault(t *testing.T) {
 			}
 		})
 	}
+}
+
+// ── JSON injection fix tests (CWE-74 / report 4078540) ──────────────────────
+// These tests verify that Mount and Unmount payloads are built with
+// encoding/json so that attacker-controlled values (bucket name, target path)
+// cannot inject extra JSON keys into the RPC body.
+
+func TestS3FSMount_WorkerNode_PayloadIsValidJSON(t *testing.T) {
+	mountWorker = true
+
+	MakeDir = func(_ string, _ os.FileMode) error { return nil }
+	writePassWrap = func(_, _ string) error { return nil }
+
+	var capturedPayload string
+	mounterRequest = func(payload, _ string) error {
+		capturedPayload = payload
+		return nil
+	}
+
+	s3fs := &S3fsMounter{
+		BucketName:   "my-bucket",
+		EndPoint:     "https://s3.example.com",
+		AccessKeys:   "key:secret",
+		AuthType:     "hmac",
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+	}
+
+	err := s3fs.Mount("source", "/var/lib/kubelet/pods/pod1/volumes/x")
+	assert.NoError(t, err)
+
+	// Payload must be valid JSON.
+	var parsed map[string]interface{}
+	assert.NoError(t, json.Unmarshal([]byte(capturedPayload), &parsed), "mount payload must be valid JSON: %s", capturedPayload)
+
+	// Core fields must be present.
+	assert.Equal(t, "/var/lib/kubelet/pods/pod1/volumes/x", parsed["path"])
+	assert.Equal(t, constants.S3FS, parsed["mounter"])
+}
+
+func TestS3FSMount_WorkerNode_InjectedBucketName_CannotOverridePath(t *testing.T) {
+	// This is the exact attack described in the report:
+	// a bucket name containing `","path":"<victim-path>","z":"` used to inject
+	// a duplicate "path" key that the server would honour (keeping the last one).
+	// After the fix, encoding/json escapes the quotes, so the payload stays a
+	// single-object document and "path" keeps the legitimate target value.
+	mountWorker = true
+
+	MakeDir = func(_ string, _ os.FileMode) error { return nil }
+	writePassWrap = func(_, _ string) error { return nil }
+
+	var capturedPayload string
+	mounterRequest = func(payload, _ string) error {
+		capturedPayload = payload
+		return nil
+	}
+
+	attackBucketName := `b","path":"/var/lib/kubelet/pods/victim/volumes/kubernetes.io~csi/pvc-victim/mount","z":"`
+	legitimateTarget := "/var/lib/kubelet/pods/legit/volumes/x"
+
+	s3fs := &S3fsMounter{
+		BucketName:   attackBucketName,
+		EndPoint:     "https://s3.example.com",
+		AccessKeys:   "key:secret",
+		AuthType:     "hmac",
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+	}
+
+	err := s3fs.Mount("source", legitimateTarget)
+	assert.NoError(t, err)
+
+	// The payload MUST be valid JSON (no injection breakout).
+	var parsed map[string]interface{}
+	assert.NoError(t, json.Unmarshal([]byte(capturedPayload), &parsed),
+		"payload must remain valid JSON even with attacker-controlled bucket name: %s", capturedPayload)
+
+	// "path" must be the legitimate driver-chosen target, not the injected victim path.
+	assert.Equal(t, legitimateTarget, parsed["path"],
+		"injected bucket name must not override the legitimate mount path")
+
+	// The injected victim path must NOT appear as the value of "path".
+	assert.NotEqual(t, "/var/lib/kubelet/pods/victim/volumes/kubernetes.io~csi/pvc-victim/mount", parsed["path"],
+		"attacker-injected path must not become the mount path")
+}
+
+func TestS3FSMount_WorkerNode_InjectedTargetPath_PayloadIsValidJSON(t *testing.T) {
+	// Guard against a target path that contains special JSON characters.
+	mountWorker = true
+
+	MakeDir = func(_ string, _ os.FileMode) error { return nil }
+	writePassWrap = func(_, _ string) error { return nil }
+
+	var capturedPayload string
+	mounterRequest = func(payload, _ string) error {
+		capturedPayload = payload
+		return nil
+	}
+
+	s3fs := &S3fsMounter{
+		BucketName:   "my-bucket",
+		EndPoint:     "https://s3.example.com",
+		AccessKeys:   "key:secret",
+		AuthType:     "hmac",
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+	}
+
+	specialTarget := `/var/lib/kubelet/pods/path"with"quotes/volumes/x`
+	err := s3fs.Mount("source", specialTarget)
+	assert.NoError(t, err)
+
+	var parsed map[string]interface{}
+	assert.NoError(t, json.Unmarshal([]byte(capturedPayload), &parsed),
+		"payload with special chars in target must still be valid JSON: %s", capturedPayload)
+
+	assert.Equal(t, specialTarget, parsed["path"])
+}
+
+func TestS3FSUnmount_WorkerNode_PayloadIsValidJSON(t *testing.T) {
+	mountWorker = true
+	removeFile = func(_, _ string) {}
+
+	var capturedPayload string
+	mounterRequest = func(payload, _ string) error {
+		capturedPayload = payload
+		return nil
+	}
+
+	s3fs := &S3fsMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{})}
+
+	err := s3fs.Unmount("/var/lib/kubelet/pods/pod1/volumes/x")
+	assert.NoError(t, err)
+
+	var parsed map[string]interface{}
+	assert.NoError(t, json.Unmarshal([]byte(capturedPayload), &parsed),
+		"unmount payload must be valid JSON: %s", capturedPayload)
+
+	assert.Equal(t, "/var/lib/kubelet/pods/pod1/volumes/x", parsed["path"])
+}
+
+func TestS3FSUnmount_WorkerNode_InjectedPath_CannotInjectExtraKeys(t *testing.T) {
+	// An attacker-controlled path with JSON special characters must not produce
+	// a malformed or multi-key document.
+	mountWorker = true
+	removeFile = func(_, _ string) {}
+
+	var capturedPayload string
+	mounterRequest = func(payload, _ string) error {
+		capturedPayload = payload
+		return nil
+	}
+
+	s3fs := &S3fsMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{})}
+
+	injectedPath := `/var/lib/kubelet/pods/x","extra":"injected`
+	err := s3fs.Unmount(injectedPath)
+	assert.NoError(t, err)
+
+	var parsed map[string]interface{}
+	assert.NoError(t, json.Unmarshal([]byte(capturedPayload), &parsed),
+		"unmount payload must remain valid JSON even with special chars in path: %s", capturedPayload)
+
+	assert.Equal(t, injectedPath, parsed["path"])
+	_, hasExtra := parsed["extra"]
+	assert.False(t, hasExtra, "injected 'extra' key must not appear in parsed payload")
 }
