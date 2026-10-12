@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
+	"github.com/gin-gonic/gin"
 )
 
 // MountRequest ...
@@ -43,6 +46,90 @@ func strictDecodeForUnknownFields(data json.RawMessage, v interface{}) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	return dec.Decode(v)
+}
+
+// decodeNoDuplicateKeys reads the request body into v, rejecting any JSON
+// object that contains the same key more than once at the top level.
+// It also applies DisallowUnknownFields so extra envelope fields are caught.
+// On error it writes the appropriate 400 response and returns false.
+func decodeNoDuplicateKeys(c *gin.Context, v interface{}) bool {
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read request body"})
+		return false
+	}
+
+	// First pass: detect duplicate top-level keys using the token stream.
+	dec := json.NewDecoder(bytes.NewReader(body))
+	// Consume opening '{'.
+	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: expected JSON object"})
+		return false
+	}
+	seen := make(map[string]struct{})
+	for dec.More() {
+		keyTok, err := dec.Token()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: malformed JSON"})
+			return false
+		}
+		key, ok := keyTok.(string)
+		if !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: non-string key"})
+			return false
+		}
+		if _, exists := seen[key]; exists {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid request: duplicate key %q", key)})
+			return false
+		}
+		seen[key] = struct{}{}
+		// Skip the value token(s) so the loop advances to the next key.
+		if err := skipJSONValue(dec); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: malformed JSON"})
+			return false
+		}
+	}
+
+	// Second pass: unmarshal with DisallowUnknownFields.
+	dec2 := json.NewDecoder(bytes.NewReader(body))
+	dec2.DisallowUnknownFields()
+	if err := dec2.Decode(v); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return false
+	}
+	return true
+}
+
+// skipJSONValue advances the decoder past one complete JSON value
+// (scalar, object, or array) so the outer loop can move to the next key.
+func skipJSONValue(dec *json.Decoder) error {
+	tok, err := dec.Token()
+	if err != nil {
+		return err
+	}
+	switch tok {
+	case json.Delim('{'), json.Delim('['):
+		closing := json.Delim('}')
+		if tok == json.Delim('[') {
+			closing = json.Delim(']')
+		}
+		for dec.More() {
+			if err := skipJSONValue(dec); err != nil {
+				return err
+			}
+			// For objects, also skip the value after each key.
+			if tok == json.Delim('{') {
+				if err := skipJSONValue(dec); err != nil {
+					return err
+				}
+			}
+		}
+		if _, err := dec.Token(); err != nil { // consume closing delimiter
+			return err
+		}
+		_ = closing
+	}
+	return nil
 }
 
 func pathValidator(targetPath string) error {

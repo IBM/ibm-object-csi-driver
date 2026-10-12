@@ -3,10 +3,14 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -181,4 +185,171 @@ func TestFileExists_AbsFails(t *testing.T) {
 	assert.False(t, exists)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to resolve absolute path")
+}
+
+// ── decodeNoDuplicateKeys tests (Remediation 2 — report 4078540) ─────────────
+
+func TestDecodeNoDuplicateKeys_ValidMountRequest(t *testing.T) {
+	// Positive: well-formed body with no duplicate keys → decodes correctly.
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	body := `{"path":"/var/lib/kubelet/pods/p1/volumes/x","bucket":"my-bucket","mounter":"s3fs","args":{}}`
+	c.Request = httptest.NewRequest("POST", "/", strings.NewReader(body))
+
+	var req MountRequest
+	ok := decodeNoDuplicateKeys(c, &req)
+
+	assert.True(t, ok)
+	assert.Equal(t, "/var/lib/kubelet/pods/p1/volumes/x", req.Path)
+	assert.Equal(t, "my-bucket", req.Bucket)
+	assert.Equal(t, "s3fs", req.Mounter)
+}
+
+func TestDecodeNoDuplicateKeys_DuplicatePathKey_Rejected(t *testing.T) {
+	// Negative: the exact attack from the report — duplicate "path" key.
+	// Must return HTTP 400 and not decode the victim path into the struct.
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	body := `{"path":"/var/lib/kubelet/pods/legit/volumes/x",` +
+		`"path":"/var/lib/kubelet/pods/victim/volumes/pvc-victim/mount",` +
+		`"bucket":"b","mounter":"s3fs","args":{}}`
+	c.Request = httptest.NewRequest("POST", "/", strings.NewReader(body))
+
+	var req MountRequest
+	ok := decodeNoDuplicateKeys(c, &req)
+
+	assert.False(t, ok)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), `duplicate key`)
+}
+
+func TestDecodeNoDuplicateKeys_DuplicateBucketKey_Rejected(t *testing.T) {
+	// Negative: duplicate key other than "path" is also rejected.
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	body := `{"path":"/var/lib/kubelet/pods/p/volumes/x","bucket":"b1","bucket":"b2","mounter":"s3fs","args":{}}`
+	c.Request = httptest.NewRequest("POST", "/", strings.NewReader(body))
+
+	var req MountRequest
+	ok := decodeNoDuplicateKeys(c, &req)
+
+	assert.False(t, ok)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), `duplicate key`)
+}
+
+func TestDecodeNoDuplicateKeys_UnknownField_Rejected(t *testing.T) {
+	// Negative: unknown top-level field is rejected (DisallowUnknownFields on envelope).
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	body := `{"path":"/var/lib/kubelet/pods/p/volumes/x","bucket":"b","mounter":"s3fs","args":{},"evil":"injection"}`
+	c.Request = httptest.NewRequest("POST", "/", strings.NewReader(body))
+
+	var req MountRequest
+	ok := decodeNoDuplicateKeys(c, &req)
+
+	assert.False(t, ok)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "invalid request")
+}
+
+func TestDecodeNoDuplicateKeys_InvalidJSON_Rejected(t *testing.T) {
+	// Negative: completely broken JSON.
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	c.Request = httptest.NewRequest("POST", "/", strings.NewReader(`not-json`))
+
+	var req MountRequest
+	ok := decodeNoDuplicateKeys(c, &req)
+
+	assert.False(t, ok)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestDecodeNoDuplicateKeys_ValidUnmountRequest(t *testing.T) {
+	// Positive: unmount body with single "path" key → decodes correctly.
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	body := `{"path":"/var/lib/kubelet/pods/p1/volumes/x"}`
+	c.Request = httptest.NewRequest("POST", "/", strings.NewReader(body))
+
+	var req struct {
+		Path string `json:"path"`
+	}
+	ok := decodeNoDuplicateKeys(c, &req)
+
+	assert.True(t, ok)
+	assert.Equal(t, "/var/lib/kubelet/pods/p1/volumes/x", req.Path)
+}
+
+func TestDecodeNoDuplicateKeys_DuplicatePathInUnmount_Rejected(t *testing.T) {
+	// Negative: duplicate "path" in unmount body is also rejected.
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	body := `{"path":"/var/lib/kubelet/pods/p1/volumes/x","path":"/mnt/evil"}`
+	c.Request = httptest.NewRequest("POST", "/", strings.NewReader(body))
+
+	var req struct {
+		Path string `json:"path"`
+	}
+	ok := decodeNoDuplicateKeys(c, &req)
+
+	assert.False(t, ok)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), `duplicate key`)
+}
+
+func TestHandleCosMount_DuplicatePathKey_Rejected(t *testing.T) {
+	// End-to-end: the handler itself must return 400 when "path" appears twice.
+	gin.SetMode(gin.TestMode)
+	mockMounter := new(MockMounterUtils)
+	router := gin.Default()
+	router.POST("/mount", handleCosMount(mockMounter, &MockMounterArgsParser{}))
+
+	body := `{"path":"/var/lib/kubelet/pods/legit/volumes/x",` +
+		`"path":"/var/lib/kubelet/pods/victim/volumes/pvc-victim/mount",` +
+		`"bucket":"b","mounter":"s3fs","args":{}}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/mount", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "duplicate key")
+	// FuseMount must never have been called.
+	mockMounter.AssertNotCalled(t, "FuseMount")
+}
+
+func TestHandleCosUnmount_DuplicatePathKey_Rejected(t *testing.T) {
+	// End-to-end: unmount handler must also reject duplicate "path".
+	gin.SetMode(gin.TestMode)
+	mockMounter := new(MockMounterUtils)
+	router := gin.Default()
+	router.POST("/unmount", handleCosUnmount(mockMounter))
+
+	body := `{"path":"/var/lib/kubelet/pods/p1/volumes/x","path":"/mnt/evil"}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/unmount", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "duplicate key")
+	mockMounter.AssertNotCalled(t, "FuseUnmount")
 }
