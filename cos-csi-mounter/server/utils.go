@@ -132,15 +132,21 @@ func skipJSONValue(dec *json.Decoder) error {
 	return nil
 }
 
+// pathValidator validates that the target path resolves to an absolute path,
+// ends with "/mount", and resides strictly within one of the safe mount directories.
 func pathValidator(targetPath string) error {
 	absPath, err := absPathResolver(targetPath)
 	if err != nil {
 		return fmt.Errorf("failed to resolve absolute mount path: %v", err)
 	}
+	// CSI target paths must end with "/mount"
+	if !strings.HasSuffix(absPath, "/mount") {
+		return fmt.Errorf("bad value for target path \"%v\"", targetPath)
+	}
 	for _, dir := range safeMountDirs {
 		// Use dir+"/" so that a path like /var/lib/kubelet/pods-evil does not
 		// pass by sharing a string prefix with /var/lib/kubelet/pods.
-		if absPath == dir || strings.HasPrefix(absPath, dir+"/") {
+		if strings.HasPrefix(absPath, dir+"/") {
 			return nil
 		}
 	}

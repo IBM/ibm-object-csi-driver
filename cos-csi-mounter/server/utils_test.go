@@ -369,24 +369,32 @@ func TestPathValidator_AltSafeDirPath_Passes(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestPathValidator_ExactSafeDir_Passes(t *testing.T) {
-	// Positive: the safe directory itself is accepted (edge case).
+func TestPathValidator_ExactSafeDir_Rejected(t *testing.T) {
+	// Negative: the safe directory itself does not end with /mount.
 	err := pathValidator("/var/lib/kubelet/pods")
-	assert.NoError(t, err)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "bad value for target path")
+}
+
+func TestPathValidator_MissingMountSuffix_Rejected(t *testing.T) {
+	// Negative: valid prefix under safe dir but does not end with /mount.
+	err := pathValidator("/var/lib/kubelet/pods/abc-123/volumes/kubernetes.io~csi/pvc")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "bad value for target path")
 }
 
 func TestPathValidator_PodsEvilSuffix_Rejected(t *testing.T) {
 	// Negative: the exact bypass from the report — /var/lib/kubelet/pods-evil
 	// shares the string prefix "/var/lib/kubelet/pods" but is a different directory.
 	// Before the fix this passed; after the fix it must be rejected.
-	err := pathValidator("/var/lib/kubelet/pods-evil/volumes/x")
+	err := pathValidator("/var/lib/kubelet/pods-evil/volumes/x/mount")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "bad value for target path")
 }
 
 func TestPathValidator_PodsEvilSuffixAltDir_Rejected(t *testing.T) {
 	// Same bypass attempt against the /var/data/kubelet/pods safe dir.
-	err := pathValidator("/var/data/kubelet/pods-evil/volumes/x")
+	err := pathValidator("/var/data/kubelet/pods-evil/volumes/x/mount")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "bad value for target path")
 }
