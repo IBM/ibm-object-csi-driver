@@ -137,10 +137,14 @@ func pathValidator(targetPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to resolve absolute mount path: %v", err)
 	}
-	if !strings.HasPrefix(absPath, safeMountDirs[0]) && !strings.HasPrefix(absPath, safeMountDirs[1]) {
-		return fmt.Errorf("bad value for target path \"%v\"", targetPath)
+	for _, dir := range safeMountDirs {
+		// Use dir+"/" so that a path like /var/lib/kubelet/pods-evil does not
+		// pass by sharing a string prefix with /var/lib/kubelet/pods.
+		if absPath == dir || strings.HasPrefix(absPath, dir+"/") {
+			return nil
+		}
 	}
-	return nil
+	return fmt.Errorf("bad value for target path \"%v\"", targetPath)
 }
 
 // --- Parser for Mounter Arguments ---

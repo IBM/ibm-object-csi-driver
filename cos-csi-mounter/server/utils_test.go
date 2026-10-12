@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -352,4 +353,68 @@ func TestHandleCosUnmount_DuplicatePathKey_Rejected(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, w.Body.String(), "duplicate key")
 	mockMounter.AssertNotCalled(t, "FuseUnmount")
+}
+
+// ── pathValidator tests (Remediation 3 — report 4078540) ─────────────────────
+
+func TestPathValidator_LegitPodPath_Passes(t *testing.T) {
+	// Positive: a normal pod volume path under /var/lib/kubelet/pods.
+	err := pathValidator("/var/lib/kubelet/pods/abc-123/volumes/kubernetes.io~csi/pvc/mount")
+	assert.NoError(t, err)
+}
+
+func TestPathValidator_AltSafeDirPath_Passes(t *testing.T) {
+	// Positive: path under the second safe directory /var/data/kubelet/pods.
+	err := pathValidator("/var/data/kubelet/pods/abc-123/volumes/kubernetes.io~csi/pvc/mount")
+	assert.NoError(t, err)
+}
+
+func TestPathValidator_ExactSafeDir_Passes(t *testing.T) {
+	// Positive: the safe directory itself is accepted (edge case).
+	err := pathValidator("/var/lib/kubelet/pods")
+	assert.NoError(t, err)
+}
+
+func TestPathValidator_PodsEvilSuffix_Rejected(t *testing.T) {
+	// Negative: the exact bypass from the report — /var/lib/kubelet/pods-evil
+	// shares the string prefix "/var/lib/kubelet/pods" but is a different directory.
+	// Before the fix this passed; after the fix it must be rejected.
+	err := pathValidator("/var/lib/kubelet/pods-evil/volumes/x")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "bad value for target path")
+}
+
+func TestPathValidator_PodsEvilSuffixAltDir_Rejected(t *testing.T) {
+	// Same bypass attempt against the /var/data/kubelet/pods safe dir.
+	err := pathValidator("/var/data/kubelet/pods-evil/volumes/x")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "bad value for target path")
+}
+
+func TestPathValidator_EtcPath_Rejected(t *testing.T) {
+	// Negative: completely out-of-bounds path.
+	err := pathValidator("/etc/passwd")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "bad value for target path")
+}
+
+func TestPathValidator_RootPath_Rejected(t *testing.T) {
+	// Negative: filesystem root.
+	err := pathValidator("/")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "bad value for target path")
+}
+
+func TestPathValidator_AbsResolverFails_ReturnsError(t *testing.T) {
+	// Negative: absPathResolver returns an error → pathValidator propagates it.
+	orig := absPathResolver
+	defer func() { absPathResolver = orig }()
+
+	absPathResolver = func(string) (string, error) {
+		return "", fmt.Errorf("mock resolve failure")
+	}
+
+	err := pathValidator("/var/lib/kubelet/pods/x")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to resolve absolute mount path")
 }
