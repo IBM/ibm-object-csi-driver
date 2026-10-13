@@ -8,10 +8,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 // MountRequest ...
@@ -23,8 +25,8 @@ type MountRequest struct {
 }
 
 var (
-	// Directories where bucket can be mounted
-	safeMountDirs = []string{"/var/data/kubelet/pods", "/var/lib/kubelet/pods"}
+	// Directories where bucket can be mounted.
+	safeMountDirs = []string{"/var/data/kubelet/pods/", "/var/lib/kubelet/pods/"}
 	// Directories where s3fs/rclone configuration files need to be present
 	safeMounterConfigDir = "/var/lib/coscsi-config"
 
@@ -48,13 +50,36 @@ func strictDecodeForUnknownFields(data json.RawMessage, v interface{}) error {
 	return dec.Decode(v)
 }
 
+// jsonFieldNames returns the exact JSON key names declared on the struct
+// that v points to.
+func jsonFieldNames(v interface{}) map[string]struct{} {
+	t := reflect.TypeOf(v)
+	for t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	names := make(map[string]struct{}, t.NumField())
+	for i := 0; i < t.NumField(); i++ {
+		name, _, _ := strings.Cut(t.Field(i).Tag.Get("json"), ",")
+		if name != "" && name != "-" {
+			names[name] = struct{}{}
+		}
+	}
+	return names
+}
+
 // decodeNoDuplicateKeys reads the request body into v, rejecting any JSON
 // object that contains the same key more than once at the top level.
-// It also applies DisallowUnknownFields so extra envelope fields are caught.
+// encoding/json matches keys to struct fields case-insensitively (including
+// Unicode folds such as "arg\u017f" == "args"), which would let a
+// case-variant key silently collide with a real one. To avoid that, every
+// top-level key must exactly match a json tag on v; duplicates are then
+// detected with a plain exact-string comparison. It also applies
+// DisallowUnknownFields and rejects any data trailing the JSON object.
 // On error it writes the appropriate 400 response and returns false.
 func decodeNoDuplicateKeys(c *gin.Context, v interface{}) bool {
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
+		logger.Error("failed to read request body", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read request body"})
 		return false
 	}
@@ -63,28 +88,39 @@ func decodeNoDuplicateKeys(c *gin.Context, v interface{}) bool {
 	dec := json.NewDecoder(bytes.NewReader(body))
 	// Consume opening '{'.
 	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
+		logger.Error("invalid request body: expected JSON object", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: expected JSON object"})
 		return false
 	}
+	allowed := jsonFieldNames(v)
 	seen := make(map[string]struct{})
 	for dec.More() {
 		keyTok, err := dec.Token()
 		if err != nil {
+			logger.Error("invalid request body: failed to read key", zap.Error(err))
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: malformed JSON"})
 			return false
 		}
 		key, ok := keyTok.(string)
 		if !ok {
+			logger.Error("invalid request body: non-string key")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: non-string key"})
 			return false
 		}
+		if _, ok := allowed[key]; !ok {
+			logger.Error("invalid request body: unknown or non-exact key", zap.String("key", key))
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+			return false
+		}
 		if _, exists := seen[key]; exists {
+			logger.Error("invalid request body: duplicate key", zap.String("key", key))
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid request: duplicate key %q", key)})
 			return false
 		}
 		seen[key] = struct{}{}
-		// Skip the value token(s) so the loop advances to the next key.
+		// Skip the value so the loop advances to the next key.
 		if err := skipJSONValue(dec); err != nil {
+			logger.Error("invalid request body: failed to read value", zap.Error(err))
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: malformed JSON"})
 			return false
 		}
@@ -94,6 +130,13 @@ func decodeNoDuplicateKeys(c *gin.Context, v interface{}) bool {
 	dec2 := json.NewDecoder(bytes.NewReader(body))
 	dec2.DisallowUnknownFields()
 	if err := dec2.Decode(v); err != nil {
+		logger.Error("invalid request body: decode failed", zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return false
+	}
+	// Reject trailing data after the JSON object.
+	if _, err := dec2.Token(); err != io.EOF {
+		logger.Error("invalid request body: unexpected trailing data")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return false
 	}
@@ -101,33 +144,29 @@ func decodeNoDuplicateKeys(c *gin.Context, v interface{}) bool {
 }
 
 // skipJSONValue advances the decoder past one complete JSON value
-// (scalar, object, or array) so the outer loop can move to the next key.
+// (scalar, object, or array) so the caller can move to the next key.
 func skipJSONValue(dec *json.Decoder) error {
 	tok, err := dec.Token()
 	if err != nil {
 		return err
 	}
-	switch tok {
-	case json.Delim('{'), json.Delim('['):
-		closing := json.Delim('}')
-		if tok == json.Delim('[') {
-			closing = json.Delim(']')
-		}
-		for dec.More() {
-			if err := skipJSONValue(dec); err != nil {
-				return err
-			}
-			// For objects, also skip the value after each key.
-			if tok == json.Delim('{') {
-				if err := skipJSONValue(dec); err != nil {
-					return err
-				}
-			}
-		}
-		if _, err := dec.Token(); err != nil { // consume closing delimiter
+	if d, ok := tok.(json.Delim); !ok || (d != '{' && d != '[') {
+		return nil // scalar value
+	}
+	// Composite value: consume tokens until the matching closing delimiter.
+	for depth := 1; depth > 0; {
+		tok, err := dec.Token()
+		if err != nil {
 			return err
 		}
-		_ = closing
+		if d, ok := tok.(json.Delim); ok {
+			switch d {
+			case '{', '[':
+				depth++
+			case '}', ']':
+				depth--
+			}
+		}
 	}
 	return nil
 }
@@ -144,9 +183,7 @@ func pathValidator(targetPath string) error {
 		return fmt.Errorf("bad value for target path \"%v\"", targetPath)
 	}
 	for _, dir := range safeMountDirs {
-		// Use dir+"/" so that a path like /var/lib/kubelet/pods-evil does not
-		// pass by sharing a string prefix with /var/lib/kubelet/pods.
-		if strings.HasPrefix(absPath, dir+"/") {
+		if strings.HasPrefix(absPath, dir) {
 			return nil
 		}
 	}
