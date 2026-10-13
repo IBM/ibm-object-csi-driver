@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/iotest"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/gin-gonic/gin"
@@ -312,6 +314,263 @@ func TestDecodeNoDuplicateKeys_DuplicatePathInUnmount_Rejected(t *testing.T) {
 	assert.False(t, ok)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, w.Body.String(), `duplicate key`)
+}
+
+// ── exact-key, trailing-data and skipJSONValue tests ─────────────────────────
+
+// newDecodeCtx builds a gin test context whose request body is the given reader.
+func newDecodeCtx(body io.Reader) (*gin.Context, *httptest.ResponseRecorder) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("POST", "/", body)
+	return c, w
+}
+
+func TestDecodeNoDuplicateKeys_NonExactKey_Rejected(t *testing.T) {
+	// Negative: encoding/json matches keys case-insensitively and with Unicode
+	// folds. Any key that is not an exact match for a json tag must be rejected,
+	// whether or not the exact key is also present.
+	bodies := []string{
+		`{"path":"/var/lib/kubelet/pods/legit/volumes/x","PATH":"/var/lib/kubelet/pods/victim/volumes/pvc/mount"}`,
+		`{"PATH":"/var/lib/kubelet/pods/p/volumes/x"}`,
+		`{"path":"/var/lib/kubelet/pods/p/volumes/x","bucket":"a","buc\u212aet":"b"}`, // Kelvin sign
+		`{"path":"/var/lib/kubelet/pods/p/volumes/x","args":{},"arg\u017f":{}}`,       // long s
+	}
+	for _, body := range bodies {
+		c, w := newDecodeCtx(strings.NewReader(body))
+
+		var req MountRequest
+		ok := decodeNoDuplicateKeys(c, &req)
+
+		assert.False(t, ok, body)
+		assert.Equal(t, http.StatusBadRequest, w.Code, body)
+		assert.Contains(t, w.Body.String(), "invalid request", body)
+	}
+}
+
+func TestDecodeNoDuplicateKeys_NonExactKeyInUnmount_Rejected(t *testing.T) {
+	// Negative: the exact-key rule also applies to the anonymous unmount struct.
+	c, w := newDecodeCtx(strings.NewReader(`{"path":"/var/lib/kubelet/pods/p/volumes/x","Path":"/mnt/evil"}`))
+
+	var req struct {
+		Path string `json:"path"`
+	}
+	ok := decodeNoDuplicateKeys(c, &req)
+
+	assert.False(t, ok)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestDecodeNoDuplicateKeys_TrailingData_Rejected(t *testing.T) {
+	// Negative: any data after the JSON object must be rejected.
+	bodies := []string{
+		`{"path":"/var/lib/kubelet/pods/p/volumes/x"}{"path":"/mnt/evil"}`,
+		`{"path":"/var/lib/kubelet/pods/p/volumes/x"} trailing`,
+		`{"path":"/var/lib/kubelet/pods/p/volumes/x"} []`,
+	}
+	for _, body := range bodies {
+		c, w := newDecodeCtx(strings.NewReader(body))
+
+		var req struct {
+			Path string `json:"path"`
+		}
+		ok := decodeNoDuplicateKeys(c, &req)
+
+		assert.False(t, ok, body)
+		assert.Equal(t, http.StatusBadRequest, w.Code, body)
+	}
+}
+
+func TestDecodeNoDuplicateKeys_TrailingWhitespace_Accepted(t *testing.T) {
+	// Positive: trailing whitespace/newlines are not data and must still pass.
+	c, w := newDecodeCtx(strings.NewReader("{\"path\":\"/var/lib/kubelet/pods/p/volumes/x\"}\n  \n"))
+
+	var req struct {
+		Path string `json:"path"`
+	}
+	ok := decodeNoDuplicateKeys(c, &req)
+
+	assert.True(t, ok)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "/var/lib/kubelet/pods/p/volumes/x", req.Path)
+}
+
+func TestDecodeNoDuplicateKeys_NestedValuesSkipped(t *testing.T) {
+	// Positive: nested objects/arrays are skipped correctly, and keys repeated
+	// inside nested values are not treated as top-level duplicates.
+	body := `{"path":"/var/lib/kubelet/pods/p/volumes/x","bucket":"b","mounter":"s3fs",` +
+		`"args":{"a":[1,{"path":"n"},[2,3]],"path":"m"}}`
+	c, _ := newDecodeCtx(strings.NewReader(body))
+
+	var req MountRequest
+	ok := decodeNoDuplicateKeys(c, &req)
+
+	assert.True(t, ok)
+	assert.Equal(t, "/var/lib/kubelet/pods/p/volumes/x", req.Path)
+	assert.Equal(t, "b", req.Bucket)
+	assert.JSONEq(t, `{"a":[1,{"path":"n"},[2,3]],"path":"m"}`, string(req.Args))
+}
+
+func TestDecodeNoDuplicateKeys_NotAnObject_Rejected(t *testing.T) {
+	// Negative: top-level value must be a JSON object.
+	for _, body := range []string{``, `null`, `[]`, `"str"`, `123`} {
+		c, w := newDecodeCtx(strings.NewReader(body))
+
+		var req MountRequest
+		ok := decodeNoDuplicateKeys(c, &req)
+
+		assert.False(t, ok, body)
+		assert.Equal(t, http.StatusBadRequest, w.Code, body)
+		assert.Contains(t, w.Body.String(), "expected JSON object", body)
+	}
+}
+
+func TestDecodeNoDuplicateKeys_TruncatedValue_Rejected(t *testing.T) {
+	// Negative: bodies that end inside a value or before the closing brace.
+	bodies := []string{
+		`{"path"`,
+		`{"path":`,
+		`{"path":{"a":`,
+		`{"path":"x","args":[1,[2`,
+		`{"path":"x"`,
+	}
+	for _, body := range bodies {
+		c, w := newDecodeCtx(strings.NewReader(body))
+
+		var req MountRequest
+		ok := decodeNoDuplicateKeys(c, &req)
+
+		assert.False(t, ok, body)
+		assert.Equal(t, http.StatusBadRequest, w.Code, body)
+	}
+}
+
+func TestDecodeNoDuplicateKeys_ReadError_Rejected(t *testing.T) {
+	// Negative: failure while reading the request body.
+	c, w := newDecodeCtx(iotest.ErrReader(errors.New("boom")))
+
+	var req MountRequest
+	ok := decodeNoDuplicateKeys(c, &req)
+
+	assert.False(t, ok)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "failed to read request body")
+	// Internal error detail must not leak to the client.
+	assert.NotContains(t, w.Body.String(), "boom")
+}
+
+func TestJSONFieldNames(t *testing.T) {
+	type sample struct {
+		Plain    string `json:"plain"`
+		WithOpt  string `json:"with_opt,omitempty"`
+		Skipped  string `json:"-"`
+		NoName   string `json:",omitempty"`
+		Untagged string
+	}
+
+	// Pointer to struct.
+	assert.Equal(t,
+		map[string]struct{}{"plain": {}, "with_opt": {}},
+		jsonFieldNames(&sample{}))
+
+	// Pointer to pointer to struct.
+	p := &sample{}
+	assert.Equal(t,
+		map[string]struct{}{"plain": {}, "with_opt": {}},
+		jsonFieldNames(&p))
+
+	// The real request types.
+	assert.Equal(t,
+		map[string]struct{}{"path": {}, "bucket": {}, "mounter": {}, "args": {}},
+		jsonFieldNames(&MountRequest{}))
+}
+
+func TestSkipJSONValue(t *testing.T) {
+	// Input is `{"a":<value>,"b":1}`. After consuming '{' and "a", skipJSONValue
+	// must consume exactly <value>, leaving "b" as the next token.
+	values := []string{
+		`"str"`,
+		`123`,
+		`true`,
+		`null`,
+		`{}`,
+		`[]`,
+		`{"x":1,"x":2}`,
+		`[1,2,3]`,
+		`{"x":[1,{"y":[2,{"z":{}}]}],"w":"v"}`,
+		`[[[[]]]]`,
+		`[{"a":[]},{"b":{}}]`,
+	}
+	for _, v := range values {
+		dec := json.NewDecoder(strings.NewReader(`{"a":` + v + `,"b":1}`))
+		_, err := dec.Token() // '{'
+		assert.NoError(t, err, v)
+		_, err = dec.Token() // "a"
+		assert.NoError(t, err, v)
+
+		assert.NoError(t, skipJSONValue(dec), v)
+
+		tok, err := dec.Token()
+		assert.NoError(t, err, v)
+		assert.Equal(t, "b", tok, v)
+	}
+}
+
+func TestSkipJSONValue_Errors(t *testing.T) {
+	// Empty input and values truncated at various nesting depths must error.
+	inputs := []string{
+		``,
+		`{`,
+		`[`,
+		`[1,2`,
+		`{"a":1`,
+		`[[1,2]`,
+		`{"a":[1,{"b":2}`,
+		`]`,
+	}
+	for _, in := range inputs {
+		dec := json.NewDecoder(strings.NewReader(in))
+		assert.Error(t, skipJSONValue(dec), in)
+	}
+}
+
+func TestHandleCosMount_NonExactKey_Rejected(t *testing.T) {
+	// End-to-end: handler returns 400 for a case-variant key and never mounts.
+	gin.SetMode(gin.TestMode)
+	mockMounter := new(MockMounterUtils)
+	router := gin.Default()
+	router.POST("/mount", handleCosMount(mockMounter, &MockMounterArgsParser{}))
+
+	body := `{"path":"/var/lib/kubelet/pods/legit/volumes/x",` +
+		`"PATH":"/var/lib/kubelet/pods/victim/volumes/pvc-victim/mount",` +
+		`"bucket":"b","mounter":"s3fs","args":{}}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/mount", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	mockMounter.AssertNotCalled(t, "FuseMount")
+}
+
+func TestHandleCosUnmount_TrailingData_Rejected(t *testing.T) {
+	// End-to-end: handler returns 400 for a second appended JSON object.
+	gin.SetMode(gin.TestMode)
+	mockMounter := new(MockMounterUtils)
+	router := gin.Default()
+	router.POST("/unmount", handleCosUnmount(mockMounter))
+
+	body := `{"path":"/var/lib/kubelet/pods/p1/volumes/x"}{"path":"/mnt/evil"}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/unmount", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	mockMounter.AssertNotCalled(t, "FuseUnmount")
 }
 
 func TestHandleCosMount_DuplicatePathKey_Rejected(t *testing.T) {
