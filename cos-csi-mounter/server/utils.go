@@ -25,8 +25,8 @@ type MountRequest struct {
 }
 
 var (
-	// Directories where bucket can be mounted
-	safeMountDirs = []string{"/var/data/kubelet/pods", "/var/lib/kubelet/pods"}
+	// Directories where bucket can be mounted.
+	safeMountDirs = []string{"/var/data/kubelet/pods/", "/var/lib/kubelet/pods/"}
 	// Directories where s3fs/rclone configuration files need to be present
 	safeMounterConfigDir = "/var/lib/coscsi-config"
 
@@ -183,9 +183,7 @@ func pathValidator(targetPath string) error {
 		return fmt.Errorf("bad value for target path \"%v\"", targetPath)
 	}
 	for _, dir := range safeMountDirs {
-		// Use dir+"/" so that a path like /var/lib/kubelet/pods-evil does not
-		// pass by sharing a string prefix with /var/lib/kubelet/pods.
-		if strings.HasPrefix(absPath, dir+"/") {
+		if strings.HasPrefix(absPath, dir) {
 			return nil
 		}
 	}
