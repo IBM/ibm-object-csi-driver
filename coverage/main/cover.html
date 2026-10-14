@@ -61,11 +61,11 @@
 				
 				<option value="file2">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/s3fs.go (92.3%)</option>
 				
-				<option value="file3">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/server.go (83.2%)</option>
+				<option value="file3">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/server.go (82.5%)</option>
 				
-				<option value="file4">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/utils.go (91.7%)</option>
+				<option value="file4">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/utils.go (92.6%)</option>
 				
-				<option value="file5">github.com/IBM/ibm-object-csi-driver/pkg/driver/controllerserver.go (92.7%)</option>
+				<option value="file5">github.com/IBM/ibm-object-csi-driver/pkg/driver/controllerserver.go (92.6%)</option>
 				
 				<option value="file6">github.com/IBM/ibm-object-csi-driver/pkg/driver/fileOps.go (100.0%)</option>
 				
@@ -77,11 +77,11 @@
 				
 				<option value="file10">github.com/IBM/ibm-object-csi-driver/pkg/driver/server.go (69.5%)</option>
 				
-				<option value="file11">github.com/IBM/ibm-object-csi-driver/pkg/mounter/mounter-rclone.go (96.9%)</option>
+				<option value="file11">github.com/IBM/ibm-object-csi-driver/pkg/mounter/mounter-rclone.go (96.0%)</option>
 				
-				<option value="file12">github.com/IBM/ibm-object-csi-driver/pkg/mounter/mounter-s3fs.go (97.1%)</option>
+				<option value="file12">github.com/IBM/ibm-object-csi-driver/pkg/mounter/mounter-s3fs.go (96.2%)</option>
 				
-				<option value="file13">github.com/IBM/ibm-object-csi-driver/pkg/mounter/mounter.go (21.7%)</option>
+				<option value="file13">github.com/IBM/ibm-object-csi-driver/pkg/mounter/mounter.go (22.6%)</option>
 				
 				<option value="file14">github.com/IBM/ibm-object-csi-driver/pkg/s3client/s3client.go (89.2%)</option>
 				
@@ -825,7 +825,7 @@ var (
         logger             *zap.Logger
         MakeDir            = os.MkdirAll
         RemoveFile         = os.Remove
-        UnixSocketListener = func(network, address string) (net.Listener, error) <span class="cov4" title="2">{
+        UnixSocketListener = func(network, address string) (net.Listener, error) <span class="cov3" title="2">{
                 return net.Listen(network, address)
         }</span>
 
@@ -865,7 +865,7 @@ func isInvalidSync(err error) bool <span class="cov1" title="1">{
                 strings.Contains(strings.ToLower(err.Error()), "inappropriate ioctl") // catch edge cases on some platforms
 }</span>
 
-func setupSocket() (net.Listener, error) <span class="cov7" title="4">{
+func setupSocket() (net.Listener, error) <span class="cov6" title="4">{
         socketPath := filepath.Join(constants.SocketDir, constants.SocketFile)
 
         // Ensure the socket directory exists
@@ -875,21 +875,21 @@ func setupSocket() (net.Listener, error) <span class="cov7" title="4">{
         }</span>
 
         // Check for socket file
-        <span class="cov6" title="3">if _, err := os.Stat(socketPath); err == nil </span><span class="cov1" title="1">{
+        <span class="cov5" title="3">if _, err := os.Stat(socketPath); err == nil </span><span class="cov1" title="1">{
                 if err := RemoveFile(socketPath); err != nil </span><span class="cov1" title="1">{
                         logger.Warn("Failed to remove existing socket file", zap.String("path", socketPath), zap.Error(err))
                 }</span>
-        } else<span class="cov4" title="2"> if !os.IsNotExist(err) </span><span class="cov1" title="1">{
+        } else<span class="cov3" title="2"> if !os.IsNotExist(err) </span><span class="cov1" title="1">{
                 logger.Warn("Could not stat socket file", zap.String("path", socketPath), zap.Error(err))
         }</span>
 
-        <span class="cov6" title="3">logger.Info("Creating unix socket listener...", zap.String("path", socketPath))
+        <span class="cov5" title="3">logger.Info("Creating unix socket listener...", zap.String("path", socketPath))
         listener, err := UnixSocketListener("unix", socketPath)
         if err != nil </span><span class="cov1" title="1">{
                 logger.Error("Failed to create unix socket listener", zap.String("path", socketPath), zap.Error(err))
                 return nil, err
         }</span>
-        <span class="cov4" title="2">return listener, nil</span>
+        <span class="cov3" title="2">return listener, nil</span>
 }
 
 func handleSignals() <span class="cov0" title="0">{
@@ -920,7 +920,7 @@ func newRouter() *gin.Engine <span class="cov1" title="1">{
         return router
 }</span>
 
-func startService(setupSocketFunc func() (net.Listener, error), router http.Handler, handleSignalsFunc func()) error <span class="cov4" title="2">{
+func startService(setupSocketFunc func() (net.Listener, error), router http.Handler, handleSignalsFunc func()) error <span class="cov3" title="2">{
         listener, err := setupSocketFunc()
         if err != nil </span><span class="cov1" title="1">{
                 logger.Error("Failed to create socket", zap.Error(err))
@@ -961,17 +961,15 @@ func main() <span class="cov0" title="0">{
         }</span>
 }
 
-func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser) gin.HandlerFunc <span class="cov10" title="7">{
-        return func(c *gin.Context) </span><span class="cov9" title="6">{
+func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser) gin.HandlerFunc <span class="cov10" title="9">{
+        return func(c *gin.Context) </span><span class="cov9" title="8">{
                 var request MountRequest
 
-                if err := c.BindJSON(&amp;request); err != nil </span><span class="cov1" title="1">{
-                        logger.Error("invalid request: ", zap.Error(err))
-                        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+                if !decodeNoDuplicateKeys(c, &amp;request) </span><span class="cov5" title="3">{
                         return
                 }</span>
 
-                <span class="cov8" title="5">logger.Info("New mount request with values:", zap.String("Bucket", request.Bucket), zap.String("Path", request.Path), zap.String("Mounter", request.Mounter), zap.Any("Args", redactArgsForLog(request.Args)))
+                <span class="cov7" title="5">logger.Info("New mount request with values:", zap.String("Bucket", request.Bucket), zap.String("Path", request.Path), zap.String("Mounter", request.Mounter), zap.Any("Args", redactArgsForLog(request.Args)))
 
                 if request.Mounter != constants.S3FS &amp;&amp; request.Mounter != constants.RClone </span><span class="cov1" title="1">{
                         logger.Error("invalid mounter", zap.Any("mounter", request.Mounter))
@@ -979,14 +977,14 @@ func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser)
                         return
                 }</span>
 
-                <span class="cov7" title="4">if request.Bucket == "" </span><span class="cov1" title="1">{
+                <span class="cov6" title="4">if request.Bucket == "" </span><span class="cov1" title="1">{
                         logger.Error("missing bucket in request")
                         c.JSON(http.StatusBadRequest, gin.H{"error": "missing bucket"})
                         return
                 }</span>
 
                 // validate mounter args
-                <span class="cov6" title="3">args, err := parser.Parse(request)
+                <span class="cov5" title="3">args, err := parser.Parse(request)
                 if err != nil </span><span class="cov1" title="1">{
                         logger.Error("failed to parse mounter args", zap.Any("mounter", request.Mounter), zap.Error(err))
 
@@ -994,7 +992,7 @@ func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser)
                         return
                 }</span>
 
-                <span class="cov4" title="2">err = mounter.FuseMount(request.Path, request.Mounter, args)
+                <span class="cov3" title="2">err = mounter.FuseMount(request.Path, request.Mounter, args)
                 if err != nil </span><span class="cov1" title="1">{
                         logger.Error("mount failed: ", zap.Error(err))
                         c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("mount failed: %v", err)})
@@ -1006,19 +1004,17 @@ func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser)
         }
 }
 
-func handleCosUnmount(mounter mounterUtils.MounterUtils) gin.HandlerFunc <span class="cov7" title="4">{
-        return func(c *gin.Context) </span><span class="cov6" title="3">{
+func handleCosUnmount(mounter mounterUtils.MounterUtils) gin.HandlerFunc <span class="cov8" title="6">{
+        return func(c *gin.Context) </span><span class="cov7" title="5">{
                 var request struct {
                         Path string `json:"path"`
                 }
 
-                if err := c.BindJSON(&amp;request); err != nil </span><span class="cov1" title="1">{
-                        logger.Error("invalid request: ", zap.Error(err))
-                        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+                if !decodeNoDuplicateKeys(c, &amp;request) </span><span class="cov5" title="3">{
                         return
                 }</span>
 
-                <span class="cov4" title="2">logger.Info("New unmount request with values: ", zap.String("Path", request.Path))
+                <span class="cov3" title="2">logger.Info("New unmount request with values: ", zap.String("Path", request.Path))
 
                 err := mounter.FuseUnmount(request.Path)
                 if err != nil </span><span class="cov1" title="1">{
@@ -1039,11 +1035,16 @@ import (
         "bytes"
         "encoding/json"
         "fmt"
+        "io"
+        "net/http"
         "os"
         "path/filepath"
+        "reflect"
         "strings"
 
         "github.com/IBM/ibm-object-csi-driver/pkg/constants"
+        "github.com/gin-gonic/gin"
+        "go.uber.org/zap"
 )
 
 // MountRequest ...
@@ -1055,8 +1056,8 @@ type MountRequest struct {
 }
 
 var (
-        // Directories where bucket can be mounted
-        safeMountDirs = []string{"/var/data/kubelet/pods", "/var/lib/kubelet/pods"}
+        // Directories where bucket can be mounted.
+        safeMountDirs = []string{"/var/data/kubelet/pods/", "/var/lib/kubelet/pods/"}
         // Directories where s3fs/rclone configuration files need to be present
         safeMounterConfigDir = "/var/lib/coscsi-config"
 
@@ -1074,21 +1075,150 @@ type MounterArgsParser interface {
         Parse(request MountRequest) ([]string, error)
 }
 
-func strictDecodeForUnknownFields(data json.RawMessage, v interface{}) error <span class="cov5" title="6">{
+func strictDecodeForUnknownFields(data json.RawMessage, v interface{}) error <span class="cov4" title="6">{
         dec := json.NewDecoder(bytes.NewReader(data))
         dec.DisallowUnknownFields()
         return dec.Decode(v)
 }</span>
 
-func pathValidator(targetPath string) error <span class="cov10" title="47">{
+// jsonFieldNames returns the exact JSON key names declared on the struct
+// that v points to.
+func jsonFieldNames(v interface{}) map[string]struct{} <span class="cov7" title="35">{
+        t := reflect.TypeOf(v)
+        for t.Kind() == reflect.Ptr </span><span class="cov7" title="36">{
+                t = t.Elem()
+        }</span>
+        <span class="cov7" title="35">names := make(map[string]struct{}, t.NumField())
+        for i := 0; i &lt; t.NumField(); i++ </span><span class="cov10" title="109">{
+                name, _, _ := strings.Cut(t.Field(i).Tag.Get("json"), ",")
+                if name != "" &amp;&amp; name != "-" </span><span class="cov9" title="103">{
+                        names[name] = struct{}{}
+                }</span>
+        }
+        <span class="cov7" title="35">return names</span>
+}
+
+// decodeNoDuplicateKeys reads the request body into v, rejecting any JSON
+// object that contains the same key more than once at the top level.
+// encoding/json matches keys to struct fields case-insensitively (including
+// Unicode folds such as "arg\u017f" == "args"), which would let a
+// case-variant key silently collide with a real one. To avoid that, every
+// top-level key must exactly match a json tag on v; duplicates are then
+// detected with a plain exact-string comparison. It also applies
+// DisallowUnknownFields and rejects any data trailing the JSON object.
+// On error it writes the appropriate 400 response and returns false.
+func decodeNoDuplicateKeys(c *gin.Context, v interface{}) bool <span class="cov8" title="41">{
+        body, err := io.ReadAll(c.Request.Body)
+        if err != nil </span><span class="cov1" title="1">{
+                logger.Error("failed to read request body", zap.Error(err))
+                c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read request body"})
+                return false
+        }</span>
+
+        // First pass: detect duplicate top-level keys using the token stream.
+        <span class="cov8" title="40">dec := json.NewDecoder(bytes.NewReader(body))
+        // Consume opening '{'.
+        if tok, err := dec.Token(); err != nil || tok != json.Delim('{') </span><span class="cov4" title="8">{
+                logger.Error("invalid request body: expected JSON object", zap.Error(err))
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: expected JSON object"})
+                return false
+        }</span>
+        <span class="cov7" title="32">allowed := jsonFieldNames(v)
+        seen := make(map[string]struct{})
+        for dec.More() </span><span class="cov9" title="70">{
+                keyTok, err := dec.Token()
+                if err != nil </span><span class="cov0" title="0">{
+                        logger.Error("invalid request body: failed to read key", zap.Error(err))
+                        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: malformed JSON"})
+                        return false
+                }</span>
+                <span class="cov9" title="70">key, ok := keyTok.(string)
+                if !ok </span><span class="cov0" title="0">{
+                        logger.Error("invalid request body: non-string key")
+                        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: non-string key"})
+                        return false
+                }</span>
+                <span class="cov9" title="70">if _, ok := allowed[key]; !ok </span><span class="cov4" title="7">{
+                        logger.Error("invalid request body: unknown or non-exact key", zap.String("key", key))
+                        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+                        return false
+                }</span>
+                <span class="cov8" title="63">if _, exists := seen[key]; exists </span><span class="cov4" title="5">{
+                        logger.Error("invalid request body: duplicate key", zap.String("key", key))
+                        c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid request: duplicate key %q", key)})
+                        return false
+                }</span>
+                <span class="cov8" title="58">seen[key] = struct{}{}
+                // Skip the value so the loop advances to the next key.
+                if err := skipJSONValue(dec); err != nil </span><span class="cov3" title="4">{
+                        logger.Error("invalid request body: failed to read value", zap.Error(err))
+                        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: malformed JSON"})
+                        return false
+                }</span>
+        }
+
+        // Second pass: unmarshal with DisallowUnknownFields.
+        <span class="cov6" title="16">dec2 := json.NewDecoder(bytes.NewReader(body))
+        dec2.DisallowUnknownFields()
+        if err := dec2.Decode(v); err != nil </span><span class="cov1" title="1">{
+                logger.Error("invalid request body: decode failed", zap.Error(err))
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+                return false
+        }</span>
+        // Reject trailing data after the JSON object.
+        <span class="cov6" title="15">if _, err := dec2.Token(); err != io.EOF </span><span class="cov3" title="4">{
+                logger.Error("invalid request body: unexpected trailing data")
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+                return false
+        }</span>
+        <span class="cov5" title="11">return true</span>
+}
+
+// skipJSONValue advances the decoder past one complete JSON value
+// (scalar, object, or array) so the caller can move to the next key.
+func skipJSONValue(dec *json.Decoder) error <span class="cov9" title="77">{
+        tok, err := dec.Token()
+        if err != nil </span><span class="cov3" title="4">{
+                return err
+        }</span>
+        <span class="cov9" title="73">if d, ok := tok.(json.Delim); !ok || (d != '{' &amp;&amp; d != '[') </span><span class="cov8" title="49">{
+                return nil // scalar value
+        }</span>
+        // Composite value: consume tokens until the matching closing delimiter.
+        <span class="cov7" title="24">for depth := 1; depth &gt; 0; </span><span class="cov9" title="105">{
+                tok, err := dec.Token()
+                if err != nil </span><span class="cov4" title="8">{
+                        return err
+                }</span>
+                <span class="cov9" title="97">if d, ok := tok.(json.Delim); ok </span><span class="cov8" title="52">{
+                        switch d </span>{
+                        case '{', '[':<span class="cov6" title="19">
+                                depth++</span>
+                        case '}', ']':<span class="cov7" title="33">
+                                depth--</span>
+                        }
+                }
+        }
+        <span class="cov6" title="16">return nil</span>
+}
+
+// pathValidator validates that the target path resolves to an absolute path,
+// ends with "/mount", and resides strictly within one of the safe mount directories.
+func pathValidator(targetPath string) error <span class="cov8" title="56">{
         absPath, err := absPathResolver(targetPath)
-        if err != nil </span><span class="cov0" title="0">{
+        if err != nil </span><span class="cov1" title="1">{
                 return fmt.Errorf("failed to resolve absolute mount path: %v", err)
         }</span>
-        <span class="cov10" title="47">if !strings.HasPrefix(absPath, safeMountDirs[0]) &amp;&amp; !strings.HasPrefix(absPath, safeMountDirs[1]) </span><span class="cov4" title="4">{
+        // CSI target paths must end with "/mount"
+        <span class="cov8" title="55">if !strings.HasSuffix(absPath, "/mount") </span><span class="cov4" title="8">{
                 return fmt.Errorf("bad value for target path \"%v\"", targetPath)
         }</span>
-        <span class="cov9" title="43">return nil</span>
+        <span class="cov8" title="47">for _, dir := range safeMountDirs </span><span class="cov8" title="50">{
+                if strings.HasPrefix(absPath, dir) </span><span class="cov8" title="45">{
+                        return nil
+                }</span>
+        }
+        <span class="cov2" title="2">return fmt.Errorf("bad value for target path \"%v\"", targetPath)</span>
 }
 
 // --- Parser for Mounter Arguments ---
@@ -1099,7 +1229,7 @@ func (p *DefaultMounterArgsParser) Parse(request MountRequest) ([]string, error)
         return request.ParseMounterArgs()
 }</span>
 
-func (req *MountRequest) ParseMounterArgs() ([]string, error) <span class="cov5" title="7">{
+func (req *MountRequest) ParseMounterArgs() ([]string, error) <span class="cov4" title="7">{
         switch req.Mounter </span>{
         case constants.S3FS:<span class="cov3" title="3">
                 var args S3FSArgs
@@ -1127,7 +1257,7 @@ func (req *MountRequest) ParseMounterArgs() ([]string, error) <span class="cov5"
 }
 
 // isBoolString checks if a string is "true" or "false" (case-insensitive)
-func isBoolString(s string) bool <span class="cov7" title="18">{
+func isBoolString(s string) bool <span class="cov6" title="18">{
         s = strings.TrimSpace(strings.ToLower(s))
         return s == "true" || s == "false"
 }</span>
@@ -1154,11 +1284,11 @@ func fileExists(path string) (bool, error) <span class="cov3" title="3">{
 // redactArgsForLog returns a copy of the raw Args JSON with the value of
 // "passwd_file" replaced by "xxxxx", leaving all other fields unchanged.
 // If the JSON cannot be parsed, the original raw bytes are returned as-is.
-func redactArgsForLog(raw json.RawMessage) json.RawMessage <span class="cov6" title="9">{
+func redactArgsForLog(raw json.RawMessage) json.RawMessage <span class="cov5" title="9">{
         if len(raw) == 0 </span><span class="cov1" title="1">{
                 return raw
         }</span>
-        <span class="cov5" title="8">var m map[string]interface{}
+        <span class="cov4" title="8">var m map[string]interface{}
         if err := json.Unmarshal(raw, &amp;m); err != nil </span><span class="cov3" title="3">{
                 return raw
         }</span>
@@ -1217,7 +1347,7 @@ type controllerServer struct {
         Logger     *zap.Logger
 }
 
-func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) <span class="cov10" title="28">{
+func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) <span class="cov10" title="26">{
         var (
                 bucketName         string
                 endPoint           string
@@ -1233,34 +1363,34 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
         if err != nil </span><span class="cov0" title="0">{
                 return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
         }</span>
-        <span class="cov10" title="28">klog.V(3).Infof("CSIControllerServer-CreateVolume: Request: %v", modifiedRequest.(*csi.CreateVolumeRequest))
+        <span class="cov10" title="26">klog.V(3).Infof("CSIControllerServer-CreateVolume: Request: %v", modifiedRequest.(*csi.CreateVolumeRequest))
 
         volumeName, err := sanitizeVolumeID(req.GetName())
         if err != nil </span><span class="cov0" title="0">{
                 return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in sanitizeVolumeID %v", err))
         }</span>
-        <span class="cov10" title="28">volumeID := volumeName
+        <span class="cov10" title="26">volumeID := volumeName
         if len(volumeID) == 0 </span><span class="cov1" title="1">{
                 return nil, status.Error(codes.InvalidArgument, "Volume name missing in request")
         }</span>
-        <span class="cov9" title="27">klog.Infof("Got a request to create volume: %s", volumeID)
+        <span class="cov9" title="25">klog.Infof("Got a request to create volume: %s", volumeID)
 
         caps := req.GetVolumeCapabilities()
         if caps == nil </span><span class="cov1" title="1">{
                 return nil, status.Error(codes.InvalidArgument, "Volume Capabilities missing in request")
         }</span>
-        <span class="cov9" title="26">for _, cap := range caps </span><span class="cov9" title="26">{
+        <span class="cov9" title="24">for _, cap := range caps </span><span class="cov9" title="24">{
                 klog.Infof("Volume capability: %s", cap)
                 if cap.GetBlock() != nil </span><span class="cov1" title="1">{
                         return nil, status.Error(codes.InvalidArgument, "Volume type block Volume not supported")
                 }</span>
         }
 
-        <span class="cov9" title="25">params := req.GetParameters()
-        if params == nil </span><span class="cov7" title="13">{
+        <span class="cov9" title="23">params := req.GetParameters()
+        if params == nil </span><span class="cov7" title="11">{
                 params = make(map[string]string)
         }</span>
-        <span class="cov9" title="25">klog.Info("CreateVolume Parameters:\n\t", params)
+        <span class="cov9" title="23">klog.Info("CreateVolume Parameters:\n\t", params)
 
         secretMap := req.GetSecrets()
         klog.Info("req.GetSecrets() length:\t", len(secretMap))
@@ -1276,7 +1406,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
                         return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("pvcName not specified, could not fetch the secret %v", err))
                 }</span>
 
-                <span class="cov5" title="6">if pvcNamespace == "" </span><span class="cov3" title="3">{
+                <span class="cov5" title="6">if pvcNamespace == "" </span><span class="cov4" title="3">{
                         pvcNamespace = constants.DefaultNamespace
                 }</span>
 
@@ -1315,7 +1445,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 
                 <span class="cov2" title="2">secretMap = secretMapCustom</span>
         }
-        <span class="cov9" title="20">if quotaLimitStr, ok := secretMap[constants.QuotaLimitKey]; ok &amp;&amp; quotaLimitStr != "" </span><span class="cov7" title="10">{
+        <span class="cov8" title="18">if quotaLimitStr, ok := secretMap[constants.QuotaLimitKey]; ok &amp;&amp; quotaLimitStr != "" </span><span class="cov6" title="8">{
                 klog.Infof("quotaLimit from secretMap: %q", quotaLimitStr)
                 quotaLimitEnabled, err = strconv.ParseBool(quotaLimitStr)
                 if err != nil </span><span class="cov1" title="1">{
@@ -1323,58 +1453,54 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
                                 fmt.Sprintf("invalid quotaLimit value %q: must be 'true' or 'false'", quotaLimitStr))
                 }</span>
 
-                <span class="cov6" title="9">if quotaLimitEnabled </span><span class="cov6" title="8">{
-                        apiKeyVal := secretMap[constants.ApiKey]
-                        if apiKeyVal == "" </span><span class="cov5" title="6">{
-                                apiKeyVal = secretMap[constants.ResourceConfigApiKey]
-                        }</span>
-                        <span class="cov6" title="8">if apiKeyVal == "" </span><span class="cov1" title="1">{
+                <span class="cov6" title="7">if quotaLimitEnabled </span><span class="cov5" title="6">{
+                        if secretMap[constants.ResourceConfigApiKey] == "" </span><span class="cov1" title="1">{
                                 return nil, status.Error(codes.InvalidArgument,
-                                        "apiKey is missing in secret, cannot set quota limit for bucket")
+                                        "resourceConfigApiKey missing in secret, cannot set quota limit for bucket")
                         }</span>
 
-                        <span class="cov6" title="7">quotaBytes := req.GetCapacityRange().GetRequiredBytes()
+                        <span class="cov5" title="5">quotaBytes := req.GetCapacityRange().GetRequiredBytes()
                         if quotaBytes &lt;= 0 </span><span class="cov1" title="1">{
                                 return nil, status.Error(codes.InvalidArgument,
                                         "enable quotaLimit requested but no positive storage size requested in PVC")
                         }</span>
-                        <span class="cov5" title="6">klog.Infof("enable quota limit requested with %d bytes", quotaBytes)</span>
+                        <span class="cov4" title="4">klog.Infof("enable quota limit requested with %d bytes", quotaBytes)</span>
                 }
         }
 
-        <span class="cov8" title="17">endPoint = secretMap["cosEndpoint"]
+        <span class="cov8" title="15">endPoint = secretMap["cosEndpoint"]
         if endPoint == "" </span><span class="cov1" title="1">{
                 endPoint = params["cosEndpoint"]
-        }</span> else<span class="cov8" title="16"> {
+        }</span> else<span class="cov8" title="14"> {
                 params["cosEndpoint"] = endPoint
         }</span>
-        <span class="cov8" title="17">if endPoint == "" </span><span class="cov1" title="1">{
+        <span class="cov8" title="15">if endPoint == "" </span><span class="cov1" title="1">{
                 return nil, status.Error(codes.InvalidArgument, "cosEndpoint unknown")
         }</span>
 
-        <span class="cov8" title="16">locationConstraint = secretMap["locationConstraint"]
+        <span class="cov8" title="14">locationConstraint = secretMap["locationConstraint"]
         if locationConstraint == "" </span><span class="cov1" title="1">{
                 locationConstraint = params["locationConstraint"]
-        }</span> else<span class="cov8" title="15"> {
+        }</span> else<span class="cov8" title="13"> {
                 params["locationConstraint"] = locationConstraint
         }</span>
-        <span class="cov8" title="16">if locationConstraint == "" </span><span class="cov1" title="1">{
+        <span class="cov8" title="14">if locationConstraint == "" </span><span class="cov1" title="1">{
                 return nil, status.Error(codes.InvalidArgument, "locationConstraint unknown")
         }</span>
 
-        <span class="cov8" title="15">kpRootKeyCrn = secretMap[constants.KpRootKeyCRN]
+        <span class="cov8" title="13">kpRootKeyCrn = secretMap[constants.KpRootKeyCRN]
         if kpRootKeyCrn != "" </span><span class="cov6" title="7">{
                 klog.Infof("key protect root key crn provided for bucket creation")
         }</span>
 
-        <span class="cov8" title="15">mounter := secretMap["mounter"]
-        if mounter == "" </span><span class="cov7" title="12">{
+        <span class="cov8" title="13">mounter := secretMap["mounter"]
+        if mounter == "" </span><span class="cov7" title="10">{
                 mounter = params["mounter"]
-        }</span> else<span class="cov3" title="3"> {
+        }</span> else<span class="cov4" title="3"> {
                 params["mounter"] = mounter
         }</span>
 
-        <span class="cov8" title="15">bucketName = secretMap["bucketName"]
+        <span class="cov8" title="13">bucketName = secretMap["bucketName"]
 
         // Check for bucketVersioning parameter
         if val, ok := secretMap[constants.BucketVersioning]; ok &amp;&amp; val != "" </span><span class="cov2" title="2">{
@@ -1384,7 +1510,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
                 }</span>
                 <span class="cov1" title="1">bucketVersioning = enable
                 klog.Infof("BucketVersioning value that will be set via secret: %s", bucketVersioning)</span>
-        } else<span class="cov7" title="13"> if val, ok := params[constants.BucketVersioning]; ok &amp;&amp; val != "" </span><span class="cov2" title="2">{
+        } else<span class="cov7" title="11"> if val, ok := params[constants.BucketVersioning]; ok &amp;&amp; val != "" </span><span class="cov2" title="2">{
                 enable := strings.ToLower(strings.TrimSpace(val))
                 if enable != "true" &amp;&amp; enable != "false" </span><span class="cov1" title="1">{
                         return nil, status.Error(codes.InvalidArgument,
@@ -1394,15 +1520,15 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
                 klog.Infof("BucketVersioning value that will be set via storage class params: %s", bucketVersioning)</span>
         }
 
-        <span class="cov7" title="13">creds, err := getObjectStorageCredentialsFromSecret(secretMap, cs.iamEndpoint)
+        <span class="cov7" title="11">creds, err := getObjectStorageCredentialsFromSecret(secretMap, cs.iamEndpoint)
         if err != nil </span><span class="cov1" title="1">{
                 return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in getting credentials %v", err))
         }</span>
-        <span class="cov7" title="12">klog.Infof("cosEndpoint and locationConstraint getting paased to ObjectStorageSession: %s, %s", endPoint, locationConstraint)
+        <span class="cov7" title="10">klog.Infof("cosEndpoint and locationConstraint getting paased to ObjectStorageSession: %s, %s", endPoint, locationConstraint)
         sess := cs.cosSession.NewObjectStorageSession(endPoint, locationConstraint, creds, cs.Logger)
 
         params["userProvidedBucket"] = "true"
-        if bucketName != "" </span><span class="cov6" title="9">{
+        if bucketName != "" </span><span class="cov6" title="7">{
                 // User Provided bucket. Check its existence and create if not present
                 klog.Infof("Bucket name provided: %v", bucketName)
                 klog.Infof("Check if the provided bucket already exists: %v", bucketName)
@@ -1416,15 +1542,12 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
                         klog.Infof("Created bucket: %s", bucketName)</span>
                 }
 
-                <span class="cov6" title="7">if quotaLimitEnabled </span><span class="cov4" title="4">{
+                <span class="cov5" title="5">if quotaLimitEnabled </span><span class="cov2" title="2">{
                         quotaBytes := req.GetCapacityRange().GetRequiredBytes()
-                        apiKey := secretMap[constants.ApiKey]
-                        if apiKey == "" </span><span class="cov2" title="2">{
-                                apiKey = secretMap[constants.ResourceConfigApiKey]
-                        }</span>
+                        resConfApikey := secretMap[constants.ResourceConfigApiKey]
 
-                        <span class="cov4" title="4">klog.Infof("Applying hard quota of %d bytes to bucket %s", quotaBytes, bucketName)
-                        err = sess.UpdateQuotaLimit(quotaBytes, apiKey, bucketName, endPoint, creds.IAMEndpoint)
+                        klog.Infof("Applying hard quota of %d bytes to bucket %s", quotaBytes, bucketName)
+                        err = sess.UpdateQuotaLimit(quotaBytes, resConfApikey, bucketName, endPoint, creds.IAMEndpoint)
                         if err != nil </span><span class="cov1" title="1">{
                                 klog.Errorf("Failed to set quota limit on bucket %s: %v", bucketName, err)
                                 if params["userProvidedBucket"] == "false" </span><span class="cov0" title="0">{
@@ -1434,10 +1557,10 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
                                 }
                                 <span class="cov1" title="1">return nil, status.Error(codes.Internal, fmt.Sprintf("failed to set bucket quota limit: %v", err))</span>
                         }
-                        <span class="cov3" title="3">klog.Infof("Successfully applied hard quota %d bytes to bucket %s", quotaBytes, bucketName)</span>
+                        <span class="cov1" title="1">klog.Infof("Successfully applied hard quota %d bytes to bucket %s", quotaBytes, bucketName)</span>
                 }
 
-                <span class="cov5" title="6">if bucketVersioning != "" </span><span class="cov1" title="1">{
+                <span class="cov4" title="4">if bucketVersioning != "" </span><span class="cov1" title="1">{
                         enable := strings.ToLower(strings.TrimSpace(bucketVersioning)) == "true"
                         klog.Infof("Bucket versioning value evaluated to: %t", enable)
 
@@ -1454,8 +1577,8 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
                         <span class="cov1" title="1">klog.Infof("Bucket versioning set to %t for bucket %s", enable, bucketName)</span>
                 }
 
-                <span class="cov5" title="6">params["bucketName"] = bucketName</span>
-        } else<span class="cov3" title="3"> {
+                <span class="cov4" title="4">params["bucketName"] = bucketName</span>
+        } else<span class="cov4" title="3"> {
                 // Generate random temp bucket name based on volume id
                 klog.Infof("Bucket name not provided")
                 tempBucketName := getTempBucketName(mounter, volumeID)
@@ -1463,20 +1586,17 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
                         klog.Errorf("CreateVolume: Unable to generate the bucket name")
                         return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("Unable to access the bucket: %v", tempBucketName))
                 }</span>
-                <span class="cov3" title="3">err = createBucket(sess, tempBucketName, kpRootKeyCrn)
+                <span class="cov4" title="3">err = createBucket(sess, tempBucketName, kpRootKeyCrn)
                 if err != nil </span><span class="cov0" title="0">{
                         return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("%v: %v", err, tempBucketName))
                 }</span>
 
-                <span class="cov3" title="3">if quotaLimitEnabled </span><span class="cov2" title="2">{
+                <span class="cov4" title="3">if quotaLimitEnabled </span><span class="cov2" title="2">{
                         quotaBytes := req.GetCapacityRange().GetRequiredBytes()
-                        apiKey := secretMap[constants.ApiKey]
-                        if apiKey == "" </span><span class="cov2" title="2">{
-                                apiKey = secretMap[constants.ResourceConfigApiKey]
-                        }</span>
+                        resConfApikey := secretMap[constants.ResourceConfigApiKey]
 
-                        <span class="cov2" title="2">klog.Infof("Applying hard quota of %d bytes to temp bucket %s", quotaBytes, tempBucketName)
-                        err = sess.UpdateQuotaLimit(quotaBytes, apiKey, tempBucketName, endPoint, creds.IAMEndpoint)
+                        klog.Infof("Applying hard quota of %d bytes to temp bucket %s", quotaBytes, tempBucketName)
+                        err = sess.UpdateQuotaLimit(quotaBytes, resConfApikey, tempBucketName, endPoint, creds.IAMEndpoint)
                         if err != nil </span><span class="cov1" title="1">{
                                 klog.Errorf("Failed to set quota limit on temp bucket %s: %v", tempBucketName, err)
                                 if delErr := sess.DeleteBucket(tempBucketName); delErr != nil </span><span class="cov0" title="0">{
@@ -1505,7 +1625,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
                 params["userProvidedBucket"] = "false"
                 params["bucketName"] = tempBucketName</span>
         }
-        <span class="cov6" title="8">klog.Infof("create volume: %v", volumeID)
+        <span class="cov5" title="6">klog.Infof("create volume: %v", volumeID)
         //COS Endpoint, bucket, access keys will be stored in the csiProvisionerSecretName
         //The other tunables will be SC Parameters like ibm.io/multireq-max and other
 
@@ -1518,12 +1638,12 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
         }, nil</span>
 }
 
-func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) <span class="cov6" title="9">{
+func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) <span class="cov7" title="9">{
         modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
         if err != nil </span><span class="cov0" title="0">{
                 return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
         }</span>
-        <span class="cov6" title="9">klog.V(3).Infof("CSIControllerServer-DeleteVolume: Request: %v", modifiedRequest.(*csi.DeleteVolumeRequest))
+        <span class="cov7" title="9">klog.V(3).Infof("CSIControllerServer-DeleteVolume: Request: %v", modifiedRequest.(*csi.DeleteVolumeRequest))
 
         volumeID := req.GetVolumeId()
         if len(volumeID) == 0 </span><span class="cov1" title="1">{
@@ -1543,7 +1663,7 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
                         return nil, err
                 }</span>
 
-                <span class="cov3" title="3">klog.Info("pv Resource details:\n\t", pv)
+                <span class="cov4" title="3">klog.Info("pv Resource details:\n\t", pv)
 
                 secretName := pv.Spec.CSI.NodePublishSecretRef.Name
                 secretNamespace := pv.Spec.CSI.NodePublishSecretRef.Namespace
@@ -1584,15 +1704,15 @@ func (cs *controllerServer) DeleteVolume(_ context.Context, req *csi.DeleteVolum
                 return &amp;csi.DeleteVolumeResponse{}, nil
         }</span>
 
-        <span class="cov3" title="3">if bucketToDelete != "" </span><span class="cov3" title="3">{
+        <span class="cov4" title="3">if bucketToDelete != "" </span><span class="cov4" title="3">{
                 err = sess.DeleteBucket(bucketToDelete)
                 if err != nil </span><span class="cov1" title="1">{
                         klog.V(3).Infof("Cannot delete temp bucket: %v; error msg: %v", bucketToDelete, err)
                 }</span>
-                <span class="cov3" title="3">klog.Infof("End of bucket delete for  %v", volumeID)</span>
+                <span class="cov4" title="3">klog.Infof("End of bucket delete for  %v", volumeID)</span>
         }
 
-        <span class="cov3" title="3">return &amp;csi.DeleteVolumeResponse{}, nil</span>
+        <span class="cov4" title="3">return &amp;csi.DeleteVolumeResponse{}, nil</span>
 }
 
 func (cs *controllerServer) ControllerPublishVolume(_ context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) <span class="cov1" title="1">{
@@ -1614,7 +1734,7 @@ func (cs *controllerServer) ValidateVolumeCapabilities(_ context.Context, req *c
                 return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
         }</span>
 
-        <span class="cov3" title="3">volCaps := req.GetVolumeCapabilities()
+        <span class="cov4" title="3">volCaps := req.GetVolumeCapabilities()
         if len(volCaps) == 0 </span><span class="cov1" title="1">{
                 return nil, status.Error(codes.InvalidArgument, "Volume capabilities missing in request")
         }</span>
@@ -1685,7 +1805,7 @@ func (cs *controllerServer) ControllerModifyVolume(_ context.Context, req *csi.C
         return nil, status.Error(codes.Unimplemented, "ControllerModifyVolume")
 }</span>
 
-func getObjectStorageCredentialsFromSecret(secretMap map[string]string, iamEP string) (*s3client.ObjectStorageCredentials, error) <span class="cov8" title="18">{
+func getObjectStorageCredentialsFromSecret(secretMap map[string]string, iamEP string) (*s3client.ObjectStorageCredentials, error) <span class="cov8" title="16">{
         klog.Infof("- getObjectStorageCredentialsFromSecret-")
         var (
                 accessKey         string
@@ -1696,30 +1816,30 @@ func getObjectStorageCredentialsFromSecret(secretMap map[string]string, iamEP st
                 iamEndpoint       string
         )
 
-        if val, check := secretMap["iamEndpoint"]; check </span><span class="cov6" title="9">{
+        if val, check := secretMap["iamEndpoint"]; check </span><span class="cov7" title="9">{
                 iamEndpoint = val
         }</span>
-        <span class="cov8" title="18">if iamEndpoint == "" </span><span class="cov6" title="9">{
+        <span class="cov8" title="16">if iamEndpoint == "" </span><span class="cov6" title="7">{
                 iamEndpoint = iamEP
         }</span>
 
-        <span class="cov8" title="18">if val, check := secretMap[constants.ApiKey]; check </span><span class="cov7" title="11">{
+        <span class="cov8" title="16">if val, check := secretMap[constants.ApiKey]; check </span><span class="cov7" title="9">{
                 apiKey = val
         }</span>
 
         // Add In Docs APIKEY is require param in secret
-        <span class="cov8" title="18">authType = "iam"
+        <span class="cov8" title="16">authType = "iam"
         serviceInstanceID = secretMap[constants.ServiceId]
-        if serviceInstanceID == "" </span><span class="cov7" title="10">{
+        if serviceInstanceID == "" </span><span class="cov6" title="8">{
                 accessKey = secretMap[constants.AccessKey]
                 secretKey = secretMap[constants.SecretKey]
                 if accessKey == "" || secretKey == "" </span><span class="cov2" title="2">{
                         return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| serviceId/accessKey/secretKey unknown")
                 }</span>
-                <span class="cov6" title="8">authType = "hmac"</span>
+                <span class="cov5" title="6">authType = "hmac"</span>
         }
 
-        <span class="cov8" title="16">return &amp;s3client.ObjectStorageCredentials{
+        <span class="cov8" title="14">return &amp;s3client.ObjectStorageCredentials{
                 AuthType:          authType,
                 AccessKey:         accessKey,
                 SecretKey:         secretKey,
@@ -1729,7 +1849,7 @@ func getObjectStorageCredentialsFromSecret(secretMap map[string]string, iamEP st
         }, nil</span>
 }
 
-func parseCustomSecret(secret *v1.Secret) map[string]string <span class="cov3" title="3">{
+func parseCustomSecret(secret *v1.Secret) map[string]string <span class="cov4" title="3">{
         klog.Infof("-parseCustomSecret-")
         secretMapCustom := make(map[string]string)
 
@@ -1749,58 +1869,58 @@ func parseCustomSecret(secret *v1.Secret) map[string]string <span class="cov3" t
                 quotaLimit         string
         )
 
-        if bytesVal, ok := secret.Data[constants.AccessKey]; ok </span><span class="cov3" title="3">{
+        if bytesVal, ok := secret.Data[constants.AccessKey]; ok </span><span class="cov4" title="3">{
                 accessKey = string(bytesVal)
         }</span>
 
-        <span class="cov3" title="3">if bytesVal, ok := secret.Data[constants.SecretKey]; ok </span><span class="cov3" title="3">{
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data[constants.SecretKey]; ok </span><span class="cov4" title="3">{
                 secretKey = string(bytesVal)
         }</span>
 
-        <span class="cov3" title="3">if bytesVal, ok := secret.Data[constants.ApiKey]; ok </span><span class="cov3" title="3">{
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data[constants.ApiKey]; ok </span><span class="cov4" title="3">{
                 apiKey = string(bytesVal)
         }</span>
 
-        <span class="cov3" title="3">if bytesVal, ok := secret.Data[constants.KpRootKeyCRN]; ok </span><span class="cov3" title="3">{
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data[constants.KpRootKeyCRN]; ok </span><span class="cov4" title="3">{
                 kpRootKeyCrn = string(bytesVal)
         }</span>
 
-        <span class="cov3" title="3">if bytesVal, ok := secret.Data[constants.ServiceId]; ok </span><span class="cov3" title="3">{
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data[constants.ServiceId]; ok </span><span class="cov4" title="3">{
                 serviceInstanceID = string(bytesVal)
         }</span>
 
-        <span class="cov3" title="3">if bytesVal, ok := secret.Data["bucketName"]; ok </span><span class="cov3" title="3">{
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data["bucketName"]; ok </span><span class="cov4" title="3">{
                 bucketName = string(bytesVal)
         }</span>
 
-        <span class="cov3" title="3">if bytesVal, ok := secret.Data["iamEndpoint"]; ok </span><span class="cov3" title="3">{
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data["iamEndpoint"]; ok </span><span class="cov4" title="3">{
                 iamEndpoint = string(bytesVal)
         }</span>
 
-        <span class="cov3" title="3">if bytesVal, ok := secret.Data["cosEndpoint"]; ok </span><span class="cov3" title="3">{
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data["cosEndpoint"]; ok </span><span class="cov4" title="3">{
                 cosEndpoint = string(bytesVal)
         }</span>
 
-        <span class="cov3" title="3">if bytesVal, ok := secret.Data["locationConstraint"]; ok </span><span class="cov3" title="3">{
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data["locationConstraint"]; ok </span><span class="cov4" title="3">{
                 locationConstraint = string(bytesVal)
         }</span>
 
-        <span class="cov3" title="3">if bytesVal, ok := secret.Data[constants.BucketVersioning]; ok </span><span class="cov0" title="0">{
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data[constants.BucketVersioning]; ok </span><span class="cov0" title="0">{
                 bucketVersioning = string(bytesVal)
         }</span>
 
-        <span class="cov3" title="3">if bytesVal, ok := secret.Data["objectPath"]; ok </span><span class="cov3" title="3">{
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data["objectPath"]; ok </span><span class="cov4" title="3">{
                 objectPath = string(bytesVal)
         }</span>
 
-        <span class="cov3" title="3">if bytesVal, ok := secret.Data[constants.ResourceConfigApiKey]; ok </span><span class="cov0" title="0">{
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data[constants.ResourceConfigApiKey]; ok </span><span class="cov0" title="0">{
                 resConfApiKey = string(bytesVal)
         }</span>
-        <span class="cov3" title="3">if bytesVal, ok := secret.Data[constants.QuotaLimitKey]; ok </span><span class="cov0" title="0">{
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data[constants.QuotaLimitKey]; ok </span><span class="cov0" title="0">{
                 quotaLimit = string(bytesVal)
         }</span>
 
-        <span class="cov3" title="3">secretMapCustom[constants.AccessKey] = accessKey
+        <span class="cov4" title="3">secretMapCustom[constants.AccessKey] = accessKey
         secretMapCustom[constants.SecretKey] = secretKey
         secretMapCustom[constants.ApiKey] = apiKey
         secretMapCustom[constants.KpRootKeyCRN] = kpRootKeyCrn
@@ -1817,7 +1937,7 @@ func parseCustomSecret(secret *v1.Secret) map[string]string <span class="cov3" t
         return secretMapCustom</span>
 }
 
-func getTempBucketName(mounterType, volumeID string) string <span class="cov3" title="3">{
+func getTempBucketName(mounterType, volumeID string) string <span class="cov4" title="3">{
         klog.Infof("mounterType: %v", mounterType)
         currentTime := time.Now()
         timestamp := currentTime.Format("20060102150405")
@@ -1844,10 +1964,10 @@ func createBucket(sess s3client.ObjectStorageSession, bucketName, kpRootKeyCrn s
                 klog.Errorf("CreateVolume: Unable to access the bucket: %v", err)
                 return errors.New("unable to access the bucket")
         }</span>
-        <span class="cov3" title="3">return nil</span>
+        <span class="cov4" title="3">return nil</span>
 }
 
-func sanitizeVolumeID(volumeID string) (string, error) <span class="cov10" title="28">{
+func sanitizeVolumeID(volumeID string) (string, error) <span class="cov10" title="26">{
         var err error
         volumeID = strings.ToLower(volumeID)
         if len(volumeID) &gt; 63 </span><span class="cov1" title="1">{
@@ -1855,7 +1975,7 @@ func sanitizeVolumeID(volumeID string) (string, error) <span class="cov10" title
                 _, err = io.WriteString(h, volumeID)
                 volumeID = hex.EncodeToString(h.Sum(nil))
         }</span>
-        <span class="cov10" title="28">return volumeID, err</span>
+        <span class="cov10" title="26">return volumeID, err</span>
 }
 
 func isValidVolumeCapabilities(volCaps []*csi.VolumeCapability) bool <span class="cov2" title="2">{
@@ -2972,7 +3092,7 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
         return updatedOptions</span>
 }
 
-func (rclone *RcloneMounter) Mount(source string, target string) error <span class="cov5" title="4">{
+func (rclone *RcloneMounter) Mount(source string, target string) error <span class="cov6" title="6">{
         klog.Info("-RcloneMounter Mount-")
         klog.Infof("Mount args:\n\tsource: &lt;%s&gt;\n\ttarget: &lt;%s&gt;", source, target)
 
@@ -2980,64 +3100,82 @@ func (rclone *RcloneMounter) Mount(source string, target string) error <span cla
         var err error
 
         var configPath string
-        if mountWorker </span><span class="cov3" title="2">{
+        if mountWorker </span><span class="cov5" title="4">{
                 configPath = constants.MounterConfigPathOnHost
         }</span> else<span class="cov3" title="2"> {
                 configPath = constants.MounterConfigPathOnPodRclone
         }</span>
 
-        <span class="cov5" title="4">configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
+        <span class="cov6" title="6">configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
         if err = createConfigWrap(configPathWithVolID, rclone); err != nil </span><span class="cov1" title="1">{
                 klog.Errorf("RcloneMounter Mount: Cannot create rclone config file %v", err)
                 return err
         }</span>
 
-        <span class="cov4" title="3">if rclone.ObjectPath != "" </span><span class="cov3" title="2">{
+        <span class="cov5" title="5">if rclone.ObjectPath != "" </span><span class="cov3" title="2">{
                 trimmedPath := strings.TrimPrefix(rclone.ObjectPath, "/")
                 bucketName = fmt.Sprintf("%s:%s/%s", remote, rclone.BucketName, trimmedPath)
-        }</span> else<span class="cov1" title="1"> {
+        }</span> else<span class="cov4" title="3"> {
                 bucketName = fmt.Sprintf("%s:%s", remote, rclone.BucketName)
         }</span>
 
-        <span class="cov4" title="3">args, wnOp := rclone.formulateMountOptions(bucketName, target, configPathWithVolID)
+        <span class="cov5" title="5">args, wnOp := rclone.formulateMountOptions(bucketName, target, configPathWithVolID)
 
-        if mountWorker </span><span class="cov3" title="2">{
+        if mountWorker </span><span class="cov5" title="4">{
                 klog.Info("Mount on Worker started...")
 
-                jsonData, err := json.Marshal(wnOp)
+                mountReq := struct {
+                        Path    string            `json:"path"`
+                        Bucket  string            `json:"bucket"`
+                        Mounter string            `json:"mounter"`
+                        Args    map[string]string `json:"args"`
+                }{
+                        Path:    target,
+                        Bucket:  bucketName,
+                        Mounter: constants.RClone,
+                        Args:    wnOp,
+                }
+                payloadBytes, err := json.Marshal(mountReq)
                 if err != nil </span><span class="cov0" title="0">{
-                        klog.Fatalf("Error marshalling data: %v", err)
+                        klog.Errorf("Error marshalling mount request: %v", err)
                         return err
                 }</span>
 
-                <span class="cov3" title="2">payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.RClone, jsonData)
-
-                err = mounterRequest(payload, "http://unix/api/cos/mount")
+                <span class="cov5" title="4">err = mounterRequest(string(payloadBytes), "http://unix/api/cos/mount")
                 if err != nil </span><span class="cov1" title="1">{
                         klog.Error("failed to mount on  worker...", err)
                         return err
                 }</span>
-                <span class="cov1" title="1">return nil</span>
+                <span class="cov4" title="3">return nil</span>
         }
         <span class="cov1" title="1">klog.Info("NodeServer Mounting...")
         return rclone.MounterUtils.FuseMount(target, constants.RClone, args)</span>
 }
 
-func (rclone *RcloneMounter) Unmount(target string) error <span class="cov5" title="4">{
+func (rclone *RcloneMounter) Unmount(target string) error <span class="cov6" title="6">{
         klog.Info("-RcloneMounter Unmount-")
 
-        if mountWorker </span><span class="cov3" title="2">{
+        if mountWorker </span><span class="cov5" title="4">{
                 klog.Info("Unmount on Worker started...")
 
-                payload := fmt.Sprintf(`{"path":"%s"}`, target)
+                unmountReq := struct {
+                        Path string `json:"path"`
+                }{
+                        Path: target,
+                }
+                payloadBytes, err := json.Marshal(unmountReq)
+                if err != nil </span><span class="cov0" title="0">{
+                        klog.Errorf("Error marshalling unmount request: %v", err)
+                        return err
+                }</span>
 
-                err := mounterRequest(payload, "http://unix/api/cos/unmount")
+                <span class="cov5" title="4">err = mounterRequest(string(payloadBytes), "http://unix/api/cos/unmount")
                 if err != nil </span><span class="cov1" title="1">{
                         klog.Error("failed to unmount on  worker...", err)
                         return err
                 }</span>
 
-                <span class="cov1" title="1">removeConfigFile(constants.MounterConfigPathOnHost, target)
+                <span class="cov4" title="3">removeConfigFile(constants.MounterConfigPathOnHost, target)
                 return nil</span>
         }
         <span class="cov3" title="2">klog.Info("NodeServer Unmounting...")
@@ -3134,7 +3272,7 @@ func createConfig(configPathWithVolID string, rclone *RcloneMounter) error <span
         return nil</span>
 }
 
-func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWithVolID string) (nodeServerOp []string, workerNodeOp map[string]string) <span class="cov6" title="6">{
+func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWithVolID string) (nodeServerOp []string, workerNodeOp map[string]string) <span class="cov7" title="8">{
         nodeServerOp = []string{
                 "mount",
                 bucket,
@@ -3158,15 +3296,15 @@ func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWit
                 nodeServerOp = append(nodeServerOp, "--gid="+rclone.GID)
                 workerNodeOp["gid"] = rclone.GID
         }</span>
-        <span class="cov6" title="6">if rclone.UID != "" </span><span class="cov5" title="4">{
+        <span class="cov7" title="8">if rclone.UID != "" </span><span class="cov5" title="4">{
                 nodeServerOp = append(nodeServerOp, "--uid="+rclone.UID)
                 workerNodeOp["uid"] = rclone.UID
         }</span>
-        <span class="cov6" title="6">if rclone.ReadOnly </span><span class="cov1" title="1">{
+        <span class="cov7" title="8">if rclone.ReadOnly </span><span class="cov1" title="1">{
                 nodeServerOp = append(nodeServerOp, "--read-only")
                 workerNodeOp["read-only"] = "true"
         }</span>
-        <span class="cov6" title="6">return</span>
+        <span class="cov7" title="8">return</span>
 }
 
 func removeRcloneConfigFile(configPath, target string) <span class="cov5" title="4">{
@@ -3325,18 +3463,18 @@ func NewS3fsMounter(params S3fsMounterParams) Mounter <span class="cov4" title="
         return mounter</span>
 }
 
-func (s3fs *S3fsMounter) Mount(source string, target string) error <span class="cov4" title="5">{
+func (s3fs *S3fsMounter) Mount(source string, target string) error <span class="cov5" title="8">{
         klog.Info("-S3FSMounter Mount-")
         klog.Infof("Mount args:\n\tsource: &lt;%s&gt;\n\ttarget: &lt;%s&gt;", source, target)
 
         var s3fsCredDir string
-        if mountWorker </span><span class="cov4" title="4">{
+        if mountWorker </span><span class="cov5" title="7">{
                 s3fsCredDir = constants.MounterConfigPathOnHost
         }</span> else<span class="cov1" title="1"> {
                 s3fsCredDir = constants.MounterConfigPathOnPodS3fs
         }</span>
 
-        <span class="cov4" title="5">var bucketName string
+        <span class="cov5" title="8">var bucketName string
         var pathExist bool
         var err error
 
@@ -3347,7 +3485,7 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error <span class="
                 return fmt.Errorf("S3FSMounter Mount: Cannot stat directory %s: %v", metaPath, err)
         }</span>
 
-        <span class="cov4" title="5">if !pathExist </span><span class="cov4" title="5">{
+        <span class="cov5" title="8">if !pathExist </span><span class="cov4" title="5">{
                 if err = MakeDir(metaPath, 0755); // #nosec G301: used for s3fs
                 err != nil </span><span class="cov1" title="1">{
                         klog.Errorf("S3FSMounter Mount: Cannot create directory %s: %v", metaPath, err)
@@ -3355,64 +3493,82 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error <span class="
                 }</span>
         }
 
-        <span class="cov4" title="4">passwdFile := path.Join(metaPath, passFile)
+        <span class="cov5" title="7">passwdFile := path.Join(metaPath, passFile)
         if err = writePassWrap(passwdFile, s3fs.AccessKeys); err != nil </span><span class="cov1" title="1">{
                 klog.Errorf("S3FSMounter Mount: Cannot create file: %v", err)
                 return fmt.Errorf("S3FSMounter Mount: Cannot create file: %v", err)
         }</span>
 
-        <span class="cov3" title="3">if s3fs.ObjectPath != "" </span><span class="cov1" title="1">{
+        <span class="cov5" title="6">if s3fs.ObjectPath != "" </span><span class="cov1" title="1">{
                 if strings.HasPrefix(s3fs.ObjectPath, "/") </span><span class="cov0" title="0">{
                         bucketName = fmt.Sprintf("%s:%s", s3fs.BucketName, s3fs.ObjectPath)
                 }</span> else<span class="cov1" title="1"> {
                         bucketName = fmt.Sprintf("%s:/%s", s3fs.BucketName, s3fs.ObjectPath)
                 }</span>
-        } else<span class="cov2" title="2"> {
+        } else<span class="cov4" title="5"> {
                 bucketName = s3fs.BucketName
         }</span>
 
-        <span class="cov3" title="3">args, wnOp := s3fs.formulateMountOptions(bucketName, target, passwdFile)
+        <span class="cov5" title="6">args, wnOp := s3fs.formulateMountOptions(bucketName, target, passwdFile)
 
-        if mountWorker </span><span class="cov2" title="2">{
+        if mountWorker </span><span class="cov4" title="5">{
                 klog.Info(" Mount on Worker started...")
 
-                jsonData, err := json.Marshal(wnOp)
+                mountReq := struct {
+                        Path    string            `json:"path"`
+                        Bucket  string            `json:"bucket"`
+                        Mounter string            `json:"mounter"`
+                        Args    map[string]string `json:"args"`
+                }{
+                        Path:    target,
+                        Bucket:  bucketName,
+                        Mounter: constants.S3FS,
+                        Args:    wnOp,
+                }
+                payloadBytes, err := json.Marshal(mountReq)
                 if err != nil </span><span class="cov0" title="0">{
-                        klog.Fatalf("Error marshalling data: %v", err)
+                        klog.Errorf("Error marshalling mount request: %v", err)
                         return err
                 }</span>
 
-                <span class="cov2" title="2">payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.S3FS, jsonData)
+                <span class="cov4" title="5">klog.Infof("Worker Mounting Payload: path=%s bucket=%s mounter=%s", target, bucketName, constants.S3FS)
 
-                klog.Infof("Worker Mounting Payload: path=%s bucket=%s mounter=%s", target, bucketName, constants.S3FS)
-
-                err = mounterRequest(payload, "http://unix/api/cos/mount")
+                err = mounterRequest(string(payloadBytes), "http://unix/api/cos/mount")
                 if err != nil </span><span class="cov1" title="1">{
                         klog.Error("failed to mount on  worker...", err)
                         return err
                 }</span>
-                <span class="cov1" title="1">return nil</span>
+                <span class="cov4" title="4">return nil</span>
         }
         <span class="cov1" title="1">klog.Info("NodeServer Mounting...")
         return s3fs.MounterUtils.FuseMount(target, constants.S3FS, args)</span>
 }
 
-func (s3fs *S3fsMounter) Unmount(target string) error <span class="cov4" title="4">{
+func (s3fs *S3fsMounter) Unmount(target string) error <span class="cov5" title="6">{
         klog.Info("-S3FSMounter Unmount-")
         klog.Infof("Unmount args:\n\ttarget: &lt;%s&gt;", target)
 
-        if mountWorker </span><span class="cov2" title="2">{
+        if mountWorker </span><span class="cov4" title="4">{
                 klog.Info("Unmount on Worker started...")
 
-                payload := fmt.Sprintf(`{"path":"%s"}`, target)
+                unmountReq := struct {
+                        Path string `json:"path"`
+                }{
+                        Path: target,
+                }
+                payloadBytes, err := json.Marshal(unmountReq)
+                if err != nil </span><span class="cov0" title="0">{
+                        klog.Errorf("Error marshalling unmount request: %v", err)
+                        return err
+                }</span>
 
-                err := mounterRequest(payload, "http://unix/api/cos/unmount")
+                <span class="cov4" title="4">err = mounterRequest(string(payloadBytes), "http://unix/api/cos/unmount")
                 if err != nil </span><span class="cov1" title="1">{
                         klog.Error("failed to unmount on  worker...", err)
                         return err
                 }</span>
 
-                <span class="cov1" title="1">removeFile(constants.MounterConfigPathOnHost, target)
+                <span class="cov3" title="3">removeFile(constants.MounterConfigPathOnHost, target)
                 return nil</span>
         }
         <span class="cov2" title="2">klog.Info("NodeServer Unmounting...")
@@ -3581,7 +3737,7 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
         <span class="cov9" title="33">return updatedOptions, addMountParam</span>
 }
 
-func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string) (nodeServerOp []string, workerNodeOp map[string]string) <span class="cov5" title="6">{
+func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string) (nodeServerOp []string, workerNodeOp map[string]string) <span class="cov6" title="9">{
         nodeServerOp = []string{
                 bucket,
                 target,
@@ -3607,7 +3763,7 @@ func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string
                 workerNodeOp["endpoint"] = s3fs.LocConstraint
         }</span>
 
-        <span class="cov5" title="6">for _, val := range s3fs.MountOptions </span><span class="cov3" title="3">{
+        <span class="cov6" title="9">for _, val := range s3fs.MountOptions </span><span class="cov3" title="3">{
                 nodeServerOp = append(nodeServerOp, "-o")
                 nodeServerOp = append(nodeServerOp, val)
 
@@ -3619,24 +3775,24 @@ func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string
                 }</span>
         }
 
-        <span class="cov5" title="6">if s3fs.AuthType != "hmac" </span><span class="cov4" title="5">{
+        <span class="cov6" title="9">if s3fs.AuthType != "hmac" </span><span class="cov4" title="5">{
                 nodeServerOp = append(nodeServerOp, "-o", "ibm_iam_auth")
                 nodeServerOp = append(nodeServerOp, "-o", "ibm_iam_endpoint="+s3fs.IAMEndpoint)
 
                 workerNodeOp["ibm_iam_auth"] = "true"
                 workerNodeOp["ibm_iam_endpoint"] = s3fs.IAMEndpoint
-        }</span> else<span class="cov1" title="1"> {
+        }</span> else<span class="cov4" title="4"> {
                 nodeServerOp = append(nodeServerOp, "-o", "default_acl=private")
                 workerNodeOp["default_acl"] = "private"
         }</span>
 
         // Add unknown mount options to workerNodeOp for mounter service
-        <span class="cov5" title="6">if s3fs.AddMountParam != "" </span><span class="cov2" title="2">{
+        <span class="cov6" title="9">if s3fs.AddMountParam != "" </span><span class="cov2" title="2">{
                 workerNodeOp["add-mount-param"] = s3fs.AddMountParam
                 klog.Infof("Adding unknown mount options to mounter request: %s", s3fs.AddMountParam)
         }</span>
 
-        <span class="cov5" title="6">return</span>
+        <span class="cov6" title="9">return</span>
 }
 
 func removeS3FSCredFile(credDir, target string) <span class="cov4" title="4">{
@@ -3724,7 +3880,7 @@ func NewCSIMounterFactory() *CSIMounterFactory <span class="cov0" title="0">{
         return &amp;CSIMounterFactory{}
 }</span>
 
-func (s *CSIMounterFactory) NewMounter(params MounterParams) Mounter <span class="cov7" title="3">{
+func (s *CSIMounterFactory) NewMounter(params MounterParams) Mounter <span class="cov5" title="3">{
         attrib := params.Attrib
         secretMap := params.SecretMap
         mountFlags := params.MountFlags
@@ -3737,12 +3893,12 @@ func (s *CSIMounterFactory) NewMounter(params MounterParams) Mounter <span class
         if secretMap == nil </span><span class="cov0" title="0">{
                 secretMap = map[string]string{}
         }</span>
-        <span class="cov7" title="3">if mountFlags == nil </span><span class="cov0" title="0">{
+        <span class="cov5" title="3">if mountFlags == nil </span><span class="cov0" title="0">{
                 mountFlags = []string{}
         }</span>
 
         // Select mounter as per storage class
-        <span class="cov7" title="3">if val, check = attrib["mounter"]; check </span><span class="cov4" title="2">{
+        <span class="cov5" title="3">if val, check = attrib["mounter"]; check </span><span class="cov4" title="2">{
                 mounter = val
         }</span> else<span class="cov1" title="1"> {
                 // if mounter not set in storage class
@@ -3751,7 +3907,7 @@ func (s *CSIMounterFactory) NewMounter(params MounterParams) Mounter <span class
                 }</span>
         }
 
-        <span class="cov7" title="3">mounterUtils := &amp;(mounterUtils.MounterOptsUtils{})
+        <span class="cov5" title="3">mounterUtils := &amp;(mounterUtils.MounterOptsUtils{})
 
         switch mounter </span>{
         case constants.S3FS:<span class="cov1" title="1">
@@ -3786,14 +3942,14 @@ func (s *CSIMounterFactory) NewMounter(params MounterParams) Mounter <span class
         }
 }
 
-func checkPath(path string) (bool, error) <span class="cov10" title="5">{
+func checkPath(path string) (bool, error) <span class="cov10" title="8">{
         if path == "" </span><span class="cov0" title="0">{
                 return false, errors.New("undefined path")
         }</span>
-        <span class="cov10" title="5">_, err := Stat(path)
-        if err == nil </span><span class="cov0" title="0">{
+        <span class="cov10" title="8">_, err := Stat(path)
+        if err == nil </span><span class="cov5" title="3">{
                 return true, nil
-        }</span> else<span class="cov10" title="5"> if os.IsNotExist(err) </span><span class="cov10" title="5">{
+        }</span> else<span class="cov7" title="5"> if os.IsNotExist(err) </span><span class="cov7" title="5">{
                 return false, nil
         }</span> else<span class="cov0" title="0"> if isCorruptedMnt(err) </span><span class="cov0" title="0">{
                 return true, err
