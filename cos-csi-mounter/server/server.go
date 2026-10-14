@@ -163,9 +163,7 @@ func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser)
 	return func(c *gin.Context) {
 		var request MountRequest
 
-		if err := c.BindJSON(&request); err != nil {
-			logger.Error("invalid request: ", zap.Error(err))
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		if !decodeNoDuplicateKeys(c, &request) {
 			return
 		}
 
@@ -210,9 +208,7 @@ func handleCosUnmount(mounter mounterUtils.MounterUtils) gin.HandlerFunc {
 			Path string `json:"path"`
 		}
 
-		if err := c.BindJSON(&request); err != nil {
-			logger.Error("invalid request: ", zap.Error(err))
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		if !decodeNoDuplicateKeys(c, &request) {
 			return
 		}
 
