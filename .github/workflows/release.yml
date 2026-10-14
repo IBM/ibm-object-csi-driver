@@ -143,8 +143,8 @@ jobs:
           name: v1.0.8
           body: |
             ## 🚀 What’s New
-            - Add support for AddMountParam to pass additional s3fs mount options
-            - AddMountParam allows passing s3fs mount options as a comma-separated string
+            - mask sensitive data before logging
+            - add more validation checks for cos-csi-mounter api request's payload
           prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
 
       - name: Perform CodeQL Analysis
