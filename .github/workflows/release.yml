@@ -112,7 +112,7 @@ jobs:
           - cos-csi-mounter
 
     env:
-      IS_LATEST_RELEASE: 'false'
+      IS_LATEST_RELEASE: 'true'
       APP_VERSION: 1.0.8
 
     steps:
