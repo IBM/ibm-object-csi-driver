@@ -1085,7 +1085,7 @@ func strictDecodeForUnknownFields(data json.RawMessage, v interface{}) error <sp
 // that v points to.
 func jsonFieldNames(v interface{}) map[string]struct{} <span class="cov7" title="35">{
         t := reflect.TypeOf(v)
-        for t.Kind() == reflect.Ptr </span><span class="cov7" title="36">{
+        for t.Kind() == reflect.Pointer </span><span class="cov7" title="36">{
                 t = t.Elem()
         }</span>
         <span class="cov7" title="35">names := make(map[string]struct{}, t.NumField())
