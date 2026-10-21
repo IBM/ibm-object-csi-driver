@@ -312,14 +312,14 @@ func TestCreateConfig_Success_HMAC(t *testing.T) {
 		MountOptions:  []string{"upload_concurrency=16"},
 	}
 
-	// Classify MountOptions the same way Mount() does, so extraConfigLines carries
+	// Classify MountOptions the same way Mount() does, so extraConfigOpts carries
 	// the underscore-keyed option into the config file.
-	extraConfigLines, _ := classifyRcloneParams(rclone.MountOptions)
+	extraConfigOpts, _ := classifyRcloneParams(rclone.MountOptions)
 
 	// Create a temporary directory for the test
 	tmpDir := t.TempDir()
 
-	err := createConfig(tmpDir, rclone, extraConfigLines)
+	err := createConfig(tmpDir, rclone, extraConfigOpts)
 	assert.NoError(t, err)
 
 	// Read the generated config file and verify HMAC parameters
@@ -355,12 +355,12 @@ func TestCreateConfig_Success_IAM(t *testing.T) {
 
 	// Classify MountOptions: "vfs-cache-mode=writes" has no "_" and starts with no dash,
 	// so it is a config-file line (no leading "--").
-	extraConfigLines, _ := classifyRcloneParams(rclone.MountOptions)
+	extraConfigOpts, _ := classifyRcloneParams(rclone.MountOptions)
 
 	// Create a temporary directory for the test
 	tmpDir := t.TempDir()
 
-	err := createConfig(tmpDir, rclone, extraConfigLines)
+	err := createConfig(tmpDir, rclone, extraConfigOpts)
 	assert.NoError(t, err)
 
 	// Read the generated config file and verify IAM parameters
@@ -934,9 +934,9 @@ func TestClassifyRcloneParams_DoublesDashGoToCLI(t *testing.T) {
 		"--vfs-cache-mode=full",
 		"--no-modtime=true",
 	}
-	configLines, cliFlags := classifyRcloneParams(options)
+	configOpts, cliFlags := classifyRcloneParams(options)
 
-	assert.Empty(t, configLines, "double-dash params must not go to config file")
+	assert.Empty(t, configOpts, "double-dash params must not go to config file")
 	assert.ElementsMatch(t, options, cliFlags)
 }
 
@@ -944,14 +944,14 @@ func TestClassifyRcloneParams_DoublesDashGoToCLI(t *testing.T) {
 // short flags are routed to cliFlags.
 func TestClassifyRcloneParams_SingleLetterGoToCLI(t *testing.T) {
 	options := []string{"-v", "-q", "-P"}
-	configLines, cliFlags := classifyRcloneParams(options)
+	configOpts, cliFlags := classifyRcloneParams(options)
 
-	assert.Empty(t, configLines)
+	assert.Empty(t, configOpts)
 	assert.ElementsMatch(t, options, cliFlags)
 }
 
 // TestClassifyRcloneParams_UnderscoreGoToConfig verifies that keys containing
-// "_" are routed exclusively to configLines.
+// "_" are routed exclusively to configOpts.
 func TestClassifyRcloneParams_UnderscoreGoToConfig(t *testing.T) {
 	options := []string{
 		"upload_concurrency=16",
@@ -960,10 +960,10 @@ func TestClassifyRcloneParams_UnderscoreGoToConfig(t *testing.T) {
 		"no_check_bucket=true",
 		"storage_class=SMART",
 	}
-	configLines, cliFlags := classifyRcloneParams(options)
+	configOpts, cliFlags := classifyRcloneParams(options)
 
 	assert.Empty(t, cliFlags, "underscore params must not go to CLI")
-	assert.ElementsMatch(t, options, configLines)
+	assert.ElementsMatch(t, options, configOpts)
 }
 
 // TestClassifyRcloneParams_NoDashGoToConfig verifies that plain keys (no leading
@@ -974,19 +974,19 @@ func TestClassifyRcloneParams_NoDashGoToConfig(t *testing.T) {
 		"acl=private",
 		"force_path_style=true",
 	}
-	configLines, cliFlags := classifyRcloneParams(options)
+	configOpts, cliFlags := classifyRcloneParams(options)
 
 	assert.Empty(t, cliFlags)
-	assert.ElementsMatch(t, options, configLines)
+	assert.ElementsMatch(t, options, configOpts)
 }
 
 // TestClassifyRcloneParams_EmptyAndWhitespace verifies that blank/whitespace
 // entries are silently dropped.
 func TestClassifyRcloneParams_EmptyAndWhitespace(t *testing.T) {
 	options := []string{"", "   ", "\t"}
-	configLines, cliFlags := classifyRcloneParams(options)
+	configOpts, cliFlags := classifyRcloneParams(options)
 
-	assert.Nil(t, configLines)
+	assert.Nil(t, configOpts)
 	assert.Nil(t, cliFlags)
 }
 
@@ -1029,9 +1029,9 @@ func TestClassifyRcloneParams_MixedXlsxParams(t *testing.T) {
 		"force_path_style=true", "encoding=Slash,InvalidUtf8,Dot",
 	}
 
-	configLines, cliFlags := classifyRcloneParams(options)
+	configOpts, cliFlags := classifyRcloneParams(options)
 	assert.ElementsMatch(t, wantCLI, cliFlags)
-	assert.ElementsMatch(t, wantConfig, configLines)
+	assert.ElementsMatch(t, wantConfig, configOpts)
 }
 
 // TestCreateConfig_WithXlsxConfigParams verifies that config-file lines
@@ -1045,7 +1045,7 @@ func TestCreateConfig_WithXlsxConfigParams(t *testing.T) {
 		AuthType:      "hmac",
 	}
 
-	extraConfigLines := []string{
+	extraConfigOpts := []string{
 		"upload_concurrency=16",
 		"upload_cutoff=200M",
 		"chunk_size=64M",
@@ -1062,7 +1062,7 @@ func TestCreateConfig_WithXlsxConfigParams(t *testing.T) {
 	}
 
 	tmpDir := t.TempDir()
-	err := createConfig(tmpDir, rclone, extraConfigLines)
+	err := createConfig(tmpDir, rclone, extraConfigOpts)
 	assert.NoError(t, err)
 
 	content, err := os.ReadFile(tmpDir + "/rclone.conf")
@@ -1078,7 +1078,7 @@ func TestCreateConfig_WithXlsxConfigParams(t *testing.T) {
 	assert.Contains(t, configStr, "ibm_iam_endpoint = https://iam.cloud.ibm.com")
 
 	// Extra config-file lines from xlsx
-	for _, line := range extraConfigLines {
+	for _, line := range extraConfigOpts {
 		assert.Contains(t, configStr, line, "config line %q should be in rclone.conf", line)
 	}
 
@@ -1189,10 +1189,10 @@ func TestCreateConfig_XlsxFullFlow(t *testing.T) {
 		allOptions = append(allOptions, line)
 	}
 
-	extraConfigLines, extraCLIFlags := classifyRcloneParams(allOptions)
+	extraConfigOpts, extraCLIFlags := classifyRcloneParams(allOptions)
 
 	// Verify split counts are as expected
-	assert.NotEmpty(t, extraConfigLines, "should have config-file lines")
+	assert.NotEmpty(t, extraConfigOpts, "should have config-file lines")
 	assert.NotEmpty(t, extraCLIFlags, "should have CLI flags")
 
 	rclone := &RcloneMounter{
@@ -1206,7 +1206,7 @@ func TestCreateConfig_XlsxFullFlow(t *testing.T) {
 	}
 
 	tmpDir := t.TempDir()
-	err := createConfig(tmpDir, rclone, extraConfigLines)
+	err := createConfig(tmpDir, rclone, extraConfigOpts)
 	assert.NoError(t, err)
 
 	content, err := os.ReadFile(tmpDir + "/rclone.conf")
@@ -1282,7 +1282,7 @@ func TestPrintRcloneArtifacts(t *testing.T) {
 		}
 	}
 
-	extraConfigLines, extraCLIFlags := classifyRcloneParams(allOptions)
+	extraConfigOpts, extraCLIFlags := classifyRcloneParams(allOptions)
 
 	// ── 2. Build RcloneMounter (same as NewRcloneMounter would produce) ──────
 	rclone := &RcloneMounter{
@@ -1300,7 +1300,7 @@ func TestPrintRcloneArtifacts(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := tmpDir + "/rclone.conf"
 
-	err := createConfig(tmpDir, rclone, extraConfigLines)
+	err := createConfig(tmpDir, rclone, extraConfigOpts)
 	if err != nil {
 		t.Fatalf("createConfig failed: %v", err)
 	}
@@ -1323,7 +1323,7 @@ func TestPrintRcloneArtifacts(t *testing.T) {
 		"════════════════════════════════════════════════════════════════\n"+
 		"  Config-file lines (%d):  %v\n"+
 		"  CLI flags        (%d):  %v\n",
-		len(extraConfigLines), extraConfigLines,
+		len(extraConfigOpts), extraConfigOpts,
 		len(extraCLIFlags), extraCLIFlags,
 	)
 

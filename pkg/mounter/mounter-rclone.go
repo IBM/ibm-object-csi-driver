@@ -72,13 +72,13 @@ type RcloneMounterParams struct {
 //   - CLI flags  → key starts with "--" (e.g. "--transfers=4")
 //     OR key is a single-letter shorthand prefixed by "-" (e.g. "-v")
 //
-//   - Config-file lines → key contains "_" (e.g. "upload_concurrency=4")
+//   - Config-file opts → key contains "_" (e.g. "upload_concurrency=4")
 //     OR key has no leading dash at all (e.g. "storage_class=SMART")
 //
 // Each entry in the returned cliFlags slice is already in "--key=value" form
 // (bare "--key" for boolean flags without a value).
-// Each entry in configLines is passed verbatim into rclone.conf.
-func classifyRcloneParams(options []string) (configLines []string, cliFlags []string) {
+// Each entry in configOpts is passed verbatim into rclone.conf.
+func classifyRcloneParams(options []string) (configOpts []string, cliFlags []string) {
 	// matches exactly "--word..." (double-dash)
 	doubleDash := regexp.MustCompile(`^--`)
 	// matches exactly "-<single letter>" (single-dash, one alpha/digit char)
@@ -100,8 +100,8 @@ func classifyRcloneParams(options []string) (configLines []string, cliFlags []st
 			// Short flag: "-v" → pass as-is
 			cliFlags = append(cliFlags, opt)
 		} else {
-			// Contains "_" or has no leading dash → config file line
-			configLines = append(configLines, opt)
+			// Contains "_" or has no leading dash → config file opt
+			configOpts = append(configOpts, opt)
 		}
 	}
 	return
@@ -277,11 +277,11 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 	}
 
 	// Classify freeform mountOptions: config-file lines vs CLI flags
-	extraConfigLines, extraCLIFlags := classifyRcloneParams(rclone.MountOptions)
-	klog.Infof("RcloneMounter Mount: extraConfigLines=%v extraCLIFlags=%v", extraConfigLines, extraCLIFlags)
+	extraConfigOpts, extraCLIFlags := classifyRcloneParams(rclone.MountOptions)
+	klog.Infof("RcloneMounter Mount: extraConfigOpts=%v extraCLIFlags=%v", extraConfigOpts, extraCLIFlags)
 
 	configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
-	if err = createConfigWrap(configPathWithVolID, rclone, extraConfigLines); err != nil {
+	if err = createConfigWrap(configPathWithVolID, rclone, extraConfigOpts); err != nil {
 		klog.Errorf("RcloneMounter Mount: Cannot create rclone config file %v", err)
 		return err
 	}
