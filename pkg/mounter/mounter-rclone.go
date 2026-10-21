@@ -95,22 +95,22 @@ func NewRcloneMounter(params RcloneMounterParams) Mounter {
 	if val, check = secretMap["objectPath"]; check {
 		mounter.ObjectPath = val
 	}
-	if val, check = secretMap["accessKey"]; check {
+	if val, check = secretMap[constants.AccessKey]; check {
 		accessKey = val
 	}
-	if val, check = secretMap["secretKey"]; check {
+	if val, check = secretMap[constants.SecretKey]; check {
 		secretKey = val
 	}
-	if val, check = secretMap["kpRootKeyCRN"]; check {
+	if val, check = secretMap[constants.KpRootKeyCRN]; check {
 		mounter.KpRootKeyCrn = val
 	}
 	if val, check = secretMap["iamEndpoint"]; check {
 		mounter.IAMEndpoint = val
 	}
-	if val, check = secretMap["apiKey"]; check {
+	if val, check = secretMap[constants.ApiKey]; check {
 		apiKey = val
 	}
-	if val, check = secretMap["serviceId"]; check {
+	if val, check = secretMap[constants.ServiceId]; check {
 		serviceId = val
 	}
 
@@ -232,15 +232,24 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 	if mountWorker {
 		klog.Info("Mount on Worker started...")
 
-		jsonData, err := json.Marshal(wnOp)
+		mountReq := struct {
+			Path    string            `json:"path"`
+			Bucket  string            `json:"bucket"`
+			Mounter string            `json:"mounter"`
+			Args    map[string]string `json:"args"`
+		}{
+			Path:    target,
+			Bucket:  bucketName,
+			Mounter: constants.RClone,
+			Args:    wnOp,
+		}
+		payloadBytes, err := json.Marshal(mountReq)
 		if err != nil {
-			klog.Fatalf("Error marshalling data: %v", err)
+			klog.Errorf("Error marshalling mount request: %v", err)
 			return err
 		}
 
-		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.RClone, jsonData)
-
-		err = mounterRequest(payload, "http://unix/api/cos/mount")
+		err = mounterRequest(string(payloadBytes), "http://unix/api/cos/mount")
 		if err != nil {
 			klog.Error("failed to mount on  worker...", err)
 			return err
@@ -257,9 +266,18 @@ func (rclone *RcloneMounter) Unmount(target string) error {
 	if mountWorker {
 		klog.Info("Unmount on Worker started...")
 
-		payload := fmt.Sprintf(`{"path":"%s"}`, target)
+		unmountReq := struct {
+			Path string `json:"path"`
+		}{
+			Path: target,
+		}
+		payloadBytes, err := json.Marshal(unmountReq)
+		if err != nil {
+			klog.Errorf("Error marshalling unmount request: %v", err)
+			return err
+		}
 
-		err := mounterRequest(payload, "http://unix/api/cos/unmount")
+		err = mounterRequest(string(payloadBytes), "http://unix/api/cos/unmount")
 		if err != nil {
 			klog.Error("failed to unmount on  worker...", err)
 			return err

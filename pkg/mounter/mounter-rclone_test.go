@@ -1,27 +1,29 @@
 package mounter
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"testing"
 
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/stretchr/testify/assert"
 )
 
 var (
 	secretMapRClone = map[string]string{
-		"cosEndpoint":        "test-endpoint",
-		"locationConstraint": "test-loc-constraint",
-		"bucketName":         "test-bucket-name",
-		"objectPath":         "test-obj-path",
-		"accessKey":          "test-access-key",
-		"secretKey":          "test-secret-key",
-		"apiKey":             "test-api-key",
-		"kpRootKeyCRN":       "test-kp-root-key-crn",
-		"serviceId":          "test-service-id",
-		"gid":                "fake-gid",
-		"uid":                "fake-uid",
+		"cosEndpoint":          "test-endpoint",
+		"locationConstraint":   "test-loc-constraint",
+		"bucketName":           "test-bucket-name",
+		"objectPath":           "test-obj-path",
+		constants.AccessKey:    "test-access-key",
+		constants.SecretKey:    "test-secret-key",
+		constants.ApiKey:       "test-api-key",
+		constants.KpRootKeyCRN: "test-kp-root-key-crn",
+		constants.ServiceId:    "test-service-id",
+		"gid":                  "fake-gid",
+		"uid":                  "fake-uid",
 	}
 
 	mountOptionsRClone = []string{"opt1=val1", "opt2=val2"}
@@ -52,11 +54,11 @@ func TestNewRcloneMounter_Only_GID(t *testing.T) {
 		"cosEndpoint":        "test-endpoint",
 		"locationConstraint": "test-loc-constraint",
 		"bucketName":         "test-bucket-name",
-		"objectPath":         "test-obj-path",
-		"accessKey":          "test-access-key",
-		"secretKey":          "test-secret-key",
-		"kpRootKeyCRN":       "test-kp-root-key-crn",
-		"gid":                "1001",
+		"objectPath":           "test-obj-path",
+		constants.AccessKey:    "test-access-key",
+		constants.SecretKey:    "test-secret-key",
+		constants.KpRootKeyCRN: "test-kp-root-key-crn",
+		"gid":                  "1001",
 	}
 	mounter := NewRcloneMounter(RcloneMounterParams{
 		SecretMap:    secretMap,
@@ -80,11 +82,11 @@ func TestNewRcloneMounter_MountOptsInSecret_HMAC(t *testing.T) {
 		"cosEndpoint":        "test-endpoint",
 		"locationConstraint": "test-loc-constraint",
 		"bucketName":         "test-bucket-name",
-		"objectPath":         "test-obj-path",
-		"accessKey":          "test-access-key",
-		"secretKey":          "test-secret-key",
-		"kpRootKeyCRN":       "test-kp-root-key-crn",
-		"gid":                "1001",
+		"objectPath":           "test-obj-path",
+		constants.AccessKey:    "test-access-key",
+		constants.SecretKey:    "test-secret-key",
+		constants.KpRootKeyCRN: "test-kp-root-key-crn",
+		"gid":                  "1001",
 		"uid":                "1001",
 		"mountOptions":       "\nupload_concurrency\nkey=value",
 	}
@@ -111,11 +113,11 @@ func TestNewRcloneMounter_MountOptsInSecret_IAM(t *testing.T) {
 		"cosEndpoint":        "test-endpoint",
 		"locationConstraint": "test-loc-constraint",
 		"bucketName":         "test-bucket-name",
-		"objectPath":         "test-obj-path",
-		"apiKey":             "test-api-key",
-		"serviceId":          "test-service-id",
-		"kpRootKeyCRN":       "test-kp-root-key-crn",
-		"gid":                "1001",
+		"objectPath":           "test-obj-path",
+		constants.ApiKey:       "test-api-key",
+		constants.ServiceId:    "test-service-id",
+		constants.KpRootKeyCRN: "test-kp-root-key-crn",
+		"gid":                  "1001",
 		"uid":                "1001",
 		"mountOptions":       "\nupload_concurrency\nkey=value",
 		"iamEndpoint":        "test-iam-endpoint",
@@ -584,4 +586,124 @@ func TestFormulateRcloneMountOptions_GidUid(t *testing.T) {
 	assert.Contains(t, nodeOp, "--uid=1000")
 	assert.Equal(t, "1000", workerOp["gid"])
 	assert.Equal(t, "1000", workerOp["uid"])
+}
+
+// ── JSON injection fix tests (CWE-74 / report 4078540) ──────────────────────
+// These tests verify that Mount and Unmount payloads are built with
+// encoding/json so that attacker-controlled values (bucket name, target path)
+// cannot inject extra JSON keys into the RPC body.
+
+func TestRcloneMount_WorkerNode_PayloadIsValidJSON(t *testing.T) {
+	mountWorker = true
+
+	createConfigWrap = func(_ string, _ *RcloneMounter) error { return nil }
+
+	var capturedPayload string
+	mounterRequest = func(payload, _ string) error {
+		capturedPayload = payload
+		return nil
+	}
+
+	rclone := &RcloneMounter{
+		BucketName:   "my-bucket",
+		EndPoint:     "https://s3.example.com",
+		AccessKeys:   "key:secret",
+		AuthType:     "hmac",
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+	}
+
+	err := rclone.Mount("source", "/var/lib/kubelet/pods/pod1/volumes/x")
+	assert.NoError(t, err)
+
+	// Payload must be valid JSON.
+	var parsed map[string]interface{}
+	assert.NoError(t, json.Unmarshal([]byte(capturedPayload), &parsed),
+		"mount payload must be valid JSON: %s", capturedPayload)
+
+	assert.Equal(t, "/var/lib/kubelet/pods/pod1/volumes/x", parsed["path"])
+	assert.Equal(t, constants.RClone, parsed["mounter"])
+}
+
+func TestRcloneMount_WorkerNode_InjectedBucketName_CannotOverridePath(t *testing.T) {
+	// Mirrors the s3fs injection test for the rclone code path.
+	mountWorker = true
+
+	createConfigWrap = func(_ string, _ *RcloneMounter) error { return nil }
+
+	var capturedPayload string
+	mounterRequest = func(payload, _ string) error {
+		capturedPayload = payload
+		return nil
+	}
+
+	attackBucketName := `ibmcos:b","path":"/var/lib/kubelet/pods/victim/volumes/kubernetes.io~csi/pvc-victim/mount","z":"`
+	legitimateTarget := "/var/lib/kubelet/pods/legit/volumes/x"
+
+	rclone := &RcloneMounter{
+		BucketName:   attackBucketName,
+		EndPoint:     "https://s3.example.com",
+		AccessKeys:   "key:secret",
+		AuthType:     "hmac",
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+	}
+
+	err := rclone.Mount("source", legitimateTarget)
+	assert.NoError(t, err)
+
+	var parsed map[string]interface{}
+	assert.NoError(t, json.Unmarshal([]byte(capturedPayload), &parsed),
+		"payload must remain valid JSON even with attacker-controlled bucket name: %s", capturedPayload)
+
+	assert.Equal(t, legitimateTarget, parsed["path"],
+		"injected bucket name must not override the legitimate mount path")
+
+	assert.NotEqual(t, "/var/lib/kubelet/pods/victim/volumes/kubernetes.io~csi/pvc-victim/mount", parsed["path"],
+		"attacker-injected path must not become the mount path")
+}
+
+func TestRcloneUnmount_WorkerNode_PayloadIsValidJSON(t *testing.T) {
+	mountWorker = true
+	removeConfigFile = func(_, _ string) {}
+
+	var capturedPayload string
+	mounterRequest = func(payload, _ string) error {
+		capturedPayload = payload
+		return nil
+	}
+
+	rclone := &RcloneMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{})}
+
+	err := rclone.Unmount("/var/lib/kubelet/pods/pod1/volumes/x")
+	assert.NoError(t, err)
+
+	var parsed map[string]interface{}
+	assert.NoError(t, json.Unmarshal([]byte(capturedPayload), &parsed),
+		"unmount payload must be valid JSON: %s", capturedPayload)
+
+	assert.Equal(t, "/var/lib/kubelet/pods/pod1/volumes/x", parsed["path"])
+}
+
+func TestRcloneUnmount_WorkerNode_InjectedPath_CannotInjectExtraKeys(t *testing.T) {
+	mountWorker = true
+	removeConfigFile = func(_, _ string) {}
+
+	var capturedPayload string
+	mounterRequest = func(payload, _ string) error {
+		capturedPayload = payload
+		return nil
+	}
+
+	rclone := &RcloneMounter{MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{})}
+
+	injectedPath := `/var/lib/kubelet/pods/x","extra":"injected`
+	err := rclone.Unmount(injectedPath)
+	assert.NoError(t, err)
+
+	var parsed map[string]interface{}
+	assert.NoError(t, json.Unmarshal([]byte(capturedPayload), &parsed),
+		"unmount payload must remain valid JSON even with special chars in path: %s", capturedPayload)
+
+	assert.Equal(t, injectedPath, parsed["path"])
+	_, hasExtra := parsed["extra"]
+	assert.False(t, hasExtra, "injected 'extra' key must not appear in parsed payload")
 }

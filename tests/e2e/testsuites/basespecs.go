@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	v2 "github.com/onsi/ginkgo/v2"
 	gomega "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -126,8 +127,8 @@ func (s *TestSecret) Create() {
 			"cosEndpoint":        []byte(s.cosEndpoint),
 			"locationConstraint": []byte(s.locationConstraint),
 			"bucketName":         []byte(s.bucketName),
-			"accessKey":          []byte(s.accessKey),
-			"secretKey":          []byte(s.secretKey),
+			constants.AccessKey:  []byte(s.accessKey),
+			constants.SecretKey:  []byte(s.secretKey),
 		},
 		Type: v1.SecretType(s.secType),
 	}

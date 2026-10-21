@@ -12,7 +12,7 @@ import (
 
 var (
 	testBucket         = "testBucket"
-	testTargetPath     = "/var/data/kubelet/pods/"
+	testTargetPath     = "/var/data/kubelet/pods/abc-123/volumes/kubernetes.io~csi/pvc/mount"
 	testEndPoint       = "testEndPoint"
 	testIAMEndpoint    = "https://test.iam.cloud.ibm.com"
 	testPasswdFilePath = "testPasswdFilePath"

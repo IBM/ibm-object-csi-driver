@@ -2,7 +2,6 @@ package utils
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -71,19 +70,23 @@ func (su *DriverStatsUtils) GetClusterNodeData(nodeName string) (*ClusterNodeDat
 	return data, nil
 }
 
-// GetEndpoints return IAMEndpoint, COSResourceConfigEndpoint, error
+// GetEndpoints returns IAMEndpoint and COSResourceConfigEndpoint read from the
+// IAM_ENDPOINT and COS_RESOURCE_CONFIG_ENDPOINT environment variables.
+// If a variable is not set, the defaults are used.
 func (su *DriverStatsUtils) GetEndpoints() (string, string, error) {
-	clusterType, err := getClusterType()
-	if err != nil {
-		return "", "", err
+	iamEP := os.Getenv(constants.IAMEndpointEnv)
+	if iamEP == "" {
+		klog.Infof("%s not set, defaulting to %s", constants.IAMEndpointEnv, constants.PrivateIAMEndpoint)
+		iamEP = constants.PrivateIAMEndpoint // default for VPC cluster
 	}
 
-	if strings.Contains(strings.ToLower(clusterType), "vpc") {
-		// Use private iam endpoint for VPC clusters
-		return constants.PrivateIAMEndpoint, constants.ResourceConfigEPDirect, nil
+	cosEP := os.Getenv(constants.COSResourceConfigEndpointEnv)
+	if cosEP == "" {
+		klog.Infof("%s not set, defaulting to %s", constants.COSResourceConfigEndpointEnv, constants.ResourceConfigEPDirect)
+		cosEP = constants.ResourceConfigEPDirect // default for VPC cluster
 	}
-	// Use public iam endpoint for classic clusters
-	return constants.PublicIAMEndpoint, constants.ResourceConfigEPPrivate, nil
+
+	return iamEP, cosEP, nil
 }
 
 func (su *DriverStatsUtils) BucketToDelete(volumeID string) (string, error) {
@@ -148,7 +151,7 @@ func (su *DriverStatsUtils) GetBucketUsage(volumeID string) (int64, error) {
 		return 0, err
 	}
 
-	apiKey := string(secret.Data["apiKey"])
+	apiKey := string(secret.Data[constants.ApiKey])
 	bucketName := string(secret.Data["bucketName"])
 
 	rcOptions := &rc.ResourceConfigurationV1Options{
@@ -255,7 +258,7 @@ func ReplaceAndReturnCopy(req interface{}) (interface{}, error) {
 		secretMap := inReq.GetSecrets()
 
 		for k, v := range secretMap {
-			if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
+			if k == constants.AccessKey || k == constants.SecretKey || k == constants.ApiKey || k == constants.KpRootKeyCRN || k == constants.ServiceId || k == constants.ResourceConfigApiKey {
 				newReq.Secrets[k] = "xxxxxxx"
 				continue
 			}
@@ -275,7 +278,7 @@ func ReplaceAndReturnCopy(req interface{}) (interface{}, error) {
 		secretMap := inReq.GetSecrets()
 
 		for k, v := range secretMap {
-			if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
+			if k == constants.AccessKey || k == constants.SecretKey || k == constants.ApiKey || k == constants.KpRootKeyCRN || k == constants.ServiceId || k == constants.ResourceConfigApiKey {
 				newReq.Secrets[k] = "xxxxxxx"
 				continue
 			}
@@ -296,7 +299,29 @@ func ReplaceAndReturnCopy(req interface{}) (interface{}, error) {
 		secretMap := inReq.GetSecrets()
 
 		for k, v := range secretMap {
-			if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" {
+			if k == constants.AccessKey || k == constants.SecretKey || k == constants.ApiKey || k == constants.KpRootKeyCRN || k == constants.ServiceId || k == constants.ResourceConfigApiKey {
+				newReq.Secrets[k] = "xxxxxxx"
+				continue
+			}
+			newReq.Secrets[k] = v
+		}
+
+		return newReq, nil
+
+	case *csi.NodeStageVolumeRequest:
+		// Create a new NodeStageVolumeRequest and copy the original values
+		var inReq *csi.NodeStageVolumeRequest
+
+		newReq := proto.Clone(r).(*csi.NodeStageVolumeRequest)
+
+		inReq = req.(*csi.NodeStageVolumeRequest)
+
+		// Modify the Secrets map in the new request
+		newReq.Secrets = make(map[string]string)
+		secretMap := inReq.GetSecrets()
+
+		for k, v := range secretMap {
+			if k == constants.AccessKey || k == constants.SecretKey || k == constants.ApiKey || k == constants.KpRootKeyCRN || k == constants.ServiceId || k == constants.ResourceConfigApiKey {
 				newReq.Secrets[k] = "xxxxxxx"
 				continue
 			}
@@ -326,29 +351,6 @@ func CreateK8sClient() (*kubernetes.Clientset, error) {
 	}
 
 	return clientset, nil
-}
-
-func getClusterType() (string, error) {
-	k8sClient, err := CreateK8sClient()
-	if err != nil {
-		return "", err
-	}
-
-	configMap, err := k8sClient.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "cluster-info", metav1.GetOptions{})
-	if err != nil {
-		return "", fmt.Errorf("error getting ConfigMap: %v", err)
-	}
-
-	clusterConfigStr := configMap.Data["cluster-config.json"]
-
-	var clusterConfig map[string]string
-	if err = json.Unmarshal([]byte(clusterConfigStr), &clusterConfig); err != nil {
-		return "", fmt.Errorf("error unmarshalling cluster config: %v", err)
-	}
-
-	clusterType := clusterConfig["cluster_type"]
-	klog.Info("Cluster Type ", clusterType)
-	return clusterType, nil
 }
 
 func fetchSecretUsingPV(volumeID string, su *DriverStatsUtils) (*v1.Secret, error) {

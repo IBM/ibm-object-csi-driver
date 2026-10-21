@@ -183,7 +183,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		return nil, status.Error(codes.InvalidArgument, "locationConstraint unknown")
 	}
 
-	kpRootKeyCrn = secretMap["kpRootKeyCRN"]
+	kpRootKeyCrn = secretMap[constants.KpRootKeyCRN]
 	if kpRootKeyCrn != "" {
 		klog.Infof("key protect root key crn provided for bucket creation")
 	}
@@ -518,16 +518,16 @@ func getObjectStorageCredentialsFromSecret(secretMap map[string]string, iamEP st
 		iamEndpoint = iamEP
 	}
 
-	if val, check := secretMap["apiKey"]; check {
+	if val, check := secretMap[constants.ApiKey]; check {
 		apiKey = val
 	}
 
 	// Add In Docs APIKEY is require param in secret
 	authType = "iam"
-	serviceInstanceID = secretMap["serviceId"]
+	serviceInstanceID = secretMap[constants.ServiceId]
 	if serviceInstanceID == "" {
-		accessKey = secretMap["accessKey"]
-		secretKey = secretMap["secretKey"]
+		accessKey = secretMap[constants.AccessKey]
+		secretKey = secretMap[constants.SecretKey]
 		if accessKey == "" || secretKey == "" {
 			return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| serviceId/accessKey/secretKey unknown")
 		}
@@ -564,23 +564,23 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 		quotaLimit         string
 	)
 
-	if bytesVal, ok := secret.Data["accessKey"]; ok {
+	if bytesVal, ok := secret.Data[constants.AccessKey]; ok {
 		accessKey = string(bytesVal)
 	}
 
-	if bytesVal, ok := secret.Data["secretKey"]; ok {
+	if bytesVal, ok := secret.Data[constants.SecretKey]; ok {
 		secretKey = string(bytesVal)
 	}
 
-	if bytesVal, ok := secret.Data["apiKey"]; ok {
+	if bytesVal, ok := secret.Data[constants.ApiKey]; ok {
 		apiKey = string(bytesVal)
 	}
 
-	if bytesVal, ok := secret.Data["kpRootKeyCRN"]; ok {
+	if bytesVal, ok := secret.Data[constants.KpRootKeyCRN]; ok {
 		kpRootKeyCrn = string(bytesVal)
 	}
 
-	if bytesVal, ok := secret.Data["serviceId"]; ok {
+	if bytesVal, ok := secret.Data[constants.ServiceId]; ok {
 		serviceInstanceID = string(bytesVal)
 	}
 
@@ -615,11 +615,11 @@ func parseCustomSecret(secret *v1.Secret) map[string]string {
 		quotaLimit = string(bytesVal)
 	}
 
-	secretMapCustom["accessKey"] = accessKey
-	secretMapCustom["secretKey"] = secretKey
-	secretMapCustom["apiKey"] = apiKey
-	secretMapCustom["kpRootKeyCRN"] = kpRootKeyCrn
-	secretMapCustom["serviceId"] = serviceInstanceID
+	secretMapCustom[constants.AccessKey] = accessKey
+	secretMapCustom[constants.SecretKey] = secretKey
+	secretMapCustom[constants.ApiKey] = apiKey
+	secretMapCustom[constants.KpRootKeyCRN] = kpRootKeyCrn
+	secretMapCustom[constants.ServiceId] = serviceInstanceID
 	secretMapCustom["bucketName"] = bucketName
 	secretMapCustom["iamEndpoint"] = iamEndpoint
 	secretMapCustom["cosEndpoint"] = cosEndpoint

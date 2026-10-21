@@ -33,6 +33,7 @@ var (
 
 func init() {
 	_ = flag.Set("logtostderr", "true") // #nosec G104: Attempt to set flags for logging to stderr only on best-effort basis.Error cannot be usefully handled.
+	gin.SetMode(gin.ReleaseMode)
 	logger = setUpLogger()
 	defer func() {
 		if err := logger.Sync(); err != nil && !isInvalidSync(err) {
@@ -110,7 +111,8 @@ func newRouter() *gin.Engine {
 	parser := &DefaultMounterArgsParser{}
 
 	// Create gin router
-	router := gin.Default()
+	router := gin.New()
+	router.Use(gin.Recovery())
 	router.POST("/api/cos/mount", handleCosMount(utils, parser))
 	router.POST("/api/cos/unmount", handleCosUnmount(utils))
 	return router
@@ -161,13 +163,11 @@ func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser)
 	return func(c *gin.Context) {
 		var request MountRequest
 
-		if err := c.BindJSON(&request); err != nil {
-			logger.Error("invalid request: ", zap.Error(err))
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		if !decodeNoDuplicateKeys(c, &request) {
 			return
 		}
 
-		logger.Info("New mount request with values:", zap.String("Bucket", request.Bucket), zap.String("Path", request.Path), zap.String("Mounter", request.Mounter), zap.Any("Args", request.Args))
+		logger.Info("New mount request with values:", zap.String("Bucket", request.Bucket), zap.String("Path", request.Path), zap.String("Mounter", request.Mounter), zap.Any("Args", redactArgsForLog(request.Args)))
 
 		if request.Mounter != constants.S3FS && request.Mounter != constants.RClone {
 			logger.Error("invalid mounter", zap.Any("mounter", request.Mounter))
@@ -208,9 +208,7 @@ func handleCosUnmount(mounter mounterUtils.MounterUtils) gin.HandlerFunc {
 			Path string `json:"path"`
 		}
 
-		if err := c.BindJSON(&request); err != nil {
-			logger.Error("invalid request: ", zap.Error(err))
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		if !decodeNoDuplicateKeys(c, &request) {
 			return
 		}
 
