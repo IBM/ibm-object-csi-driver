@@ -865,8 +865,8 @@ var secretMapXlsxParams = map[string]string{
 	"cosEndpoint":        "https://s3.direct.us-south.cloud-object-storage.appdomain.cloud",
 	"locationConstraint": "us-south-standard",
 	"bucketName":         "test-bucket",
-	"accessKey":          "AKIAIOSFODNN7EXAMPLE",
-	"secretKey":          "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+	"accessKey":          "test-access-key-id",
+	"secretKey":          "test-secret-access-key",
 	"iamEndpoint":        "https://iam.cloud.ibm.com",
 	"uid":                "3000",
 	"gid":                "3000",
@@ -1038,7 +1038,7 @@ func TestClassifyRcloneParams_MixedXlsxParams(t *testing.T) {
 // classified from the xlsx sample actually appear in the written rclone.conf.
 func TestCreateConfig_WithXlsxConfigParams(t *testing.T) {
 	rclone := &RcloneMounter{
-		AccessKeys:    "AKIAIOSFODNN7EXAMPLE:wJalrXUtnFEMI",
+		AccessKeys:    "test-access-key-id:test-secret-access-key",
 		EndPoint:      "https://s3.direct.us-south.cloud-object-storage.appdomain.cloud",
 		LocConstraint: "us-south-standard",
 		IAMEndpoint:   "https://iam.cloud.ibm.com",
@@ -1196,7 +1196,7 @@ func TestCreateConfig_XlsxFullFlow(t *testing.T) {
 	assert.NotEmpty(t, extraCLIFlags, "should have CLI flags")
 
 	rclone := &RcloneMounter{
-		AccessKeys:    "AKIAIOSFODNN7EXAMPLE:wJalrXUtnFEMI",
+		AccessKeys:    "test-access-key-id:test-secret-access-key",
 		EndPoint:      secretMapXlsxParams["cosEndpoint"],
 		LocConstraint: secretMapXlsxParams["locationConstraint"],
 		IAMEndpoint:   secretMapXlsxParams["iamEndpoint"],
