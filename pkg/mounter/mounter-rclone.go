@@ -198,13 +198,25 @@ func NewRcloneMounter(params RcloneMounterParams) Mounter {
 }
 
 func updateMountOptions(dafaultMountOptions []string, secretMap map[string]string) []string {
+	// mountOptsMap stores options keyed by the left-hand side of "key=value".
+	// Bare flags (no "=") are stored with an empty-string value so they are
+	// preserved and de-duplicated correctly.
 	mountOptsMap := make(map[string]string)
 
-	// Create map out of array
+	// Populate map from the driver/SC default options.
+	// Use SplitN(..., 2) so values that contain "=" are kept intact,
+	// and accept bare entries (e.g. "-v") without an "=" too.
 	for _, e := range dafaultMountOptions {
-		opts := strings.Split(e, "=")
-		if len(opts) == 2 {
-			mountOptsMap[opts[0]] = opts[1]
+		e = strings.TrimSpace(e)
+		if e == "" {
+			continue
+		}
+		parts := strings.SplitN(e, "=", 2)
+		if len(parts) == 2 {
+			mountOptsMap[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+		} else {
+			// bare flag: "-v", "--no-modtime", etc.
+			mountOptsMap[parts[0]] = ""
 		}
 	}
 
@@ -217,24 +229,32 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 
 	lines := strings.Split(stringData, "\n")
 
-	// Update map
+	// Merge secret mountOptions into the map, overriding defaults where keys collide.
+	// Use SplitN(..., 2) so values containing "=" are preserved,
+	// and bare flags (e.g. "-v", "--no-modtime") are accepted without "=".
 	for _, line := range lines {
-		if strings.TrimSpace(line) == "" {
+		line = strings.TrimSpace(line)
+		if line == "" {
 			continue
 		}
-		opts := strings.Split(line, "=")
-		if len(opts) != 2 {
-			klog.Infof("Invalid mount option: %s\n", line)
-			continue
+		parts := strings.SplitN(line, "=", 2)
+		key := strings.TrimSpace(parts[0])
+		if len(parts) == 2 {
+			mountOptsMap[key] = strings.TrimSpace(parts[1])
+		} else {
+			// bare flag — store with empty value
+			mountOptsMap[key] = ""
 		}
-		mountOptsMap[strings.TrimSpace(opts[0])] = strings.TrimSpace(opts[1])
 	}
 
-	// Create array out of map
-	updatedOptions := []string{}
+	// Reconstruct the slice from the merged map.
+	updatedOptions := make([]string, 0, len(mountOptsMap))
 	for k, v := range mountOptsMap {
-		option := fmt.Sprintf("%s=%s", k, v)
-		updatedOptions = append(updatedOptions, option)
+		if v == "" {
+			updatedOptions = append(updatedOptions, k)
+		} else {
+			updatedOptions = append(updatedOptions, fmt.Sprintf("%s=%s", k, v))
+		}
 	}
 
 	klog.Infof("Updated rclone Options: %v", updatedOptions)

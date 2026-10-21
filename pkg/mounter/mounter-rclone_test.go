@@ -52,9 +52,9 @@ func TestNewRcloneMounter_Success(t *testing.T) {
 
 func TestNewRcloneMounter_Only_GID(t *testing.T) {
 	secretMap := map[string]string{
-		"cosEndpoint":        "test-endpoint",
-		"locationConstraint": "test-loc-constraint",
-		"bucketName":         "test-bucket-name",
+		"cosEndpoint":          "test-endpoint",
+		"locationConstraint":   "test-loc-constraint",
+		"bucketName":           "test-bucket-name",
 		"objectPath":           "test-obj-path",
 		constants.AccessKey:    "test-access-key",
 		constants.SecretKey:    "test-secret-key",
@@ -80,16 +80,16 @@ func TestNewRcloneMounter_Only_GID(t *testing.T) {
 
 func TestNewRcloneMounter_MountOptsInSecret_HMAC(t *testing.T) {
 	secretMap := map[string]string{
-		"cosEndpoint":        "test-endpoint",
-		"locationConstraint": "test-loc-constraint",
-		"bucketName":         "test-bucket-name",
+		"cosEndpoint":          "test-endpoint",
+		"locationConstraint":   "test-loc-constraint",
+		"bucketName":           "test-bucket-name",
 		"objectPath":           "test-obj-path",
 		constants.AccessKey:    "test-access-key",
 		constants.SecretKey:    "test-secret-key",
 		constants.KpRootKeyCRN: "test-kp-root-key-crn",
 		"gid":                  "1001",
-		"uid":                "1001",
-		"mountOptions":       "\nupload_concurrency\nkey=value",
+		"uid":                  "1001",
+		"mountOptions":         "\nupload_concurrency\nkey=value",
 	}
 	mounter := NewRcloneMounter(RcloneMounterParams{
 		SecretMap:    secretMap,
@@ -111,17 +111,17 @@ func TestNewRcloneMounter_MountOptsInSecret_HMAC(t *testing.T) {
 
 func TestNewRcloneMounter_MountOptsInSecret_IAM(t *testing.T) {
 	secretMap := map[string]string{
-		"cosEndpoint":        "test-endpoint",
-		"locationConstraint": "test-loc-constraint",
-		"bucketName":         "test-bucket-name",
+		"cosEndpoint":          "test-endpoint",
+		"locationConstraint":   "test-loc-constraint",
+		"bucketName":           "test-bucket-name",
 		"objectPath":           "test-obj-path",
 		constants.ApiKey:       "test-api-key",
 		constants.ServiceId:    "test-service-id",
 		constants.KpRootKeyCRN: "test-kp-root-key-crn",
 		"gid":                  "1001",
-		"uid":                "1001",
-		"mountOptions":       "\nupload_concurrency\nkey=value",
-		"iamEndpoint":        "test-iam-endpoint",
+		"uid":                  "1001",
+		"mountOptions":         "\nupload_concurrency\nkey=value",
+		"iamEndpoint":          "test-iam-endpoint",
 	}
 	mounter := NewRcloneMounter(RcloneMounterParams{
 		SecretMap:    secretMap,
@@ -621,7 +621,7 @@ func TestFormulateRcloneMountOptions_GidUid(t *testing.T) {
 func TestRcloneMount_WorkerNode_PayloadIsValidJSON(t *testing.T) {
 	mountWorker = true
 
-	createConfigWrap = func(_ string, _ *RcloneMounter) error { return nil }
+	createConfigWrap = func(_ string, _ *RcloneMounter, _ []string) error { return nil }
 
 	var capturedPayload string
 	mounterRequest = func(payload, _ string) error {
@@ -653,7 +653,7 @@ func TestRcloneMount_WorkerNode_InjectedBucketName_CannotOverridePath(t *testing
 	// Mirrors the s3fs injection test for the rclone code path.
 	mountWorker = true
 
-	createConfigWrap = func(_ string, _ *RcloneMounter) error { return nil }
+	createConfigWrap = func(_ string, _ *RcloneMounter, _ []string) error { return nil }
 
 	var capturedPayload string
 	mounterRequest = func(payload, _ string) error {
@@ -731,6 +731,120 @@ func TestRcloneUnmount_WorkerNode_InjectedPath_CannotInjectExtraKeys(t *testing.
 	assert.Equal(t, injectedPath, parsed["path"])
 	_, hasExtra := parsed["extra"]
 	assert.False(t, hasExtra, "injected 'extra' key must not appear in parsed payload")
+}
+
+// ---------------------------------------------------------------------------
+// Tests for updateMountOptions — backward-compatibility and new param formats
+// ---------------------------------------------------------------------------
+
+// TestUpdateMountOptions_LegacyKeyValue verifies that the original behaviour
+// (plain "key=value" lines in the secret mountOptions) still works.
+func TestUpdateMountOptions_LegacyKeyValue(t *testing.T) {
+	defaults := []string{"chunk_size=16M", "upload_concurrency=4"}
+	secret := map[string]string{
+		"mountOptions": "chunk_size=32M\nupload_concurrency=8\n",
+	}
+	result := updateMountOptions(defaults, secret)
+	resultMap := sliceToMap(result)
+
+	assert.Equal(t, "32M", resultMap["chunk_size"], "secret value must override default")
+	assert.Equal(t, "8", resultMap["upload_concurrency"], "secret value must override default")
+}
+
+// TestUpdateMountOptions_NoSecret verifies that defaults are returned unchanged
+// when the secret has no mountOptions key.
+func TestUpdateMountOptions_NoSecret(t *testing.T) {
+	defaults := []string{"chunk_size=16M", "upload_concurrency=4"}
+	result := updateMountOptions(defaults, map[string]string{})
+	assert.ElementsMatch(t, defaults, result)
+}
+
+// TestUpdateMountOptions_CLIDoubleDashFlags verifies that "--key=value" flags
+// from the secret are preserved and correctly merged.
+func TestUpdateMountOptions_CLIDoubleDashFlags(t *testing.T) {
+	secret := map[string]string{
+		"mountOptions": "--transfers=8\n--buffer-size=32M\n--retries=5\n",
+	}
+	result := updateMountOptions(nil, secret)
+	resultMap := sliceToMap(result)
+
+	assert.Equal(t, "8", resultMap["--transfers"])
+	assert.Equal(t, "32M", resultMap["--buffer-size"])
+	assert.Equal(t, "5", resultMap["--retries"])
+}
+
+// TestUpdateMountOptions_BareSingleLetterFlag verifies that bare flags like
+// "-v" (no "=" at all) are preserved as-is.
+func TestUpdateMountOptions_BareSingleLetterFlag(t *testing.T) {
+	secret := map[string]string{
+		"mountOptions": "-v\n",
+	}
+	result := updateMountOptions(nil, secret)
+	assert.Contains(t, result, "-v", "bare flag '-v' must be present in result")
+}
+
+// TestUpdateMountOptions_ValueContainsEquals verifies that values containing
+// "=" (e.g. a log file path on Windows, or a base64-like value) are not split.
+func TestUpdateMountOptions_ValueContainsEquals(t *testing.T) {
+	secret := map[string]string{
+		"mountOptions": "--log-file=/var/log/rclone.log\n",
+	}
+	result := updateMountOptions(nil, secret)
+	resultMap := sliceToMap(result)
+
+	assert.Equal(t, "/var/log/rclone.log", resultMap["--log-file"],
+		"value containing '/' must not be truncated at '='")
+}
+
+// TestUpdateMountOptions_SecretOverridesDefault verifies that a key present in
+// both defaults and secret ends up with the secret's value.
+func TestUpdateMountOptions_SecretOverridesDefault(t *testing.T) {
+	defaults := []string{"--vfs-cache-mode=off"}
+	secret := map[string]string{
+		"mountOptions": "--vfs-cache-mode=full\n",
+	}
+	result := updateMountOptions(defaults, secret)
+	resultMap := sliceToMap(result)
+
+	assert.Equal(t, "full", resultMap["--vfs-cache-mode"],
+		"secret value must override default for the same key")
+	assert.Len(t, result, 1, "duplicate key must be collapsed into one entry")
+}
+
+// TestUpdateMountOptions_MixedLegacyAndCLIFlags verifies that a secret
+// containing both legacy config-file params and new CLI flags is handled
+// correctly and all entries survive.
+func TestUpdateMountOptions_MixedLegacyAndCLIFlags(t *testing.T) {
+	secret := map[string]string{
+		"mountOptions": "upload_concurrency=16\nchunk_size=64M\n--transfers=8\n--buffer-size=32M\n-v\n",
+	}
+	result := updateMountOptions(nil, secret)
+	resultMap := sliceToMap(result)
+
+	// legacy config-file params
+	assert.Equal(t, "16", resultMap["upload_concurrency"])
+	assert.Equal(t, "64M", resultMap["chunk_size"])
+	// new CLI flags
+	assert.Equal(t, "8", resultMap["--transfers"])
+	assert.Equal(t, "32M", resultMap["--buffer-size"])
+	// bare flag
+	assert.Contains(t, result, "-v")
+	assert.Len(t, result, 5)
+}
+
+// sliceToMap converts []string{"key=value", "bare"} into
+// map[string]string{"key": "value", "bare": ""} for easy assertion.
+func sliceToMap(opts []string) map[string]string {
+	m := make(map[string]string, len(opts))
+	for _, o := range opts {
+		parts := strings.SplitN(o, "=", 2)
+		if len(parts) == 2 {
+			m[parts[0]] = parts[1]
+		} else {
+			m[parts[0]] = ""
+		}
+	}
+	return m
 }
 
 // ---------------------------------------------------------------------------
@@ -1230,9 +1344,9 @@ func TestPrintRcloneArtifacts(t *testing.T) {
 		strings.Join(nodeOp, " \\\n    "),
 	)
 
-	t.Logf("\n"+
-		"════════════════════════════════════════════════════════════════\n"+
-		"  WORKER-NODE MAP  (sent as JSON to cos-csi-mounter)\n"+
+	t.Logf("\n" +
+		"════════════════════════════════════════════════════════════════\n" +
+		"  WORKER-NODE MAP  (sent as JSON to cos-csi-mounter)\n" +
 		"════════════════════════════════════════════════════════════════",
 	)
 	// Sort keys for stable output
