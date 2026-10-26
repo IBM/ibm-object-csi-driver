@@ -278,7 +278,6 @@ func (rclone *RcloneMounter) Mount(source string, target string) error {
 
 	// Classify freeform mountOptions: config-file lines vs CLI flags
 	extraConfigOpts, extraCLIFlags := classifyRcloneParams(rclone.MountOptions)
-
 	configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 	if err = createConfigWrap(configPathWithVolID, rclone, extraConfigOpts); err != nil {
 		klog.Errorf("RcloneMounter Mount: Cannot create rclone config file %v", err)
