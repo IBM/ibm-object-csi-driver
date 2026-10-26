@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
@@ -51,9 +52,9 @@ func TestNewRcloneMounter_Success(t *testing.T) {
 
 func TestNewRcloneMounter_Only_GID(t *testing.T) {
 	secretMap := map[string]string{
-		"cosEndpoint":        "test-endpoint",
-		"locationConstraint": "test-loc-constraint",
-		"bucketName":         "test-bucket-name",
+		"cosEndpoint":          "test-endpoint",
+		"locationConstraint":   "test-loc-constraint",
+		"bucketName":           "test-bucket-name",
 		"objectPath":           "test-obj-path",
 		constants.AccessKey:    "test-access-key",
 		constants.SecretKey:    "test-secret-key",
@@ -79,16 +80,16 @@ func TestNewRcloneMounter_Only_GID(t *testing.T) {
 
 func TestNewRcloneMounter_MountOptsInSecret_HMAC(t *testing.T) {
 	secretMap := map[string]string{
-		"cosEndpoint":        "test-endpoint",
-		"locationConstraint": "test-loc-constraint",
-		"bucketName":         "test-bucket-name",
+		"cosEndpoint":          "test-endpoint",
+		"locationConstraint":   "test-loc-constraint",
+		"bucketName":           "test-bucket-name",
 		"objectPath":           "test-obj-path",
 		constants.AccessKey:    "test-access-key",
 		constants.SecretKey:    "test-secret-key",
 		constants.KpRootKeyCRN: "test-kp-root-key-crn",
 		"gid":                  "1001",
-		"uid":                "1001",
-		"mountOptions":       "\nupload_concurrency\nkey=value",
+		"uid":                  "1001",
+		"mountOptions":         "\nupload_concurrency\nkey=value",
 	}
 	mounter := NewRcloneMounter(RcloneMounterParams{
 		SecretMap:    secretMap,
@@ -110,17 +111,17 @@ func TestNewRcloneMounter_MountOptsInSecret_HMAC(t *testing.T) {
 
 func TestNewRcloneMounter_MountOptsInSecret_IAM(t *testing.T) {
 	secretMap := map[string]string{
-		"cosEndpoint":        "test-endpoint",
-		"locationConstraint": "test-loc-constraint",
-		"bucketName":         "test-bucket-name",
+		"cosEndpoint":          "test-endpoint",
+		"locationConstraint":   "test-loc-constraint",
+		"bucketName":           "test-bucket-name",
 		"objectPath":           "test-obj-path",
 		constants.ApiKey:       "test-api-key",
 		constants.ServiceId:    "test-service-id",
 		constants.KpRootKeyCRN: "test-kp-root-key-crn",
 		"gid":                  "1001",
-		"uid":                "1001",
-		"mountOptions":       "\nupload_concurrency\nkey=value",
-		"iamEndpoint":        "test-iam-endpoint",
+		"uid":                  "1001",
+		"mountOptions":         "\nupload_concurrency\nkey=value",
+		"iamEndpoint":          "test-iam-endpoint",
 	}
 	mounter := NewRcloneMounter(RcloneMounterParams{
 		SecretMap:    secretMap,
@@ -157,7 +158,7 @@ func TestRcloneMount_NodeServer_Positive(t *testing.T) {
 		}),
 	}
 
-	createConfigWrap = func(_ string, _ *RcloneMounter) error {
+	createConfigWrap = func(_ string, _ *RcloneMounter, _ []string) error {
 		return nil
 	}
 
@@ -168,7 +169,7 @@ func TestRcloneMount_NodeServer_Positive(t *testing.T) {
 func TestRcloneMount_CreateConfigFails_Negative(t *testing.T) {
 	rclone := &RcloneMounter{}
 
-	createConfigWrap = func(_ string, _ *RcloneMounter) error {
+	createConfigWrap = func(_ string, _ *RcloneMounter, _ []string) error {
 		return errors.New("failed to create config file")
 	}
 
@@ -194,7 +195,7 @@ func TestRcloneMount_WorkerNode_Positive(t *testing.T) {
 		}),
 	}
 
-	createConfigWrap = func(_ string, _ *RcloneMounter) error {
+	createConfigWrap = func(_ string, _ *RcloneMounter, _ []string) error {
 		return nil
 	}
 	mounterRequest = func(_, _ string) error {
@@ -222,7 +223,7 @@ func TestRcloneMount_WorkerNode_Negative(t *testing.T) {
 		}),
 	}
 
-	createConfigWrap = func(_ string, _ *RcloneMounter) error {
+	createConfigWrap = func(_ string, _ *RcloneMounter, _ []string) error {
 		return nil
 	}
 	mounterRequest = func(_, _ string) error {
@@ -311,10 +312,14 @@ func TestCreateConfig_Success_HMAC(t *testing.T) {
 		MountOptions:  []string{"upload_concurrency=16"},
 	}
 
+	// Classify MountOptions the same way Mount() does, so extraConfigOpts carries
+	// the underscore-keyed option into the config file.
+	extraConfigOpts, _ := classifyRcloneParams(rclone.MountOptions)
+
 	// Create a temporary directory for the test
 	tmpDir := t.TempDir()
 
-	err := createConfig(tmpDir, rclone)
+	err := createConfig(tmpDir, rclone, extraConfigOpts)
 	assert.NoError(t, err)
 
 	// Read the generated config file and verify HMAC parameters
@@ -348,10 +353,14 @@ func TestCreateConfig_Success_IAM(t *testing.T) {
 		MountOptions:      []string{"vfs-cache-mode=writes"},
 	}
 
+	// Classify MountOptions: "vfs-cache-mode=writes" has no "_" and starts with no dash,
+	// so it is a config-file line (no leading "--").
+	extraConfigOpts, _ := classifyRcloneParams(rclone.MountOptions)
+
 	// Create a temporary directory for the test
 	tmpDir := t.TempDir()
 
-	err := createConfig(tmpDir, rclone)
+	err := createConfig(tmpDir, rclone, extraConfigOpts)
 	assert.NoError(t, err)
 
 	// Read the generated config file and verify IAM parameters
@@ -376,23 +385,34 @@ func TestCreateConfig_Success_IAM(t *testing.T) {
 }
 
 func TestCreateConfig_MakeDirFails(t *testing.T) {
+	origMakeDir := MakeDir
 	MakeDir = func(string, os.FileMode) error {
 		return errors.New("mkdir failed")
 	}
-	err := createConfig("/tmp/testconfig", &RcloneMounter{})
+	defer func() { MakeDir = origMakeDir }()
+	err := createConfig("/tmp/testconfig", &RcloneMounter{}, nil)
 	assert.ErrorContains(t, err, "mkdir failed")
 }
 
 func TestCreateConfig_FileCreateFails(t *testing.T) {
+	origMakeDir := MakeDir
+	origCreateFile := CreateFile
 	MakeDir = func(string, os.FileMode) error { return nil }
 	CreateFile = func(string) (*os.File, error) {
 		return nil, errors.New("file create failed")
 	}
-	err := createConfig("/tmp/testconfig", &RcloneMounter{})
+	defer func() {
+		MakeDir = origMakeDir
+		CreateFile = origCreateFile
+	}()
+	err := createConfig("/tmp/testconfig", &RcloneMounter{}, nil)
 	assert.ErrorContains(t, err, "file create failed")
 }
 
 func TestCreateConfig_ChmodFails(t *testing.T) {
+	origMakeDir := MakeDir
+	origCreateFile := CreateFile
+	origChmod := Chmod
 	MakeDir = func(string, os.FileMode) error { return nil }
 	CreateFile = func(string) (*os.File, error) {
 		return os.CreateTemp("", "test")
@@ -400,7 +420,12 @@ func TestCreateConfig_ChmodFails(t *testing.T) {
 	Chmod = func(string, os.FileMode) error {
 		return errors.New("chmod failed")
 	}
-	err := createConfig("/tmp/testconfig", &RcloneMounter{})
+	defer func() {
+		MakeDir = origMakeDir
+		CreateFile = origCreateFile
+		Chmod = origChmod
+	}()
+	err := createConfig("/tmp/testconfig", &RcloneMounter{}, nil)
 	assert.ErrorContains(t, err, "chmod failed")
 }
 
@@ -560,7 +585,7 @@ func TestNewRcloneMounter_ReadOnly(t *testing.T) {
 			assert.True(t, ok)
 			assert.Equal(t, tt.wantRO, rCloneMounter.ReadOnly)
 
-			nodeOp, workerOp := rCloneMounter.formulateMountOptions("bucket", "/target", "/config")
+			nodeOp, workerOp := rCloneMounter.formulateMountOptions("bucket", "/target", "/config", nil)
 			if tt.wantRO {
 				assert.Contains(t, nodeOp, "--read-only")
 				assert.Equal(t, "true", workerOp["read-only"])
@@ -580,7 +605,7 @@ func TestFormulateRcloneMountOptions_GidUid(t *testing.T) {
 		EndPoint: "test-endpoint",
 	}
 
-	nodeOp, workerOp := rclone.formulateMountOptions("bucket", "/target", "/config")
+	nodeOp, workerOp := rclone.formulateMountOptions("bucket", "/target", "/config", nil)
 
 	assert.Contains(t, nodeOp, "--gid=1000")
 	assert.Contains(t, nodeOp, "--uid=1000")
@@ -596,7 +621,7 @@ func TestFormulateRcloneMountOptions_GidUid(t *testing.T) {
 func TestRcloneMount_WorkerNode_PayloadIsValidJSON(t *testing.T) {
 	mountWorker = true
 
-	createConfigWrap = func(_ string, _ *RcloneMounter) error { return nil }
+	createConfigWrap = func(_ string, _ *RcloneMounter, _ []string) error { return nil }
 
 	var capturedPayload string
 	mounterRequest = func(payload, _ string) error {
@@ -628,7 +653,7 @@ func TestRcloneMount_WorkerNode_InjectedBucketName_CannotOverridePath(t *testing
 	// Mirrors the s3fs injection test for the rclone code path.
 	mountWorker = true
 
-	createConfigWrap = func(_ string, _ *RcloneMounter) error { return nil }
+	createConfigWrap = func(_ string, _ *RcloneMounter, _ []string) error { return nil }
 
 	var capturedPayload string
 	mounterRequest = func(payload, _ string) error {
@@ -706,4 +731,636 @@ func TestRcloneUnmount_WorkerNode_InjectedPath_CannotInjectExtraKeys(t *testing.
 	assert.Equal(t, injectedPath, parsed["path"])
 	_, hasExtra := parsed["extra"]
 	assert.False(t, hasExtra, "injected 'extra' key must not appear in parsed payload")
+}
+
+// ---------------------------------------------------------------------------
+// Tests for updateMountOptions — backward-compatibility and new param formats
+// ---------------------------------------------------------------------------
+
+// TestUpdateMountOptions_LegacyKeyValue verifies that the original behaviour
+// (plain "key=value" lines in the secret mountOptions) still works.
+func TestUpdateMountOptions_LegacyKeyValue(t *testing.T) {
+	defaults := []string{"chunk_size=16M", "upload_concurrency=4"}
+	secret := map[string]string{
+		"mountOptions": "chunk_size=32M\nupload_concurrency=8\n",
+	}
+	result := updateMountOptions(defaults, secret)
+	resultMap := sliceToMap(result)
+
+	assert.Equal(t, "32M", resultMap["chunk_size"], "secret value must override default")
+	assert.Equal(t, "8", resultMap["upload_concurrency"], "secret value must override default")
+}
+
+// TestUpdateMountOptions_NoSecret verifies that defaults are returned unchanged
+// when the secret has no mountOptions key.
+func TestUpdateMountOptions_NoSecret(t *testing.T) {
+	defaults := []string{"chunk_size=16M", "upload_concurrency=4"}
+	result := updateMountOptions(defaults, map[string]string{})
+	assert.ElementsMatch(t, defaults, result)
+}
+
+// TestUpdateMountOptions_CLIDoubleDashFlags verifies that "--key=value" flags
+// from the secret are preserved and correctly merged.
+func TestUpdateMountOptions_CLIDoubleDashFlags(t *testing.T) {
+	secret := map[string]string{
+		"mountOptions": "--transfers=8\n--buffer-size=32M\n--retries=5\n",
+	}
+	result := updateMountOptions(nil, secret)
+	resultMap := sliceToMap(result)
+
+	assert.Equal(t, "8", resultMap["--transfers"])
+	assert.Equal(t, "32M", resultMap["--buffer-size"])
+	assert.Equal(t, "5", resultMap["--retries"])
+}
+
+// TestUpdateMountOptions_BareSingleLetterFlag verifies that bare flags like
+// "-v" (no "=" at all) are preserved as-is.
+func TestUpdateMountOptions_BareSingleLetterFlag(t *testing.T) {
+	secret := map[string]string{
+		"mountOptions": "-v\n",
+	}
+	result := updateMountOptions(nil, secret)
+	assert.Contains(t, result, "-v", "bare flag '-v' must be present in result")
+}
+
+// TestUpdateMountOptions_ValueContainsEquals verifies that values containing
+// "=" (e.g. a log file path on Windows, or a base64-like value) are not split.
+func TestUpdateMountOptions_ValueContainsEquals(t *testing.T) {
+	secret := map[string]string{
+		"mountOptions": "--log-file=/var/log/rclone.log\n",
+	}
+	result := updateMountOptions(nil, secret)
+	resultMap := sliceToMap(result)
+
+	assert.Equal(t, "/var/log/rclone.log", resultMap["--log-file"],
+		"value containing '/' must not be truncated at '='")
+}
+
+// TestUpdateMountOptions_SecretOverridesDefault verifies that a key present in
+// both defaults and secret ends up with the secret's value.
+func TestUpdateMountOptions_SecretOverridesDefault(t *testing.T) {
+	defaults := []string{"--vfs-cache-mode=off"}
+	secret := map[string]string{
+		"mountOptions": "--vfs-cache-mode=full\n",
+	}
+	result := updateMountOptions(defaults, secret)
+	resultMap := sliceToMap(result)
+
+	assert.Equal(t, "full", resultMap["--vfs-cache-mode"],
+		"secret value must override default for the same key")
+	assert.Len(t, result, 1, "duplicate key must be collapsed into one entry")
+}
+
+// TestUpdateMountOptions_MixedLegacyAndCLIFlags verifies that a secret
+// containing both legacy config-file params and new CLI flags is handled
+// correctly and all entries survive.
+func TestUpdateMountOptions_MixedLegacyAndCLIFlags(t *testing.T) {
+	secret := map[string]string{
+		"mountOptions": "upload_concurrency=16\nchunk_size=64M\n--transfers=8\n--buffer-size=32M\n-v\n",
+	}
+	result := updateMountOptions(nil, secret)
+	resultMap := sliceToMap(result)
+
+	// legacy config-file params
+	assert.Equal(t, "16", resultMap["upload_concurrency"])
+	assert.Equal(t, "64M", resultMap["chunk_size"])
+	// new CLI flags
+	assert.Equal(t, "8", resultMap["--transfers"])
+	assert.Equal(t, "32M", resultMap["--buffer-size"])
+	// bare flag
+	assert.Contains(t, result, "-v")
+	assert.Len(t, result, 5)
+}
+
+// sliceToMap converts []string{"key=value", "bare"} into
+// map[string]string{"key": "value", "bare": ""} for easy assertion.
+func sliceToMap(opts []string) map[string]string {
+	m := make(map[string]string, len(opts))
+	for _, o := range opts {
+		parts := strings.SplitN(o, "=", 2)
+		if len(parts) == 2 {
+			m[parts[0]] = parts[1]
+		} else {
+			m[parts[0]] = ""
+		}
+	}
+	return m
+}
+
+// ---------------------------------------------------------------------------
+// Tests for classifyRcloneParams and the full xlsx-param secret flow
+// ---------------------------------------------------------------------------
+
+// secretMapXlsxParams is a Kubernetes-Secret-like map containing a representative
+// sample of every parameter from rclone_params.xlsx, keyed exactly as a user
+// would write them in the "mountOptions" field of the Secret stringData block.
+//
+// Rule tested:
+//
+//	keys starting with "--"             → CLI flag
+//	keys matching "-<single-letter>"    → CLI flag  (short-hand)
+//	keys containing "_" or no dash      → rclone.conf line
+var secretMapXlsxParams = map[string]string{
+	// ---- well-known identity keys (handled separately by NewRcloneMounter) ----
+	"cosEndpoint":        "https://s3.direct.us-south.cloud-object-storage.appdomain.cloud",
+	"locationConstraint": "us-south-standard",
+	"bucketName":         "test-bucket",
+	"accessKey":          "test-access-key-id",
+	"secretKey":          "test-secret-access-key",
+	"iamEndpoint":        "https://iam.cloud.ibm.com",
+	"uid":                "3000",
+	"gid":                "3000",
+
+	// ---- freeform mountOptions block (newline-separated) ----
+	// These get parsed by updateMountOptions and then classifyRcloneParams.
+	//
+	// CLI flags (double-dash) — from xlsx CLI Flags sheet:
+	//   --transfers, --checkers, --buffer-size, --low-level-retries,
+	//   --log-level, --log-file, --bwlimit, --retries, --timeout, --contimeout,
+	//   --vfs-cache-mode (special: also appears as mount default, overrides it),
+	//   --vfs-cache-max-age, --vfs-read-chunk-size, --attr-timeout,
+	//   --dir-cache-time, --poll-interval, --no-modtime, --allow-other
+	//
+	// CLI flags (single-letter):
+	//   -v  (verbose)
+	//
+	// Config-file lines (underscore / no dash) — from xlsx Config File sheet:
+	//   upload_concurrency, upload_cutoff, chunk_size, max_upload_parts,
+	//   storage_class, server_side_encryption, acl,
+	//   no_check_bucket, disable_checksum, list_chunk, list_version,
+	//   force_path_style, encoding
+	"mountOptions": `
+--transfers=8
+--checkers=16
+--buffer-size=32M
+--low-level-retries=5
+--log-level=INFO
+--log-file=/var/log/rclone.log
+--bwlimit=100M
+--retries=5
+--timeout=10m
+--contimeout=2m
+--vfs-cache-mode=full
+--vfs-cache-max-age=24h
+--vfs-read-chunk-size=128M
+--attr-timeout=30s
+--dir-cache-time=5m
+--poll-interval=30s
+--no-modtime=true
+--allow-other=true
+-v
+upload_concurrency=16
+upload_cutoff=200M
+chunk_size=64M
+max_upload_parts=1000
+storage_class=SMART
+server_side_encryption=AES256
+acl=private
+no_check_bucket=true
+disable_checksum=true
+list_chunk=1000
+list_version=2
+force_path_style=true
+encoding=Slash,InvalidUtf8,Dot
+`,
+}
+
+// TestClassifyRcloneParams_DoublesDashGoToCLI verifies that "--key=value" entries
+// are routed exclusively to cliFlags.
+func TestClassifyRcloneParams_DoublesDashGoToCLI(t *testing.T) {
+	options := []string{
+		"--transfers=8",
+		"--buffer-size=32M",
+		"--vfs-cache-mode=full",
+		"--no-modtime=true",
+	}
+	configOpts, cliFlags := classifyRcloneParams(options)
+
+	assert.Empty(t, configOpts, "double-dash params must not go to config file")
+	assert.ElementsMatch(t, options, cliFlags)
+}
+
+// TestClassifyRcloneParams_SingleLetterGoToCLI verifies that "-v" style
+// short flags are routed to cliFlags.
+func TestClassifyRcloneParams_SingleLetterGoToCLI(t *testing.T) {
+	options := []string{"-v", "-q", "-P"}
+	configOpts, cliFlags := classifyRcloneParams(options)
+
+	assert.Empty(t, configOpts)
+	assert.ElementsMatch(t, options, cliFlags)
+}
+
+// TestClassifyRcloneParams_UnderscoreGoToConfig verifies that keys containing
+// "_" are routed exclusively to configOpts.
+func TestClassifyRcloneParams_UnderscoreGoToConfig(t *testing.T) {
+	options := []string{
+		"upload_concurrency=16",
+		"upload_cutoff=200M",
+		"chunk_size=64M",
+		"no_check_bucket=true",
+		"storage_class=SMART",
+	}
+	configOpts, cliFlags := classifyRcloneParams(options)
+
+	assert.Empty(t, cliFlags, "underscore params must not go to CLI")
+	assert.ElementsMatch(t, options, configOpts)
+}
+
+// TestClassifyRcloneParams_NoDashGoToConfig verifies that plain keys (no leading
+// dash at all) are treated as config-file lines.
+func TestClassifyRcloneParams_NoDashGoToConfig(t *testing.T) {
+	options := []string{
+		"encoding=Slash,InvalidUtf8,Dot",
+		"acl=private",
+		"force_path_style=true",
+	}
+	configOpts, cliFlags := classifyRcloneParams(options)
+
+	assert.Empty(t, cliFlags)
+	assert.ElementsMatch(t, options, configOpts)
+}
+
+// TestClassifyRcloneParams_EmptyAndWhitespace verifies that blank/whitespace
+// entries are silently dropped.
+func TestClassifyRcloneParams_EmptyAndWhitespace(t *testing.T) {
+	options := []string{"", "   ", "\t"}
+	configOpts, cliFlags := classifyRcloneParams(options)
+
+	assert.Nil(t, configOpts)
+	assert.Nil(t, cliFlags)
+}
+
+// TestClassifyRcloneParams_MixedXlsxParams verifies the complete xlsx sample:
+// every "--" entry goes to CLI, every "_"/no-dash entry goes to config.
+func TestClassifyRcloneParams_MixedXlsxParams(t *testing.T) {
+	options := []string{
+		// CLI flags
+		"--transfers=8", "--checkers=16", "--buffer-size=32M",
+		"--low-level-retries=5", "--log-level=INFO", "--log-file=/var/log/rclone.log",
+		"--bwlimit=100M", "--retries=5", "--timeout=10m", "--contimeout=2m",
+		"--vfs-cache-mode=full", "--vfs-cache-max-age=24h", "--vfs-read-chunk-size=128M",
+		"--attr-timeout=30s", "--dir-cache-time=5m", "--poll-interval=30s",
+		"--no-modtime=true", "--allow-other=true",
+		"-v",
+		// Config-file lines
+		"upload_concurrency=16", "upload_cutoff=200M", "chunk_size=64M",
+		"max_upload_parts=1000", "storage_class=SMART",
+		"server_side_encryption=AES256", "acl=private",
+		"no_check_bucket=true", "disable_checksum=true",
+		"list_chunk=1000", "list_version=2",
+		"force_path_style=true", "encoding=Slash,InvalidUtf8,Dot",
+	}
+
+	wantCLI := []string{
+		"--transfers=8", "--checkers=16", "--buffer-size=32M",
+		"--low-level-retries=5", "--log-level=INFO", "--log-file=/var/log/rclone.log",
+		"--bwlimit=100M", "--retries=5", "--timeout=10m", "--contimeout=2m",
+		"--vfs-cache-mode=full", "--vfs-cache-max-age=24h", "--vfs-read-chunk-size=128M",
+		"--attr-timeout=30s", "--dir-cache-time=5m", "--poll-interval=30s",
+		"--no-modtime=true", "--allow-other=true",
+		"-v",
+	}
+	wantConfig := []string{
+		"upload_concurrency=16", "upload_cutoff=200M", "chunk_size=64M",
+		"max_upload_parts=1000", "storage_class=SMART",
+		"server_side_encryption=AES256", "acl=private",
+		"no_check_bucket=true", "disable_checksum=true",
+		"list_chunk=1000", "list_version=2",
+		"force_path_style=true", "encoding=Slash,InvalidUtf8,Dot",
+	}
+
+	configOpts, cliFlags := classifyRcloneParams(options)
+	assert.ElementsMatch(t, wantCLI, cliFlags)
+	assert.ElementsMatch(t, wantConfig, configOpts)
+}
+
+// TestCreateConfig_WithXlsxConfigParams verifies that config-file lines
+// classified from the xlsx sample actually appear in the written rclone.conf.
+func TestCreateConfig_WithXlsxConfigParams(t *testing.T) {
+	rclone := &RcloneMounter{
+		AccessKeys:    "test-access-key-id:test-secret-access-key",
+		EndPoint:      "https://s3.direct.us-south.cloud-object-storage.appdomain.cloud",
+		LocConstraint: "us-south-standard",
+		IAMEndpoint:   "https://iam.cloud.ibm.com",
+		AuthType:      "hmac",
+	}
+
+	extraConfigOpts := []string{
+		"upload_concurrency=16",
+		"upload_cutoff=200M",
+		"chunk_size=64M",
+		"max_upload_parts=1000",
+		"storage_class=SMART",
+		"server_side_encryption=AES256",
+		"acl=private",
+		"no_check_bucket=true",
+		"disable_checksum=true",
+		"list_chunk=1000",
+		"list_version=2",
+		"force_path_style=true",
+		"encoding=Slash,InvalidUtf8,Dot",
+	}
+
+	tmpDir := t.TempDir()
+	err := createConfig(tmpDir, rclone, extraConfigOpts)
+	assert.NoError(t, err)
+
+	content, err := os.ReadFile(tmpDir + "/rclone.conf")
+	assert.NoError(t, err)
+	configStr := string(content)
+
+	// Identity / auth block
+	assert.Contains(t, configStr, "[ibmcos]")
+	assert.Contains(t, configStr, "type = s3")
+	assert.Contains(t, configStr, "provider = IBMCOS")
+	assert.Contains(t, configStr, "endpoint = https://s3.direct.us-south.cloud-object-storage.appdomain.cloud")
+	assert.Contains(t, configStr, "location_constraint = us-south-standard")
+	assert.Contains(t, configStr, "ibm_iam_endpoint = https://iam.cloud.ibm.com")
+
+	// Extra config-file lines from xlsx
+	for _, line := range extraConfigOpts {
+		assert.Contains(t, configStr, line, "config line %q should be in rclone.conf", line)
+	}
+
+	// CLI flags must NOT appear in the config file
+	assert.NotContains(t, configStr, "--transfers")
+	assert.NotContains(t, configStr, "--bwlimit")
+	assert.NotContains(t, configStr, "--vfs-cache-mode")
+}
+
+// TestFormulateRcloneMountOptions_WithXlsxCLIFlags verifies that CLI flags
+// classified from the xlsx sample appear in both nodeServerOp and workerNodeOp,
+// and that config-file params do NOT appear as CLI flags.
+func TestFormulateRcloneMountOptions_WithXlsxCLIFlags(t *testing.T) {
+	rclone := &RcloneMounter{
+		GID: "3000",
+		UID: "3000",
+	}
+
+	extraCLIFlags := []string{
+		"--transfers=8",
+		"--checkers=16",
+		"--buffer-size=32M",
+		"--low-level-retries=5",
+		"--log-level=INFO",
+		"--bwlimit=100M",
+		"--retries=5",
+		"--timeout=10m",
+		"--vfs-cache-mode=full",
+		"--vfs-cache-max-age=24h",
+		"--vfs-read-chunk-size=128M",
+		"--attr-timeout=30s",
+		"--dir-cache-time=5m",
+		"--poll-interval=30s",
+		"--no-modtime=true",
+	}
+
+	nodeOp, workerOp := rclone.formulateMountOptions(
+		"ibmcos:test-bucket",
+		"/var/lib/kubelet/pods/abc/volumes/mount",
+		"/var/lib/coscsi-config/abc123",
+		extraCLIFlags,
+	)
+
+	// All extra CLI flags must be in nodeServerOp
+	for _, flag := range extraCLIFlags {
+		assert.Contains(t, nodeOp, flag, "nodeServerOp should contain %q", flag)
+	}
+
+	// Key-value flags must appear in workerNodeOp
+	assert.Equal(t, "8", workerOp["transfers"])
+	assert.Equal(t, "16", workerOp["checkers"])
+	assert.Equal(t, "32M", workerOp["buffer-size"])
+	assert.Equal(t, "5", workerOp["low-level-retries"])
+	assert.Equal(t, "INFO", workerOp["log-level"])
+	assert.Equal(t, "100M", workerOp["bwlimit"])
+	assert.Equal(t, "5", workerOp["retries"])
+	assert.Equal(t, "10m", workerOp["timeout"])
+	assert.Equal(t, "full", workerOp["vfs-cache-mode"])
+	assert.Equal(t, "24h", workerOp["vfs-cache-max-age"])
+	assert.Equal(t, "128M", workerOp["vfs-read-chunk-size"])
+	assert.Equal(t, "30s", workerOp["attr-timeout"])
+	assert.Equal(t, "5m", workerOp["dir-cache-time"])
+	assert.Equal(t, "30s", workerOp["poll-interval"])
+	assert.Equal(t, "true", workerOp["no-modtime"])
+
+	// uid/gid still present
+	assert.Equal(t, "3000", workerOp["gid"])
+	assert.Equal(t, "3000", workerOp["uid"])
+
+	// Config-file params must NOT appear in nodeServerOp as flags
+	assert.NotContains(t, nodeOp, "upload_concurrency=16")
+	assert.NotContains(t, nodeOp, "storage_class=SMART")
+}
+
+// TestNewRcloneMounter_XlsxSecretMap is an end-to-end constructor test using
+// the full xlsx-based secret. It verifies that well-known fields are parsed
+// and MountOptions contains exactly what updateMountOptions produces.
+func TestNewRcloneMounter_XlsxSecretMap(t *testing.T) {
+	mounter := NewRcloneMounter(RcloneMounterParams{
+		SecretMap:    secretMapXlsxParams,
+		MountOptions: nil,
+		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
+	})
+
+	rclone, ok := mounter.(*RcloneMounter)
+	assert.True(t, ok)
+
+	assert.Equal(t, "test-bucket", rclone.BucketName)
+	assert.Equal(t, "https://s3.direct.us-south.cloud-object-storage.appdomain.cloud", rclone.EndPoint)
+	assert.Equal(t, "us-south-standard", rclone.LocConstraint)
+	assert.Equal(t, "hmac", rclone.AuthType)
+	assert.Equal(t, "3000", rclone.UID)
+	assert.Equal(t, "3000", rclone.GID)
+}
+
+// TestCreateConfig_XlsxFullFlow creates a real temp config file using the
+// xlsx-classified config-file lines and verifies the file on disk contains
+// all expected config entries, and none of the CLI-only entries.
+func TestCreateConfig_XlsxFullFlow(t *testing.T) {
+	// Parse mountOptions the same way updateMountOptions does
+	raw := secretMapXlsxParams["mountOptions"]
+	var allOptions []string
+	for _, line := range strings.Split(raw, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		allOptions = append(allOptions, line)
+	}
+
+	extraConfigOpts, extraCLIFlags := classifyRcloneParams(allOptions)
+
+	// Verify split counts are as expected
+	assert.NotEmpty(t, extraConfigOpts, "should have config-file lines")
+	assert.NotEmpty(t, extraCLIFlags, "should have CLI flags")
+
+	rclone := &RcloneMounter{
+		AccessKeys:    "test-access-key-id:test-secret-access-key",
+		EndPoint:      secretMapXlsxParams["cosEndpoint"],
+		LocConstraint: secretMapXlsxParams["locationConstraint"],
+		IAMEndpoint:   secretMapXlsxParams["iamEndpoint"],
+		AuthType:      "hmac",
+		UID:           "3000",
+		GID:           "3000",
+	}
+
+	tmpDir := t.TempDir()
+	err := createConfig(tmpDir, rclone, extraConfigOpts)
+	assert.NoError(t, err)
+
+	content, err := os.ReadFile(tmpDir + "/rclone.conf")
+	assert.NoError(t, err)
+	configStr := string(content)
+
+	// Config-file lines must be present
+	expectedConfigEntries := []string{
+		"upload_concurrency=16",
+		"upload_cutoff=200M",
+		"chunk_size=64M",
+		"max_upload_parts=1000",
+		"storage_class=SMART",
+		"server_side_encryption=AES256",
+		"acl=private",
+		"no_check_bucket=true",
+		"disable_checksum=true",
+		"list_chunk=1000",
+		"list_version=2",
+		"force_path_style=true",
+		"encoding=Slash,InvalidUtf8,Dot",
+	}
+	for _, entry := range expectedConfigEntries {
+		assert.Contains(t, configStr, entry, "rclone.conf should contain %q", entry)
+	}
+
+	// CLI flags must NOT be written to config file
+	forbiddenInConfig := []string{
+		"--transfers", "--checkers", "--buffer-size", "--low-level-retries",
+		"--bwlimit", "--retries", "--timeout", "--contimeout",
+		"--vfs-cache-max-age", "--vfs-read-chunk-size",
+		"--attr-timeout", "--dir-cache-time", "--poll-interval", "--no-modtime",
+		"-v",
+	}
+	for _, f := range forbiddenInConfig {
+		assert.NotContains(t, configStr, f, "rclone.conf must not contain CLI flag %q", f)
+	}
+
+	// Final CLI must contain the CLI flags
+	nodeOp, workerOp := rclone.formulateMountOptions(
+		"ibmcos:test-bucket",
+		"/var/lib/kubelet/pods/abc/volumes/mount",
+		tmpDir,
+		extraCLIFlags,
+	)
+
+	assert.Contains(t, nodeOp, "--transfers=8")
+	assert.Contains(t, nodeOp, "--vfs-cache-mode=full")
+	assert.Contains(t, nodeOp, "--bwlimit=100M")
+	assert.Equal(t, "8", workerOp["transfers"])
+	assert.Equal(t, "full", workerOp["vfs-cache-mode"])
+	assert.Equal(t, "100M", workerOp["bwlimit"])
+
+	// Config-file params must not appear as CLI flags
+	for _, entry := range expectedConfigEntries {
+		assert.NotContains(t, nodeOp, entry, "CLI args should not contain config-file entry %q", entry)
+	}
+}
+
+// TestPrintRcloneArtifacts is a manual-verification helper.
+// Run with -v to see the exact rclone.conf content and the final CLI command
+// that would be executed, given the full xlsx-param secret.
+//
+//	go test -v -run TestPrintRcloneArtifacts ./pkg/mounter/
+func TestPrintRcloneArtifacts(t *testing.T) {
+	// ── 1. Parse mountOptions (same as updateMountOptions) ──────────────────
+	raw := secretMapXlsxParams["mountOptions"]
+	var allOptions []string
+	for _, line := range strings.Split(raw, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			allOptions = append(allOptions, line)
+		}
+	}
+
+	extraConfigOpts, extraCLIFlags := classifyRcloneParams(allOptions)
+
+	// ── 2. Build RcloneMounter (same as NewRcloneMounter would produce) ──────
+	rclone := &RcloneMounter{
+		BucketName:    secretMapXlsxParams["bucketName"],
+		EndPoint:      secretMapXlsxParams["cosEndpoint"],
+		LocConstraint: secretMapXlsxParams["locationConstraint"],
+		IAMEndpoint:   secretMapXlsxParams["iamEndpoint"],
+		AccessKeys:    secretMapXlsxParams["accessKey"] + ":" + secretMapXlsxParams["secretKey"],
+		AuthType:      "hmac",
+		UID:           secretMapXlsxParams["uid"],
+		GID:           secretMapXlsxParams["gid"],
+	}
+
+	// ── 3. Write rclone.conf into a temp dir ─────────────────────────────────
+	tmpDir := t.TempDir()
+	configPath := tmpDir + "/rclone.conf"
+
+	err := createConfig(tmpDir, rclone, extraConfigOpts)
+	if err != nil {
+		t.Fatalf("createConfig failed: %v", err)
+	}
+
+	configBytes, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("reading config file failed: %v", err)
+	}
+
+	// ── 4. Build the final CLI args ──────────────────────────────────────────
+	bucket := "ibmcos:" + rclone.BucketName
+	targetPath := "/var/lib/kubelet/pods/abc123/volumes/kubernetes.io~csi/pvc-xyz/mount"
+
+	nodeOp, workerOp := rclone.formulateMountOptions(bucket, targetPath, tmpDir, extraCLIFlags)
+
+	// ── 5. Print for manual inspection ──────────────────────────────────────
+	t.Logf("\n"+
+		"════════════════════════════════════════════════════════════════\n"+
+		"  CLASSIFICATION SUMMARY\n"+
+		"════════════════════════════════════════════════════════════════\n"+
+		"  Config-file lines (%d):  %v\n"+
+		"  CLI flags        (%d):  %v\n",
+		len(extraConfigOpts), extraConfigOpts,
+		len(extraCLIFlags), extraCLIFlags,
+	)
+
+	t.Logf("\n"+
+		"════════════════════════════════════════════════════════════════\n"+
+		"  rclone.conf  (%s)\n"+
+		"════════════════════════════════════════════════════════════════\n"+
+		"%s",
+		configPath, string(configBytes),
+	)
+
+	t.Logf("\n"+
+		"════════════════════════════════════════════════════════════════\n"+
+		"  FINAL CLI COMMAND (nodeServerOp []string)\n"+
+		"════════════════════════════════════════════════════════════════\n"+
+		"  rclone \\\n"+
+		"    %s\n",
+		strings.Join(nodeOp, " \\\n    "),
+	)
+
+	t.Logf("\n" +
+		"════════════════════════════════════════════════════════════════\n" +
+		"  WORKER-NODE MAP  (sent as JSON to cos-csi-mounter)\n" +
+		"════════════════════════════════════════════════════════════════",
+	)
+	// Sort keys for stable output
+	keys := make([]string, 0, len(workerOp))
+	for k := range workerOp {
+		keys = append(keys, k)
+	}
+	// simple insertion sort — no stdlib sort import needed
+	for i := 1; i < len(keys); i++ {
+		for j := i; j > 0 && keys[j] < keys[j-1]; j-- {
+			keys[j], keys[j-1] = keys[j-1], keys[j]
+		}
+	}
+	for _, k := range keys {
+		t.Logf("  %-30s = %s", k, workerOp[k])
+	}
 }
