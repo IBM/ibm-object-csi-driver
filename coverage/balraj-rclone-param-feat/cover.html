@@ -313,6 +313,7 @@ type RCloneArgs struct {
         GID                   string `json:"gid,omitempty"`
         LogFile               string `json:"log-file,omitempty"`
         LogLevel              string `json:"log-level,omitempty"`
+        MultiThreadCutoff     string `json:"multi-thread-cutoff,omitempty"`
         NoModificationTime    string `json:"no-modtime,omitempty"`
         PollInterval          string `json:"poll-interval,omitempty"`
         ReadOnly              string `json:"read-only,omitempty"`
@@ -335,7 +336,7 @@ type RCloneArgs struct {
         WriteBackCache        string `json:"write-back-cache,omitempty"`
 }
 
-func (args RCloneArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, error) <span class="cov3" title="2">{
+func (args RCloneArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, error) <span class="cov4" title="3">{
         // Marshal to JSON
         raw, err := json.Marshal(args)
         if err != nil </span><span class="cov0" title="0">{
@@ -343,18 +344,18 @@ func (args RCloneArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, e
         }</span>
 
         // Unmarshal into map[string]string
-        <span class="cov3" title="2">var m map[string]string
+        <span class="cov4" title="3">var m map[string]string
         if err := json.Unmarshal(raw, &amp;m); err != nil </span><span class="cov0" title="0">{
                 return nil, err
         }</span>
 
         // Convert to key=value slice
-        <span class="cov3" title="2">result := []string{"mount", bucket, targetPath}
-        for k, v := range m </span><span class="cov1" title="1">{
+        <span class="cov4" title="3">result := []string{"mount", bucket, targetPath}
+        for k, v := range m </span><span class="cov3" title="2">{
                 result = append(result, fmt.Sprintf("--%s=%v", k, v)) // --key=value
         }</span>
 
-        <span class="cov3" title="2">return result, nil</span> // [mount, bucket, path, --key1=value1, --key2=value2, ...]
+        <span class="cov4" title="3">return result, nil</span> // [mount, bucket, path, --key1=value1, --key2=value2, ...]
 }
 
 func (args RCloneArgs) Validate(targetPath string) error <span class="cov10" title="15">{
