@@ -143,7 +143,7 @@ jobs:
           name: v1.0.10
           body: |
             ## 🚀 What's New
-            - fix govet linter issue: replace deprecated reflect.Ptr with reflect.Pointer
+            - identify cli param and config file params from secret mount options
           prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
 
       - name: Perform CodeQL Analysis
