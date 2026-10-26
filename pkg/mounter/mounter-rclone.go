@@ -73,7 +73,7 @@ type RcloneMounterParams struct {
 //     OR key is a single-letter shorthand prefixed by "-" (e.g. "-v")
 //
 //   - Config-file opts → key contains "_" (e.g. "upload_concurrency=4")
-//     OR key has no leading dash at all (e.g. "storage_class=SMART")
+//     OR key has no leading dash at all (e.g. "provider=IBMCOS")
 //
 // Each entry in the returned cliFlags slice is already in "--key=value" form
 // (bare "--key" for boolean flags without a value).
