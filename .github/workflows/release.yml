@@ -113,11 +113,16 @@ jobs:
 
     env:
       IS_LATEST_RELEASE: 'true'
-      APP_VERSION: 1.0.9
+      APP_VERSION: 1.0.10
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
@@ -139,11 +144,12 @@ jobs:
             /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.deb.tar.gz.sha256
             /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz
             /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz.sha256
-          tag_name: v1.0.9
-          name: v1.0.9
+          tag_name: v1.0.10
+          name: v1.0.10
           body: |
             ## 🚀 What's New
-            - fix govet linter issue: replace deprecated reflect.Ptr with reflect.Pointer
+            - update go version to 1.26.10
+            - Support additional rclone option "multi-thread-cutoff"
           prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
 
       - name: Perform CodeQL Analysis
