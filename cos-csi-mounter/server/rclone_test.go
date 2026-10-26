@@ -19,6 +19,17 @@ func TestRClonePopulateArgsSlice_Success(t *testing.T) {
 	assert.Equal(t, expectedVal, resp)
 }
 
+func TestRClonePopulateArgsSlice_MultiThreadCutoff(t *testing.T) {
+	args := RCloneArgs{
+		MultiThreadCutoff: "256M",
+	}
+
+	resp, err := args.PopulateArgsSlice(testBucket, testTargetPath)
+	assert.NoError(t, err)
+	expectedVal := []string{"mount", testBucket, testTargetPath, "--multi-thread-cutoff=256M"}
+	assert.Equal(t, expectedVal, resp)
+}
+
 func TestRCloneValidate_Success(t *testing.T) {
 	FileExists = func(path string) (bool, error) {
 		return true, nil
