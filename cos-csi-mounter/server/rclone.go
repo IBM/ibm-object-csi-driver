@@ -3,9 +3,47 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"strings"
 
 	"go.uber.org/zap"
 )
+
+// rcloneFlagPattern matches a valid rclone CLI flag token:
+//
+//	--flag-name          (boolean flag)
+//	--flag-name=value    (flag with value; value is an opaque string)
+//
+// Flag names must start with a lowercase letter and contain only [a-z0-9-].
+var rcloneFlagPattern = regexp.MustCompile(`^--([a-z][a-z0-9-]*)(?:=(.*))?$`)
+
+// rcloneKnownFlags is the set of flag names already covered by the typed
+// RCloneArgs fields. extra-flags tokens whose flag name matches one of these
+// are rejected to prevent accidental or malicious override of a validated
+// parameter (e.g. trying to override --config via extra-flags).
+var rcloneKnownFlags = jsonFieldNames(RCloneArgs{})
+
+// validateExtraFlags validates every comma-separated token in the extra-flags
+// string. Each token must look like --flag or --flag=value (lowercase rclone
+// flag name format). Tokens whose flag name collides with a known RCloneArgs
+// field are rejected to prevent override attacks.
+func validateExtraFlags(extra string) error {
+	for _, token := range strings.Split(extra, ",") {
+		token = strings.TrimSpace(token)
+		if token == "" {
+			continue
+		}
+		m := rcloneFlagPattern.FindStringSubmatch(token)
+		if m == nil {
+			return fmt.Errorf("extra-flags: invalid token %q: must be --flag or --flag=value with a lowercase flag name", token)
+		}
+		flagName := m[1]
+		if _, reserved := rcloneKnownFlags[flagName]; reserved {
+			return fmt.Errorf("extra-flags: flag %q is already a known parameter and cannot be set via extra-flags", flagName)
+		}
+	}
+	return nil
+}
 
 type RCloneArgs struct {
 	AllowOther            string `json:"allow-other,omitempty"`
@@ -36,12 +74,16 @@ type RCloneArgs struct {
 	VfsReadAhead          string `json:"vfs-read-ahead,omitempty"`
 	VfsReadChunkSize      string `json:"vfs-read-chunk-size,omitempty"`
 	VfsReadChunkSizeLimit string `json:"vfs-read-chunk-size-limit,omitempty"`
-	VfsReadChunkStreams   string `json:"vfs-read-chunk-streams,omitempty"`
+	VfsReadChunkStreams    string `json:"vfs-read-chunk-streams,omitempty"`
 	VfsReadWait           string `json:"vfs-read-wait,omitempty"`
 	VfsRefresh            string `json:"vfs-refresh,omitempty"`
 	VfsWriteBack          string `json:"vfs-write-back,omitempty"`
 	VfsWriteWait          string `json:"vfs-write-wait,omitempty"`
 	WriteBackCache        string `json:"write-back-cache,omitempty"`
+	// ExtraFlags allows passing additional rclone mount flags not covered by
+	// the fields above, as a comma-separated list of --flag or --flag=value
+	// tokens. Example: "--transfers=4,--checkers=8,--s3-upload-concurrency=16"
+	ExtraFlags string `json:"extra-flags,omitempty"`
 }
 
 func (args RCloneArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, error) {
@@ -57,13 +99,26 @@ func (args RCloneArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, e
 		return nil, err
 	}
 
-	// Convert to key=value slice
+	// Convert to key=value slice, skipping extra-flags (handled separately below)
 	result := []string{"mount", bucket, targetPath}
 	for k, v := range m {
+		if k == "extra-flags" {
+			continue
+		}
 		result = append(result, fmt.Sprintf("--%s=%v", k, v)) // --key=value
 	}
 
-	return result, nil // [mount, bucket, path, --key1=value1, --key2=value2, ...]
+	// Append each validated extra-flags token as its own argument
+	if args.ExtraFlags != "" {
+		for _, token := range strings.Split(args.ExtraFlags, ",") {
+			token = strings.TrimSpace(token)
+			if token != "" {
+				result = append(result, token)
+			}
+		}
+	}
+
+	return result, nil // [mount, bucket, path, --key1=value1, --key2=value2, ..., --extra1=val, ...]
 }
 
 func (args RCloneArgs) Validate(targetPath string) error {
@@ -149,6 +204,14 @@ func (args RCloneArgs) Validate(targetPath string) error {
 		if isBool := isBoolString(args.WriteBackCache); !isBool {
 			logger.Error("cannot convert value of write-back-cache into boolean", zap.Any("write-back-cache", args.WriteBackCache))
 			return fmt.Errorf("cannot convert value of write-back-cache into boolean: %v", args.WriteBackCache)
+		}
+	}
+
+	// Validate extra-flags tokens: format and reserved-name check
+	if args.ExtraFlags != "" {
+		if err := validateExtraFlags(args.ExtraFlags); err != nil {
+			logger.Error("invalid extra-flags value", zap.Error(err))
+			return err
 		}
 	}
 

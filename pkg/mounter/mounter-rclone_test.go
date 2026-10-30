@@ -1122,20 +1122,13 @@ func TestFormulateRcloneMountOptions_WithXlsxCLIFlags(t *testing.T) {
 		extraCLIFlags,
 	)
 
-	// All extra CLI flags must be in nodeServerOp
+	// All extra CLI flags must be in nodeServerOp regardless of known/unknown.
 	for _, flag := range extraCLIFlags {
 		assert.Contains(t, nodeOp, flag, "nodeServerOp should contain %q", flag)
 	}
 
-	// Key-value flags must appear in workerNodeOp
-	assert.Equal(t, "8", workerOp["transfers"])
-	assert.Equal(t, "16", workerOp["checkers"])
-	assert.Equal(t, "32M", workerOp["buffer-size"])
-	assert.Equal(t, "5", workerOp["low-level-retries"])
+	// Known RCloneArgs fields → individual workerNodeOp keys.
 	assert.Equal(t, "INFO", workerOp["log-level"])
-	assert.Equal(t, "100M", workerOp["bwlimit"])
-	assert.Equal(t, "5", workerOp["retries"])
-	assert.Equal(t, "10m", workerOp["timeout"])
 	assert.Equal(t, "full", workerOp["vfs-cache-mode"])
 	assert.Equal(t, "24h", workerOp["vfs-cache-max-age"])
 	assert.Equal(t, "128M", workerOp["vfs-read-chunk-size"])
@@ -1143,10 +1136,22 @@ func TestFormulateRcloneMountOptions_WithXlsxCLIFlags(t *testing.T) {
 	assert.Equal(t, "5m", workerOp["dir-cache-time"])
 	assert.Equal(t, "30s", workerOp["poll-interval"])
 	assert.Equal(t, "true", workerOp["no-modtime"])
-
 	// uid/gid still present
 	assert.Equal(t, "3000", workerOp["gid"])
 	assert.Equal(t, "3000", workerOp["uid"])
+
+	// Unknown flags (not in RCloneArgs) → packed into extra-flags.
+	extraFlags := workerOp["extra-flags"]
+	assert.Contains(t, extraFlags, "--transfers=8")
+	assert.Contains(t, extraFlags, "--checkers=16")
+	assert.Contains(t, extraFlags, "--buffer-size=32M")
+	assert.Contains(t, extraFlags, "--low-level-retries=5")
+	assert.Contains(t, extraFlags, "--bwlimit=100M")
+	assert.Contains(t, extraFlags, "--retries=5")
+	assert.Contains(t, extraFlags, "--timeout=10m")
+	// Known flags must NOT appear in extra-flags
+	assert.NotContains(t, extraFlags, "--vfs-cache-mode")
+	assert.NotContains(t, extraFlags, "--log-level")
 
 	// Config-file params must NOT appear in nodeServerOp as flags
 	assert.NotContains(t, nodeOp, "upload_concurrency=16")
@@ -1256,9 +1261,11 @@ func TestCreateConfig_XlsxFullFlow(t *testing.T) {
 	assert.Contains(t, nodeOp, "--transfers=8")
 	assert.Contains(t, nodeOp, "--vfs-cache-mode=full")
 	assert.Contains(t, nodeOp, "--bwlimit=100M")
-	assert.Equal(t, "8", workerOp["transfers"])
+	// vfs-cache-mode is a known RCloneArgs field → individual key
 	assert.Equal(t, "full", workerOp["vfs-cache-mode"])
-	assert.Equal(t, "100M", workerOp["bwlimit"])
+	// transfers and bwlimit are unknown → packed into extra-flags
+	assert.Contains(t, workerOp["extra-flags"], "--transfers=8")
+	assert.Contains(t, workerOp["extra-flags"], "--bwlimit=100M")
 
 	// Config-file params must not appear as CLI flags
 	for _, entry := range expectedConfigEntries {
