@@ -310,16 +310,16 @@ import (
 var rcloneFlagPattern = regexp.MustCompile(`^--([a-z][a-z0-9-]*)(?:=(.*))?$`)
 
 // rcloneKnownFlags is the set of flag names already covered by the typed
-// RCloneArgs fields. extra-flags tokens whose flag name matches one of these
+// RCloneArgs fields. add-mount-param tokens whose flag name matches one of these
 // are rejected to prevent accidental or malicious override of a validated
-// parameter (e.g. trying to override --config via extra-flags).
+// parameter (e.g. trying to override --config via add-mount-param).
 var rcloneKnownFlags = jsonFieldNames(RCloneArgs{})
 
-// validateExtraFlags validates every comma-separated token in the extra-flags
+// validateAddMountParam validates every comma-separated token in the add-mount-param
 // string. Each token must look like --flag or --flag=value (lowercase rclone
 // flag name format). Tokens whose flag name collides with a known RCloneArgs
 // field are rejected to prevent override attacks.
-func validateExtraFlags(extra string) error <span class="cov7" title="9">{
+func validateAddMountParam(extra string) error <span class="cov7" title="9">{
         for _, token := range strings.Split(extra, ",") </span><span class="cov8" title="15">{
                 token = strings.TrimSpace(token)
                 if token == "" </span><span class="cov5" title="5">{
@@ -327,11 +327,11 @@ func validateExtraFlags(extra string) error <span class="cov7" title="9">{
                 }
                 <span class="cov7" title="10">m := rcloneFlagPattern.FindStringSubmatch(token)
                 if m == nil </span><span class="cov4" title="3">{
-                        return fmt.Errorf("extra-flags: invalid token %q: must be --flag or --flag=value with a lowercase flag name", token)
+                        return fmt.Errorf("add-mount-param: invalid token %q: must be --flag or --flag=value with a lowercase flag name", token)
                 }</span>
                 <span class="cov6" title="7">flagName := m[1]
                 if _, reserved := rcloneKnownFlags[flagName]; reserved </span><span class="cov3" title="2">{
-                        return fmt.Errorf("extra-flags: flag %q is already a known parameter and cannot be set via extra-flags", flagName)
+                        return fmt.Errorf("add-mount-param: flag %q is already a known parameter and cannot be set via add-mount-param", flagName)
                 }</span>
         }
         <span class="cov5" title="4">return nil</span>
@@ -366,16 +366,16 @@ type RCloneArgs struct {
         VfsReadAhead          string `json:"vfs-read-ahead,omitempty"`
         VfsReadChunkSize      string `json:"vfs-read-chunk-size,omitempty"`
         VfsReadChunkSizeLimit string `json:"vfs-read-chunk-size-limit,omitempty"`
-        VfsReadChunkStreams    string `json:"vfs-read-chunk-streams,omitempty"`
+        VfsReadChunkStreams   string `json:"vfs-read-chunk-streams,omitempty"`
         VfsReadWait           string `json:"vfs-read-wait,omitempty"`
         VfsRefresh            string `json:"vfs-refresh,omitempty"`
         VfsWriteBack          string `json:"vfs-write-back,omitempty"`
         VfsWriteWait          string `json:"vfs-write-wait,omitempty"`
         WriteBackCache        string `json:"write-back-cache,omitempty"`
-        // ExtraFlags allows passing additional rclone mount flags not covered by
+        // AddMountParam allows passing additional rclone mount flags not covered by
         // the fields above, as a comma-separated list of --flag or --flag=value
         // tokens. Example: "--transfers=4,--checkers=8,--s3-upload-concurrency=16"
-        ExtraFlags string `json:"extra-flags,omitempty"`
+        AddMountParam string `json:"add-mount-param,omitempty"`
 }
 
 func (args RCloneArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, error) <span class="cov6" title="6">{
@@ -391,18 +391,18 @@ func (args RCloneArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, e
                 return nil, err
         }</span>
 
-        // Convert to key=value slice, skipping extra-flags (handled separately below)
+        // Convert to key=value slice, skipping add-mount-param (handled separately below)
         <span class="cov6" title="6">result := []string{"mount", bucket, targetPath}
         for k, v := range m </span><span class="cov5" title="5">{
-                if k == "extra-flags" </span><span class="cov4" title="3">{
+                if k == "add-mount-param" </span><span class="cov4" title="3">{
                         continue</span>
                 }
                 <span class="cov3" title="2">result = append(result, fmt.Sprintf("--%s=%v", k, v))</span> // --key=value
         }
 
-        // Append each validated extra-flags token as its own argument
-        <span class="cov6" title="6">if args.ExtraFlags != "" </span><span class="cov4" title="3">{
-                for _, token := range strings.Split(args.ExtraFlags, ",") </span><span class="cov6" title="7">{
+        // Append each validated add-mount-param token as its own argument
+        <span class="cov6" title="6">if args.AddMountParam != "" </span><span class="cov4" title="3">{
+                for _, token := range strings.Split(args.AddMountParam, ",") </span><span class="cov6" title="7">{
                         token = strings.TrimSpace(token)
                         if token != "" </span><span class="cov5" title="5">{
                                 result = append(result, token)
@@ -499,10 +499,10 @@ func (args RCloneArgs) Validate(targetPath string) error <span class="cov10" tit
                 }</span>
         }
 
-        // Validate extra-flags tokens: format and reserved-name check
-        <span class="cov7" title="9">if args.ExtraFlags != "" </span><span class="cov6" title="7">{
-                if err := validateExtraFlags(args.ExtraFlags); err != nil </span><span class="cov5" title="5">{
-                        logger.Error("invalid extra-flags value", zap.Error(err))
+        // Validate add-mount-param tokens: format and reserved-name check
+        <span class="cov7" title="9">if args.AddMountParam != "" </span><span class="cov6" title="7">{
+                if err := validateAddMountParam(args.AddMountParam); err != nil </span><span class="cov5" title="5">{
+                        logger.Error("invalid add-mount-param value", zap.Error(err))
                         return err
                 }</span>
         }
@@ -3016,48 +3016,48 @@ var (
 
 // rcloneServerKnownFlags is the set of flag names that correspond to typed
 // fields on the cos-csi-mounter server's RCloneArgs struct (i.e. the json tags
-// without the "extra-flags" transport key itself). Any CLI flag whose name is
+// without the "add-mount-param" transport key itself). Any CLI flag whose name is
 // in this set is sent as its own key in the worker-node JSON payload.
-// All other CLI flags are accumulated into the "extra-flags" transport key so
+// All other CLI flags are accumulated into the "add-mount-param" transport key so
 // the server's strict JSON decoder does not reject them.
 //
 // This list must stay in sync with the json tags of RCloneArgs in
 // cos-csi-mounter/server/rclone.go.
 var rcloneServerKnownFlags = map[string]struct{}{
-        "allow-other":             {},
-        "allow-root":              {},
-        "async-read":              {},
-        "attr-timeout":            {},
-        "config":                  {},
-        "daemon":                  {},
-        "daemon-timeout":          {},
-        "daemon-wait":             {},
-        "dir-cache-time":          {},
-        "direct-io":               {},
-        "gid":                     {},
-        "log-file":                {},
-        "log-level":               {},
-        "multi-thread-cutoff":     {},
-        "no-modtime":              {},
-        "poll-interval":           {},
-        "read-only":               {},
-        "uid":                     {},
-        "umask":                   {},
-        "vfs-cache-max-age":       {},
-        "vfs-cache-max-size":      {},
-        "vfs-cache-min-free-space": {},
-        "vfs-cache-mode":          {},
-        "vfs-cache-poll-interval": {},
+        "allow-other":               {},
+        "allow-root":                {},
+        "async-read":                {},
+        "attr-timeout":              {},
+        "config":                    {},
+        "daemon":                    {},
+        "daemon-timeout":            {},
+        "daemon-wait":               {},
+        "dir-cache-time":            {},
+        "direct-io":                 {},
+        "gid":                       {},
+        "log-file":                  {},
+        "log-level":                 {},
+        "multi-thread-cutoff":       {},
+        "no-modtime":                {},
+        "poll-interval":             {},
+        "read-only":                 {},
+        "uid":                       {},
+        "umask":                     {},
+        "vfs-cache-max-age":         {},
+        "vfs-cache-max-size":        {},
+        "vfs-cache-min-free-space":  {},
+        "vfs-cache-mode":            {},
+        "vfs-cache-poll-interval":   {},
         "vfs-disk-space-total-size": {},
-        "vfs-read-ahead":          {},
-        "vfs-read-chunk-size":     {},
+        "vfs-read-ahead":            {},
+        "vfs-read-chunk-size":       {},
         "vfs-read-chunk-size-limit": {},
-        "vfs-read-chunk-streams":  {},
-        "vfs-read-wait":           {},
-        "vfs-refresh":             {},
-        "vfs-write-back":          {},
-        "vfs-write-wait":          {},
-        "write-back-cache":        {},
+        "vfs-read-chunk-streams":    {},
+        "vfs-read-wait":             {},
+        "vfs-refresh":               {},
+        "vfs-write-back":            {},
+        "vfs-write-wait":            {},
+        "write-back-cache":          {},
 }
 
 type RcloneMounterParams struct {
@@ -3492,7 +3492,7 @@ func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWit
         // Flags whose name is in rcloneServerKnownFlags map to a typed field on the
         // server's RCloneArgs struct and are sent as individual JSON keys in the
         // worker-node payload. All other flags are unknown to the server's strict
-        // JSON decoder and must travel as a comma-separated "extra-flags" string.
+        // JSON decoder and must travel as a comma-separated "add-mount-param" string.
         <span class="cov5" title="11">var extraFlagTokens []string
         for _, flag := range extraCLIFlags </span><span class="cov8" title="53">{
                 nodeServerOp = append(nodeServerOp, flag)
@@ -3514,12 +3514,12 @@ func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWit
                                 workerNodeOp[flagName] = "true"
                         }</span>
                 } else<span class="cov7" title="25"> {
-                        // Unknown to the server: collect as-is for the extra-flags transport key.
+                        // Unknown to the server: collect as-is for the add-mount-param transport key.
                         extraFlagTokens = append(extraFlagTokens, flag)
                 }</span>
         }
         <span class="cov5" title="11">if len(extraFlagTokens) &gt; 0 </span><span class="cov3" title="3">{
-                workerNodeOp["extra-flags"] = strings.Join(extraFlagTokens, ",")
+                workerNodeOp["add-mount-param"] = strings.Join(extraFlagTokens, ",")
         }</span>
 
         <span class="cov5" title="11">return</span>
