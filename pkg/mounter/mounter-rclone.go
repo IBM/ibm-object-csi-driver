@@ -60,48 +60,48 @@ var (
 
 // rcloneServerKnownFlags is the set of flag names that correspond to typed
 // fields on the cos-csi-mounter server's RCloneArgs struct (i.e. the json tags
-// without the "extra-flags" transport key itself). Any CLI flag whose name is
+// without the "add-mount-param" transport key itself). Any CLI flag whose name is
 // in this set is sent as its own key in the worker-node JSON payload.
-// All other CLI flags are accumulated into the "extra-flags" transport key so
+// All other CLI flags are accumulated into the "add-mount-param" transport key so
 // the server's strict JSON decoder does not reject them.
 //
 // This list must stay in sync with the json tags of RCloneArgs in
 // cos-csi-mounter/server/rclone.go.
 var rcloneServerKnownFlags = map[string]struct{}{
-	"allow-other":             {},
-	"allow-root":              {},
-	"async-read":              {},
-	"attr-timeout":            {},
-	"config":                  {},
-	"daemon":                  {},
-	"daemon-timeout":          {},
-	"daemon-wait":             {},
-	"dir-cache-time":          {},
-	"direct-io":               {},
-	"gid":                     {},
-	"log-file":                {},
-	"log-level":               {},
-	"multi-thread-cutoff":     {},
-	"no-modtime":              {},
-	"poll-interval":           {},
-	"read-only":               {},
-	"uid":                     {},
-	"umask":                   {},
-	"vfs-cache-max-age":       {},
-	"vfs-cache-max-size":      {},
-	"vfs-cache-min-free-space": {},
-	"vfs-cache-mode":          {},
-	"vfs-cache-poll-interval": {},
+	"allow-other":               {},
+	"allow-root":                {},
+	"async-read":                {},
+	"attr-timeout":              {},
+	"config":                    {},
+	"daemon":                    {},
+	"daemon-timeout":            {},
+	"daemon-wait":               {},
+	"dir-cache-time":            {},
+	"direct-io":                 {},
+	"gid":                       {},
+	"log-file":                  {},
+	"log-level":                 {},
+	"multi-thread-cutoff":       {},
+	"no-modtime":                {},
+	"poll-interval":             {},
+	"read-only":                 {},
+	"uid":                       {},
+	"umask":                     {},
+	"vfs-cache-max-age":         {},
+	"vfs-cache-max-size":        {},
+	"vfs-cache-min-free-space":  {},
+	"vfs-cache-mode":            {},
+	"vfs-cache-poll-interval":   {},
 	"vfs-disk-space-total-size": {},
-	"vfs-read-ahead":          {},
-	"vfs-read-chunk-size":     {},
+	"vfs-read-ahead":            {},
+	"vfs-read-chunk-size":       {},
 	"vfs-read-chunk-size-limit": {},
-	"vfs-read-chunk-streams":  {},
-	"vfs-read-wait":           {},
-	"vfs-refresh":             {},
-	"vfs-write-back":          {},
-	"vfs-write-wait":          {},
-	"write-back-cache":        {},
+	"vfs-read-chunk-streams":    {},
+	"vfs-read-wait":             {},
+	"vfs-refresh":               {},
+	"vfs-write-back":            {},
+	"vfs-write-wait":            {},
+	"write-back-cache":          {},
 }
 
 type RcloneMounterParams struct {
@@ -536,7 +536,7 @@ func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWit
 	// Flags whose name is in rcloneServerKnownFlags map to a typed field on the
 	// server's RCloneArgs struct and are sent as individual JSON keys in the
 	// worker-node payload. All other flags are unknown to the server's strict
-	// JSON decoder and must travel as a comma-separated "extra-flags" string.
+	// JSON decoder and must travel as a comma-separated "add-mount-param" string.
 	var extraFlagTokens []string
 	for _, flag := range extraCLIFlags {
 		nodeServerOp = append(nodeServerOp, flag)
@@ -558,12 +558,12 @@ func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWit
 				workerNodeOp[flagName] = "true"
 			}
 		} else {
-			// Unknown to the server: collect as-is for the extra-flags transport key.
+			// Unknown to the server: collect as-is for the add-mount-param transport key.
 			extraFlagTokens = append(extraFlagTokens, flag)
 		}
 	}
 	if len(extraFlagTokens) > 0 {
-		workerNodeOp["extra-flags"] = strings.Join(extraFlagTokens, ",")
+		workerNodeOp["add-mount-param"] = strings.Join(extraFlagTokens, ",")
 	}
 
 	return

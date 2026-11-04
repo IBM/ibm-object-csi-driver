@@ -1140,18 +1140,18 @@ func TestFormulateRcloneMountOptions_WithXlsxCLIFlags(t *testing.T) {
 	assert.Equal(t, "3000", workerOp["gid"])
 	assert.Equal(t, "3000", workerOp["uid"])
 
-	// Unknown flags (not in RCloneArgs) → packed into extra-flags.
-	extraFlags := workerOp["extra-flags"]
-	assert.Contains(t, extraFlags, "--transfers=8")
-	assert.Contains(t, extraFlags, "--checkers=16")
-	assert.Contains(t, extraFlags, "--buffer-size=32M")
-	assert.Contains(t, extraFlags, "--low-level-retries=5")
-	assert.Contains(t, extraFlags, "--bwlimit=100M")
-	assert.Contains(t, extraFlags, "--retries=5")
-	assert.Contains(t, extraFlags, "--timeout=10m")
-	// Known flags must NOT appear in extra-flags
-	assert.NotContains(t, extraFlags, "--vfs-cache-mode")
-	assert.NotContains(t, extraFlags, "--log-level")
+	// Unknown flags (not in RCloneArgs) → packed into add-mount-param.
+	addMountParam := workerOp["add-mount-param"]
+	assert.Contains(t, addMountParam, "--transfers=8")
+	assert.Contains(t, addMountParam, "--checkers=16")
+	assert.Contains(t, addMountParam, "--buffer-size=32M")
+	assert.Contains(t, addMountParam, "--low-level-retries=5")
+	assert.Contains(t, addMountParam, "--bwlimit=100M")
+	assert.Contains(t, addMountParam, "--retries=5")
+	assert.Contains(t, addMountParam, "--timeout=10m")
+	// Known flags must NOT appear in add-mount-param
+	assert.NotContains(t, addMountParam, "--vfs-cache-mode")
+	assert.NotContains(t, addMountParam, "--log-level")
 
 	// Config-file params must NOT appear in nodeServerOp as flags
 	assert.NotContains(t, nodeOp, "upload_concurrency=16")
@@ -1263,9 +1263,9 @@ func TestCreateConfig_XlsxFullFlow(t *testing.T) {
 	assert.Contains(t, nodeOp, "--bwlimit=100M")
 	// vfs-cache-mode is a known RCloneArgs field → individual key
 	assert.Equal(t, "full", workerOp["vfs-cache-mode"])
-	// transfers and bwlimit are unknown → packed into extra-flags
-	assert.Contains(t, workerOp["extra-flags"], "--transfers=8")
-	assert.Contains(t, workerOp["extra-flags"], "--bwlimit=100M")
+	// transfers and bwlimit are unknown → packed into add-mount-param
+	assert.Contains(t, workerOp["add-mount-param"], "--transfers=8")
+	assert.Contains(t, workerOp["add-mount-param"], "--bwlimit=100M")
 
 	// Config-file params must not appear as CLI flags
 	for _, entry := range expectedConfigEntries {

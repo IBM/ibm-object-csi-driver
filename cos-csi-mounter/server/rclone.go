@@ -18,16 +18,16 @@ import (
 var rcloneFlagPattern = regexp.MustCompile(`^--([a-z][a-z0-9-]*)(?:=(.*))?$`)
 
 // rcloneKnownFlags is the set of flag names already covered by the typed
-// RCloneArgs fields. extra-flags tokens whose flag name matches one of these
+// RCloneArgs fields. add-mount-param tokens whose flag name matches one of these
 // are rejected to prevent accidental or malicious override of a validated
-// parameter (e.g. trying to override --config via extra-flags).
+// parameter (e.g. trying to override --config via add-mount-param).
 var rcloneKnownFlags = jsonFieldNames(RCloneArgs{})
 
-// validateExtraFlags validates every comma-separated token in the extra-flags
+// validateAddMountParam validates every comma-separated token in the add-mount-param
 // string. Each token must look like --flag or --flag=value (lowercase rclone
 // flag name format). Tokens whose flag name collides with a known RCloneArgs
 // field are rejected to prevent override attacks.
-func validateExtraFlags(extra string) error {
+func validateAddMountParam(extra string) error {
 	for _, token := range strings.Split(extra, ",") {
 		token = strings.TrimSpace(token)
 		if token == "" {
@@ -35,11 +35,11 @@ func validateExtraFlags(extra string) error {
 		}
 		m := rcloneFlagPattern.FindStringSubmatch(token)
 		if m == nil {
-			return fmt.Errorf("extra-flags: invalid token %q: must be --flag or --flag=value with a lowercase flag name", token)
+			return fmt.Errorf("add-mount-param: invalid token %q: must be --flag or --flag=value with a lowercase flag name", token)
 		}
 		flagName := m[1]
 		if _, reserved := rcloneKnownFlags[flagName]; reserved {
-			return fmt.Errorf("extra-flags: flag %q is already a known parameter and cannot be set via extra-flags", flagName)
+			return fmt.Errorf("add-mount-param: flag %q is already a known parameter and cannot be set via add-mount-param", flagName)
 		}
 	}
 	return nil
@@ -74,16 +74,16 @@ type RCloneArgs struct {
 	VfsReadAhead          string `json:"vfs-read-ahead,omitempty"`
 	VfsReadChunkSize      string `json:"vfs-read-chunk-size,omitempty"`
 	VfsReadChunkSizeLimit string `json:"vfs-read-chunk-size-limit,omitempty"`
-	VfsReadChunkStreams    string `json:"vfs-read-chunk-streams,omitempty"`
+	VfsReadChunkStreams   string `json:"vfs-read-chunk-streams,omitempty"`
 	VfsReadWait           string `json:"vfs-read-wait,omitempty"`
 	VfsRefresh            string `json:"vfs-refresh,omitempty"`
 	VfsWriteBack          string `json:"vfs-write-back,omitempty"`
 	VfsWriteWait          string `json:"vfs-write-wait,omitempty"`
 	WriteBackCache        string `json:"write-back-cache,omitempty"`
-	// ExtraFlags allows passing additional rclone mount flags not covered by
+	// AddMountParam allows passing additional rclone mount flags not covered by
 	// the fields above, as a comma-separated list of --flag or --flag=value
 	// tokens. Example: "--transfers=4,--checkers=8,--s3-upload-concurrency=16"
-	ExtraFlags string `json:"extra-flags,omitempty"`
+	AddMountParam string `json:"add-mount-param,omitempty"`
 }
 
 func (args RCloneArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, error) {
@@ -99,18 +99,18 @@ func (args RCloneArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, e
 		return nil, err
 	}
 
-	// Convert to key=value slice, skipping extra-flags (handled separately below)
+	// Convert to key=value slice, skipping add-mount-param (handled separately below)
 	result := []string{"mount", bucket, targetPath}
 	for k, v := range m {
-		if k == "extra-flags" {
+		if k == "add-mount-param" {
 			continue
 		}
 		result = append(result, fmt.Sprintf("--%s=%v", k, v)) // --key=value
 	}
 
-	// Append each validated extra-flags token as its own argument
-	if args.ExtraFlags != "" {
-		for _, token := range strings.Split(args.ExtraFlags, ",") {
+	// Append each validated add-mount-param token as its own argument
+	if args.AddMountParam != "" {
+		for _, token := range strings.Split(args.AddMountParam, ",") {
 			token = strings.TrimSpace(token)
 			if token != "" {
 				result = append(result, token)
@@ -207,10 +207,10 @@ func (args RCloneArgs) Validate(targetPath string) error {
 		}
 	}
 
-	// Validate extra-flags tokens: format and reserved-name check
-	if args.ExtraFlags != "" {
-		if err := validateExtraFlags(args.ExtraFlags); err != nil {
-			logger.Error("invalid extra-flags value", zap.Error(err))
+	// Validate add-mount-param tokens: format and reserved-name check
+	if args.AddMountParam != "" {
+		if err := validateAddMountParam(args.AddMountParam); err != nil {
+			logger.Error("invalid add-mount-param value", zap.Error(err))
 			return err
 		}
 	}
