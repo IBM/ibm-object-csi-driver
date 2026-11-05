@@ -100,6 +100,7 @@ func handleSignals() {
 		<-signals
 		socketPath := filepath.Join(constants.SocketDir, constants.SocketFile)
 		if err := os.Remove(socketPath); err != nil {
+			// Handle it properly: log it, retry, return, etc.
 			logger.Warn("Failed to remove socket on exit", zap.String("path", socketPath), zap.Error(err))
 		}
 		os.Exit(0)
@@ -124,6 +125,7 @@ func startService(setupSocketFunc func() (net.Listener, error), router http.Hand
 		logger.Error("Failed to create socket", zap.Error(err))
 		return err
 	}
+	// Close the listener at the end
 	defer func() {
 		if err := listener.Close(); err != nil {
 			fmt.Fprintf(os.Stderr, "failed to close listener: %v\n", err)
@@ -134,6 +136,7 @@ func startService(setupSocketFunc func() (net.Listener, error), router http.Hand
 
 	logger.Info("Starting cos-csi-mounter service...")
 
+	// Serve HTTP requests over Unix socket
 	server := &http.Server{
 		Handler:           router,
 		ReadHeaderTimeout: 3 * time.Second,
