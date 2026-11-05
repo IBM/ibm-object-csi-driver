@@ -148,7 +148,7 @@ jobs:
           name: v1.0.11
           body: |
             ## 🚀 What's New
-            - Support custom rclone CLI flags and backend configuration options in Secret `mountOptions`.
+            - Add support to accept additional rclone CLI flags.
           prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
 
       - name: Perform CodeQL Analysis
