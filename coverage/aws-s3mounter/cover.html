@@ -57,11 +57,11 @@
 				
 				<option value="file0">github.com/IBM/ibm-object-csi-driver/cmd/main.go (54.9%)</option>
 				
-				<option value="file1">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/rclone.go (97.4%)</option>
+				<option value="file1">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/mount-s3.go (92.4%)</option>
 				
-				<option value="file2">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/s3fs.go (92.3%)</option>
+				<option value="file2">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/rclone.go (97.4%)</option>
 				
-				<option value="file3">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/s3mounter.go (92.4%)</option>
+				<option value="file3">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/s3fs.go (92.3%)</option>
 				
 				<option value="file4">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/server.go (73.5%)</option>
 				
@@ -79,11 +79,11 @@
 				
 				<option value="file11">github.com/IBM/ibm-object-csi-driver/pkg/driver/server.go (69.5%)</option>
 				
-				<option value="file12">github.com/IBM/ibm-object-csi-driver/pkg/mounter/mounter-rclone.go (94.9%)</option>
+				<option value="file12">github.com/IBM/ibm-object-csi-driver/pkg/mounter/mounter-mount-s3.go (94.2%)</option>
 				
-				<option value="file13">github.com/IBM/ibm-object-csi-driver/pkg/mounter/mounter-s3fs.go (96.2%)</option>
+				<option value="file13">github.com/IBM/ibm-object-csi-driver/pkg/mounter/mounter-rclone.go (94.9%)</option>
 				
-				<option value="file14">github.com/IBM/ibm-object-csi-driver/pkg/mounter/mounter-s3mounter.go (94.2%)</option>
+				<option value="file14">github.com/IBM/ibm-object-csi-driver/pkg/mounter/mounter-s3fs.go (96.2%)</option>
 				
 				<option value="file15">github.com/IBM/ibm-object-csi-driver/pkg/mounter/mounter.go (23.4%)</option>
 				
@@ -295,6 +295,227 @@ func checkCosCsiMounterSocketHealth() error <span class="cov8" title="3">{
 </pre>
 		
 		<pre class="file" id="file1" style="display: none">package main
+
+import (
+        "fmt"
+        "strconv"
+
+        "go.uber.org/zap"
+)
+
+var (
+        // Safe base directory for mount-s3 log files.
+        s3MounterSafeLogDir = "/var/log/mount-s3"
+        // Safe base directory for mount-s3 cache files.
+        s3MounterSafeCacheDir = "/tmp"
+)
+
+// s3MounterArgs holds the args sent from the node server for mount-s3.
+// This struct must match the s3MounterArgs in pkg/mounter/mounter-mount-s3.go
+type s3MounterArgs struct {
+        // Always set.
+        AllowOther         string `json:"allow-other,omitempty"`
+        AwsCredentialsFile string `json:"aws-credentials-file,omitempty"`
+        AwsConfigFile      string `json:"aws-config-file,omitempty"`
+
+        // SecretMap-sourced.
+        EndpointURL string `json:"endpoint-url,omitempty"`
+        Region      string `json:"region,omitempty"`
+
+        // Identity.
+        UID string `json:"uid,omitempty"`
+        GID string `json:"gid,omitempty"`
+
+        // Logging (translated from LogLevel).
+        LogLevel     string `json:"log-level,omitempty"`
+        LogDirectory string `json:"log-directory,omitempty"`
+
+        // Cache.
+        CacheDir string `json:"cache,omitempty"`
+
+        // Write operations - conflict resolution applied when read-only is set.
+        ReadOnly          string `json:"read-only,omitempty"`
+        AllowDelete       string `json:"allow-delete,omitempty"`
+        AllowOverwrite    string `json:"allow-overwrite,omitempty"`
+        IncrementalUpload string `json:"incremental-upload,omitempty"`
+
+        // ForcePathStyle is always true for IBM COS compatibility.
+        ForcePathStyle string `json:"force-path-style,omitempty"`
+
+        // Passthrough flags — user-supplied flags not handled by structured fields.
+        // Secret flags override SC flags when the same key appears in both.
+        // These are already deduplicated by the node server before being sent here.
+        Args []string `json:"args,omitempty"`
+}
+
+// PopulateArgsSlice builds the CLI args slice for mount-s3.
+func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, error) <span class="cov8" title="11">{
+        result := []string{bucket, targetPath}
+
+        // Block incremental-upload flag (causes data loss with IBM COS).
+        // This flag uses multiple PutObject calls that overwrite each other,
+        // resulting in ~75% data loss.
+        if args.IncrementalUpload == "true" </span><span class="cov1" title="1">{
+                logger.Warn("incremental-upload is not supported with IBM Cloud Object Storage, disabling")
+                args.IncrementalUpload = ""
+        }</span>
+
+        // Read-only priority resolution: suppress write-enabling flags.
+        <span class="cov8" title="11">if args.ReadOnly == "true" </span><span class="cov1" title="1">{
+                if args.AllowDelete == "true" </span><span class="cov1" title="1">{
+                        logger.Warn("read-only is set, clearing allow-delete")
+                        args.AllowDelete = ""
+                }</span>
+                <span class="cov1" title="1">if args.AllowOverwrite == "true" </span><span class="cov1" title="1">{
+                        logger.Warn("read-only is set, clearing allow-overwrite")
+                        args.AllowOverwrite = ""
+                }</span>
+        }
+
+        <span class="cov8" title="11">if args.AllowOther == "true" </span><span class="cov4" title="3">{
+                result = append(result, "--allow-other")
+        }</span>
+        <span class="cov8" title="11">if args.ReadOnly == "true" </span><span class="cov1" title="1">{
+                result = append(result, "--read-only")
+        }</span>
+        <span class="cov8" title="11">if args.AllowDelete == "true" </span><span class="cov3" title="2">{
+                result = append(result, "--allow-delete")
+        }</span>
+        <span class="cov8" title="11">if args.AllowOverwrite == "true" </span><span class="cov3" title="2">{
+                result = append(result, "--allow-overwrite")
+        }</span>
+        <span class="cov8" title="11">if args.IncrementalUpload == "true" </span><span class="cov0" title="0">{
+                result = append(result, "--incremental-upload")
+        }</span>
+        <span class="cov8" title="11">if args.UID != "" </span><span class="cov1" title="1">{
+                result = append(result, "--uid="+args.UID)
+        }</span>
+        <span class="cov8" title="11">if args.GID != "" </span><span class="cov1" title="1">{
+                result = append(result, "--gid="+args.GID)
+        }</span>
+        <span class="cov8" title="11">if args.EndpointURL != "" </span><span class="cov3" title="2">{
+                result = append(result, "--endpoint-url="+args.EndpointURL)
+        }</span>
+        <span class="cov8" title="11">if args.Region != "" </span><span class="cov3" title="2">{
+                result = append(result, "--region="+args.Region)
+        }</span>
+
+        <span class="cov8" title="11">switch args.LogLevel </span>{
+        case "debug":<span class="cov1" title="1">
+                result = append(result, "--debug")</span>
+        case "debug-crt":<span class="cov1" title="1">
+                result = append(result, "--debug-crt")</span>
+        case "no-log":<span class="cov1" title="1">
+                result = append(result, "--no-log")</span>
+        default:<span class="cov7" title="8">
+                if args.LogLevel != "" </span><span class="cov1" title="1">{
+                        logger.Warn("unsupported log level for mount-s3, ignoring",
+                                zap.String("log-level", args.LogLevel),
+                                zap.String("supported", "debug, debug-crt, no-log"),
+                        )
+                }</span>
+        }
+
+        <span class="cov8" title="11">if args.LogDirectory != "" </span><span class="cov1" title="1">{
+                result = append(result, "--log-directory="+args.LogDirectory)
+        }</span>
+        <span class="cov8" title="11">if args.CacheDir != "" </span><span class="cov1" title="1">{
+                result = append(result, "--cache="+args.CacheDir)
+        }</span>
+        <span class="cov8" title="11">if args.ForcePathStyle == "true" </span><span class="cov3" title="2">{
+                result = append(result, "--force-path-style")
+        }</span>
+
+        // Passthrough flags appended last — already deduplicated by node server.
+        <span class="cov8" title="11">result = append(result, args.Args...)
+
+        return result, nil</span>
+}
+
+// Validate checks that required fields are present and values are valid.
+func (args s3MounterArgs) Validate(targetPath string) error <span class="cov10" title="16">{
+        if err := pathValidator(targetPath); err != nil </span><span class="cov3" title="2">{
+                return err
+        }</span>
+
+        <span class="cov9" title="14">if args.AllowOther != "" </span><span class="cov5" title="4">{
+                if isBool := isBoolString(args.AllowOther); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of allow-other into boolean", zap.Any("allow-other", args.AllowOther))
+                        return fmt.Errorf("cannot convert value of allow-other into boolean: %v", args.AllowOther)
+                }</span>
+        }
+
+        <span class="cov9" title="13">if args.AwsCredentialsFile == "" </span><span class="cov3" title="2">{
+                logger.Error("aws-credentials-file is required for mount-s3")
+                return fmt.Errorf("aws-credentials-file is required for mount-s3")
+        }</span>
+        <span class="cov8" title="11">if args.AwsConfigFile == "" </span><span class="cov1" title="1">{
+                logger.Error("aws-config-file is required for mount-s3")
+                return fmt.Errorf("aws-config-file is required for mount-s3")
+        }</span>
+
+        <span class="cov8" title="10">if args.ReadOnly != "" </span><span class="cov1" title="1">{
+                if isBool := isBoolString(args.ReadOnly); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of read-only into boolean", zap.Any("read-only", args.ReadOnly))
+                        return fmt.Errorf("cannot convert value of read-only into boolean: %v", args.ReadOnly)
+                }</span>
+        }
+        <span class="cov8" title="9">if args.AllowDelete != "" </span><span class="cov3" title="2">{
+                if isBool := isBoolString(args.AllowDelete); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of allow-delete into boolean", zap.Any("allow-delete", args.AllowDelete))
+                        return fmt.Errorf("cannot convert value of allow-delete into boolean: %v", args.AllowDelete)
+                }</span>
+        }
+        <span class="cov7" title="8">if args.AllowOverwrite != "" </span><span class="cov3" title="2">{
+                if isBool := isBoolString(args.AllowOverwrite); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of allow-overwrite into boolean", zap.Any("allow-overwrite", args.AllowOverwrite))
+                        return fmt.Errorf("cannot convert value of allow-overwrite into boolean: %v", args.AllowOverwrite)
+                }</span>
+        }
+        <span class="cov7" title="7">if args.IncrementalUpload != "" </span><span class="cov1" title="1">{
+                if isBool := isBoolString(args.IncrementalUpload); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of incremental-upload into boolean", zap.Any("incremental-upload", args.IncrementalUpload))
+                        return fmt.Errorf("cannot convert value of incremental-upload into boolean: %v", args.IncrementalUpload)
+                }</span>
+        }
+
+        <span class="cov6" title="6">if args.UID != "" </span><span class="cov3" title="2">{
+                if _, err := strconv.Atoi(args.UID); err != nil </span><span class="cov1" title="1">{
+                        logger.Error("uid must be a valid integer", zap.String("uid", args.UID))
+                        return fmt.Errorf("uid must be a valid integer: %v", args.UID)
+                }</span>
+        }
+        <span class="cov6" title="5">if args.GID != "" </span><span class="cov3" title="2">{
+                if _, err := strconv.Atoi(args.GID); err != nil </span><span class="cov1" title="1">{
+                        logger.Error("gid must be a valid integer", zap.String("gid", args.GID))
+                        return fmt.Errorf("gid must be a valid integer: %v", args.GID)
+                }</span>
+        }
+        <span class="cov5" title="4">if args.ForcePathStyle != "" </span><span class="cov3" title="2">{
+                if isBool := isBoolString(args.ForcePathStyle); !isBool </span><span class="cov1" title="1">{
+                        logger.Error("cannot convert value of force-path-style into boolean", zap.Any("force-path-style", args.ForcePathStyle))
+                        return fmt.Errorf("cannot convert value of force-path-style into boolean: %v", args.ForcePathStyle)
+                }</span>
+        }
+
+        // ensureDir creates the directory if it does not exist, confined to its safe base.
+        <span class="cov4" title="3">if args.CacheDir != "" </span><span class="cov0" title="0">{
+                if err := ensureDir(args.CacheDir, s3MounterSafeCacheDir); err != nil </span><span class="cov0" title="0">{
+                        logger.Error("failed to create cache directory", zap.String("cache-dir", args.CacheDir), zap.Error(err))
+                        return fmt.Errorf("failed to create cache directory '%s': %w", args.CacheDir, err)
+                }</span>
+        }
+        <span class="cov4" title="3">if args.LogDirectory != "" </span><span class="cov0" title="0">{
+                if err := ensureDir(args.LogDirectory, s3MounterSafeLogDir); err != nil </span><span class="cov0" title="0">{
+                        logger.Error("failed to create log directory", zap.String("log-dir", args.LogDirectory), zap.Error(err))
+                        return fmt.Errorf("failed to create log directory '%s': %w", args.LogDirectory, err)
+                }</span>
+        }
+
+        <span class="cov4" title="3">return nil</span>
+}</pre>
+		
+		<pre class="file" id="file2" style="display: none">package main
 
 import (
         "encoding/json"
@@ -515,7 +736,7 @@ func (args RCloneArgs) Validate(targetPath string) error <span class="cov10" tit
 }
 </pre>
 		
-		<pre class="file" id="file2" style="display: none">package main
+		<pre class="file" id="file3" style="display: none">package main
 
 import (
         "encoding/json"
@@ -867,227 +1088,6 @@ func (args S3FSArgs) Validate(targetPath string) error <span class="cov10" title
         <span class="cov2" title="2">return nil</span>
 }
 </pre>
-		
-		<pre class="file" id="file3" style="display: none">package main
-
-import (
-        "fmt"
-        "strconv"
-
-        "go.uber.org/zap"
-)
-
-var (
-        // Safe base directory for mount-s3 log files.
-        s3MounterSafeLogDir = "/var/log/mount-s3"
-        // Safe base directory for mount-s3 cache files.
-        s3MounterSafeCacheDir = "/tmp"
-)
-
-// s3MounterArgs holds the args sent from the node server for mount-s3.
-// This struct must match the s3MounterArgs in pkg/mounter/mounter_s3mounter.go
-type s3MounterArgs struct {
-        // Always set.
-        AllowOther         string `json:"allow-other,omitempty"`
-        AwsCredentialsFile string `json:"aws-credentials-file,omitempty"`
-        AwsConfigFile      string `json:"aws-config-file,omitempty"`
-
-        // SecretMap-sourced.
-        EndpointURL string `json:"endpoint-url,omitempty"`
-        Region      string `json:"region,omitempty"`
-
-        // Identity.
-        UID string `json:"uid,omitempty"`
-        GID string `json:"gid,omitempty"`
-
-        // Logging (translated from LogLevel).
-        LogLevel     string `json:"log-level,omitempty"`
-        LogDirectory string `json:"log-directory,omitempty"`
-
-        // Cache.
-        CacheDir string `json:"cache,omitempty"`
-
-        // Write operations - conflict resolution applied when read-only is set.
-        ReadOnly          string `json:"read-only,omitempty"`
-        AllowDelete       string `json:"allow-delete,omitempty"`
-        AllowOverwrite    string `json:"allow-overwrite,omitempty"`
-        IncrementalUpload string `json:"incremental-upload,omitempty"`
-
-        // ForcePathStyle is always true for IBM COS compatibility.
-        ForcePathStyle string `json:"force-path-style,omitempty"`
-
-        // Passthrough flags — user-supplied flags not handled by structured fields.
-        // Secret flags override SC flags when the same key appears in both.
-        // These are already deduplicated by the node server before being sent here.
-        Args []string `json:"args,omitempty"`
-}
-
-// PopulateArgsSlice builds the CLI args slice for mount-s3.
-func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, error) <span class="cov8" title="11">{
-        result := []string{bucket, targetPath}
-
-        // Block incremental-upload flag (causes data loss with IBM COS).
-        // This flag uses multiple PutObject calls that overwrite each other,
-        // resulting in ~75% data loss.
-        if args.IncrementalUpload == "true" </span><span class="cov1" title="1">{
-                logger.Warn("incremental-upload is not supported with IBM Cloud Object Storage, disabling")
-                args.IncrementalUpload = ""
-        }</span>
-
-        // Read-only priority resolution: suppress write-enabling flags.
-        <span class="cov8" title="11">if args.ReadOnly == "true" </span><span class="cov1" title="1">{
-                if args.AllowDelete == "true" </span><span class="cov1" title="1">{
-                        logger.Warn("read-only is set, clearing allow-delete")
-                        args.AllowDelete = ""
-                }</span>
-                <span class="cov1" title="1">if args.AllowOverwrite == "true" </span><span class="cov1" title="1">{
-                        logger.Warn("read-only is set, clearing allow-overwrite")
-                        args.AllowOverwrite = ""
-                }</span>
-        }
-
-        <span class="cov8" title="11">if args.AllowOther == "true" </span><span class="cov4" title="3">{
-                result = append(result, "--allow-other")
-        }</span>
-        <span class="cov8" title="11">if args.ReadOnly == "true" </span><span class="cov1" title="1">{
-                result = append(result, "--read-only")
-        }</span>
-        <span class="cov8" title="11">if args.AllowDelete == "true" </span><span class="cov3" title="2">{
-                result = append(result, "--allow-delete")
-        }</span>
-        <span class="cov8" title="11">if args.AllowOverwrite == "true" </span><span class="cov3" title="2">{
-                result = append(result, "--allow-overwrite")
-        }</span>
-        <span class="cov8" title="11">if args.IncrementalUpload == "true" </span><span class="cov0" title="0">{
-                result = append(result, "--incremental-upload")
-        }</span>
-        <span class="cov8" title="11">if args.UID != "" </span><span class="cov1" title="1">{
-                result = append(result, "--uid="+args.UID)
-        }</span>
-        <span class="cov8" title="11">if args.GID != "" </span><span class="cov1" title="1">{
-                result = append(result, "--gid="+args.GID)
-        }</span>
-        <span class="cov8" title="11">if args.EndpointURL != "" </span><span class="cov3" title="2">{
-                result = append(result, "--endpoint-url="+args.EndpointURL)
-        }</span>
-        <span class="cov8" title="11">if args.Region != "" </span><span class="cov3" title="2">{
-                result = append(result, "--region="+args.Region)
-        }</span>
-
-        <span class="cov8" title="11">switch args.LogLevel </span>{
-        case "debug":<span class="cov1" title="1">
-                result = append(result, "--debug")</span>
-        case "debug-crt":<span class="cov1" title="1">
-                result = append(result, "--debug-crt")</span>
-        case "no-log":<span class="cov1" title="1">
-                result = append(result, "--no-log")</span>
-        default:<span class="cov7" title="8">
-                if args.LogLevel != "" </span><span class="cov1" title="1">{
-                        logger.Warn("unsupported log level for mount-s3, ignoring",
-                                zap.String("log-level", args.LogLevel),
-                                zap.String("supported", "debug, debug-crt, no-log"),
-                        )
-                }</span>
-        }
-
-        <span class="cov8" title="11">if args.LogDirectory != "" </span><span class="cov1" title="1">{
-                result = append(result, "--log-directory="+args.LogDirectory)
-        }</span>
-        <span class="cov8" title="11">if args.CacheDir != "" </span><span class="cov1" title="1">{
-                result = append(result, "--cache="+args.CacheDir)
-        }</span>
-        <span class="cov8" title="11">if args.ForcePathStyle == "true" </span><span class="cov3" title="2">{
-                result = append(result, "--force-path-style")
-        }</span>
-
-        // Passthrough flags appended last — already deduplicated by node server.
-        <span class="cov8" title="11">result = append(result, args.Args...)
-
-        return result, nil</span>
-}
-
-// Validate checks that required fields are present and values are valid.
-func (args s3MounterArgs) Validate(targetPath string) error <span class="cov10" title="16">{
-        if err := pathValidator(targetPath); err != nil </span><span class="cov3" title="2">{
-                return err
-        }</span>
-
-        <span class="cov9" title="14">if args.AllowOther != "" </span><span class="cov5" title="4">{
-                if isBool := isBoolString(args.AllowOther); !isBool </span><span class="cov1" title="1">{
-                        logger.Error("cannot convert value of allow-other into boolean", zap.Any("allow-other", args.AllowOther))
-                        return fmt.Errorf("cannot convert value of allow-other into boolean: %v", args.AllowOther)
-                }</span>
-        }
-
-        <span class="cov9" title="13">if args.AwsCredentialsFile == "" </span><span class="cov3" title="2">{
-                logger.Error("aws-credentials-file is required for mount-s3")
-                return fmt.Errorf("aws-credentials-file is required for mount-s3")
-        }</span>
-        <span class="cov8" title="11">if args.AwsConfigFile == "" </span><span class="cov1" title="1">{
-                logger.Error("aws-config-file is required for mount-s3")
-                return fmt.Errorf("aws-config-file is required for mount-s3")
-        }</span>
-
-        <span class="cov8" title="10">if args.ReadOnly != "" </span><span class="cov1" title="1">{
-                if isBool := isBoolString(args.ReadOnly); !isBool </span><span class="cov1" title="1">{
-                        logger.Error("cannot convert value of read-only into boolean", zap.Any("read-only", args.ReadOnly))
-                        return fmt.Errorf("cannot convert value of read-only into boolean: %v", args.ReadOnly)
-                }</span>
-        }
-        <span class="cov8" title="9">if args.AllowDelete != "" </span><span class="cov3" title="2">{
-                if isBool := isBoolString(args.AllowDelete); !isBool </span><span class="cov1" title="1">{
-                        logger.Error("cannot convert value of allow-delete into boolean", zap.Any("allow-delete", args.AllowDelete))
-                        return fmt.Errorf("cannot convert value of allow-delete into boolean: %v", args.AllowDelete)
-                }</span>
-        }
-        <span class="cov7" title="8">if args.AllowOverwrite != "" </span><span class="cov3" title="2">{
-                if isBool := isBoolString(args.AllowOverwrite); !isBool </span><span class="cov1" title="1">{
-                        logger.Error("cannot convert value of allow-overwrite into boolean", zap.Any("allow-overwrite", args.AllowOverwrite))
-                        return fmt.Errorf("cannot convert value of allow-overwrite into boolean: %v", args.AllowOverwrite)
-                }</span>
-        }
-        <span class="cov7" title="7">if args.IncrementalUpload != "" </span><span class="cov1" title="1">{
-                if isBool := isBoolString(args.IncrementalUpload); !isBool </span><span class="cov1" title="1">{
-                        logger.Error("cannot convert value of incremental-upload into boolean", zap.Any("incremental-upload", args.IncrementalUpload))
-                        return fmt.Errorf("cannot convert value of incremental-upload into boolean: %v", args.IncrementalUpload)
-                }</span>
-        }
-
-        <span class="cov6" title="6">if args.UID != "" </span><span class="cov3" title="2">{
-                if _, err := strconv.Atoi(args.UID); err != nil </span><span class="cov1" title="1">{
-                        logger.Error("uid must be a valid integer", zap.String("uid", args.UID))
-                        return fmt.Errorf("uid must be a valid integer: %v", args.UID)
-                }</span>
-        }
-        <span class="cov6" title="5">if args.GID != "" </span><span class="cov3" title="2">{
-                if _, err := strconv.Atoi(args.GID); err != nil </span><span class="cov1" title="1">{
-                        logger.Error("gid must be a valid integer", zap.String("gid", args.GID))
-                        return fmt.Errorf("gid must be a valid integer: %v", args.GID)
-                }</span>
-        }
-        <span class="cov5" title="4">if args.ForcePathStyle != "" </span><span class="cov3" title="2">{
-                if isBool := isBoolString(args.ForcePathStyle); !isBool </span><span class="cov1" title="1">{
-                        logger.Error("cannot convert value of force-path-style into boolean", zap.Any("force-path-style", args.ForcePathStyle))
-                        return fmt.Errorf("cannot convert value of force-path-style into boolean: %v", args.ForcePathStyle)
-                }</span>
-        }
-
-        // ensureDir creates the directory if it does not exist, confined to its safe base.
-        <span class="cov4" title="3">if args.CacheDir != "" </span><span class="cov0" title="0">{
-                if err := ensureDir(args.CacheDir, s3MounterSafeCacheDir); err != nil </span><span class="cov0" title="0">{
-                        logger.Error("failed to create cache directory", zap.String("cache-dir", args.CacheDir), zap.Error(err))
-                        return fmt.Errorf("failed to create cache directory '%s': %w", args.CacheDir, err)
-                }</span>
-        }
-        <span class="cov4" title="3">if args.LogDirectory != "" </span><span class="cov0" title="0">{
-                if err := ensureDir(args.LogDirectory, s3MounterSafeLogDir); err != nil </span><span class="cov0" title="0">{
-                        logger.Error("failed to create log directory", zap.String("log-dir", args.LogDirectory), zap.Error(err))
-                        return fmt.Errorf("failed to create log directory '%s': %w", args.LogDirectory, err)
-                }</span>
-        }
-
-        <span class="cov4" title="3">return nil</span>
-}</pre>
 		
 		<pre class="file" id="file4" style="display: none">package main
 
@@ -3257,7 +3257,592 @@ func logGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, h
 }
 </pre>
 		
-		<pre class="file" id="file12" style="display: none">/*******************************************************************************
+		<pre class="file" id="file12" style="display: none">// Package mounter
+package mounter
+
+import (
+        "bufio"
+        "crypto/sha256"
+        "encoding/json"
+        "fmt"
+        "os"
+        "path"
+        "strings"
+        "time"
+
+        "github.com/IBM/ibm-object-csi-driver/pkg/constants"
+        "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
+        "k8s.io/klog/v2"
+)
+
+// MountpointS3Mounter implements Mounter for AWS Mountpoint S3.
+type MountpointS3Mounter struct {
+        BucketName    string
+        ObjectPath    string
+        EndPoint      string
+        LocConstraint string
+        AuthType      string
+        AccessKey     string
+        SecretKey     string
+
+        UID string
+        GID string
+
+        LogLevel     string
+        LogDirectory string
+        CacheDir     string
+
+        ReadOnly          bool
+        AllowDelete       bool
+        AllowOverwrite    bool
+        IncrementalUpload bool
+
+        // MountOptions holds deduplicated passthrough flags.
+        // SC flags are overridden by secret flags when the same key appears in both.
+        MountOptions []string
+        MounterUtils utils.MounterUtils
+}
+
+const (
+        // s3MountLogDirectory is the hardcoded log directory for mount-s3, matching
+        // the same convention as rclone's hardcoded --log-file=/var/log/rclone.log.
+        s3MountLogDirectory = "/var/log/mount-s3"
+)
+
+// s3MounterArgs holds the args sent to the worker node daemon for mount-s3.
+// This struct must stay in sync with s3MounterArgs in the worker (cos-csi-mounter).
+type s3MounterArgs struct {
+        AllowOther         string `json:"allow-other,omitempty"`
+        AwsCredentialsFile string `json:"aws-credentials-file,omitempty"`
+        AwsConfigFile      string `json:"aws-config-file,omitempty"`
+
+        EndpointURL string `json:"endpoint-url,omitempty"`
+        Region      string `json:"region,omitempty"`
+
+        UID string `json:"uid,omitempty"`
+        GID string `json:"gid,omitempty"`
+
+        LogLevel     string `json:"log-level,omitempty"`
+        LogDirectory string `json:"log-directory,omitempty"`
+
+        CacheDir string `json:"cache,omitempty"`
+
+        ReadOnly          string `json:"read-only,omitempty"`
+        AllowDelete       string `json:"allow-delete,omitempty"`
+        AllowOverwrite    string `json:"allow-overwrite,omitempty"`
+        IncrementalUpload string `json:"incremental-upload,omitempty"`
+
+        // ForcePathStyle is always true for IBM COS compatibility.
+        ForcePathStyle string `json:"force-path-style,omitempty"`
+
+        // Passthrough flags — user-supplied flags not handled by structured fields.
+        // Secret flags override SC flags when the same key appears in both.
+        Args []string `json:"args,omitempty"`
+}
+
+const (
+        s3MountCredentialsFile = "credentials"
+        s3MountConfigFile      = "config"
+        s3MountAwsProfile      = "default"
+)
+
+var (
+        removeS3ConfigFile = removeS3MountConfigFile
+)
+
+type MountpointS3MounterParams struct {
+        SecretMap    map[string]string
+        MountOptions []string
+        MounterUtils utils.MounterUtils
+        Gid          string
+        ReadOnly     bool
+}
+
+// NewMountpointS3Mounter creates a new MountpointS3Mounter from the unified
+// secret format.
+//
+// Precedence (lowest → highest):
+//  1. secretMap identity keys
+//  2. StorageClass mountOptions — parsed first
+//  3. Secret mountOptions — parsed second, wins over SC on any overlapping flag
+//
+// For passthrough flags, deduplication is applied: if the same flag key appears
+// in both SC and secret, the SC entry is dropped and the secret entry is kept.
+func NewMountpointS3Mounter(params MountpointS3MounterParams) Mounter <span class="cov5" title="6">{
+        secretMap := params.SecretMap
+        mountOptions := params.MountOptions
+        mounterUtils := params.MounterUtils
+        gid := params.Gid
+        readOnly := params.ReadOnly
+
+        klog.Info("-newMountpointS3Mounter-")
+
+        mounter := &amp;MountpointS3Mounter{}
+
+        if val, ok := secretMap["accessKey"]; ok </span><span class="cov4" title="4">{
+                mounter.AccessKey = val
+        }</span>
+        <span class="cov5" title="6">if val, ok := secretMap["secretKey"]; ok </span><span class="cov4" title="4">{
+                mounter.SecretKey = val
+        }</span>
+        <span class="cov5" title="6">if val, ok := secretMap["bucketName"]; ok </span><span class="cov4" title="4">{
+                mounter.BucketName = val
+        }</span>
+        <span class="cov5" title="6">if val, ok := secretMap["objectPath"]; ok </span><span class="cov2" title="2">{
+                mounter.ObjectPath = val
+        }</span>
+        <span class="cov5" title="6">if val, ok := secretMap["cosEndpoint"]; ok </span><span class="cov2" title="2">{
+                mounter.EndPoint = val
+        }</span>
+        <span class="cov5" title="6">if val, ok := secretMap["locationConstraint"]; ok </span><span class="cov2" title="2">{
+                mounter.LocConstraint = val
+        }</span>
+
+        <span class="cov5" title="6">if gid != "" &amp;&amp; secretMap["uid"] == "" </span><span class="cov1" title="1">{
+                mounter.UID = gid
+        }</span> else<span class="cov5" title="5"> if val := secretMap["uid"]; val != "" </span><span class="cov3" title="3">{
+                mounter.UID = val
+        }</span>
+        <span class="cov5" title="6">if val := secretMap["gid"]; val != "" </span><span class="cov1" title="1">{
+                mounter.GID = val
+        }</span> else<span class="cov5" title="5"> {
+                mounter.GID = gid
+        }</span>
+
+        <span class="cov5" title="6">mounter.ReadOnly = readOnly
+
+        mounter.AuthType = "hmac"
+
+        // Step 1: parse SC options.
+        scRemainder := parseMountpointS3Options(mounter, mountOptions)
+
+        // Step 2: parse secret options (structured fields set by secret override SC).
+        secretOpts := splitSecretMountOptions(secretMap["mountOptions"])
+        secretRemainder := parseMountpointS3Options(mounter, secretOpts)
+
+        // Step 3: deduplicate passthroughs — secret wins over SC on same key.
+        mounter.MountOptions = deduplicatePassthrough(scRemainder, secretRemainder)
+
+        // Step 4: Block incremental-upload flag (causes data loss with IBM COS).
+        // This flag uses multiple PutObject calls that overwrite each other instead of
+        // using proper multipart upload, resulting in ~75% data loss.
+        if mounter.IncrementalUpload </span><span class="cov1" title="1">{
+                klog.Info("mount-s3: --incremental-upload is not supported ")
+                mounter.IncrementalUpload = false
+        }</span>
+
+        // Step 5: allow-delete and allow-overwrite are hardcoded defaults.
+        // They are suppressed later in Mount() when read-only is set.
+        <span class="cov5" title="6">mounter.AllowDelete = true
+        mounter.AllowOverwrite = true
+
+        mounter.MounterUtils = mounterUtils
+
+        klog.Infof("newMountpointS3Mounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
+                mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType)
+        klog.Infof("newMountpointS3Mounter: SC mountOptions=%v secretMountOptions=%v deduplicated passthrough=%v",
+                mountOptions, secretOpts, mounter.MountOptions)
+
+        return mounter</span>
+}
+
+// deduplicatePassthrough merges SC and secret passthrough flags.
+// If the same flag key appears in both, the SC entry is dropped and the
+// secret entry is kept (secret wins).
+//
+// Examples:
+//
+//        SC:     [--max-threads=32, --maximum-throughput-gbps=10, --allow-delete]
+//        Secret: [--max-threads=128, --maximum-throughput-gbps=25]
+//        Result: [--allow-delete, --max-threads=128, --maximum-throughput-gbps=25]
+func deduplicatePassthrough(scFlags, secretFlags []string) []string <span class="cov7" title="12">{
+        // Build a set of keys present in secret flags.
+        secretKeys := make(map[string]struct{}, len(secretFlags))
+        for _, flag := range secretFlags </span><span class="cov6" title="8">{
+                key := flagKey(flag)
+                secretKeys[key] = struct{}{}
+        }</span>
+
+        // Keep SC flags whose key does NOT appear in secret flags.
+        <span class="cov7" title="12">var result []string
+        for _, flag := range scFlags </span><span class="cov7" title="14">{
+                key := flagKey(flag)
+                if _, overridden := secretKeys[key]; overridden </span><span class="cov5" title="6">{
+                        klog.Infof("deduplicatePassthrough: SC flag %q overridden by secret", flag)
+                }</span> else<span class="cov6" title="8"> {
+                        result = append(result, flag)
+                }</span>
+        }
+
+        // Append all secret flags last.
+        <span class="cov7" title="12">result = append(result, secretFlags...)
+        return result</span>
+}
+
+// flagKey extracts the key portion from a passthrough flag.
+// "--max-threads=128" → "max-threads"
+// "--allow-delete"    → "allow-delete"
+func flagKey(flag string) string <span class="cov9" title="26">{
+        trimmed := strings.TrimPrefix(flag, "--")
+        key, _, _ := strings.Cut(trimmed, "=")
+        return key
+}</span>
+
+// splitSecretMountOptions splits the multiline mountOptions string from the secret.
+func splitSecretMountOptions(raw string) []string <span class="cov7" title="13">{
+        if raw == "" </span><span class="cov4" title="4">{
+                return nil
+        }</span>
+        <span class="cov6" title="9">var opts []string
+        for _, line := range strings.Split(raw, "\n") </span><span class="cov9" title="27">{
+                line = strings.TrimSpace(line)
+                line = strings.TrimRight(line, ",")
+                if line == "" || strings.HasPrefix(line, "#") </span><span class="cov5" title="6">{
+                        continue</span>
+                }
+                <span class="cov8" title="21">opts = append(opts, line)</span>
+        }
+        <span class="cov6" title="9">return opts</span>
+}
+
+// parseMountpointS3Options parses mount-s3 options from the provided slice.
+func parseMountpointS3Options(mounter *MountpointS3Mounter, opts []string) []string <span class="cov8" title="18">{
+        var remaining []string
+
+        for _, opt := range opts </span><span class="cov9" title="28">{
+                trimmed := strings.TrimPrefix(opt, "--")
+                key, value, hasValue := strings.Cut(trimmed, "=")
+
+                switch key </span>{
+                case "allow-other":<span class="cov1" title="1">
+                        klog.Infof("parseMountpointS3Options: 'allow-other' is always enabled and cannot be overridden.")</span>
+                case "umask":<span class="cov0" title="0">
+                        klog.Warningf("parseMountpointS3Options: 'umask' is not supported by mount-s3. " +
+                                "Use --dir-mode / --file-mode instead. Ignoring.")</span>
+                case "uid":<span class="cov3" title="3">
+                        if hasValue </span><span class="cov3" title="3">{
+                                mounter.UID = value
+                        }</span>
+                case "gid":<span class="cov1" title="1">
+                        if hasValue </span><span class="cov1" title="1">{
+                                mounter.GID = value
+                        }</span>
+                case "log-level":<span class="cov2" title="2">
+                        if hasValue </span><span class="cov2" title="2">{
+                                mounter.LogLevel = value
+                        }</span>
+                case "log-directory":<span class="cov1" title="1">
+                        // Hardcoded — user-supplied value is ignored; the struct field is set
+                        // to the fixed path so callers can read it back consistently.
+                        klog.Warningf("parseMountpointS3Options: 'log-directory' is hardcoded to %q and cannot be overridden. Ignoring.", s3MountLogDirectory)
+                        mounter.LogDirectory = s3MountLogDirectory</span>
+                case "force-path-style":<span class="cov0" title="0">
+                        // Hardcoded — always enabled for IBM COS compatibility.
+                        klog.Warningf("parseMountpointS3Options: 'force-path-style' is hardcoded and cannot be overridden. Ignoring.")</span>
+                case "cache":<span class="cov2" title="2">
+                        if hasValue </span><span class="cov2" title="2">{
+                                mounter.CacheDir = value
+                        }</span>
+                case "read-only":<span class="cov1" title="1">
+                        // read-only is now set directly from MounterParams.ReadOnly — ignore if passed via flags.
+                        klog.Warningf("parseMountpointS3Options: 'read-only' is set via MounterParams and cannot be overridden via mount options. Ignoring.")</span>
+                case "allow-delete":<span class="cov1" title="1">
+                        // Hardcoded — always enabled unless read-only. User override ignored.
+                        klog.Warningf("parseMountpointS3Options: 'allow-delete' is hardcoded and cannot be overridden. Ignoring.")</span>
+                case "allow-overwrite":<span class="cov2" title="2">
+                        // Hardcoded — always enabled unless read-only. User override ignored.
+                        klog.Warningf("parseMountpointS3Options: 'allow-overwrite' is hardcoded and cannot be overridden. Ignoring.")</span>
+                case "incremental-upload":<span class="cov2" title="2">
+                        mounter.IncrementalUpload = true</span>
+                default:<span class="cov7" title="12">
+                        if strings.HasPrefix(opt, "--") </span><span class="cov6" title="8">{
+                                remaining = append(remaining, opt)
+                        }</span> else<span class="cov4" title="4"> {
+                                remaining = append(remaining, "--"+opt)
+                        }</span>
+                }
+        }
+
+        <span class="cov8" title="18">return remaining</span>
+}
+
+// Mount mounts the S3 bucket using mountpoint-s3.
+func (s3 *MountpointS3Mounter) Mount(source string, target string) error <span class="cov5" title="7">{
+        klog.Info("-MountpointS3Mounter Mount-")
+        klog.Infof("Mount args:\n\tsource: &lt;%s&gt;\n\ttarget: &lt;%s&gt;", source, target)
+
+        // Read-only priority resolution: suppress write-enabling flags.
+        if s3.ReadOnly </span><span class="cov2" title="2">{
+                if s3.AllowDelete </span><span class="cov1" title="1">{
+                        klog.Infof("MountpointS3Mounter: read-only set — clearing allow-delete")
+                        s3.AllowDelete = false
+                }</span>
+                <span class="cov2" title="2">if s3.AllowOverwrite </span><span class="cov1" title="1">{
+                        klog.Infof("MountpointS3Mounter: read-only set — clearing allow-overwrite")
+                        s3.AllowOverwrite = false
+                }</span>
+        }
+
+        // NOTE: No directory validation or creation here.
+        // LogDirectory and CacheDir are forwarded to the worker via workerNodeOp.
+        // The worker's Validate() calls ensureDir() which creates them if missing.
+
+        <span class="cov5" title="7">var configPath string
+        if mountWorker </span><span class="cov2" title="2">{
+                configPath = constants.MounterConfigPathOnHost
+        }</span> else<span class="cov5" title="5"> {
+                configPath = constants.MounterConfigPathOnPodS3Mount
+        }</span>
+
+        <span class="cov5" title="7">configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
+
+        if err := createS3MountConfig(configPathWithVolID, s3); err != nil </span><span class="cov2" title="2">{
+                klog.Errorf("MountpointS3Mounter Mount: Cannot create config file: %v", err)
+                return err
+        }</span>
+
+        <span class="cov5" title="5">bucketName := s3.BucketName
+        if s3.ObjectPath != "" </span><span class="cov1" title="1">{
+                trimmedPath := strings.TrimPrefix(s3.ObjectPath, "/")
+                bucketName = fmt.Sprintf("%s/%s", s3.BucketName, trimmedPath)
+        }</span>
+
+        <span class="cov5" title="5">args, envVars, wnOp := s3.formulateMountOptions(bucketName, target, configPathWithVolID)
+
+        if mountWorker </span><span class="cov2" title="2">{
+                klog.Info("Mount on Worker started...")
+
+                jsonData, err := json.Marshal(wnOp)
+                if err != nil </span><span class="cov0" title="0">{
+                        klog.Errorf("Error marshalling mount args: %v", err)
+                        return err
+                }</span>
+
+                <span class="cov2" title="2">payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`,
+                        target, bucketName, constants.AMAZONS3MOUNTER, jsonData)
+
+                klog.Infof("MountpointS3Mounter: worker payload: %s", payload)
+
+                err = mounterRequest(payload, "http://unix/api/cos/mount")
+                if err != nil </span><span class="cov1" title="1">{
+                        klog.Errorf("failed to mount on worker: %v", err)
+                        return err
+                }</span>
+                <span class="cov1" title="1">return nil</span>
+        }
+
+        <span class="cov3" title="3">klog.Info("NodeServer Mounting...")
+
+        return s3.MounterUtils.FuseMountWithEnv(target, constants.MountpointS3BinaryPath, args, envVars)</span>
+}
+
+// Unmount unmounts the S3 bucket.
+func (s3 *MountpointS3Mounter) Unmount(target string) error <span class="cov4" title="4">{
+        klog.Info("-MountpointS3Mounter Unmount-")
+
+        if mountWorker </span><span class="cov2" title="2">{
+                klog.Info("Unmount on Worker started...")
+
+                payload := fmt.Sprintf(`{"path":"%s"}`, target)
+
+                err := mounterRequest(payload, "http://unix/api/cos/unmount")
+                if err != nil </span><span class="cov1" title="1">{
+                        klog.Errorf("failed to unmount on worker: %v", err)
+                        return err
+                }</span>
+
+                <span class="cov1" title="1">removeS3ConfigFile(constants.MounterConfigPathOnHost, target)
+                return nil</span>
+        }
+
+        <span class="cov2" title="2">klog.Info("NodeServer Unmounting...")
+        err := s3.MounterUtils.FuseUnmount(target)
+        if err != nil </span><span class="cov1" title="1">{
+                return err
+        }</span>
+
+        <span class="cov1" title="1">removeS3ConfigFile(constants.MounterConfigPathOnPodS3Mount, target)
+        return nil</span>
+}
+
+// createS3MountConfig creates the AWS credentials and config files.
+func createS3MountConfig(configPathWithVolID string, s3 *MountpointS3Mounter) error <span class="cov6" title="10">{
+        if err := MakeDir(configPathWithVolID, 0755); err != nil </span><span class="cov2" title="2">{ // #nosec G301 -- config directory needs to be readable by mount-s3 process
+                klog.Errorf("MountpointS3Mounter: Cannot create config dir %s: %v", configPathWithVolID, err)
+                return err
+        }</span>
+
+        <span class="cov6" title="8">credFile := path.Join(configPathWithVolID, s3MountCredentialsFile)
+        credParams := []string{
+                "[" + s3MountAwsProfile + "]",
+                "aws_access_key_id = " + s3.AccessKey,
+                "aws_secret_access_key = " + s3.SecretKey,
+        }
+        if err := writeConfigFile(credFile, credParams); err != nil </span><span class="cov2" title="2">{
+                klog.Errorf("MountpointS3Mounter: Cannot write credentials file: %v", err)
+                return err
+        }</span>
+
+        <span class="cov5" title="6">region := s3.LocConstraint
+        configParams := []string{
+                "[" + s3MountAwsProfile + "]",
+                "region = " + region,
+        }
+        if s3.EndPoint != "" </span><span class="cov4" title="4">{
+                configParams = append(configParams, "endpoint_url = "+s3.EndPoint)
+        }</span>
+        <span class="cov5" title="6">cfgFile := path.Join(configPathWithVolID, s3MountConfigFile)
+        if err := writeConfigFile(cfgFile, configParams); err != nil </span><span class="cov0" title="0">{
+                klog.Errorf("MountpointS3Mounter: Cannot write config file: %v", err)
+                return err
+        }</span>
+
+        <span class="cov5" title="6">klog.Infof("MountpointS3Mounter: Created config files at %s", configPathWithVolID)
+        return nil</span>
+}
+
+// writeConfigFile writes lines to a file with 0600 permissions.
+func writeConfigFile(filePath string, lines []string) error <span class="cov7" title="14">{
+        f, err := OpenFile(filePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600) // #nosec G304 -- file path is constructed from controlled configPathWithVolID and constant filename
+        if err != nil </span><span class="cov2" title="2">{
+                return fmt.Errorf("cannot create file %s: %w", filePath, err)
+        }</span>
+        <span class="cov7" title="12">defer func() </span><span class="cov7" title="12">{
+                if cerr := f.Close(); cerr != nil </span><span class="cov0" title="0">{
+                        klog.Errorf("writeConfigFile: cannot close file %s: %v", filePath, cerr)
+                }</span>
+        }()
+
+        <span class="cov7" title="12">w := bufio.NewWriter(f)
+        for _, line := range lines </span><span class="cov10" title="34">{
+                if _, err := w.WriteString(line + "\n"); err != nil </span><span class="cov0" title="0">{
+                        return fmt.Errorf("cannot write to file %s: %w", filePath, err)
+                }</span>
+        }
+        <span class="cov7" title="12">return w.Flush()</span>
+}
+
+// formulateMountOptions builds the CLI args, env vars, and worker payload for mount-s3.
+func (s3 *MountpointS3Mounter) formulateMountOptions(bucket, target, configPathWithVolID string) (nodeServerOp []string, envVars []string, workerNodeOp s3MounterArgs) <span class="cov6" title="10">{
+        nodeServerOp = []string{bucket, target, "--allow-other"}
+
+        credFilePath := path.Join(configPathWithVolID, s3MountCredentialsFile)
+        cfgFilePath := path.Join(configPathWithVolID, s3MountConfigFile)
+        envVars = []string{
+                "AWS_SHARED_CREDENTIALS_FILE=" + credFilePath,
+                "AWS_CONFIG_FILE=" + cfgFilePath,
+        }
+
+        workerNodeOp = s3MounterArgs{
+                AllowOther:         "true",
+                AwsCredentialsFile: credFilePath,
+                AwsConfigFile:      cfgFilePath,
+        }
+
+        if s3.EndPoint != "" </span><span class="cov4" title="4">{
+                nodeServerOp = append(nodeServerOp, "--endpoint-url="+s3.EndPoint)
+                workerNodeOp.EndpointURL = s3.EndPoint
+        }</span>
+        <span class="cov6" title="10">if s3.LocConstraint != "" </span><span class="cov4" title="4">{
+                nodeServerOp = append(nodeServerOp, "--region="+s3.LocConstraint)
+                workerNodeOp.Region = s3.LocConstraint
+        }</span>
+        <span class="cov6" title="10">if s3.UID != "" </span><span class="cov2" title="2">{
+                nodeServerOp = append(nodeServerOp, "--uid="+s3.UID)
+                workerNodeOp.UID = s3.UID
+        }</span>
+        <span class="cov6" title="10">if s3.GID != "" </span><span class="cov2" title="2">{
+                nodeServerOp = append(nodeServerOp, "--gid="+s3.GID)
+                workerNodeOp.GID = s3.GID
+        }</span>
+
+        <span class="cov6" title="10">switch s3.LogLevel </span>{
+        case "debug":<span class="cov2" title="2">
+                nodeServerOp = append(nodeServerOp, "--debug")
+                workerNodeOp.LogLevel = "debug"</span>
+        case "debug-crt":<span class="cov1" title="1">
+                nodeServerOp = append(nodeServerOp, "--debug-crt")
+                workerNodeOp.LogLevel = "debug-crt"</span>
+        case "no-log":<span class="cov1" title="1">
+                nodeServerOp = append(nodeServerOp, "--no-log")
+                workerNodeOp.LogLevel = "no-log"</span>
+        default:<span class="cov5" title="6">
+                if s3.LogLevel != "" </span><span class="cov1" title="1">{
+                        klog.Warningf("MountpointS3Mounter: unsupported log-level %q. "+
+                                "Supported: 'debug', 'debug-crt', 'no-log'. Ignoring.", s3.LogLevel)
+                }</span>
+        }
+
+        // log-directory is hardcoded — always passed, never user-configurable.
+        <span class="cov6" title="10">nodeServerOp = append(nodeServerOp, "--log-directory="+s3MountLogDirectory)
+        workerNodeOp.LogDirectory = s3MountLogDirectory
+
+        if s3.CacheDir != "" </span><span class="cov1" title="1">{
+                nodeServerOp = append(nodeServerOp, "--cache="+s3.CacheDir)
+                workerNodeOp.CacheDir = s3.CacheDir
+        }</span>
+
+        // force-path-style is hardcoded — required for IBM COS compatibility.
+        <span class="cov6" title="10">nodeServerOp = append(nodeServerOp, "--force-path-style")
+        workerNodeOp.ForcePathStyle = "true"
+
+        // allow-delete and allow-overwrite are hardcoded defaults, suppressed when read-only.
+        if s3.AllowDelete </span><span class="cov0" title="0">{
+                nodeServerOp = append(nodeServerOp, "--allow-delete")
+                workerNodeOp.AllowDelete = "true"
+        }</span>
+        <span class="cov6" title="10">if s3.AllowOverwrite </span><span class="cov0" title="0">{
+                nodeServerOp = append(nodeServerOp, "--allow-overwrite")
+                workerNodeOp.AllowOverwrite = "true"
+        }</span>
+        <span class="cov6" title="10">if s3.IncrementalUpload </span><span class="cov0" title="0">{
+                nodeServerOp = append(nodeServerOp, "--incremental-upload")
+                workerNodeOp.IncrementalUpload = "true"
+        }</span>
+        <span class="cov6" title="10">if s3.ReadOnly </span><span class="cov3" title="3">{
+                nodeServerOp = append(nodeServerOp, "--read-only")
+                workerNodeOp.ReadOnly = "true"
+        }</span>
+
+        // Passthrough — deduplicated so secret wins over SC.
+        // Set on BOTH paths so the worker daemon receives them too.
+        <span class="cov6" title="10">nodeServerOp = append(nodeServerOp, s3.MountOptions...)
+        workerNodeOp.Args = s3.MountOptions
+
+        klog.Infof("MountpointS3 nodeServerOp: %v", nodeServerOp)
+        klog.Infof("MountpointS3 workerNodeOp: %+v", workerNodeOp)
+
+        return nodeServerOp, envVars, workerNodeOp</span>
+}
+
+// removeS3MountConfigFile removes the config directory for the given volume target.
+func removeS3MountConfigFile(configPath, target string) <span class="cov4" title="4">{
+        configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
+
+        for retry := 1; retry &lt;= maxRetries; retry++ </span><span class="cov6" title="8">{
+                _, err := Stat(configPathWithVolID)
+                if err != nil </span><span class="cov2" title="2">{
+                        if os.IsNotExist(err) </span><span class="cov1" title="1">{
+                                klog.Infof("removeS3MountConfigFile: Config dir does not exist: %s", configPathWithVolID)
+                                return
+                        }</span>
+                        <span class="cov1" title="1">klog.Errorf("removeS3MountConfigFile: Attempt %d - Failed to stat path %s: %v", retry, configPathWithVolID, err)
+                        time.Sleep(constants.Interval)
+                        continue</span>
+                }
+                <span class="cov5" title="6">if err = RemoveAll(configPathWithVolID); err != nil </span><span class="cov4" title="4">{
+                        klog.Errorf("removeS3MountConfigFile: Attempt %d - Failed to remove config dir %s: %v", retry, configPathWithVolID, err)
+                        time.Sleep(constants.Interval)
+                        continue</span>
+                }
+                <span class="cov2" title="2">klog.Infof("removeS3MountConfigFile: Successfully removed config dir: %s", configPathWithVolID)
+                return</span>
+        }
+        <span class="cov1" title="1">klog.Errorf("removeS3MountConfigFile: Failed to remove config dir after %d attempts", maxRetries)</span>
+}
+</pre>
+		
+		<pre class="file" id="file13" style="display: none">/*******************************************************************************
  * IBM Confidential
  * OCO Source Materials
  * IBM Cloud Kubernetes Service, 5737-D43
@@ -3854,7 +4439,7 @@ func removeRcloneConfigFile(configPath, target string) <span class="cov3" title=
 }
 </pre>
 		
-		<pre class="file" id="file13" style="display: none">/*******************************************************************************
+		<pre class="file" id="file14" style="display: none">/*******************************************************************************
  * IBM Confidential
  * OCO Source Materials
  * IBM Cloud Kubernetes Service, 5737-D43
@@ -4339,591 +4924,6 @@ func removeS3FSCredFile(credDir, target string) <span class="cov4" title="4">{
                 return</span>
         }
         <span class="cov1" title="1">klog.Errorf("removeS3FSCredFile: Failed to remove password file after %d attempts", maxRetries)</span>
-}
-</pre>
-		
-		<pre class="file" id="file14" style="display: none">// Package mounter
-package mounter
-
-import (
-        "bufio"
-        "crypto/sha256"
-        "encoding/json"
-        "fmt"
-        "os"
-        "path"
-        "strings"
-        "time"
-
-        "github.com/IBM/ibm-object-csi-driver/pkg/constants"
-        "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
-        "k8s.io/klog/v2"
-)
-
-// MountpointS3Mounter implements Mounter for AWS Mountpoint S3.
-type MountpointS3Mounter struct {
-        BucketName    string
-        ObjectPath    string
-        EndPoint      string
-        LocConstraint string
-        AuthType      string
-        AccessKey     string
-        SecretKey     string
-
-        UID string
-        GID string
-
-        LogLevel     string
-        LogDirectory string
-        CacheDir     string
-
-        ReadOnly          bool
-        AllowDelete       bool
-        AllowOverwrite    bool
-        IncrementalUpload bool
-
-        // MountOptions holds deduplicated passthrough flags.
-        // SC flags are overridden by secret flags when the same key appears in both.
-        MountOptions []string
-        MounterUtils utils.MounterUtils
-}
-
-const (
-        // s3MountLogDirectory is the hardcoded log directory for mount-s3, matching
-        // the same convention as rclone's hardcoded --log-file=/var/log/rclone.log.
-        s3MountLogDirectory = "/var/log/mount-s3"
-)
-
-// s3MounterArgs holds the args sent to the worker node daemon for mount-s3.
-// This struct must stay in sync with s3MounterArgs in the worker (cos-csi-mounter).
-type s3MounterArgs struct {
-        AllowOther         string `json:"allow-other,omitempty"`
-        AwsCredentialsFile string `json:"aws-credentials-file,omitempty"`
-        AwsConfigFile      string `json:"aws-config-file,omitempty"`
-
-        EndpointURL string `json:"endpoint-url,omitempty"`
-        Region      string `json:"region,omitempty"`
-
-        UID string `json:"uid,omitempty"`
-        GID string `json:"gid,omitempty"`
-
-        LogLevel     string `json:"log-level,omitempty"`
-        LogDirectory string `json:"log-directory,omitempty"`
-
-        CacheDir string `json:"cache,omitempty"`
-
-        ReadOnly          string `json:"read-only,omitempty"`
-        AllowDelete       string `json:"allow-delete,omitempty"`
-        AllowOverwrite    string `json:"allow-overwrite,omitempty"`
-        IncrementalUpload string `json:"incremental-upload,omitempty"`
-
-        // ForcePathStyle is always true for IBM COS compatibility.
-        ForcePathStyle string `json:"force-path-style,omitempty"`
-
-        // Passthrough flags — user-supplied flags not handled by structured fields.
-        // Secret flags override SC flags when the same key appears in both.
-        Args []string `json:"args,omitempty"`
-}
-
-const (
-        s3MountCredentialsFile = "credentials"
-        s3MountConfigFile      = "config"
-        s3MountAwsProfile      = "default"
-)
-
-var (
-        removeS3ConfigFile = removeS3MountConfigFile
-)
-
-type MountpointS3MounterParams struct {
-        SecretMap    map[string]string
-        MountOptions []string
-        MounterUtils utils.MounterUtils
-        Gid          string
-        ReadOnly     bool
-}
-
-// NewMountpointS3Mounter creates a new MountpointS3Mounter from the unified
-// secret format.
-//
-// Precedence (lowest → highest):
-//  1. secretMap identity keys
-//  2. StorageClass mountOptions — parsed first
-//  3. Secret mountOptions — parsed second, wins over SC on any overlapping flag
-//
-// For passthrough flags, deduplication is applied: if the same flag key appears
-// in both SC and secret, the SC entry is dropped and the secret entry is kept.
-func NewMountpointS3Mounter(params MountpointS3MounterParams) Mounter <span class="cov5" title="6">{
-        secretMap := params.SecretMap
-        mountOptions := params.MountOptions
-        mounterUtils := params.MounterUtils
-        gid := params.Gid
-        readOnly := params.ReadOnly
-
-        klog.Info("-newMountpointS3Mounter-")
-
-        mounter := &amp;MountpointS3Mounter{}
-
-        if val, ok := secretMap["accessKey"]; ok </span><span class="cov4" title="4">{
-                mounter.AccessKey = val
-        }</span>
-        <span class="cov5" title="6">if val, ok := secretMap["secretKey"]; ok </span><span class="cov4" title="4">{
-                mounter.SecretKey = val
-        }</span>
-        <span class="cov5" title="6">if val, ok := secretMap["bucketName"]; ok </span><span class="cov4" title="4">{
-                mounter.BucketName = val
-        }</span>
-        <span class="cov5" title="6">if val, ok := secretMap["objectPath"]; ok </span><span class="cov2" title="2">{
-                mounter.ObjectPath = val
-        }</span>
-        <span class="cov5" title="6">if val, ok := secretMap["cosEndpoint"]; ok </span><span class="cov2" title="2">{
-                mounter.EndPoint = val
-        }</span>
-        <span class="cov5" title="6">if val, ok := secretMap["locationConstraint"]; ok </span><span class="cov2" title="2">{
-                mounter.LocConstraint = val
-        }</span>
-
-        <span class="cov5" title="6">if gid != "" &amp;&amp; secretMap["uid"] == "" </span><span class="cov1" title="1">{
-                mounter.UID = gid
-        }</span> else<span class="cov5" title="5"> if val := secretMap["uid"]; val != "" </span><span class="cov3" title="3">{
-                mounter.UID = val
-        }</span>
-        <span class="cov5" title="6">if val := secretMap["gid"]; val != "" </span><span class="cov1" title="1">{
-                mounter.GID = val
-        }</span> else<span class="cov5" title="5"> {
-                mounter.GID = gid
-        }</span>
-
-        <span class="cov5" title="6">mounter.ReadOnly = readOnly
-
-        mounter.AuthType = "hmac"
-
-        // Step 1: parse SC options.
-        scRemainder := parseMountpointS3Options(mounter, mountOptions)
-
-        // Step 2: parse secret options (structured fields set by secret override SC).
-        secretOpts := splitSecretMountOptions(secretMap["mountOptions"])
-        secretRemainder := parseMountpointS3Options(mounter, secretOpts)
-
-        // Step 3: deduplicate passthroughs — secret wins over SC on same key.
-        mounter.MountOptions = deduplicatePassthrough(scRemainder, secretRemainder)
-
-        // Step 4: Block incremental-upload flag (causes data loss with IBM COS).
-        // This flag uses multiple PutObject calls that overwrite each other instead of
-        // using proper multipart upload, resulting in ~75% data loss.
-        if mounter.IncrementalUpload </span><span class="cov1" title="1">{
-                klog.Info("mount-s3: --incremental-upload is not supported ")
-                mounter.IncrementalUpload = false
-        }</span>
-
-        // Step 5: allow-delete and allow-overwrite are hardcoded defaults.
-        // They are suppressed later in Mount() when read-only is set.
-        <span class="cov5" title="6">mounter.AllowDelete = true
-        mounter.AllowOverwrite = true
-
-        mounter.MounterUtils = mounterUtils
-
-        klog.Infof("newMountpointS3Mounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
-                mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType)
-        klog.Infof("newMountpointS3Mounter: SC mountOptions=%v secretMountOptions=%v deduplicated passthrough=%v",
-                mountOptions, secretOpts, mounter.MountOptions)
-
-        return mounter</span>
-}
-
-// deduplicatePassthrough merges SC and secret passthrough flags.
-// If the same flag key appears in both, the SC entry is dropped and the
-// secret entry is kept (secret wins).
-//
-// Examples:
-//
-//        SC:     [--max-threads=32, --maximum-throughput-gbps=10, --allow-delete]
-//        Secret: [--max-threads=128, --maximum-throughput-gbps=25]
-//        Result: [--allow-delete, --max-threads=128, --maximum-throughput-gbps=25]
-func deduplicatePassthrough(scFlags, secretFlags []string) []string <span class="cov7" title="12">{
-        // Build a set of keys present in secret flags.
-        secretKeys := make(map[string]struct{}, len(secretFlags))
-        for _, flag := range secretFlags </span><span class="cov6" title="8">{
-                key := flagKey(flag)
-                secretKeys[key] = struct{}{}
-        }</span>
-
-        // Keep SC flags whose key does NOT appear in secret flags.
-        <span class="cov7" title="12">var result []string
-        for _, flag := range scFlags </span><span class="cov7" title="14">{
-                key := flagKey(flag)
-                if _, overridden := secretKeys[key]; overridden </span><span class="cov5" title="6">{
-                        klog.Infof("deduplicatePassthrough: SC flag %q overridden by secret", flag)
-                }</span> else<span class="cov6" title="8"> {
-                        result = append(result, flag)
-                }</span>
-        }
-
-        // Append all secret flags last.
-        <span class="cov7" title="12">result = append(result, secretFlags...)
-        return result</span>
-}
-
-// flagKey extracts the key portion from a passthrough flag.
-// "--max-threads=128" → "max-threads"
-// "--allow-delete"    → "allow-delete"
-func flagKey(flag string) string <span class="cov9" title="26">{
-        trimmed := strings.TrimPrefix(flag, "--")
-        key, _, _ := strings.Cut(trimmed, "=")
-        return key
-}</span>
-
-// splitSecretMountOptions splits the multiline mountOptions string from the secret.
-func splitSecretMountOptions(raw string) []string <span class="cov7" title="13">{
-        if raw == "" </span><span class="cov4" title="4">{
-                return nil
-        }</span>
-        <span class="cov6" title="9">var opts []string
-        for _, line := range strings.Split(raw, "\n") </span><span class="cov9" title="27">{
-                line = strings.TrimSpace(line)
-                line = strings.TrimRight(line, ",")
-                if line == "" || strings.HasPrefix(line, "#") </span><span class="cov5" title="6">{
-                        continue</span>
-                }
-                <span class="cov8" title="21">opts = append(opts, line)</span>
-        }
-        <span class="cov6" title="9">return opts</span>
-}
-
-// parseMountpointS3Options parses mount-s3 options from the provided slice.
-func parseMountpointS3Options(mounter *MountpointS3Mounter, opts []string) []string <span class="cov8" title="18">{
-        var remaining []string
-
-        for _, opt := range opts </span><span class="cov9" title="28">{
-                trimmed := strings.TrimPrefix(opt, "--")
-                key, value, hasValue := strings.Cut(trimmed, "=")
-
-                switch key </span>{
-                case "allow-other":<span class="cov1" title="1">
-                        klog.Infof("parseMountpointS3Options: 'allow-other' is always enabled and cannot be overridden.")</span>
-                case "umask":<span class="cov0" title="0">
-                        klog.Warningf("parseMountpointS3Options: 'umask' is not supported by mount-s3. " +
-                                "Use --dir-mode / --file-mode instead. Ignoring.")</span>
-                case "uid":<span class="cov3" title="3">
-                        if hasValue </span><span class="cov3" title="3">{
-                                mounter.UID = value
-                        }</span>
-                case "gid":<span class="cov1" title="1">
-                        if hasValue </span><span class="cov1" title="1">{
-                                mounter.GID = value
-                        }</span>
-                case "log-level":<span class="cov2" title="2">
-                        if hasValue </span><span class="cov2" title="2">{
-                                mounter.LogLevel = value
-                        }</span>
-                case "log-directory":<span class="cov1" title="1">
-                        // Hardcoded — user-supplied value is ignored; the struct field is set
-                        // to the fixed path so callers can read it back consistently.
-                        klog.Warningf("parseMountpointS3Options: 'log-directory' is hardcoded to %q and cannot be overridden. Ignoring.", s3MountLogDirectory)
-                        mounter.LogDirectory = s3MountLogDirectory</span>
-                case "force-path-style":<span class="cov0" title="0">
-                        // Hardcoded — always enabled for IBM COS compatibility.
-                        klog.Warningf("parseMountpointS3Options: 'force-path-style' is hardcoded and cannot be overridden. Ignoring.")</span>
-                case "cache":<span class="cov2" title="2">
-                        if hasValue </span><span class="cov2" title="2">{
-                                mounter.CacheDir = value
-                        }</span>
-                case "read-only":<span class="cov1" title="1">
-                        // read-only is now set directly from MounterParams.ReadOnly — ignore if passed via flags.
-                        klog.Warningf("parseMountpointS3Options: 'read-only' is set via MounterParams and cannot be overridden via mount options. Ignoring.")</span>
-                case "allow-delete":<span class="cov1" title="1">
-                        // Hardcoded — always enabled unless read-only. User override ignored.
-                        klog.Warningf("parseMountpointS3Options: 'allow-delete' is hardcoded and cannot be overridden. Ignoring.")</span>
-                case "allow-overwrite":<span class="cov2" title="2">
-                        // Hardcoded — always enabled unless read-only. User override ignored.
-                        klog.Warningf("parseMountpointS3Options: 'allow-overwrite' is hardcoded and cannot be overridden. Ignoring.")</span>
-                case "incremental-upload":<span class="cov2" title="2">
-                        mounter.IncrementalUpload = true</span>
-                default:<span class="cov7" title="12">
-                        if strings.HasPrefix(opt, "--") </span><span class="cov6" title="8">{
-                                remaining = append(remaining, opt)
-                        }</span> else<span class="cov4" title="4"> {
-                                remaining = append(remaining, "--"+opt)
-                        }</span>
-                }
-        }
-
-        <span class="cov8" title="18">return remaining</span>
-}
-
-// Mount mounts the S3 bucket using mountpoint-s3.
-func (s3 *MountpointS3Mounter) Mount(source string, target string) error <span class="cov5" title="7">{
-        klog.Info("-MountpointS3Mounter Mount-")
-        klog.Infof("Mount args:\n\tsource: &lt;%s&gt;\n\ttarget: &lt;%s&gt;", source, target)
-
-        // Read-only priority resolution: suppress write-enabling flags.
-        if s3.ReadOnly </span><span class="cov2" title="2">{
-                if s3.AllowDelete </span><span class="cov1" title="1">{
-                        klog.Infof("MountpointS3Mounter: read-only set — clearing allow-delete")
-                        s3.AllowDelete = false
-                }</span>
-                <span class="cov2" title="2">if s3.AllowOverwrite </span><span class="cov1" title="1">{
-                        klog.Infof("MountpointS3Mounter: read-only set — clearing allow-overwrite")
-                        s3.AllowOverwrite = false
-                }</span>
-        }
-
-        // NOTE: No directory validation or creation here.
-        // LogDirectory and CacheDir are forwarded to the worker via workerNodeOp.
-        // The worker's Validate() calls ensureDir() which creates them if missing.
-
-        <span class="cov5" title="7">var configPath string
-        if mountWorker </span><span class="cov2" title="2">{
-                configPath = constants.MounterConfigPathOnHost
-        }</span> else<span class="cov5" title="5"> {
-                configPath = constants.MounterConfigPathOnPodS3Mount
-        }</span>
-
-        <span class="cov5" title="7">configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
-
-        if err := createS3MountConfig(configPathWithVolID, s3); err != nil </span><span class="cov2" title="2">{
-                klog.Errorf("MountpointS3Mounter Mount: Cannot create config file: %v", err)
-                return err
-        }</span>
-
-        <span class="cov5" title="5">bucketName := s3.BucketName
-        if s3.ObjectPath != "" </span><span class="cov1" title="1">{
-                trimmedPath := strings.TrimPrefix(s3.ObjectPath, "/")
-                bucketName = fmt.Sprintf("%s/%s", s3.BucketName, trimmedPath)
-        }</span>
-
-        <span class="cov5" title="5">args, envVars, wnOp := s3.formulateMountOptions(bucketName, target, configPathWithVolID)
-
-        if mountWorker </span><span class="cov2" title="2">{
-                klog.Info("Mount on Worker started...")
-
-                jsonData, err := json.Marshal(wnOp)
-                if err != nil </span><span class="cov0" title="0">{
-                        klog.Errorf("Error marshalling mount args: %v", err)
-                        return err
-                }</span>
-
-                <span class="cov2" title="2">payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`,
-                        target, bucketName, constants.AMAZONS3MOUNTER, jsonData)
-
-                klog.Infof("MountpointS3Mounter: worker payload: %s", payload)
-
-                err = mounterRequest(payload, "http://unix/api/cos/mount")
-                if err != nil </span><span class="cov1" title="1">{
-                        klog.Errorf("failed to mount on worker: %v", err)
-                        return err
-                }</span>
-                <span class="cov1" title="1">return nil</span>
-        }
-
-        <span class="cov3" title="3">klog.Info("NodeServer Mounting...")
-
-        return s3.MounterUtils.FuseMountWithEnv(target, constants.MountpointS3BinaryPath, args, envVars)</span>
-}
-
-// Unmount unmounts the S3 bucket.
-func (s3 *MountpointS3Mounter) Unmount(target string) error <span class="cov4" title="4">{
-        klog.Info("-MountpointS3Mounter Unmount-")
-
-        if mountWorker </span><span class="cov2" title="2">{
-                klog.Info("Unmount on Worker started...")
-
-                payload := fmt.Sprintf(`{"path":"%s"}`, target)
-
-                err := mounterRequest(payload, "http://unix/api/cos/unmount")
-                if err != nil </span><span class="cov1" title="1">{
-                        klog.Errorf("failed to unmount on worker: %v", err)
-                        return err
-                }</span>
-
-                <span class="cov1" title="1">removeS3ConfigFile(constants.MounterConfigPathOnHost, target)
-                return nil</span>
-        }
-
-        <span class="cov2" title="2">klog.Info("NodeServer Unmounting...")
-        err := s3.MounterUtils.FuseUnmount(target)
-        if err != nil </span><span class="cov1" title="1">{
-                return err
-        }</span>
-
-        <span class="cov1" title="1">removeS3ConfigFile(constants.MounterConfigPathOnPodS3Mount, target)
-        return nil</span>
-}
-
-// createS3MountConfig creates the AWS credentials and config files.
-func createS3MountConfig(configPathWithVolID string, s3 *MountpointS3Mounter) error <span class="cov6" title="10">{
-        if err := MakeDir(configPathWithVolID, 0755); err != nil </span><span class="cov2" title="2">{ // #nosec G301 -- config directory needs to be readable by mount-s3 process
-                klog.Errorf("MountpointS3Mounter: Cannot create config dir %s: %v", configPathWithVolID, err)
-                return err
-        }</span>
-
-        <span class="cov6" title="8">credFile := path.Join(configPathWithVolID, s3MountCredentialsFile)
-        credParams := []string{
-                "[" + s3MountAwsProfile + "]",
-                "aws_access_key_id = " + s3.AccessKey,
-                "aws_secret_access_key = " + s3.SecretKey,
-        }
-        if err := writeConfigFile(credFile, credParams); err != nil </span><span class="cov2" title="2">{
-                klog.Errorf("MountpointS3Mounter: Cannot write credentials file: %v", err)
-                return err
-        }</span>
-
-        <span class="cov5" title="6">region := s3.LocConstraint
-        configParams := []string{
-                "[" + s3MountAwsProfile + "]",
-                "region = " + region,
-        }
-        if s3.EndPoint != "" </span><span class="cov4" title="4">{
-                configParams = append(configParams, "endpoint_url = "+s3.EndPoint)
-        }</span>
-        <span class="cov5" title="6">cfgFile := path.Join(configPathWithVolID, s3MountConfigFile)
-        if err := writeConfigFile(cfgFile, configParams); err != nil </span><span class="cov0" title="0">{
-                klog.Errorf("MountpointS3Mounter: Cannot write config file: %v", err)
-                return err
-        }</span>
-
-        <span class="cov5" title="6">klog.Infof("MountpointS3Mounter: Created config files at %s", configPathWithVolID)
-        return nil</span>
-}
-
-// writeConfigFile writes lines to a file with 0600 permissions.
-func writeConfigFile(filePath string, lines []string) error <span class="cov7" title="14">{
-        f, err := OpenFile(filePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600) // #nosec G304 -- file path is constructed from controlled configPathWithVolID and constant filename
-        if err != nil </span><span class="cov2" title="2">{
-                return fmt.Errorf("cannot create file %s: %w", filePath, err)
-        }</span>
-        <span class="cov7" title="12">defer func() </span><span class="cov7" title="12">{
-                if cerr := f.Close(); cerr != nil </span><span class="cov0" title="0">{
-                        klog.Errorf("writeConfigFile: cannot close file %s: %v", filePath, cerr)
-                }</span>
-        }()
-
-        <span class="cov7" title="12">w := bufio.NewWriter(f)
-        for _, line := range lines </span><span class="cov10" title="34">{
-                if _, err := w.WriteString(line + "\n"); err != nil </span><span class="cov0" title="0">{
-                        return fmt.Errorf("cannot write to file %s: %w", filePath, err)
-                }</span>
-        }
-        <span class="cov7" title="12">return w.Flush()</span>
-}
-
-// formulateMountOptions builds the CLI args, env vars, and worker payload for mount-s3.
-func (s3 *MountpointS3Mounter) formulateMountOptions(bucket, target, configPathWithVolID string) (nodeServerOp []string, envVars []string, workerNodeOp s3MounterArgs) <span class="cov6" title="10">{
-        nodeServerOp = []string{bucket, target, "--allow-other"}
-
-        credFilePath := path.Join(configPathWithVolID, s3MountCredentialsFile)
-        cfgFilePath := path.Join(configPathWithVolID, s3MountConfigFile)
-        envVars = []string{
-                "AWS_SHARED_CREDENTIALS_FILE=" + credFilePath,
-                "AWS_CONFIG_FILE=" + cfgFilePath,
-        }
-
-        workerNodeOp = s3MounterArgs{
-                AllowOther:         "true",
-                AwsCredentialsFile: credFilePath,
-                AwsConfigFile:      cfgFilePath,
-        }
-
-        if s3.EndPoint != "" </span><span class="cov4" title="4">{
-                nodeServerOp = append(nodeServerOp, "--endpoint-url="+s3.EndPoint)
-                workerNodeOp.EndpointURL = s3.EndPoint
-        }</span>
-        <span class="cov6" title="10">if s3.LocConstraint != "" </span><span class="cov4" title="4">{
-                nodeServerOp = append(nodeServerOp, "--region="+s3.LocConstraint)
-                workerNodeOp.Region = s3.LocConstraint
-        }</span>
-        <span class="cov6" title="10">if s3.UID != "" </span><span class="cov2" title="2">{
-                nodeServerOp = append(nodeServerOp, "--uid="+s3.UID)
-                workerNodeOp.UID = s3.UID
-        }</span>
-        <span class="cov6" title="10">if s3.GID != "" </span><span class="cov2" title="2">{
-                nodeServerOp = append(nodeServerOp, "--gid="+s3.GID)
-                workerNodeOp.GID = s3.GID
-        }</span>
-
-        <span class="cov6" title="10">switch s3.LogLevel </span>{
-        case "debug":<span class="cov2" title="2">
-                nodeServerOp = append(nodeServerOp, "--debug")
-                workerNodeOp.LogLevel = "debug"</span>
-        case "debug-crt":<span class="cov1" title="1">
-                nodeServerOp = append(nodeServerOp, "--debug-crt")
-                workerNodeOp.LogLevel = "debug-crt"</span>
-        case "no-log":<span class="cov1" title="1">
-                nodeServerOp = append(nodeServerOp, "--no-log")
-                workerNodeOp.LogLevel = "no-log"</span>
-        default:<span class="cov5" title="6">
-                if s3.LogLevel != "" </span><span class="cov1" title="1">{
-                        klog.Warningf("MountpointS3Mounter: unsupported log-level %q. "+
-                                "Supported: 'debug', 'debug-crt', 'no-log'. Ignoring.", s3.LogLevel)
-                }</span>
-        }
-
-        // log-directory is hardcoded — always passed, never user-configurable.
-        <span class="cov6" title="10">nodeServerOp = append(nodeServerOp, "--log-directory="+s3MountLogDirectory)
-        workerNodeOp.LogDirectory = s3MountLogDirectory
-
-        if s3.CacheDir != "" </span><span class="cov1" title="1">{
-                nodeServerOp = append(nodeServerOp, "--cache="+s3.CacheDir)
-                workerNodeOp.CacheDir = s3.CacheDir
-        }</span>
-
-        // force-path-style is hardcoded — required for IBM COS compatibility.
-        <span class="cov6" title="10">nodeServerOp = append(nodeServerOp, "--force-path-style")
-        workerNodeOp.ForcePathStyle = "true"
-
-        // allow-delete and allow-overwrite are hardcoded defaults, suppressed when read-only.
-        if s3.AllowDelete </span><span class="cov0" title="0">{
-                nodeServerOp = append(nodeServerOp, "--allow-delete")
-                workerNodeOp.AllowDelete = "true"
-        }</span>
-        <span class="cov6" title="10">if s3.AllowOverwrite </span><span class="cov0" title="0">{
-                nodeServerOp = append(nodeServerOp, "--allow-overwrite")
-                workerNodeOp.AllowOverwrite = "true"
-        }</span>
-        <span class="cov6" title="10">if s3.IncrementalUpload </span><span class="cov0" title="0">{
-                nodeServerOp = append(nodeServerOp, "--incremental-upload")
-                workerNodeOp.IncrementalUpload = "true"
-        }</span>
-        <span class="cov6" title="10">if s3.ReadOnly </span><span class="cov3" title="3">{
-                nodeServerOp = append(nodeServerOp, "--read-only")
-                workerNodeOp.ReadOnly = "true"
-        }</span>
-
-        // Passthrough — deduplicated so secret wins over SC.
-        // Set on BOTH paths so the worker daemon receives them too.
-        <span class="cov6" title="10">nodeServerOp = append(nodeServerOp, s3.MountOptions...)
-        workerNodeOp.Args = s3.MountOptions
-
-        klog.Infof("MountpointS3 nodeServerOp: %v", nodeServerOp)
-        klog.Infof("MountpointS3 workerNodeOp: %+v", workerNodeOp)
-
-        return nodeServerOp, envVars, workerNodeOp</span>
-}
-
-// removeS3MountConfigFile removes the config directory for the given volume target.
-func removeS3MountConfigFile(configPath, target string) <span class="cov4" title="4">{
-        configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
-
-        for retry := 1; retry &lt;= maxRetries; retry++ </span><span class="cov6" title="8">{
-                _, err := Stat(configPathWithVolID)
-                if err != nil </span><span class="cov2" title="2">{
-                        if os.IsNotExist(err) </span><span class="cov1" title="1">{
-                                klog.Infof("removeS3MountConfigFile: Config dir does not exist: %s", configPathWithVolID)
-                                return
-                        }</span>
-                        <span class="cov1" title="1">klog.Errorf("removeS3MountConfigFile: Attempt %d - Failed to stat path %s: %v", retry, configPathWithVolID, err)
-                        time.Sleep(constants.Interval)
-                        continue</span>
-                }
-                <span class="cov5" title="6">if err = RemoveAll(configPathWithVolID); err != nil </span><span class="cov4" title="4">{
-                        klog.Errorf("removeS3MountConfigFile: Attempt %d - Failed to remove config dir %s: %v", retry, configPathWithVolID, err)
-                        time.Sleep(constants.Interval)
-                        continue</span>
-                }
-                <span class="cov2" title="2">klog.Infof("removeS3MountConfigFile: Successfully removed config dir: %s", configPathWithVolID)
-                return</span>
-        }
-        <span class="cov1" title="1">klog.Errorf("removeS3MountConfigFile: Failed to remove config dir after %d attempts", maxRetries)</span>
 }
 </pre>
 		
