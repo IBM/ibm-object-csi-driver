@@ -57,15 +57,15 @@
 				
 				<option value="file0">github.com/IBM/ibm-object-csi-driver/cmd/main.go (54.9%)</option>
 				
-				<option value="file1">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/rclone.go (96.4%)</option>
+				<option value="file1">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/rclone.go (97.4%)</option>
 				
 				<option value="file2">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/s3fs.go (92.3%)</option>
 				
 				<option value="file3">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/s3mounter.go (92.4%)</option>
 				
-				<option value="file4">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/server.go (73.9%)</option>
+				<option value="file4">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/server.go (73.5%)</option>
 				
-				<option value="file5">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/utils.go (91.4%)</option>
+				<option value="file5">github.com/IBM/ibm-object-csi-driver/cos-csi-mounter/server/utils.go (66.9%)</option>
 				
 				<option value="file6">github.com/IBM/ibm-object-csi-driver/pkg/driver/controllerserver.go (92.6%)</option>
 				
@@ -73,19 +73,19 @@
 				
 				<option value="file8">github.com/IBM/ibm-object-csi-driver/pkg/driver/identityserver.go (100.0%)</option>
 				
-				<option value="file9">github.com/IBM/ibm-object-csi-driver/pkg/driver/nodeserver.go (97.0%)</option>
+				<option value="file9">github.com/IBM/ibm-object-csi-driver/pkg/driver/nodeserver.go (96.4%)</option>
 				
 				<option value="file10">github.com/IBM/ibm-object-csi-driver/pkg/driver/s3-driver.go (91.4%)</option>
 				
 				<option value="file11">github.com/IBM/ibm-object-csi-driver/pkg/driver/server.go (69.5%)</option>
 				
-				<option value="file12">github.com/IBM/ibm-object-csi-driver/pkg/mounter/mounter-rclone.go (96.9%)</option>
+				<option value="file12">github.com/IBM/ibm-object-csi-driver/pkg/mounter/mounter-rclone.go (94.9%)</option>
 				
-				<option value="file13">github.com/IBM/ibm-object-csi-driver/pkg/mounter/mounter-s3fs.go (97.1%)</option>
+				<option value="file13">github.com/IBM/ibm-object-csi-driver/pkg/mounter/mounter-s3fs.go (96.2%)</option>
 				
 				<option value="file14">github.com/IBM/ibm-object-csi-driver/pkg/mounter/mounter-s3mounter.go (94.2%)</option>
 				
-				<option value="file15">github.com/IBM/ibm-object-csi-driver/pkg/mounter/mounter.go (22.4%)</option>
+				<option value="file15">github.com/IBM/ibm-object-csi-driver/pkg/mounter/mounter.go (23.4%)</option>
 				
 				<option value="file16">github.com/IBM/ibm-object-csi-driver/pkg/s3client/s3client.go (89.2%)</option>
 				
@@ -299,9 +299,47 @@ func checkCosCsiMounterSocketHealth() error <span class="cov8" title="3">{
 import (
         "encoding/json"
         "fmt"
+        "regexp"
+        "strings"
 
         "go.uber.org/zap"
 )
+
+// rcloneFlagPattern matches a valid rclone CLI flag token:
+//
+//        --flag-name          (boolean flag)
+//        --flag-name=value    (flag with value; value is an opaque string)
+//
+// Flag names must start with a lowercase letter and contain only [a-z0-9-].
+var rcloneFlagPattern = regexp.MustCompile(`^--([a-z][a-z0-9-]*)(?:=(.*))?$`)
+
+// rcloneKnownFlags is the set of flag names already covered by the typed
+// RCloneArgs fields. add-mount-param tokens whose flag name matches one of these
+// are rejected to prevent accidental or malicious override of a validated
+// parameter (e.g. trying to override --config via add-mount-param).
+var rcloneKnownFlags = jsonFieldNames(RCloneArgs{})
+
+// validateAddMountParam validates every comma-separated token in the add-mount-param
+// string. Each token must look like --flag or --flag=value (lowercase rclone
+// flag name format). Tokens whose flag name collides with a known RCloneArgs
+// field are rejected to prevent override attacks.
+func validateAddMountParam(extra string) error <span class="cov7" title="9">{
+        for _, token := range strings.Split(extra, ",") </span><span class="cov8" title="15">{
+                token = strings.TrimSpace(token)
+                if token == "" </span><span class="cov5" title="5">{
+                        continue</span>
+                }
+                <span class="cov7" title="10">m := rcloneFlagPattern.FindStringSubmatch(token)
+                if m == nil </span><span class="cov4" title="3">{
+                        return fmt.Errorf("add-mount-param: invalid token %q: must be --flag or --flag=value with a lowercase flag name", token)
+                }</span>
+                <span class="cov6" title="7">flagName := m[1]
+                if _, reserved := rcloneKnownFlags[flagName]; reserved </span><span class="cov3" title="2">{
+                        return fmt.Errorf("add-mount-param: flag %q is already a known parameter and cannot be set via add-mount-param", flagName)
+                }</span>
+        }
+        <span class="cov5" title="4">return nil</span>
+}
 
 type RCloneArgs struct {
         AllowOther            string `json:"allow-other,omitempty"`
@@ -317,6 +355,7 @@ type RCloneArgs struct {
         GID                   string `json:"gid,omitempty"`
         LogFile               string `json:"log-file,omitempty"`
         LogLevel              string `json:"log-level,omitempty"`
+        MultiThreadCutoff     string `json:"multi-thread-cutoff,omitempty"`
         NoModificationTime    string `json:"no-modtime,omitempty"`
         PollInterval          string `json:"poll-interval,omitempty"`
         ReadOnly              string `json:"read-only,omitempty"`
@@ -337,9 +376,13 @@ type RCloneArgs struct {
         VfsWriteBack          string `json:"vfs-write-back,omitempty"`
         VfsWriteWait          string `json:"vfs-write-wait,omitempty"`
         WriteBackCache        string `json:"write-back-cache,omitempty"`
+        // AddMountParam allows passing additional rclone mount flags not covered by
+        // the fields above, as a comma-separated list of --flag or --flag=value
+        // tokens. Example: "--transfers=4,--checkers=8,--s3-upload-concurrency=16"
+        AddMountParam string `json:"add-mount-param,omitempty"`
 }
 
-func (args RCloneArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, error) <span class="cov3" title="2">{
+func (args RCloneArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, error) <span class="cov6" title="6">{
         // Marshal to JSON
         raw, err := json.Marshal(args)
         if err != nil </span><span class="cov0" title="0">{
@@ -347,27 +390,40 @@ func (args RCloneArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, e
         }</span>
 
         // Unmarshal into map[string]string
-        <span class="cov3" title="2">var m map[string]string
+        <span class="cov6" title="6">var m map[string]string
         if err := json.Unmarshal(raw, &amp;m); err != nil </span><span class="cov0" title="0">{
                 return nil, err
         }</span>
 
-        // Convert to key=value slice
-        <span class="cov3" title="2">result := []string{"mount", bucket, targetPath}
-        for k, v := range m </span><span class="cov1" title="1">{
-                result = append(result, fmt.Sprintf("--%s=%v", k, v)) // --key=value
-        }</span>
+        // Convert to key=value slice, skipping add-mount-param (handled separately below)
+        <span class="cov6" title="6">result := []string{"mount", bucket, targetPath}
+        for k, v := range m </span><span class="cov5" title="5">{
+                if k == "add-mount-param" </span><span class="cov4" title="3">{
+                        continue</span>
+                }
+                <span class="cov3" title="2">result = append(result, fmt.Sprintf("--%s=%v", k, v))</span> // --key=value
+        }
 
-        <span class="cov3" title="2">return result, nil</span> // [mount, bucket, path, --key1=value1, --key2=value2, ...]
+        // Append each validated add-mount-param token as its own argument
+        <span class="cov6" title="6">if args.AddMountParam != "" </span><span class="cov4" title="3">{
+                for _, token := range strings.Split(args.AddMountParam, ",") </span><span class="cov6" title="7">{
+                        token = strings.TrimSpace(token)
+                        if token != "" </span><span class="cov5" title="5">{
+                                result = append(result, token)
+                        }</span>
+                }
+        }
+
+        <span class="cov6" title="6">return result, nil</span> // [mount, bucket, path, --key1=value1, --key2=value2, ..., --extra1=val, ...]
 }
 
-func (args RCloneArgs) Validate(targetPath string) error <span class="cov10" title="15">{
+func (args RCloneArgs) Validate(targetPath string) error <span class="cov10" title="22">{
         if err := pathValidator(targetPath); err != nil </span><span class="cov3" title="2">{
                 return err
         }</span>
 
         // Check if value of allow-other parameter is boolean "true" or "false"
-        <span class="cov9" title="13">if args.AllowOther != "" </span><span class="cov1" title="1">{
+        <span class="cov9" title="20">if args.AllowOther != "" </span><span class="cov1" title="1">{
                 if isBool := isBoolString(args.AllowOther); !isBool </span><span class="cov1" title="1">{
                         logger.Error("cannot convert value of allow-other into boolean", zap.Any("allow-other", args.AllowOther))
                         return fmt.Errorf("cannot convert value of allow-other into boolean: %v", args.AllowOther)
@@ -375,7 +431,7 @@ func (args RCloneArgs) Validate(targetPath string) error <span class="cov10" tit
         }
 
         // Check if value of allow-root parameter is boolean "true" or "false"
-        <span class="cov9" title="12">if args.AllowRoot != "" </span><span class="cov1" title="1">{
+        <span class="cov9" title="19">if args.AllowRoot != "" </span><span class="cov1" title="1">{
                 if isBool := isBoolString(args.AllowRoot); !isBool </span><span class="cov1" title="1">{
                         logger.Error("cannot convert value of allow-root into boolean", zap.Any("allow-root", args.AllowRoot))
                         return fmt.Errorf("cannot convert value of allow-root into boolean: %v", args.AllowRoot)
@@ -383,7 +439,7 @@ func (args RCloneArgs) Validate(targetPath string) error <span class="cov10" tit
         }
 
         // Check if value of async-read parameter is boolean "true" or "false"
-        <span class="cov8" title="11">if args.AsyncRead != "" </span><span class="cov1" title="1">{
+        <span class="cov9" title="18">if args.AsyncRead != "" </span><span class="cov1" title="1">{
                 if isBool := isBoolString(args.AsyncRead); !isBool </span><span class="cov1" title="1">{
                         logger.Error("cannot convert value of async-read into boolean", zap.Any("async-read", args.AsyncRead))
                         return fmt.Errorf("cannot convert value of async-read into boolean: %v", args.AsyncRead)
@@ -391,16 +447,16 @@ func (args RCloneArgs) Validate(targetPath string) error <span class="cov10" tit
         }
 
         // Check if rclone config file exists or not
-        <span class="cov8" title="10">if exists, err := FileExists(args.ConfigPath); err != nil </span><span class="cov1" title="1">{
+        <span class="cov9" title="17">if exists, err := FileExists(args.ConfigPath); err != nil </span><span class="cov1" title="1">{
                 logger.Error("error checking rclone config file existence")
                 return fmt.Errorf("error checking rclone config file existence")
-        }</span> else<span class="cov8" title="9"> if !exists </span><span class="cov1" title="1">{
+        }</span> else<span class="cov9" title="16"> if !exists </span><span class="cov1" title="1">{
                 logger.Error("rclone config file not found")
                 return fmt.Errorf("rclone config file not found")
         }</span>
 
         // Check if value of daemon parameter is boolean "true" or "false"
-        <span class="cov7" title="8">if args.Daemon != "" </span><span class="cov1" title="1">{
+        <span class="cov8" title="15">if args.Daemon != "" </span><span class="cov1" title="1">{
                 if isBool := isBoolString(args.Daemon); !isBool </span><span class="cov1" title="1">{
                         logger.Error("cannot convert value of daemon into boolean", zap.Any("daemon", args.Daemon))
                         return fmt.Errorf("cannot convert value of daemon into boolean: %v", args.Daemon)
@@ -408,7 +464,7 @@ func (args RCloneArgs) Validate(targetPath string) error <span class="cov10" tit
         }
 
         // Check if value of direct-io parameter is boolean "true" or "false"
-        <span class="cov7" title="7">if args.DirectIO != "" </span><span class="cov1" title="1">{
+        <span class="cov8" title="14">if args.DirectIO != "" </span><span class="cov1" title="1">{
                 if isBool := isBoolString(args.DirectIO); !isBool </span><span class="cov1" title="1">{
                         logger.Error("cannot convert value of direct-io into boolean", zap.Any("direct-io", args.DirectIO))
                         return fmt.Errorf("cannot convert value of direct-io into boolean: %v", args.DirectIO)
@@ -416,7 +472,7 @@ func (args RCloneArgs) Validate(targetPath string) error <span class="cov10" tit
         }
 
         // Check if value of no-modtime parameter is boolean "true" or "false"
-        <span class="cov6" title="6">if args.NoModificationTime != "" </span><span class="cov1" title="1">{
+        <span class="cov8" title="13">if args.NoModificationTime != "" </span><span class="cov1" title="1">{
                 if isBool := isBoolString(args.NoModificationTime); !isBool </span><span class="cov1" title="1">{
                         logger.Error("cannot convert value of no-modtime into boolean", zap.Any("no-modtime", args.NoModificationTime))
                         return fmt.Errorf("cannot convert value of no-modtime into boolean: %v", args.NoModificationTime)
@@ -424,7 +480,7 @@ func (args RCloneArgs) Validate(targetPath string) error <span class="cov10" tit
         }
 
         // Check if value of read-only parameter is boolean "true" or "false"
-        <span class="cov6" title="5">if args.ReadOnly != "" </span><span class="cov1" title="1">{
+        <span class="cov8" title="12">if args.ReadOnly != "" </span><span class="cov1" title="1">{
                 if isBool := isBoolString(args.ReadOnly); !isBool </span><span class="cov1" title="1">{
                         logger.Error("cannot convert value of read-only into boolean", zap.Any("read-only", args.ReadOnly))
                         return fmt.Errorf("cannot convert value of read-only into boolean: %v", args.ReadOnly)
@@ -432,7 +488,7 @@ func (args RCloneArgs) Validate(targetPath string) error <span class="cov10" tit
         }
 
         // Check if value of vfs-refresh parameter is boolean "true" or "false"
-        <span class="cov5" title="4">if args.VfsRefresh != "" </span><span class="cov1" title="1">{
+        <span class="cov7" title="11">if args.VfsRefresh != "" </span><span class="cov1" title="1">{
                 if isBool := isBoolString(args.VfsRefresh); !isBool </span><span class="cov1" title="1">{
                         logger.Error("cannot convert value of vfs-refresh into boolean", zap.Any("vfs-refresh", args.VfsRefresh))
                         return fmt.Errorf("cannot convert value of vfs-refresh into boolean: %v", args.VfsRefresh)
@@ -440,14 +496,22 @@ func (args RCloneArgs) Validate(targetPath string) error <span class="cov10" tit
         }
 
         // Check if value of write-back-cache parameter is boolean "true" or "false"
-        <span class="cov4" title="3">if args.WriteBackCache != "" </span><span class="cov1" title="1">{
+        <span class="cov7" title="10">if args.WriteBackCache != "" </span><span class="cov1" title="1">{
                 if isBool := isBoolString(args.WriteBackCache); !isBool </span><span class="cov1" title="1">{
                         logger.Error("cannot convert value of write-back-cache into boolean", zap.Any("write-back-cache", args.WriteBackCache))
                         return fmt.Errorf("cannot convert value of write-back-cache into boolean: %v", args.WriteBackCache)
                 }</span>
         }
 
-        <span class="cov3" title="2">return nil</span>
+        // Validate add-mount-param tokens: format and reserved-name check
+        <span class="cov7" title="9">if args.AddMountParam != "" </span><span class="cov6" title="7">{
+                if err := validateAddMountParam(args.AddMountParam); err != nil </span><span class="cov5" title="5">{
+                        logger.Error("invalid add-mount-param value", zap.Error(err))
+                        return err
+                }</span>
+        }
+
+        <span class="cov5" title="4">return nil</span>
 }
 </pre>
 		
@@ -1061,6 +1125,7 @@ var (
 
 func init() <span class="cov1" title="1">{
         _ = flag.Set("logtostderr", "true") // #nosec G104: Attempt to set flags for logging to stderr only on best-effort basis.Error cannot be usefully handled.
+        gin.SetMode(gin.ReleaseMode)
         logger = setUpLogger()
         defer func() </span><span class="cov1" title="1">{
                 if err := logger.Sync(); err != nil &amp;&amp; !isInvalidSync(err) </span><span class="cov0" title="0">{
@@ -1137,7 +1202,8 @@ func newRouter() *gin.Engine <span class="cov1" title="1">{
         parser := &amp;DefaultMounterArgsParser{}
 
         // Create gin router
-        router := gin.Default()
+        router := gin.New()
+        router.Use(gin.Recovery())
         router.POST("/api/cos/mount", handleCosMount(utils, parser))
         router.POST("/api/cos/unmount", handleCosUnmount(utils))
         return router
@@ -1186,18 +1252,11 @@ func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser)
         return func(c *gin.Context) </span><span class="cov9" title="6">{
                 var request MountRequest
 
-                if err := c.BindJSON(&amp;request); err != nil </span><span class="cov1" title="1">{
-                        logger.Error("invalid request: ", zap.Error(err))
-                        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+                if !decodeNoDuplicateKeys(c, &amp;request) </span><span class="cov1" title="1">{
                         return
                 }</span>
 
-                <span class="cov8" title="5">logger.Info("New mount request with values:",
-                        zap.String("Bucket", request.Bucket),
-                        zap.String("Path", request.Path),
-                        zap.String("Mounter", request.Mounter),
-                        zap.Any("Args", request.Args),
-                )
+                <span class="cov8" title="5">logger.Info("New mount request with values:", zap.String("Bucket", request.Bucket), zap.String("Path", request.Path), zap.String("Mounter", request.Mounter), zap.Any("Args", redactArgsForLog(request.Args)))
 
                 if request.Mounter != constants.S3FS &amp;&amp; request.Mounter != constants.RClone &amp;&amp; request.Mounter != constants.AMAZONS3MOUNTER </span><span class="cov1" title="1">{
                         logger.Error("invalid mounter", zap.Any("mounter", request.Mounter))
@@ -1273,9 +1332,7 @@ func handleCosUnmount(mounter mounterUtils.MounterUtils) gin.HandlerFunc <span c
                         Path string `json:"path"`
                 }
 
-                if err := c.BindJSON(&amp;request); err != nil </span><span class="cov1" title="1">{
-                        logger.Error("invalid request: ", zap.Error(err))
-                        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+                if !decodeNoDuplicateKeys(c, &amp;request) </span><span class="cov1" title="1">{
                         return
                 }</span>
 
@@ -1291,7 +1348,8 @@ func handleCosUnmount(mounter mounterUtils.MounterUtils) gin.HandlerFunc <span c
                 <span class="cov1" title="1">logger.Info("bucket unmount is successful", zap.Any("path", request.Path))
                 c.JSON(http.StatusOK, gin.H{"status": "success"})</span>
         }
-}</pre>
+}
+</pre>
 		
 		<pre class="file" id="file5" style="display: none">package main
 
@@ -1299,11 +1357,16 @@ import (
         "bytes"
         "encoding/json"
         "fmt"
+        "io"
+        "net/http"
         "os"
         "path/filepath"
+        "reflect"
         "strings"
 
         "github.com/IBM/ibm-object-csi-driver/pkg/constants"
+        "github.com/gin-gonic/gin"
+        "go.uber.org/zap"
 )
 
 // MountRequest ...
@@ -1315,8 +1378,8 @@ type MountRequest struct {
 }
 
 var (
-        // Directories where bucket can be mounted
-        safeMountDirs = []string{"/var/data/kubelet/pods", "/var/lib/kubelet/pods"}
+        // Directories where bucket can be mounted.
+        safeMountDirs = []string{"/var/data/kubelet/pods/", "/var/lib/kubelet/pods/"}
         // Directories where s3fs/rclone configuration files need to be present
         safeMounterConfigDir = "/var/lib/coscsi-config"
 
@@ -1340,15 +1403,144 @@ func strictDecodeForUnknownFields(data json.RawMessage, v interface{}) error <sp
         return dec.Decode(v)
 }</span>
 
-func pathValidator(targetPath string) error <span class="cov10" title="63">{
+// jsonFieldNames returns the exact JSON key names declared on the struct
+// that v points to.
+func jsonFieldNames(v interface{}) map[string]struct{} <span class="cov5" title="8">{
+        t := reflect.TypeOf(v)
+        for t.Kind() == reflect.Pointer </span><span class="cov5" title="7">{
+                t = t.Elem()
+        }</span>
+        <span class="cov5" title="8">names := make(map[string]struct{}, t.NumField())
+        for i := 0; i &lt; t.NumField(); i++ </span><span class="cov9" title="57">{
+                name, _, _ := strings.Cut(t.Field(i).Tag.Get("json"), ",")
+                if name != "" &amp;&amp; name != "-" </span><span class="cov9" title="57">{
+                        names[name] = struct{}{}
+                }</span>
+        }
+        <span class="cov5" title="8">return names</span>
+}
+
+// decodeNoDuplicateKeys reads the request body into v, rejecting any JSON
+// object that contains the same key more than once at the top level.
+// encoding/json matches keys to struct fields case-insensitively (including
+// Unicode folds such as "arg\u017f" == "args"), which would let a
+// case-variant key silently collide with a real one. To avoid that, every
+// top-level key must exactly match a json tag on v; duplicates are then
+// detected with a plain exact-string comparison. It also applies
+// DisallowUnknownFields and rejects any data trailing the JSON object.
+// On error it writes the appropriate 400 response and returns false.
+func decodeNoDuplicateKeys(c *gin.Context, v interface{}) bool <span class="cov5" title="9">{
+        body, err := io.ReadAll(c.Request.Body)
+        if err != nil </span><span class="cov0" title="0">{
+                logger.Error("failed to read request body", zap.Error(err))
+                c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read request body"})
+                return false
+        }</span>
+
+        // First pass: detect duplicate top-level keys using the token stream.
+        <span class="cov5" title="9">dec := json.NewDecoder(bytes.NewReader(body))
+        // Consume opening '{'.
+        if tok, err := dec.Token(); err != nil || tok != json.Delim('{') </span><span class="cov2" title="2">{
+                logger.Error("invalid request body: expected JSON object", zap.Error(err))
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: expected JSON object"})
+                return false
+        }</span>
+        <span class="cov5" title="7">allowed := jsonFieldNames(v)
+        seen := make(map[string]struct{})
+        for dec.More() </span><span class="cov7" title="21">{
+                keyTok, err := dec.Token()
+                if err != nil </span><span class="cov0" title="0">{
+                        logger.Error("invalid request body: failed to read key", zap.Error(err))
+                        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: malformed JSON"})
+                        return false
+                }</span>
+                <span class="cov7" title="21">key, ok := keyTok.(string)
+                if !ok </span><span class="cov0" title="0">{
+                        logger.Error("invalid request body: non-string key")
+                        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: non-string key"})
+                        return false
+                }</span>
+                <span class="cov7" title="21">if _, ok := allowed[key]; !ok </span><span class="cov0" title="0">{
+                        logger.Error("invalid request body: unknown or non-exact key", zap.String("key", key))
+                        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+                        return false
+                }</span>
+                <span class="cov7" title="21">if _, exists := seen[key]; exists </span><span class="cov0" title="0">{
+                        logger.Error("invalid request body: duplicate key", zap.String("key", key))
+                        c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid request: duplicate key %q", key)})
+                        return false
+                }</span>
+                <span class="cov7" title="21">seen[key] = struct{}{}
+                // Skip the value so the loop advances to the next key.
+                if err := skipJSONValue(dec); err != nil </span><span class="cov0" title="0">{
+                        logger.Error("invalid request body: failed to read value", zap.Error(err))
+                        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: malformed JSON"})
+                        return false
+                }</span>
+        }
+
+        // Second pass: unmarshal with DisallowUnknownFields.
+        <span class="cov5" title="7">dec2 := json.NewDecoder(bytes.NewReader(body))
+        dec2.DisallowUnknownFields()
+        if err := dec2.Decode(v); err != nil </span><span class="cov0" title="0">{
+                logger.Error("invalid request body: decode failed", zap.Error(err))
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+                return false
+        }</span>
+        // Reject trailing data after the JSON object.
+        <span class="cov5" title="7">if _, err := dec2.Token(); err != io.EOF </span><span class="cov0" title="0">{
+                logger.Error("invalid request body: unexpected trailing data")
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+                return false
+        }</span>
+        <span class="cov5" title="7">return true</span>
+}
+
+// skipJSONValue advances the decoder past one complete JSON value
+// (scalar, object, or array) so the caller can move to the next key.
+func skipJSONValue(dec *json.Decoder) error <span class="cov7" title="21">{
+        tok, err := dec.Token()
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov7" title="21">if d, ok := tok.(json.Delim); !ok || (d != '{' &amp;&amp; d != '[') </span><span class="cov6" title="16">{
+                return nil // scalar value
+        }</span>
+        // Composite value: consume tokens until the matching closing delimiter.
+        <span class="cov4" title="5">for depth := 1; depth &gt; 0; </span><span class="cov6" title="13">{
+                tok, err := dec.Token()
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+                <span class="cov6" title="13">if d, ok := tok.(json.Delim); ok </span><span class="cov4" title="5">{
+                        switch d </span>{
+                        case '{', '[':<span class="cov0" title="0">
+                                depth++</span>
+                        case '}', ']':<span class="cov4" title="5">
+                                depth--</span>
+                        }
+                }
+        }
+        <span class="cov4" title="5">return nil</span>
+}
+
+// pathValidator validates that the target path resolves to an absolute path,
+// ends with "/mount", and resides strictly within one of the safe mount directories.
+func pathValidator(targetPath string) error <span class="cov10" title="70">{
         absPath, err := absPathResolver(targetPath)
         if err != nil </span><span class="cov0" title="0">{
                 return fmt.Errorf("failed to resolve absolute mount path: %v", err)
         }</span>
-        <span class="cov10" title="63">if !strings.HasPrefix(absPath, safeMountDirs[0]) &amp;&amp; !strings.HasPrefix(absPath, safeMountDirs[1]) </span><span class="cov4" title="6">{
+        // CSI target paths must end with "/mount"
+        <span class="cov10" title="70">if !strings.HasSuffix(absPath, "/mount") </span><span class="cov4" title="6">{
                 return fmt.Errorf("bad value for target path \"%v\"", targetPath)
         }</span>
-        <span class="cov9" title="57">return nil</span>
+        <span class="cov9" title="64">for _, dir := range safeMountDirs </span><span class="cov9" title="64">{
+                if strings.HasPrefix(absPath, dir) </span><span class="cov9" title="64">{
+                        return nil
+                }</span>
+        }
+        <span class="cov0" title="0">return fmt.Errorf("bad value for target path \"%v\"", targetPath)</span>
 }
 
 // --- Parser for Mounter Arguments ---
@@ -1424,36 +1616,57 @@ func fileExists(path string) (bool, error) <span class="cov3" title="3">{
 // ensureDir creates the directory at path if it doesn't exist.
 // It first resolves the absolute path and verifies it is within safeBase
 // to prevent path-traversal attacks before creating the directory.
-func ensureDir(path, safeBase string) error <span class="cov4" title="6">{
+func ensureDir(path, safeBase string) error <span class="cov0" title="0">{
         absPath, err := absPathResolver(path) // #nosec G304 -- path is validated against safeBase below to prevent traversal
-        if err != nil </span><span class="cov1" title="1">{
+        if err != nil </span><span class="cov0" title="0">{
                 return fmt.Errorf("failed to resolve absolute path: %v", err)
         }</span>
-        <span class="cov4" title="5">if !strings.HasPrefix(absPath, safeBase) </span><span class="cov2" title="2">{
+        <span class="cov0" title="0">if !strings.HasPrefix(absPath, safeBase) </span><span class="cov0" title="0">{
                 return fmt.Errorf("path %v is outside the safe directory", absPath)
         }</span>
 
         // Check if directory already exists
-        <span class="cov3" title="3">info, err := os.Stat(absPath) // #nosec G304 -- absPath is validated against safeBase above
-        if err == nil </span><span class="cov2" title="2">{
+        <span class="cov0" title="0">info, err := os.Stat(absPath) // #nosec G304 -- absPath is validated against safeBase above
+        if err == nil </span><span class="cov0" title="0">{
                 // Path exists, verify it's a directory
-                if !info.IsDir() </span><span class="cov1" title="1">{
+                if !info.IsDir() </span><span class="cov0" title="0">{
                         return fmt.Errorf("path exists but is not a directory: %s", absPath)
                 }</span>
-                <span class="cov1" title="1">return nil</span>
+                <span class="cov0" title="0">return nil</span>
         }
 
         // If error is not "not exist", return it
-        <span class="cov1" title="1">if !os.IsNotExist(err) </span><span class="cov0" title="0">{
+        <span class="cov0" title="0">if !os.IsNotExist(err) </span><span class="cov0" title="0">{
                 return fmt.Errorf("failed to stat directory: %w", err)
         }</span>
 
         // Directory doesn't exist, create it with parent directories
-        <span class="cov1" title="1">if err := os.MkdirAll(absPath, 0750); err != nil </span><span class="cov0" title="0">{ // #nosec G301 -- directory permissions set to 0750 for security
+        <span class="cov0" title="0">if err := os.MkdirAll(absPath, 0750); err != nil </span><span class="cov0" title="0">{ // #nosec G301 -- directory permissions set to 0750 for security
                 return fmt.Errorf("failed to create directory: %w", err)
         }</span>
 
-        <span class="cov1" title="1">return nil</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+// redactArgsForLog returns a copy of the raw Args JSON with the value of
+// "passwd_file" replaced by "xxxxx", leaving all other fields unchanged.
+// If the JSON cannot be parsed, the original raw bytes are returned as-is.
+func redactArgsForLog(raw json.RawMessage) json.RawMessage <span class="cov5" title="9">{
+        if len(raw) == 0 </span><span class="cov1" title="1">{
+                return raw
+        }</span>
+        <span class="cov5" title="8">var m map[string]interface{}
+        if err := json.Unmarshal(raw, &amp;m); err != nil </span><span class="cov3" title="3">{
+                return raw
+        }</span>
+        <span class="cov4" title="5">if _, ok := m["passwd_file"]; ok </span><span class="cov1" title="1">{
+                m["passwd_file"] = "xxxxx"
+        }</span>
+        <span class="cov4" title="5">redacted, err := json.Marshal(m)
+        if err != nil </span><span class="cov0" title="0">{
+                return raw
+        }</span>
+        <span class="cov4" title="5">return redacted</span>
 }
 </pre>
 		
@@ -1642,7 +1855,7 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
                 return nil, status.Error(codes.InvalidArgument, "locationConstraint unknown")
         }</span>
 
-        <span class="cov8" title="13">kpRootKeyCrn = secretMap["kpRootKeyCRN"]
+        <span class="cov8" title="13">kpRootKeyCrn = secretMap[constants.KpRootKeyCRN]
         if kpRootKeyCrn != "" </span><span class="cov6" title="7">{
                 klog.Infof("key protect root key crn provided for bucket creation")
         }</span>
@@ -1977,16 +2190,16 @@ func getObjectStorageCredentialsFromSecret(secretMap map[string]string, iamEP st
                 iamEndpoint = iamEP
         }</span>
 
-        <span class="cov8" title="16">if val, check := secretMap["apiKey"]; check </span><span class="cov7" title="9">{
+        <span class="cov8" title="16">if val, check := secretMap[constants.ApiKey]; check </span><span class="cov7" title="9">{
                 apiKey = val
         }</span>
 
         // Add In Docs APIKEY is require param in secret
         <span class="cov8" title="16">authType = "iam"
-        serviceInstanceID = secretMap["serviceId"]
+        serviceInstanceID = secretMap[constants.ServiceId]
         if serviceInstanceID == "" </span><span class="cov6" title="8">{
-                accessKey = secretMap["accessKey"]
-                secretKey = secretMap["secretKey"]
+                accessKey = secretMap[constants.AccessKey]
+                secretKey = secretMap[constants.SecretKey]
                 if accessKey == "" || secretKey == "" </span><span class="cov2" title="2">{
                         return nil, status.Error(codes.Unauthenticated, "Valid access credentials are not provided in the secret| serviceId/accessKey/secretKey unknown")
                 }</span>
@@ -2023,23 +2236,23 @@ func parseCustomSecret(secret *v1.Secret) map[string]string <span class="cov4" t
                 quotaLimit         string
         )
 
-        if bytesVal, ok := secret.Data["accessKey"]; ok </span><span class="cov4" title="3">{
+        if bytesVal, ok := secret.Data[constants.AccessKey]; ok </span><span class="cov4" title="3">{
                 accessKey = string(bytesVal)
         }</span>
 
-        <span class="cov4" title="3">if bytesVal, ok := secret.Data["secretKey"]; ok </span><span class="cov4" title="3">{
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data[constants.SecretKey]; ok </span><span class="cov4" title="3">{
                 secretKey = string(bytesVal)
         }</span>
 
-        <span class="cov4" title="3">if bytesVal, ok := secret.Data["apiKey"]; ok </span><span class="cov4" title="3">{
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data[constants.ApiKey]; ok </span><span class="cov4" title="3">{
                 apiKey = string(bytesVal)
         }</span>
 
-        <span class="cov4" title="3">if bytesVal, ok := secret.Data["kpRootKeyCRN"]; ok </span><span class="cov4" title="3">{
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data[constants.KpRootKeyCRN]; ok </span><span class="cov4" title="3">{
                 kpRootKeyCrn = string(bytesVal)
         }</span>
 
-        <span class="cov4" title="3">if bytesVal, ok := secret.Data["serviceId"]; ok </span><span class="cov4" title="3">{
+        <span class="cov4" title="3">if bytesVal, ok := secret.Data[constants.ServiceId]; ok </span><span class="cov4" title="3">{
                 serviceInstanceID = string(bytesVal)
         }</span>
 
@@ -2074,11 +2287,11 @@ func parseCustomSecret(secret *v1.Secret) map[string]string <span class="cov4" t
                 quotaLimit = string(bytesVal)
         }</span>
 
-        <span class="cov4" title="3">secretMapCustom["accessKey"] = accessKey
-        secretMapCustom["secretKey"] = secretKey
-        secretMapCustom["apiKey"] = apiKey
-        secretMapCustom["kpRootKeyCRN"] = kpRootKeyCrn
-        secretMapCustom["serviceId"] = serviceInstanceID
+        <span class="cov4" title="3">secretMapCustom[constants.AccessKey] = accessKey
+        secretMapCustom[constants.SecretKey] = secretKey
+        secretMapCustom[constants.ApiKey] = apiKey
+        secretMapCustom[constants.KpRootKeyCRN] = kpRootKeyCrn
+        secretMapCustom[constants.ServiceId] = serviceInstanceID
         secretMapCustom["bucketName"] = bucketName
         secretMapCustom["iamEndpoint"] = iamEndpoint
         secretMapCustom["cosEndpoint"] = cosEndpoint
@@ -2353,7 +2566,11 @@ type NodeServerConfig struct {
 }
 
 func (ns *nodeServer) NodeStageVolume(_ context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) <span class="cov3" title="3">{
-        klog.V(2).Infof("CSINodeServer-NodeStageVolume: Request %+v", req)
+        modifiedRequest, err := utils.ReplaceAndReturnCopy(req)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Error in modifying requests %v", err))
+        }</span>
+        <span class="cov3" title="3">klog.V(2).Infof("CSINodeServer-NodeStageVolume: Request %+v", modifiedRequest.(*csi.NodeStageVolumeRequest))
 
         volumeID := req.GetVolumeId()
         if len(volumeID) == 0 </span><span class="cov1" title="1">{
@@ -2440,11 +2657,11 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
         klog.V(2).Infof("-NodePublishVolume-: length of req.GetSecrets() length: %v", len(secretMap))
         secretMapCopy := make(map[string]string)
         for k, v := range secretMap </span><span class="cov10" title="29">{
-                if k == "accessKey" || k == "secretKey" || k == "apiKey" || k == "kpRootKeyCRN" </span><span class="cov8" title="14">{
+                if k == constants.AccessKey || k == constants.SecretKey || k == constants.ApiKey || k == constants.KpRootKeyCRN || k == constants.ServiceId || k == constants.ResourceConfigApiKey </span><span class="cov8" title="16">{
                         secretMapCopy[k] = "xxxxxxx"
                         continue</span>
                 }
-                <span class="cov8" title="15">secretMapCopy[k] = v</span>
+                <span class="cov7" title="13">secretMapCopy[k] = v</span>
         }
         <span class="cov5" title="5">klog.V(2).Infof("-NodePublishVolume-: secretMap: %v", secretMapCopy)
 
@@ -2496,7 +2713,7 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 
         klog.Info("-NodePublishVolume-: Mount")
         if err = mounterObj.Mount("", targetPath); err != nil </span><span class="cov1" title="1">{
-                klog.Info("-Mount-: Error: ", err)
+                klog.Error("-Mount-: failed with error", err)
                 return nil, err
         }</span>
 
@@ -3060,6 +3277,7 @@ import (
         "fmt"
         "os"
         "path"
+        "regexp"
         "strings"
         "time"
 
@@ -3099,6 +3317,52 @@ var (
         removeConfigFile = removeRcloneConfigFile
 )
 
+// rcloneServerKnownFlags is the set of flag names that correspond to typed
+// fields on the cos-csi-mounter server's RCloneArgs struct (i.e. the json tags
+// without the "add-mount-param" transport key itself). Any CLI flag whose name is
+// in this set is sent as its own key in the worker-node JSON payload.
+// All other CLI flags are accumulated into the "add-mount-param" transport key so
+// the server's strict JSON decoder does not reject them.
+//
+// This list must stay in sync with the json tags of RCloneArgs in
+// cos-csi-mounter/server/rclone.go.
+var rcloneServerKnownFlags = map[string]struct{}{
+        "allow-other":               {},
+        "allow-root":                {},
+        "async-read":                {},
+        "attr-timeout":              {},
+        "config":                    {},
+        "daemon":                    {},
+        "daemon-timeout":            {},
+        "daemon-wait":               {},
+        "dir-cache-time":            {},
+        "direct-io":                 {},
+        "gid":                       {},
+        "log-file":                  {},
+        "log-level":                 {},
+        "multi-thread-cutoff":       {},
+        "no-modtime":                {},
+        "poll-interval":             {},
+        "read-only":                 {},
+        "uid":                       {},
+        "umask":                     {},
+        "vfs-cache-max-age":         {},
+        "vfs-cache-max-size":        {},
+        "vfs-cache-min-free-space":  {},
+        "vfs-cache-mode":            {},
+        "vfs-cache-poll-interval":   {},
+        "vfs-disk-space-total-size": {},
+        "vfs-read-ahead":            {},
+        "vfs-read-chunk-size":       {},
+        "vfs-read-chunk-size-limit": {},
+        "vfs-read-chunk-streams":    {},
+        "vfs-read-wait":             {},
+        "vfs-refresh":               {},
+        "vfs-write-back":            {},
+        "vfs-write-wait":            {},
+        "write-back-cache":          {},
+}
+
 type RcloneMounterParams struct {
         SecretMap    map[string]string
         MountOptions []string
@@ -3107,7 +3371,48 @@ type RcloneMounterParams struct {
         ReadOnly     bool
 }
 
-func NewRcloneMounter(params RcloneMounterParams) Mounter <span class="cov8" title="11">{
+// classifyRcloneParams splits a slice of "key=value" (or bare "key") mount-option
+// strings into two groups using the following regex rules:
+//
+//   - CLI flags  → key starts with "--" (e.g. "--transfers=4")
+//     OR key is a single-letter shorthand prefixed by "-" (e.g. "-v")
+//
+//   - Config-file opts → key contains "_" (e.g. "upload_concurrency=4")
+//     OR key has no leading dash at all (e.g. "provider=IBMCOS")
+//
+// Each entry in the returned cliFlags slice is already in "--key=value" form
+// (bare "--key" for boolean flags without a value).
+// Each entry in configOpts is passed verbatim into rclone.conf.
+func classifyRcloneParams(options []string) (configOpts []string, cliFlags []string) <span class="cov6" title="16">{
+        // matches exactly "--word..." (double-dash)
+        doubleDash := regexp.MustCompile(`^--`)
+        // matches exactly "-&lt;single letter&gt;" (single-dash, one alpha/digit char)
+        singleLetterFlag := regexp.MustCompile(`^-[a-zA-Z0-9]$`)
+
+        for _, opt := range options </span><span class="cov10" title="116">{
+                opt = strings.TrimSpace(opt)
+                if opt == "" </span><span class="cov3" title="3">{
+                        continue</span>
+                }
+                // Split on first "=" only so values may themselves contain "="
+                <span class="cov9" title="113">parts := strings.SplitN(opt, "=", 2)
+                key := strings.TrimSpace(parts[0])
+
+                if doubleDash.MatchString(key) </span><span class="cov8" title="58">{
+                        // Already formatted as --key or --key=value
+                        cliFlags = append(cliFlags, opt)
+                }</span> else<span class="cov8" title="55"> if singleLetterFlag.MatchString(key) </span><span class="cov4" title="6">{
+                        // Short flag: "-v" → pass as-is
+                        cliFlags = append(cliFlags, opt)
+                }</span> else<span class="cov8" title="49"> {
+                        // Contains "_" or has no leading dash → config file opt
+                        configOpts = append(configOpts, opt)
+                }</span>
+        }
+        <span class="cov6" title="16">return</span>
+}
+
+func NewRcloneMounter(params RcloneMounterParams) Mounter <span class="cov5" title="12">{
         secretMap := params.SecretMap
         mountOptions := params.MountOptions
         mounterUtils := params.MounterUtils
@@ -3125,66 +3430,66 @@ func NewRcloneMounter(params RcloneMounterParams) Mounter <span class="cov8" tit
 
         mounter = &amp;RcloneMounter{}
 
-        if val, check = secretMap["cosEndpoint"]; check </span><span class="cov5" title="5">{
+        if val, check = secretMap["cosEndpoint"]; check </span><span class="cov4" title="6">{
                 mounter.EndPoint = val
         }</span>
-        <span class="cov8" title="11">if val, check = secretMap["locationConstraint"]; check </span><span class="cov5" title="5">{
+        <span class="cov5" title="12">if val, check = secretMap["locationConstraint"]; check </span><span class="cov4" title="6">{
                 mounter.LocConstraint = val
         }</span>
-        <span class="cov8" title="11">if val, check = secretMap["bucketName"]; check </span><span class="cov5" title="5">{
+        <span class="cov5" title="12">if val, check = secretMap["bucketName"]; check </span><span class="cov4" title="6">{
                 mounter.BucketName = val
         }</span>
-        <span class="cov8" title="11">if val, check = secretMap["objectPath"]; check </span><span class="cov5" title="5">{
+        <span class="cov5" title="12">if val, check = secretMap["objectPath"]; check </span><span class="cov4" title="5">{
                 mounter.ObjectPath = val
         }</span>
-        <span class="cov8" title="11">if val, check = secretMap["accessKey"]; check </span><span class="cov5" title="4">{
+        <span class="cov5" title="12">if val, check = secretMap[constants.AccessKey]; check </span><span class="cov4" title="5">{
                 accessKey = val
         }</span>
-        <span class="cov8" title="11">if val, check = secretMap["secretKey"]; check </span><span class="cov5" title="4">{
+        <span class="cov5" title="12">if val, check = secretMap[constants.SecretKey]; check </span><span class="cov4" title="5">{
                 secretKey = val
         }</span>
-        <span class="cov8" title="11">if val, check = secretMap["kpRootKeyCRN"]; check </span><span class="cov5" title="5">{
+        <span class="cov5" title="12">if val, check = secretMap[constants.KpRootKeyCRN]; check </span><span class="cov4" title="5">{
                 mounter.KpRootKeyCrn = val
         }</span>
-        <span class="cov8" title="11">if val, check = secretMap["iamEndpoint"]; check </span><span class="cov1" title="1">{
+        <span class="cov5" title="12">if val, check = secretMap["iamEndpoint"]; check </span><span class="cov2" title="2">{
                 mounter.IAMEndpoint = val
         }</span>
-        <span class="cov8" title="11">if val, check = secretMap["apiKey"]; check </span><span class="cov3" title="2">{
+        <span class="cov5" title="12">if val, check = secretMap[constants.ApiKey]; check </span><span class="cov2" title="2">{
                 apiKey = val
         }</span>
-        <span class="cov8" title="11">if val, check = secretMap["serviceId"]; check </span><span class="cov3" title="2">{
+        <span class="cov5" title="12">if val, check = secretMap[constants.ServiceId]; check </span><span class="cov2" title="2">{
                 serviceId = val
         }</span>
 
-        <span class="cov8" title="11">if apiKey != "" </span><span class="cov3" title="2">{
+        <span class="cov5" title="12">if apiKey != "" </span><span class="cov2" title="2">{
                 mounter.AccessKeys = apiKey
                 mounter.serviceInstanceID = serviceId
                 mounter.AuthType = "iam"
-        }</span> else<span class="cov7" title="9"> {
+        }</span> else<span class="cov5" title="10"> {
                 mounter.AccessKeys = fmt.Sprintf("%s:%s", accessKey, secretKey)
                 mounter.AuthType = "hmac"
         }</span>
 
         // set uid and gid, if present in csi secret "data" section
-        <span class="cov8" title="11">if secretMap["uid"] != "" </span><span class="cov5" title="5">{
+        <span class="cov5" title="12">if secretMap["uid"] != "" </span><span class="cov4" title="6">{
                 mounter.UID = secretMap["uid"]
         }</span>
-        <span class="cov8" title="11">if secretMap["gid"] != "" </span><span class="cov6" title="6">{
+        <span class="cov5" title="12">if secretMap["gid"] != "" </span><span class="cov4" title="7">{
                 mounter.GID = secretMap["gid"]
         }</span>
 
         // override gid, based on fsGroup defined in securityContext of the workload pod, if defined
-        <span class="cov8" title="11">if params.Gid != "" </span><span class="cov4" title="3">{
+        <span class="cov5" title="12">if params.Gid != "" </span><span class="cov3" title="3">{
                 mounter.GID = params.Gid
         }</span>
 
         // if gid is set but uid is not, default uid to gid
-        <span class="cov8" title="11">if mounter.GID != "" &amp;&amp; mounter.UID == "" </span><span class="cov4" title="3">{
+        <span class="cov5" title="12">if mounter.GID != "" &amp;&amp; mounter.UID == "" </span><span class="cov3" title="3">{
                 mounter.UID = mounter.GID
         }</span>
 
         // To mount the bucket in read-only mode based on PVC accessMode "ReadOnlyMany"
-        <span class="cov8" title="11">mounter.ReadOnly = params.ReadOnly
+        <span class="cov5" title="12">mounter.ReadOnly = params.ReadOnly
 
         klog.Infof("newRcloneMounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
                 mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType)
@@ -3197,52 +3502,72 @@ func NewRcloneMounter(params RcloneMounterParams) Mounter <span class="cov8" tit
         return mounter</span>
 }
 
-func updateMountOptions(dafaultMountOptions []string, secretMap map[string]string) []string <span class="cov8" title="11">{
+func updateMountOptions(dafaultMountOptions []string, secretMap map[string]string) []string <span class="cov6" title="19">{
+        // mountOptsMap stores options keyed by the left-hand side of "key=value".
+        // Bare flags (no "=") are stored with an empty-string value so they are
+        // preserved and de-duplicated correctly.
         mountOptsMap := make(map[string]string)
 
-        // Create map out of array
-        for _, e := range dafaultMountOptions </span><span class="cov7" title="10">{
-                opts := strings.Split(e, "=")
-                if len(opts) == 2 </span><span class="cov7" title="10">{
-                        mountOptsMap[opts[0]] = opts[1]
+        // Populate map from the driver/SC default options.
+        // Use SplitN(..., 2) so values that contain "=" are kept intact,
+        // and accept bare entries (e.g. "-v") without an "=" too.
+        for _, e := range dafaultMountOptions </span><span class="cov6" title="15">{
+                e = strings.TrimSpace(e)
+                if e == "" </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                <span class="cov6" title="15">parts := strings.SplitN(e, "=", 2)
+                if len(parts) == 2 </span><span class="cov6" title="15">{
+                        mountOptsMap[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+                }</span> else<span class="cov0" title="0"> {
+                        // bare flag: "-v", "--no-modtime", etc.
+                        mountOptsMap[parts[0]] = ""
                 }</span>
         }
 
-        <span class="cov8" title="11">stringData, ok := secretMap["mountOptions"]
+        <span class="cov6" title="19">stringData, ok := secretMap["mountOptions"]
 
-        if !ok </span><span class="cov7" title="9">{
+        if !ok </span><span class="cov5" title="10">{
                 klog.Infof("No new mountOptions found. Using default mountOptions: %v", dafaultMountOptions)
                 return dafaultMountOptions
         }</span>
 
-        <span class="cov3" title="2">lines := strings.Split(stringData, "\n")
+        <span class="cov5" title="9">lines := strings.Split(stringData, "\n")
 
-        // Update map
-        for _, line := range lines </span><span class="cov6" title="6">{
-                if strings.TrimSpace(line) == "" </span><span class="cov3" title="2">{
+        // Merge secret mountOptions into the map, overriding defaults where keys collide.
+        // Use SplitN(..., 2) so values containing "=" are preserved,
+        // and bare flags (e.g. "-v", "--no-modtime") are accepted without "=".
+        for _, line := range lines </span><span class="cov8" title="59">{
+                line = strings.TrimSpace(line)
+                if line == "" </span><span class="cov5" title="10">{
                         continue</span>
                 }
-                <span class="cov5" title="4">opts := strings.Split(line, "=")
-                if len(opts) != 2 </span><span class="cov3" title="2">{
-                        klog.Infof("Invalid mount option: %s\n", line)
-                        continue</span>
-                }
-                <span class="cov3" title="2">mountOptsMap[strings.TrimSpace(opts[0])] = strings.TrimSpace(opts[1])</span>
+                <span class="cov8" title="49">parts := strings.SplitN(line, "=", 2)
+                key := strings.TrimSpace(parts[0])
+                if len(parts) == 2 </span><span class="cov8" title="44">{
+                        mountOptsMap[key] = strings.TrimSpace(parts[1])
+                }</span> else<span class="cov4" title="5"> {
+                        // bare flag — store with empty value
+                        mountOptsMap[key] = ""
+                }</span>
         }
 
-        // Create array out of map
-        <span class="cov3" title="2">updatedOptions := []string{}
-        for k, v := range mountOptsMap </span><span class="cov6" title="6">{
-                option := fmt.Sprintf("%s=%s", k, v)
-                updatedOptions = append(updatedOptions, option)
-        }</span>
+        // Reconstruct the slice from the merged map.
+        <span class="cov5" title="9">updatedOptions := make([]string, 0, len(mountOptsMap))
+        for k, v := range mountOptsMap </span><span class="cov8" title="53">{
+                if v == "" </span><span class="cov4" title="5">{
+                        updatedOptions = append(updatedOptions, k)
+                }</span> else<span class="cov8" title="48"> {
+                        updatedOptions = append(updatedOptions, fmt.Sprintf("%s=%s", k, v))
+                }</span>
+        }
 
-        <span class="cov3" title="2">klog.Infof("Updated rclone Options: %v", updatedOptions)
+        <span class="cov5" title="9">klog.Infof("Updated rclone Options: %v", updatedOptions)
 
         return updatedOptions</span>
 }
 
-func (rclone *RcloneMounter) Mount(source string, target string) error <span class="cov5" title="4">{
+func (rclone *RcloneMounter) Mount(source string, target string) error <span class="cov4" title="6">{
         klog.Info("-RcloneMounter Mount-")
         klog.Infof("Mount args:\n\tsource: &lt;%s&gt;\n\ttarget: &lt;%s&gt;", source, target)
 
@@ -3250,67 +3575,87 @@ func (rclone *RcloneMounter) Mount(source string, target string) error <span cla
         var err error
 
         var configPath string
-        if mountWorker </span><span class="cov3" title="2">{
+        if mountWorker </span><span class="cov3" title="4">{
                 configPath = constants.MounterConfigPathOnHost
-        }</span> else<span class="cov3" title="2"> {
+        }</span> else<span class="cov2" title="2"> {
                 configPath = constants.MounterConfigPathOnPodRclone
         }</span>
 
-        <span class="cov5" title="4">configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
-        if err = createConfigWrap(configPathWithVolID, rclone); err != nil </span><span class="cov1" title="1">{
+        // Classify freeform mountOptions: config-file lines vs CLI flags
+        <span class="cov4" title="6">extraConfigOpts, extraCLIFlags := classifyRcloneParams(rclone.MountOptions)
+        configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
+        if err = createConfigWrap(configPathWithVolID, rclone, extraConfigOpts); err != nil </span><span class="cov1" title="1">{
                 klog.Errorf("RcloneMounter Mount: Cannot create rclone config file %v", err)
                 return err
         }</span>
 
-        <span class="cov4" title="3">if rclone.ObjectPath != "" </span><span class="cov3" title="2">{
+        <span class="cov4" title="5">if rclone.ObjectPath != "" </span><span class="cov2" title="2">{
                 trimmedPath := strings.TrimPrefix(rclone.ObjectPath, "/")
                 bucketName = fmt.Sprintf("%s:%s/%s", remote, rclone.BucketName, trimmedPath)
-        }</span> else<span class="cov1" title="1"> {
+        }</span> else<span class="cov3" title="3"> {
                 bucketName = fmt.Sprintf("%s:%s", remote, rclone.BucketName)
         }</span>
 
-        <span class="cov4" title="3">args, wnOp := rclone.formulateMountOptions(bucketName, target, configPathWithVolID)
+        <span class="cov4" title="5">args, wnOp := rclone.formulateMountOptions(bucketName, target, configPathWithVolID, extraCLIFlags)
 
-        if mountWorker </span><span class="cov3" title="2">{
+        if mountWorker </span><span class="cov3" title="4">{
                 klog.Info("Mount on Worker started...")
 
-                jsonData, err := json.Marshal(wnOp)
+                mountReq := struct {
+                        Path    string            `json:"path"`
+                        Bucket  string            `json:"bucket"`
+                        Mounter string            `json:"mounter"`
+                        Args    map[string]string `json:"args"`
+                }{
+                        Path:    target,
+                        Bucket:  bucketName,
+                        Mounter: constants.RClone,
+                        Args:    wnOp,
+                }
+                payloadBytes, err := json.Marshal(mountReq)
                 if err != nil </span><span class="cov0" title="0">{
-                        klog.Fatalf("Error marshalling data: %v", err)
+                        klog.Errorf("Error marshalling mount request: %v", err)
                         return err
                 }</span>
 
-                <span class="cov3" title="2">payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.RClone, jsonData)
-
-                err = mounterRequest(payload, "http://unix/api/cos/mount")
+                <span class="cov3" title="4">err = mounterRequest(string(payloadBytes), "http://unix/api/cos/mount")
                 if err != nil </span><span class="cov1" title="1">{
                         klog.Error("failed to mount on  worker...", err)
                         return err
                 }</span>
-                <span class="cov1" title="1">return nil</span>
+                <span class="cov3" title="3">return nil</span>
         }
         <span class="cov1" title="1">klog.Info("NodeServer Mounting...")
         return rclone.MounterUtils.FuseMount(target, constants.RClone, args)</span>
 }
 
-func (rclone *RcloneMounter) Unmount(target string) error <span class="cov5" title="4">{
+func (rclone *RcloneMounter) Unmount(target string) error <span class="cov4" title="6">{
         klog.Info("-RcloneMounter Unmount-")
 
-        if mountWorker </span><span class="cov3" title="2">{
+        if mountWorker </span><span class="cov3" title="4">{
                 klog.Info("Unmount on Worker started...")
 
-                payload := fmt.Sprintf(`{"path":"%s"}`, target)
+                unmountReq := struct {
+                        Path string `json:"path"`
+                }{
+                        Path: target,
+                }
+                payloadBytes, err := json.Marshal(unmountReq)
+                if err != nil </span><span class="cov0" title="0">{
+                        klog.Errorf("Error marshalling unmount request: %v", err)
+                        return err
+                }</span>
 
-                err := mounterRequest(payload, "http://unix/api/cos/unmount")
+                <span class="cov3" title="4">err = mounterRequest(string(payloadBytes), "http://unix/api/cos/unmount")
                 if err != nil </span><span class="cov1" title="1">{
                         klog.Error("failed to unmount on  worker...", err)
                         return err
                 }</span>
 
-                <span class="cov1" title="1">removeConfigFile(constants.MounterConfigPathOnHost, target)
+                <span class="cov3" title="3">removeConfigFile(constants.MounterConfigPathOnHost, target)
                 return nil</span>
         }
-        <span class="cov3" title="2">klog.Info("NodeServer Unmounting...")
+        <span class="cov2" title="2">klog.Info("NodeServer Unmounting...")
 
         err := rclone.MounterUtils.FuseUnmount(target)
         if err != nil </span><span class="cov1" title="1">{
@@ -3321,7 +3666,10 @@ func (rclone *RcloneMounter) Unmount(target string) error <span class="cov5" tit
         return nil</span>
 }
 
-func createConfig(configPathWithVolID string, rclone *RcloneMounter) error <span class="cov5" title="5">{
+// createConfig writes rclone.conf at configPathWithVolID.
+// extraConfigLines are additional config-file lines (classified from MountOptions)
+// that are appended after the identity/auth block.
+func createConfig(configPathWithVolID string, rclone *RcloneMounter, extraConfigLines []string) error <span class="cov4" title="8">{
         var accessKey, secretKey, apiKey, envAuth, v2Auth string
 
         configParams := []string{
@@ -3331,7 +3679,7 @@ func createConfig(configPathWithVolID string, rclone *RcloneMounter) error <span
                 "provider = " + cosProvider,
         }
 
-        if rclone.AuthType == "hmac" </span><span class="cov1" title="1">{
+        if rclone.AuthType == "hmac" </span><span class="cov3" title="4">{
                 keys := strings.Split(rclone.AccessKeys, ":")
                 accessKey = keys[0]
                 secretKey = keys[1]
@@ -3341,7 +3689,7 @@ func createConfig(configPathWithVolID string, rclone *RcloneMounter) error <span
                 configParams = append(configParams, "access_key_id = "+accessKey)
                 configParams = append(configParams, "secret_access_key = "+secretKey)
 
-        }</span> else<span class="cov5" title="4"> {
+        }</span> else<span class="cov3" title="4"> {
                 apiKey = rclone.AccessKeys
                 v2Auth = "true"
                 envAuth = "false"
@@ -3350,18 +3698,19 @@ func createConfig(configPathWithVolID string, rclone *RcloneMounter) error <span
                 configParams = append(configParams, "ibm_resource_instance_id = "+rclone.serviceInstanceID)
         }</span>
 
-        <span class="cov5" title="5">configParams = append(configParams, "env_auth = "+envAuth)
+        <span class="cov4" title="8">configParams = append(configParams, "env_auth = "+envAuth)
         configParams = append(configParams, "v2_auth = "+v2Auth)
 
-        if rclone.IAMEndpoint != "" </span><span class="cov1" title="1">{
+        if rclone.IAMEndpoint != "" </span><span class="cov3" title="4">{
                 configParams = append(configParams, "ibm_iam_endpoint = "+rclone.IAMEndpoint)
         }</span>
 
-        <span class="cov5" title="5">if rclone.LocConstraint != "" </span><span class="cov3" title="2">{
+        <span class="cov4" title="8">if rclone.LocConstraint != "" </span><span class="cov4" title="5">{
                 configParams = append(configParams, "location_constraint = "+rclone.LocConstraint)
         }</span>
 
-        <span class="cov5" title="5">configParams = append(configParams, rclone.MountOptions...)
+        // Append config-file lines classified from MountOptions (keys with "_" or no dash prefix)
+        <span class="cov4" title="8">configParams = append(configParams, extraConfigLines...)
 
         if err := MakeDir(configPathWithVolID, 0755); // #nosec G301: used for rclone
         err != nil </span><span class="cov1" title="1">{
@@ -3369,42 +3718,46 @@ func createConfig(configPathWithVolID string, rclone *RcloneMounter) error <span
                 return err
         }</span>
 
-        <span class="cov5" title="4">configFile := path.Join(configPathWithVolID, configFileName)
+        <span class="cov4" title="7">configFile := path.Join(configPathWithVolID, configFileName)
         file, err := CreateFile(configFile) // #nosec G304 used for rclone
         if err != nil </span><span class="cov1" title="1">{
                 klog.Errorf("RcloneMounter Mount: Cannot create file %s: %v", configFileName, err)
                 return err
         }</span>
-        <span class="cov4" title="3">defer func() </span><span class="cov4" title="3">{
+        <span class="cov4" title="6">defer func() </span><span class="cov4" title="6">{
                 if err = file.Close(); err != nil </span><span class="cov0" title="0">{
                         klog.Errorf("RcloneMounter Mount: Cannot close file %s: %v", configFileName, err)
                 }</span>
         }()
 
-        <span class="cov4" title="3">err = Chmod(configFile, 0644) // #nosec G302: used for rclone
+        <span class="cov4" title="6">err = Chmod(configFile, 0644) // #nosec G302: used for rclone
         if err != nil </span><span class="cov1" title="1">{
                 klog.Errorf("RcloneMounter Mount: Cannot change permissions on file  %s: %v", configFileName, err)
                 return err
         }</span>
 
-        <span class="cov3" title="2">klog.Info("-Rclone writing to config-")
+        <span class="cov4" title="5">klog.Info("-Rclone writing to config-")
         datawriter := bufio.NewWriter(file)
-        for _, line := range configParams </span><span class="cov10" title="21">{
+        for _, line := range configParams </span><span class="cov9" title="90">{
                 _, err = datawriter.WriteString(line + "\n")
                 if err != nil </span><span class="cov0" title="0">{
                         klog.Errorf("RcloneMounter Mount: Could not write to config file: %v", err)
                         return err
                 }</span>
         }
-        <span class="cov3" title="2">err = datawriter.Flush()
+        <span class="cov4" title="5">err = datawriter.Flush()
         if err != nil </span><span class="cov0" title="0">{
                 return err
         }</span>
-        <span class="cov3" title="2">klog.Info("-Rclone created rclone config file-")
+        <span class="cov4" title="5">klog.Info("-Rclone created rclone config file-")
         return nil</span>
 }
 
-func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWithVolID string) (nodeServerOp []string, workerNodeOp map[string]string) <span class="cov6" title="6">{
+// formulateMountOptions builds the final CLI args (nodeServerOp) and the
+// worker-node map (workerNodeOp) sent to cos-csi-mounter.
+// extraCLIFlags contains already-prefixed "--key=value" strings classified
+// from MountOptions by classifyRcloneParams; they are appended verbatim.
+func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWithVolID string, extraCLIFlags []string) (nodeServerOp []string, workerNodeOp map[string]string) <span class="cov5" title="11">{
         nodeServerOp = []string{
                 "mount",
                 bucket,
@@ -3424,27 +3777,62 @@ func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWit
                 "vfs-cache-mode": "writes",
         }
 
-        if rclone.GID != "" </span><span class="cov5" title="4">{
+        if rclone.GID != "" </span><span class="cov4" title="7">{
                 nodeServerOp = append(nodeServerOp, "--gid="+rclone.GID)
                 workerNodeOp["gid"] = rclone.GID
         }</span>
-        <span class="cov6" title="6">if rclone.UID != "" </span><span class="cov5" title="4">{
+        <span class="cov5" title="11">if rclone.UID != "" </span><span class="cov4" title="7">{
                 nodeServerOp = append(nodeServerOp, "--uid="+rclone.UID)
                 workerNodeOp["uid"] = rclone.UID
         }</span>
-        <span class="cov6" title="6">if rclone.ReadOnly </span><span class="cov1" title="1">{
+        <span class="cov5" title="11">if rclone.ReadOnly </span><span class="cov1" title="1">{
                 nodeServerOp = append(nodeServerOp, "--read-only")
                 workerNodeOp["read-only"] = "true"
         }</span>
-        <span class="cov6" title="6">return</span>
+
+        // Append extra CLI flags classified from MountOptions (keys with "--" or single "-&lt;letter&gt;").
+        //
+        // Flags whose name is in rcloneServerKnownFlags map to a typed field on the
+        // server's RCloneArgs struct and are sent as individual JSON keys in the
+        // worker-node payload. All other additional rclone flags are passed as a comma-separated "add-mount-param" string.
+        <span class="cov5" title="11">var extraFlagTokens []string
+        for _, flag := range extraCLIFlags </span><span class="cov8" title="53">{
+                nodeServerOp = append(nodeServerOp, flag)
+
+                // Strip leading dashes and split on first "=" to get the flag name.
+                stripped := strings.TrimPrefix(flag, "--")
+                stripped = strings.TrimPrefix(stripped, "-")
+                parts := strings.SplitN(stripped, "=", 2)
+                flagName := parts[0]
+                if flagName == "" </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+
+                <span class="cov8" title="53">if _, isKnown := rcloneServerKnownFlags[flagName]; isKnown </span><span class="cov7" title="28">{
+                        // Known field: set/override the entry in workerNodeOp.
+                        if len(parts) == 2 </span><span class="cov7" title="28">{
+                                workerNodeOp[flagName] = parts[1]
+                        }</span> else<span class="cov0" title="0"> {
+                                workerNodeOp[flagName] = "true"
+                        }</span>
+                } else<span class="cov7" title="25"> {
+                        // Unknown to the server: collect as-is for the add-mount-param transport key.
+                        extraFlagTokens = append(extraFlagTokens, flag)
+                }</span>
+        }
+        <span class="cov5" title="11">if len(extraFlagTokens) &gt; 0 </span><span class="cov3" title="3">{
+                workerNodeOp["add-mount-param"] = strings.Join(extraFlagTokens, ",")
+        }</span>
+
+        <span class="cov5" title="11">return</span>
 }
 
-func removeRcloneConfigFile(configPath, target string) <span class="cov5" title="4">{
+func removeRcloneConfigFile(configPath, target string) <span class="cov3" title="4">{
         configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 
-        for retry := 1; retry &lt;= maxRetries; retry++ </span><span class="cov7" title="8">{
+        for retry := 1; retry &lt;= maxRetries; retry++ </span><span class="cov4" title="8">{
                 _, err := Stat(configPathWithVolID)
-                if err != nil </span><span class="cov3" title="2">{
+                if err != nil </span><span class="cov2" title="2">{
                         if os.IsNotExist(err) </span><span class="cov1" title="1">{
                                 klog.Infof("removeRcloneConfigFile: Config file directory does not exist: %s", configPathWithVolID)
                                 return
@@ -3453,13 +3841,13 @@ func removeRcloneConfigFile(configPath, target string) <span class="cov5" title=
                         time.Sleep(constants.Interval)
                         continue</span>
                 }
-                <span class="cov6" title="6">err = RemoveAll(configPathWithVolID)
-                if err != nil </span><span class="cov5" title="4">{
+                <span class="cov4" title="6">err = RemoveAll(configPathWithVolID)
+                if err != nil </span><span class="cov3" title="4">{
                         klog.Errorf("removeRcloneConfigFile: Attempt %d - Failed to remove config file path %s: %v", retry, configPathWithVolID, err)
                         time.Sleep(constants.Interval)
                         continue</span>
                 }
-                <span class="cov3" title="2">klog.Infof("removeRcloneConfigFile: Successfully removed config file path: %s", configPathWithVolID)
+                <span class="cov2" title="2">klog.Infof("removeRcloneConfigFile: Successfully removed config file path: %s", configPathWithVolID)
                 return</span>
         }
         <span class="cov1" title="1">klog.Errorf("removeRcloneConfigFile: Failed to remove config file path after %d attempts", maxRetries)</span>
@@ -3561,16 +3949,16 @@ func NewS3fsMounter(params S3fsMounterParams) Mounter <span class="cov4" title="
         <span class="cov4" title="4">if val, check = secretMap["objectPath"]; check </span><span class="cov4" title="4">{
                 mounter.ObjectPath = val
         }</span>
-        <span class="cov4" title="4">if val, check = secretMap["accessKey"]; check </span><span class="cov4" title="4">{
+        <span class="cov4" title="4">if val, check = secretMap[constants.AccessKey]; check </span><span class="cov4" title="4">{
                 accessKey = val
         }</span>
-        <span class="cov4" title="4">if val, check = secretMap["secretKey"]; check </span><span class="cov4" title="4">{
+        <span class="cov4" title="4">if val, check = secretMap[constants.SecretKey]; check </span><span class="cov4" title="4">{
                 secretKey = val
         }</span>
-        <span class="cov4" title="4">if val, check = secretMap["apiKey"]; check </span><span class="cov2" title="2">{
+        <span class="cov4" title="4">if val, check = secretMap[constants.ApiKey]; check </span><span class="cov2" title="2">{
                 apiKey = val
         }</span>
-        <span class="cov4" title="4">if val, check = secretMap["kpRootKeyCRN"]; check </span><span class="cov4" title="4">{
+        <span class="cov4" title="4">if val, check = secretMap[constants.KpRootKeyCRN]; check </span><span class="cov4" title="4">{
                 mounter.KpRootKeyCrn = val
         }</span>
         <span class="cov4" title="4">if val, check = secretMap["iamEndpoint"]; check </span><span class="cov1" title="1">{
@@ -3583,26 +3971,30 @@ func NewS3fsMounter(params S3fsMounterParams) Mounter <span class="cov4" title="
                 mounter.AccessKeys = fmt.Sprintf("%s:%s", accessKey, secretKey)
                 mounter.AuthType = "hmac"
         }</span>
+        <span class="cov4" title="4">kpRootKeyCrnMasked := ""
+        if mounter.KpRootKeyCrn != "" </span><span class="cov4" title="4">{
+                kpRootKeyCrnMasked = "xxxxxxx"
+        }</span>
         <span class="cov4" title="4">klog.Infof("newS3fsMounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]\n\tkpRootKeyCrn: [%s]",
-                mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType, mounter.KpRootKeyCrn)
+                mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType, kpRootKeyCrnMasked)
         updatedOptions, addMountParam := updateS3FSMountOptions(mountOptions, secretMap, knownS3FSOptions, defaultParams, params.Gid, params.ReadOnly)
         mounter.MountOptions = updatedOptions
         mounter.AddMountParam = addMountParam
         return mounter</span>
 }
 
-func (s3fs *S3fsMounter) Mount(source string, target string) error <span class="cov4" title="5">{
+func (s3fs *S3fsMounter) Mount(source string, target string) error <span class="cov5" title="8">{
         klog.Info("-S3FSMounter Mount-")
         klog.Infof("Mount args:\n\tsource: &lt;%s&gt;\n\ttarget: &lt;%s&gt;", source, target)
 
         var s3fsCredDir string
-        if mountWorker </span><span class="cov4" title="4">{
+        if mountWorker </span><span class="cov5" title="7">{
                 s3fsCredDir = constants.MounterConfigPathOnHost
         }</span> else<span class="cov1" title="1"> {
                 s3fsCredDir = constants.MounterConfigPathOnPodS3fs
         }</span>
 
-        <span class="cov4" title="5">var bucketName string
+        <span class="cov5" title="8">var bucketName string
         var pathExist bool
         var err error
 
@@ -3613,7 +4005,7 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error <span class="
                 return fmt.Errorf("S3FSMounter Mount: Cannot stat directory %s: %v", metaPath, err)
         }</span>
 
-        <span class="cov4" title="5">if !pathExist </span><span class="cov4" title="5">{
+        <span class="cov5" title="8">if !pathExist </span><span class="cov4" title="5">{
                 if err = MakeDir(metaPath, 0755); // #nosec G301: used for s3fs
                 err != nil </span><span class="cov1" title="1">{
                         klog.Errorf("S3FSMounter Mount: Cannot create directory %s: %v", metaPath, err)
@@ -3621,64 +4013,82 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error <span class="
                 }</span>
         }
 
-        <span class="cov4" title="4">passwdFile := path.Join(metaPath, passFile)
+        <span class="cov5" title="7">passwdFile := path.Join(metaPath, passFile)
         if err = writePassWrap(passwdFile, s3fs.AccessKeys); err != nil </span><span class="cov1" title="1">{
-                klog.Errorf("S3FSMounter Mount: Cannot create file %s: %v", passwdFile, err)
-                return fmt.Errorf("S3FSMounter Mount: Cannot create file %s: %v", passwdFile, err)
+                klog.Errorf("S3FSMounter Mount: Cannot create file: %v", err)
+                return fmt.Errorf("S3FSMounter Mount: Cannot create file: %v", err)
         }</span>
 
-        <span class="cov3" title="3">if s3fs.ObjectPath != "" </span><span class="cov1" title="1">{
+        <span class="cov5" title="6">if s3fs.ObjectPath != "" </span><span class="cov1" title="1">{
                 if strings.HasPrefix(s3fs.ObjectPath, "/") </span><span class="cov0" title="0">{
                         bucketName = fmt.Sprintf("%s:%s", s3fs.BucketName, s3fs.ObjectPath)
                 }</span> else<span class="cov1" title="1"> {
                         bucketName = fmt.Sprintf("%s:/%s", s3fs.BucketName, s3fs.ObjectPath)
                 }</span>
-        } else<span class="cov2" title="2"> {
+        } else<span class="cov4" title="5"> {
                 bucketName = s3fs.BucketName
         }</span>
 
-        <span class="cov3" title="3">args, wnOp := s3fs.formulateMountOptions(bucketName, target, passwdFile)
+        <span class="cov5" title="6">args, wnOp := s3fs.formulateMountOptions(bucketName, target, passwdFile)
 
-        if mountWorker </span><span class="cov2" title="2">{
+        if mountWorker </span><span class="cov4" title="5">{
                 klog.Info(" Mount on Worker started...")
 
-                jsonData, err := json.Marshal(wnOp)
+                mountReq := struct {
+                        Path    string            `json:"path"`
+                        Bucket  string            `json:"bucket"`
+                        Mounter string            `json:"mounter"`
+                        Args    map[string]string `json:"args"`
+                }{
+                        Path:    target,
+                        Bucket:  bucketName,
+                        Mounter: constants.S3FS,
+                        Args:    wnOp,
+                }
+                payloadBytes, err := json.Marshal(mountReq)
                 if err != nil </span><span class="cov0" title="0">{
-                        klog.Fatalf("Error marshalling data: %v", err)
+                        klog.Errorf("Error marshalling mount request: %v", err)
                         return err
                 }</span>
 
-                <span class="cov2" title="2">payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`, target, bucketName, constants.S3FS, jsonData)
+                <span class="cov4" title="5">klog.Infof("Worker Mounting Payload: path=%s bucket=%s mounter=%s", target, bucketName, constants.S3FS)
 
-                klog.Info("Worker Mounting Payload...", payload)
-
-                err = mounterRequest(payload, "http://unix/api/cos/mount")
+                err = mounterRequest(string(payloadBytes), "http://unix/api/cos/mount")
                 if err != nil </span><span class="cov1" title="1">{
                         klog.Error("failed to mount on  worker...", err)
                         return err
                 }</span>
-                <span class="cov1" title="1">return nil</span>
+                <span class="cov4" title="4">return nil</span>
         }
         <span class="cov1" title="1">klog.Info("NodeServer Mounting...")
         return s3fs.MounterUtils.FuseMount(target, constants.S3FS, args)</span>
 }
 
-func (s3fs *S3fsMounter) Unmount(target string) error <span class="cov4" title="4">{
+func (s3fs *S3fsMounter) Unmount(target string) error <span class="cov5" title="6">{
         klog.Info("-S3FSMounter Unmount-")
         klog.Infof("Unmount args:\n\ttarget: &lt;%s&gt;", target)
 
-        if mountWorker </span><span class="cov2" title="2">{
+        if mountWorker </span><span class="cov4" title="4">{
                 klog.Info("Unmount on Worker started...")
 
-                payload := fmt.Sprintf(`{"path":"%s"}`, target)
+                unmountReq := struct {
+                        Path string `json:"path"`
+                }{
+                        Path: target,
+                }
+                payloadBytes, err := json.Marshal(unmountReq)
+                if err != nil </span><span class="cov0" title="0">{
+                        klog.Errorf("Error marshalling unmount request: %v", err)
+                        return err
+                }</span>
 
-                err := mounterRequest(payload, "http://unix/api/cos/unmount")
+                <span class="cov4" title="4">err = mounterRequest(string(payloadBytes), "http://unix/api/cos/unmount")
                 if err != nil </span><span class="cov1" title="1">{
                         klog.Error("failed to unmount on  worker...", err)
                         return err
                 }</span>
 
-                <span class="cov1" title="1">removeFile(constants.MounterConfigPathOnHost, target)
+                <span class="cov3" title="3">removeFile(constants.MounterConfigPathOnHost, target)
                 return nil</span>
         }
         <span class="cov2" title="2">klog.Info("NodeServer Unmounting...")
@@ -3847,7 +4257,7 @@ func updateS3FSMountOptions(defaultMountOp []string, secretMap map[string]string
         <span class="cov9" title="33">return updatedOptions, addMountParam</span>
 }
 
-func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string) (nodeServerOp []string, workerNodeOp map[string]string) <span class="cov5" title="6">{
+func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string) (nodeServerOp []string, workerNodeOp map[string]string) <span class="cov6" title="9">{
         nodeServerOp = []string{
                 bucket,
                 target,
@@ -3873,7 +4283,7 @@ func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string
                 workerNodeOp["endpoint"] = s3fs.LocConstraint
         }</span>
 
-        <span class="cov5" title="6">for _, val := range s3fs.MountOptions </span><span class="cov3" title="3">{
+        <span class="cov6" title="9">for _, val := range s3fs.MountOptions </span><span class="cov3" title="3">{
                 nodeServerOp = append(nodeServerOp, "-o")
                 nodeServerOp = append(nodeServerOp, val)
 
@@ -3885,24 +4295,24 @@ func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string
                 }</span>
         }
 
-        <span class="cov5" title="6">if s3fs.AuthType != "hmac" </span><span class="cov4" title="5">{
+        <span class="cov6" title="9">if s3fs.AuthType != "hmac" </span><span class="cov4" title="5">{
                 nodeServerOp = append(nodeServerOp, "-o", "ibm_iam_auth")
                 nodeServerOp = append(nodeServerOp, "-o", "ibm_iam_endpoint="+s3fs.IAMEndpoint)
 
                 workerNodeOp["ibm_iam_auth"] = "true"
                 workerNodeOp["ibm_iam_endpoint"] = s3fs.IAMEndpoint
-        }</span> else<span class="cov1" title="1"> {
+        }</span> else<span class="cov4" title="4"> {
                 nodeServerOp = append(nodeServerOp, "-o", "default_acl=private")
                 workerNodeOp["default_acl"] = "private"
         }</span>
 
         // Add unknown mount options to workerNodeOp for mounter service
-        <span class="cov5" title="6">if s3fs.AddMountParam != "" </span><span class="cov2" title="2">{
+        <span class="cov6" title="9">if s3fs.AddMountParam != "" </span><span class="cov2" title="2">{
                 workerNodeOp["add-mount-param"] = s3fs.AddMountParam
                 klog.Infof("Adding unknown mount options to mounter request: %s", s3fs.AddMountParam)
         }</span>
 
-        <span class="cov5" title="6">return</span>
+        <span class="cov6" title="9">return</span>
 }
 
 func removeS3FSCredFile(credDir, target string) <span class="cov4" title="4">{
@@ -4576,7 +4986,7 @@ func NewCSIMounterFactory() *CSIMounterFactory <span class="cov0" title="0">{
         return &amp;CSIMounterFactory{}
 }</span>
 
-func (s *CSIMounterFactory) NewMounter(params MounterParams) Mounter <span class="cov8" title="4">{
+func (s *CSIMounterFactory) NewMounter(params MounterParams) Mounter <span class="cov7" title="4">{
         attrib := params.Attrib
         secretMap := params.SecretMap
         mountFlags := params.MountFlags
@@ -4589,12 +4999,12 @@ func (s *CSIMounterFactory) NewMounter(params MounterParams) Mounter <span class
         if secretMap == nil </span><span class="cov0" title="0">{
                 secretMap = map[string]string{}
         }</span>
-        <span class="cov8" title="4">if mountFlags == nil </span><span class="cov0" title="0">{
+        <span class="cov7" title="4">if mountFlags == nil </span><span class="cov0" title="0">{
                 mountFlags = []string{}
         }</span>
 
         // Select mounter as per storage class
-        <span class="cov8" title="4">if val, check = attrib["mounter"]; check </span><span class="cov7" title="3">{
+        <span class="cov7" title="4">if val, check = attrib["mounter"]; check </span><span class="cov5" title="3">{
                 mounter = val
         }</span> else<span class="cov1" title="1"> {
                 // if mounter not set in storage class
@@ -4603,7 +5013,7 @@ func (s *CSIMounterFactory) NewMounter(params MounterParams) Mounter <span class
                 }</span>
         }
 
-        <span class="cov8" title="4">mounterUtils := &amp;(mounterUtils.MounterOptsUtils{})
+        <span class="cov7" title="4">mounterUtils := &amp;(mounterUtils.MounterOptsUtils{})
 
         switch mounter </span>{
         case constants.S3FS:<span class="cov1" title="1">
@@ -4646,14 +5056,14 @@ func (s *CSIMounterFactory) NewMounter(params MounterParams) Mounter <span class
         }
 }
 
-func checkPath(path string) (bool, error) <span class="cov10" title="5">{
+func checkPath(path string) (bool, error) <span class="cov10" title="8">{
         if path == "" </span><span class="cov0" title="0">{
                 return false, errors.New("undefined path")
         }</span>
-        <span class="cov10" title="5">_, err := Stat(path)
-        if err == nil </span><span class="cov0" title="0">{
+        <span class="cov10" title="8">_, err := Stat(path)
+        if err == nil </span><span class="cov5" title="3">{
                 return true, nil
-        }</span> else<span class="cov10" title="5"> if os.IsNotExist(err) </span><span class="cov10" title="5">{
+        }</span> else<span class="cov7" title="5"> if os.IsNotExist(err) </span><span class="cov7" title="5">{
                 return false, nil
         }</span> else<span class="cov0" title="0"> if isCorruptedMnt(err) </span><span class="cov0" title="0">{
                 return true, err
