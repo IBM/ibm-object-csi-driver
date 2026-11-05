@@ -3,10 +3,10 @@ name: CI & Release
 on:
   push:
     branches:
-      - balraj-rclone-additional-params
+      - main
   pull_request:
     branches:
-      - balraj-rclone-additional-params
+      - main
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -112,8 +112,8 @@ jobs:
           - cos-csi-mounter
 
     env:
-      IS_LATEST_RELEASE: 'false'
-      APP_VERSION: 0.12.65
+      IS_LATEST_RELEASE: 'true'
+      APP_VERSION: 1.0.11
 
     steps:
       - name: Checkout Code
@@ -144,12 +144,11 @@ jobs:
             /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.deb.tar.gz.sha256
             /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz
             /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz.sha256
-          tag_name: v0.12.65
-          name: v0.12.65
+          tag_name: v1.0.11
+          name: v1.0.11
           body: |
             ## 🚀 What's New
-            - update go version to 1.26.10
-            - Support additional rclone option "multi-thread-cutoff"
+            - Support custom rclone CLI flags and backend configuration options in Secret `mountOptions`.
           prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
 
       - name: Perform CodeQL Analysis
