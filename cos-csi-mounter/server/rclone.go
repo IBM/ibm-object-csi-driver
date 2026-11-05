@@ -3,9 +3,47 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"strings"
 
 	"go.uber.org/zap"
 )
+
+// rcloneFlagPattern matches a valid rclone CLI flag token:
+//
+//	--flag-name          (boolean flag)
+//	--flag-name=value    (flag with value; value is an opaque string)
+//
+// Flag names must start with a lowercase letter and contain only [a-z0-9-].
+var rcloneFlagPattern = regexp.MustCompile(`^--([a-z][a-z0-9-]*)(?:=(.*))?$`)
+
+// rcloneKnownFlags is the set of flag names already covered by the typed
+// RCloneArgs fields. add-mount-param tokens whose flag name matches one of these
+// are rejected to prevent accidental or malicious override of a validated
+// parameter (e.g. trying to override --config via add-mount-param).
+var rcloneKnownFlags = jsonFieldNames(RCloneArgs{})
+
+// validateAddMountParam validates every comma-separated token in the add-mount-param
+// string. Each token must look like --flag or --flag=value (lowercase rclone
+// flag name format). Tokens whose flag name collides with a known RCloneArgs
+// field are rejected to prevent override attacks.
+func validateAddMountParam(extra string) error {
+	for _, token := range strings.Split(extra, ",") {
+		token = strings.TrimSpace(token)
+		if token == "" {
+			continue
+		}
+		m := rcloneFlagPattern.FindStringSubmatch(token)
+		if m == nil {
+			return fmt.Errorf("add-mount-param: invalid token %q: must be --flag or --flag=value with a lowercase flag name", token)
+		}
+		flagName := m[1]
+		if _, reserved := rcloneKnownFlags[flagName]; reserved {
+			return fmt.Errorf("add-mount-param: flag %q is already a known parameter and cannot be set via add-mount-param", flagName)
+		}
+	}
+	return nil
+}
 
 type RCloneArgs struct {
 	AllowOther            string `json:"allow-other,omitempty"`
@@ -42,6 +80,10 @@ type RCloneArgs struct {
 	VfsWriteBack          string `json:"vfs-write-back,omitempty"`
 	VfsWriteWait          string `json:"vfs-write-wait,omitempty"`
 	WriteBackCache        string `json:"write-back-cache,omitempty"`
+	// AddMountParam allows passing additional rclone mount flags not covered by
+	// the fields above, as a comma-separated list of --flag or --flag=value
+	// tokens. Example: "--transfers=4,--checkers=8,--s3-upload-concurrency=16"
+	AddMountParam string `json:"add-mount-param,omitempty"`
 }
 
 func (args RCloneArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, error) {
@@ -57,13 +99,26 @@ func (args RCloneArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, e
 		return nil, err
 	}
 
-	// Convert to key=value slice
+	// Convert to key=value slice, skipping add-mount-param (handled separately below)
 	result := []string{"mount", bucket, targetPath}
 	for k, v := range m {
+		if k == "add-mount-param" {
+			continue
+		}
 		result = append(result, fmt.Sprintf("--%s=%v", k, v)) // --key=value
 	}
 
-	return result, nil // [mount, bucket, path, --key1=value1, --key2=value2, ...]
+	// Append each validated add-mount-param token as its own argument
+	if args.AddMountParam != "" {
+		for _, token := range strings.Split(args.AddMountParam, ",") {
+			token = strings.TrimSpace(token)
+			if token != "" {
+				result = append(result, token)
+			}
+		}
+	}
+
+	return result, nil // [mount, bucket, path, --key1=value1, --key2=value2, ..., --extra1=val, ...]
 }
 
 func (args RCloneArgs) Validate(targetPath string) error {
@@ -149,6 +204,14 @@ func (args RCloneArgs) Validate(targetPath string) error {
 		if isBool := isBoolString(args.WriteBackCache); !isBool {
 			logger.Error("cannot convert value of write-back-cache into boolean", zap.Any("write-back-cache", args.WriteBackCache))
 			return fmt.Errorf("cannot convert value of write-back-cache into boolean: %v", args.WriteBackCache)
+		}
+	}
+
+	// Validate add-mount-param tokens: format and reserved-name check
+	if args.AddMountParam != "" {
+		if err := validateAddMountParam(args.AddMountParam); err != nil {
+			logger.Error("invalid add-mount-param value", zap.Error(err))
+			return err
 		}
 	}
 

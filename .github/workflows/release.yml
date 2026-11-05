@@ -113,7 +113,7 @@ jobs:
 
     env:
       IS_LATEST_RELEASE: 'true'
-      APP_VERSION: 1.0.10
+      APP_VERSION: 1.0.11
 
     steps:
       - name: Checkout Code
@@ -144,12 +144,11 @@ jobs:
             /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.deb.tar.gz.sha256
             /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz
             /home/runner/work/ibm-object-csi-driver/ibm-object-csi-driver/cos-csi-mounter/cos-csi-mounter-${{ env.APP_VERSION }}.rpm.tar.gz.sha256
-          tag_name: v1.0.10
-          name: v1.0.10
+          tag_name: v1.0.11
+          name: v1.0.11
           body: |
             ## 🚀 What's New
-            - update go version to 1.26.10
-            - Support additional rclone option "multi-thread-cutoff"
+            - Add support to accept additional rclone CLI flags.
           prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
 
       - name: Perform CodeQL Analysis
