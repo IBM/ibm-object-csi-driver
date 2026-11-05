@@ -535,8 +535,7 @@ func (rclone *RcloneMounter) formulateMountOptions(bucket, target, configPathWit
 	//
 	// Flags whose name is in rcloneServerKnownFlags map to a typed field on the
 	// server's RCloneArgs struct and are sent as individual JSON keys in the
-	// worker-node payload. All other flags are unknown to the server's strict
-	// JSON decoder and must travel as a comma-separated "add-mount-param" string.
+	// worker-node payload. All other additional rclone flags are passed as a comma-separated "add-mount-param" string.
 	var extraFlagTokens []string
 	for _, flag := range extraCLIFlags {
 		nodeServerOp = append(nodeServerOp, flag)
