@@ -15,4 +15,4 @@ type MounterUtils interface {
 type MounterOptsUtils struct{}
 
 func (su *MounterOptsUtils) FuseMount(_ string, _ string, _ []string) error { return nil }
-func (su *MounterOptsUtils) FuseUnmount(_ string) error                      { return nil }
+func (su *MounterOptsUtils) FuseUnmount(_ string) error                     { return nil }

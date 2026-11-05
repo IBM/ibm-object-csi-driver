@@ -15,7 +15,7 @@ var (
 )
 
 // s3MounterArgs holds the args sent from the node server for mount-s3.
-// This struct must match the s3MounterArgs in pkg/mounter/mounter_s3mounter.go
+// This struct must match the s3MounterArgs in pkg/mounter/mounter-mount-s3.go
 type s3MounterArgs struct {
 	// Always set.
 	AllowOther         string `json:"allow-other,omitempty"`
