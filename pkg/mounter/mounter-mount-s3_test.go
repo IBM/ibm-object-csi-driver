@@ -2,10 +2,10 @@ package mounter
 
 import (
 	"errors"
-	"os"
-	"testing"
 	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
 	"github.com/stretchr/testify/assert"
+	"os"
+	"testing"
 )
 
 var (
@@ -744,9 +744,9 @@ func TestParseMountpointS3Options(t *testing.T) {
 			expectedRemaining: []string{},
 		},
 		{
-			name: "Add double dash to options without it",
-			opts: []string{"max-threads=32", "dir-mode=0755"},
-			expectedMounter: &MountpointS3Mounter{},
+			name:              "Add double dash to options without it",
+			opts:              []string{"max-threads=32", "dir-mode=0755"},
+			expectedMounter:   &MountpointS3Mounter{},
 			expectedRemaining: []string{"--max-threads=32", "--dir-mode=0755"},
 		},
 	}
@@ -755,7 +755,7 @@ func TestParseMountpointS3Options(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mounter := &MountpointS3Mounter{}
 			remaining := parseMountpointS3Options(mounter, tt.opts)
-			
+
 			assert.Equal(t, tt.expectedMounter.UID, mounter.UID)
 			assert.Equal(t, tt.expectedMounter.GID, mounter.GID)
 			assert.Equal(t, tt.expectedMounter.LogLevel, mounter.LogLevel)
@@ -786,7 +786,7 @@ allow-overwrite`,
 
 	s3Mounter, ok := mounter.(*MountpointS3Mounter)
 	assert.True(t, ok)
-	
+
 	// incremental-upload should be blocked (set to false)
 	assert.False(t, s3Mounter.IncrementalUpload, "incremental-upload should be blocked due to data loss issues")
 	// allow-overwrite should still be set
