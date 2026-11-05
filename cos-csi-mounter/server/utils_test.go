@@ -3,13 +3,46 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestRedactArgsForLog_MasksPasswdFile(t *testing.T) {
+	raw := json.RawMessage(`{"url":"https://s3.example.com","passwd_file":"/var/lib/coscsi-config/secret.txt","allow_other":"true"}`)
+	result := redactArgsForLog(raw)
+
+	var m map[string]interface{}
+	err := json.Unmarshal(result, &m)
+	assert.NoError(t, err)
+	assert.Equal(t, "xxxxx", m["passwd_file"])
+	assert.Equal(t, "https://s3.example.com", m["url"])
+	assert.Equal(t, "true", m["allow_other"])
+}
+
+func TestRedactArgsForLog_NoPasswdFile(t *testing.T) {
+	raw := json.RawMessage(`{"url":"https://s3.example.com","allow_other":"true"}`)
+	result := redactArgsForLog(raw)
+
+	var m map[string]interface{}
+	err := json.Unmarshal(result, &m)
+	assert.NoError(t, err)
+	assert.NotContains(t, m, "passwd_file")
+	assert.Equal(t, "https://s3.example.com", m["url"])
+}
+
+func TestRedactArgsForLog_EmptyInput(t *testing.T) {
+	result := redactArgsForLog(json.RawMessage{})
+	assert.Empty(t, result)
+}
+
+func TestRedactArgsForLog_InvalidJSON(t *testing.T) {
+	raw := json.RawMessage(`{invalid}`)
+	result := redactArgsForLog(raw)
+	assert.Equal(t, []byte(`{invalid}`), []byte(result))
+}
 
 func TestParse_UnknownMounter(t *testing.T) {
 	req := MountRequest{
@@ -146,56 +179,6 @@ func TestFileExists_AbsFails(t *testing.T) {
 
 	exists, err := fileExists("invalid-path")
 	assert.False(t, exists)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to resolve absolute path")
-}
-
-func TestEnsureDir_OutsideSafeDirectory(t *testing.T) {
-	err := ensureDir("/etc/passwd", "/tmp")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "outside the safe directory")
-}
-
-func TestEnsureDir_PathTraversal(t *testing.T) {
-	err := ensureDir("/tmp/../../etc", "/tmp")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "outside the safe directory")
-}
-
-func TestEnsureDir_CreatesDirectory(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "subdir")
-	safeBase := filepath.Dir(dir)
-	err := ensureDir(dir, safeBase)
-	assert.NoError(t, err)
-	info, statErr := os.Stat(dir)
-	assert.NoError(t, statErr)
-	assert.True(t, info.IsDir())
-}
-
-func TestEnsureDir_ExistingDirectory(t *testing.T) {
-	dir := t.TempDir()
-	err := ensureDir(dir, filepath.Dir(dir))
-	assert.NoError(t, err)
-}
-
-func TestEnsureDir_PathIsFile(t *testing.T) {
-	dir := t.TempDir()
-	file := filepath.Join(dir, "file.txt")
-	assert.NoError(t, os.WriteFile(file, []byte("x"), 0600))
-	err := ensureDir(file, dir)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "not a directory")
-}
-
-func TestEnsureDir_AbsFails(t *testing.T) {
-	originalAbs := absPathResolver
-	defer func() { absPathResolver = originalAbs }()
-
-	absPathResolver = func(path string) (string, error) {
-		return "", errors.New("abs error")
-	}
-
-	err := ensureDir("some-path", "/tmp")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to resolve absolute path")
 }

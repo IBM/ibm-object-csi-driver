@@ -22,7 +22,7 @@ RUN   microdnf -y install fuse-devel
 RUN   rm /usr/bin/register-sys.sh && subscription-manager unregister && subscription-manager clean
 
 RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && cd s3fs-fuse && \
-    git checkout v1.94 && \
+    git checkout v1.95 && \
     ./autogen.sh && ./configure --prefix=/usr/local --with-openssl && make && make install && \
     rm -rf /var/lib/apt/lists/*
 
@@ -30,7 +30,7 @@ FROM registry.access.redhat.com/ubi8/ubi AS rclone-builder
 RUN yum install wget git gcc -y
 
 ENV ARCH=amd64
-ENV GO_VERSION=1.26.6
+ENV GO_VERSION=1.26.10
 
 RUN echo $ARCH $GO_VERSION
 
@@ -46,7 +46,7 @@ ENV GOARCH=$ARCH
 ENV GO111MODULE=on
 
 RUN git clone https://github.com/rclone/rclone.git && \
-      cd rclone && git checkout tags/v1.73.5 && \
+      cd rclone && git checkout tags/v1.75.2 && \
       go build && ./rclone version && \
       cp rclone /usr/local/bin/rclone
 

@@ -33,6 +33,27 @@ type MounterUtils interface {
 type MounterOptsUtils struct {
 }
 
+// redactMountArgs returns a copy of args with values for sensitive mount
+// passwd_file replaced by "xxxxx".
+func redactMountArgs(args []string) []string {
+	sensitiveOpts := []string{"passwd_file="}
+	redacted := make([]string, len(args))
+	for i, arg := range args {
+		masked := false
+		for _, opt := range sensitiveOpts {
+			if strings.Contains(arg, opt) {
+				redacted[i] = opt + "xxxxx"
+				masked = true
+				break
+			}
+		}
+		if !masked {
+			redacted[i] = arg
+		}
+	}
+	return redacted
+}
+
 // FuseMount — signature unchanged, delegates to fuseMountInternal with no extra env vars.
 func (su *MounterOptsUtils) FuseMount(path string, comm string, args []string) error {
 	return su.fuseMountInternal(path, comm, args, nil)
@@ -45,7 +66,7 @@ func (su *MounterOptsUtils) FuseMountWithEnv(path string, comm string, args []st
 
 func (su *MounterOptsUtils) fuseMountInternal(path string, comm string, args []string, envVars []string) error {
 	klog.Info("-FuseMount-")
-	klog.Infof("FuseMount: params:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%v>", path, comm, args)
+	klog.Infof("FuseMount: params:\n\tpath: <%s>\n\tcommand: <%s>\n\targs: <%v>", path, comm, redactMountArgs(args))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	var mounted bool
@@ -78,7 +99,7 @@ func (su *MounterOptsUtils) fuseMountInternal(path string, comm string, args []s
 
 	err := cmd.Start()
 	if err != nil {
-		klog.Errorf("FuseMount: command start failed: mounter=%s, args=%v, error=%v", comm, args, err)
+		klog.Errorf("FuseMount: command start failed: mounter=%s, args=%v, error=%v", comm, redactMountArgs(args), err)
 		return fmt.Errorf("FuseMount: '%s' command start failed: %v", comm, err)
 	}
 	klog.Infof("FuseMount: command 'start' succeeded for '%s' mounter", comm)
@@ -101,7 +122,7 @@ func (su *MounterOptsUtils) fuseMountInternal(path string, comm string, args []s
 	select {
 	case err := <-waitCh:
 		if err != nil {
-			klog.Warningf("FuseMount: command 'wait' failed: mounter=%s, args=%v, error=%v", comm, args, err)
+			klog.Warningf("FuseMount: command 'wait' failed: mounter=%s, args=%v, error=%v", comm, redactMountArgs(args), err)
 			klog.Infof("FuseMount: checking if path already exists and is a mountpoint: path=%s", path)
 			if isMount, err1 := isMountpoint(path); err1 == nil && isMount { // check if bucket already got mounted
 				klog.Infof("bucket is already mounted using '%s' mounter", comm)

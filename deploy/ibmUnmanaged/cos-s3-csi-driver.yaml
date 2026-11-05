@@ -27,9 +27,6 @@ rules:
     resources: ["volumeattachments"]
     verbs: ["get", "list", "watch", "update"]
   - apiGroups: [""]
-    resources: ["configmaps"]
-    verbs: ["get", "list"]
-  - apiGroups: [""]
     resources: ["events"]
     verbs: ["get", "list", "watch", "create", "update", "patch"]
   - apiGroups: [""]
@@ -111,6 +108,15 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
+            # IAM_ENDPOINT: public endpoint used by default.
+            # For private network access use: https://private.iam.cloud.ibm.com
+            - name: IAM_ENDPOINT
+              value: "https://iam.cloud.ibm.com"
+            # COS_RESOURCE_CONFIG_ENDPOINT: private endpoint used by default.
+            # For direct (dedicated) network access use: https://config.direct.cloud-object-storage.cloud.ibm.com/v1
+            # For public access use: https://config.cloud-object-storage.cloud.ibm.com/v1
+            - name: COS_RESOURCE_CONFIG_ENDPOINT
+              value: "https://config.private.cloud-object-storage.cloud.ibm.com/v1"
           imagePullPolicy: Always
           volumeMounts:
             - name: plugin-dir
