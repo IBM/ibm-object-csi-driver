@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"net"
@@ -169,7 +170,7 @@ func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser)
 
 		logger.Info("New mount request with values:", zap.String("Bucket", request.Bucket), zap.String("Path", request.Path), zap.String("Mounter", request.Mounter), zap.Any("Args", redactArgsForLog(request.Args)))
 
-		if request.Mounter != constants.S3FS && request.Mounter != constants.RClone {
+		if request.Mounter != constants.S3FS && request.Mounter != constants.RClone && request.Mounter != constants.AMAZONS3MOUNTER {
 			logger.Error("invalid mounter", zap.Any("mounter", request.Mounter))
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid mounter"})
 			return
@@ -181,16 +182,20 @@ func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser)
 			return
 		}
 
-		// validate mounter args
+		// validate and parse mounter args
 		args, err := parser.Parse(request)
 		if err != nil {
 			logger.Error("failed to parse mounter args", zap.Any("mounter", request.Mounter), zap.Error(err))
-
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid args for mounter: %v", err)})
 			return
 		}
 
-		err = mounter.FuseMount(request.Path, request.Mounter, args)
+		// For mount-s3: pass AWS credential paths as env vars on the subprocess.
+		if request.Mounter == constants.AMAZONS3MOUNTER {
+			err = mounter.FuseMountWithEnv(request.Path, request.Mounter, args, buildS3EnvVars(request.Args))
+		} else {
+			err = mounter.FuseMount(request.Path, request.Mounter, args)
+		}
 		if err != nil {
 			logger.Error("mount failed: ", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("mount failed: %v", err)})
@@ -200,6 +205,37 @@ func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser)
 		logger.Info("bucket mount is successful", zap.Any("bucket", request.Bucket), zap.Any("path", request.Path))
 		c.JSON(http.StatusOK, gin.H{"status": "success"})
 	}
+}
+
+// buildS3EnvVars extracts AWS credential file paths from the request args map
+// and returns them as env var strings for the mount-s3 subprocess.
+// mount-s3 uses the AWS SDK which reads these standard env vars to locate credentials.
+//
+// IMPORTANT: must use map[string]interface{} — NOT map[string]string.
+// The args payload contains mixed types (e.g. "log-metrics": true is a bool,
+// not a string). Unmarshalling into map[string]string silently fails on any
+// bool or numeric field, returning nil and dropping both credential env vars,
+// which causes mount-s3 to fail with NoSigningCredentials.
+func buildS3EnvVars(args json.RawMessage) []string {
+	var argsMap map[string]interface{}
+	if err := json.Unmarshal(args, &argsMap); err != nil {
+		logger.Error("buildS3EnvVars: failed to unmarshal args, credential env vars will be missing",
+			zap.Error(err))
+		return nil
+	}
+
+	var envVars []string
+	if v, ok := argsMap["aws-credentials-file"]; ok {
+		if s, ok := v.(string); ok && s != "" {
+			envVars = append(envVars, "AWS_SHARED_CREDENTIALS_FILE="+s)
+		}
+	}
+	if v, ok := argsMap["aws-config-file"]; ok {
+		if s, ok := v.(string); ok && s != "" {
+			envVars = append(envVars, "AWS_CONFIG_FILE="+s)
+		}
+	}
+	return envVars
 }
 
 func handleCosUnmount(mounter mounterUtils.MounterUtils) gin.HandlerFunc {

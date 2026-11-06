@@ -231,6 +231,10 @@ func (m *FakeNewMounterOptsUtils) FuseMount(path string, comm string, args []str
 	return nil
 }
 
+func (m *FakeNewMounterOptsUtils) FuseMountWithEnv(path string, comm string, args []string, envVars []string) error {
+	return nil
+}
+
 // Fake DriverStatsUtils
 type FakeNewDriverStatsUtils struct {
 }

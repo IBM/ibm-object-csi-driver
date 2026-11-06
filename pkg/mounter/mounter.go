@@ -27,6 +27,7 @@ var (
 	MakeDir    = os.MkdirAll
 	CreateFile = os.Create
 	Chmod      = os.Chmod
+	OpenFile   = os.OpenFile
 	Stat       = os.Stat
 	RemoveAll  = os.RemoveAll
 )
@@ -39,13 +40,13 @@ type Mounter interface {
 type CSIMounterFactory struct{}
 
 type MounterParams struct {
-	Attrib          map[string]string
-	SecretMap       map[string]string
-	MountFlags      []string
+	Attrib           map[string]string
+	SecretMap        map[string]string
+	MountFlags       []string
 	KnownS3FSOptions *pkgutils.Set
-	DefaultMOMap    map[string]string
-	Gid             string
-	ReadOnly        bool
+	DefaultMOMap     map[string]string
+	Gid              string
+	ReadOnly         bool
 }
 
 type NewMounterFactory interface {
@@ -98,6 +99,14 @@ func (s *CSIMounterFactory) NewMounter(params MounterParams) Mounter {
 		})
 	case constants.RClone:
 		return NewRcloneMounter(RcloneMounterParams{
+			SecretMap:    secretMap,
+			MountOptions: mountFlags,
+			MounterUtils: mounterUtils,
+			Gid:          params.Gid,
+			ReadOnly:     params.ReadOnly,
+		})
+	case constants.AMAZONS3MOUNTER:
+		return NewMountpointS3Mounter(MountpointS3MounterParams{
 			SecretMap:    secretMap,
 			MountOptions: mountFlags,
 			MounterUtils: mounterUtils,
