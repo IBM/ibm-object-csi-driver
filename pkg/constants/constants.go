@@ -31,16 +31,15 @@ const (
 	NodeRegionLabel = "topology.kubernetes.io/region"
 
 	// Timeout specifies a time limit for requests made by HTTP Client
-	Timeout                    = 3 * time.Minute
-	COSCSIMounterSocketPath    = "/var/lib/coscsi-sock/coscsi.sock"
-	COSCSIMounterSocketPathEnv = "COS_CSI_MOUNTER_SOCKET"
-	MounterConfigPathOnHost    = "/var/lib/coscsi-config"
-	MounterConfigPathOnPodS3fs = "/var/lib/ibmc-s3fs"
-	MountpointS3BinaryPath     = "/usr/bin/mount-s3"
-
-	// Config paths for mountpoint-s3 (same pattern as rclone)
-	MounterConfigPathOnPodS3Mount = "/var/lib/coscsi-config/s3mount"
+	Timeout                       = 3 * time.Minute
+	COSCSIMounterSocketPath       = "/var/lib/coscsi-sock/coscsi.sock"
+	COSCSIMounterSocketPathEnv    = "COS_CSI_MOUNTER_SOCKET"
+	MounterConfigPathOnHost       = "/var/lib/coscsi-config"
+	MounterConfigPathOnPodS3fs    = "/var/lib/ibmc-s3fs"
 	MounterConfigPathOnPodRclone  = "/root/.config/rclone"
+	MounterConfigPathOnPodS3Mount = "/var/lib/coscsi-config/s3mount"
+	MountpointS3BinaryPath        = "/usr/bin/mount-s3"
+
 	// Interval to wait till next loop
 	Interval = 500 * time.Millisecond
 
