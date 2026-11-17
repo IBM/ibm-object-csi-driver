@@ -61,4 +61,3 @@ func (s *Set) Contains(key string) bool {
 func (s *Set) Size() int {
 	return len(s.m)
 }
-

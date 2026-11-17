@@ -8,6 +8,7 @@ package utils
 type MounterUtils interface {
 	FuseUnmount(path string) error
 	FuseMount(path string, comm string, args []string) error
+	FuseMountWithEnv(path string, comm string, args []string, envVars []string) error
 }
 
 // MounterOptsUtils is an empty struct whose methods are defined in mounter_utils.go (Linux only).
@@ -15,4 +16,7 @@ type MounterUtils interface {
 type MounterOptsUtils struct{}
 
 func (su *MounterOptsUtils) FuseMount(_ string, _ string, _ []string) error { return nil }
-func (su *MounterOptsUtils) FuseUnmount(_ string) error                      { return nil }
+func (su *MounterOptsUtils) FuseUnmount(_ string) error                     { return nil }
+func (su *MounterOptsUtils) FuseMountWithEnv(_ string, _ string, _ []string, _ []string) error {
+	return nil
+}

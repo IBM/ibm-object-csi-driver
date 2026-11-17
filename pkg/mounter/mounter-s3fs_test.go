@@ -14,9 +14,9 @@ import (
 
 var (
 	secretMap = map[string]string{
-		"cosEndpoint":        "test-endpoint",
-		"locationConstraint": "test-loc-constraint",
-		"bucketName":         "test-bucket-name",
+		"cosEndpoint":          "test-endpoint",
+		"locationConstraint":   "test-loc-constraint",
+		"bucketName":           "test-bucket-name",
 		"objectPath":           "test-obj-path",
 		constants.AccessKey:    "test-access-key",
 		constants.SecretKey:    "test-secret-key",
@@ -48,18 +48,18 @@ func TestNewS3fsMounter_Success(t *testing.T) {
 
 func TestNewS3fsMounter_Success_Hmac(t *testing.T) {
 	secretMap := map[string]string{
-		"cosEndpoint":        "test-endpoint",
-		"locationConstraint": "test-loc-constraint",
-		"bucketName":         "test-bucket-name",
+		"cosEndpoint":          "test-endpoint",
+		"locationConstraint":   "test-loc-constraint",
+		"bucketName":           "test-bucket-name",
 		"objectPath":           "test-obj-path",
 		constants.AccessKey:    "test-access-key",
 		constants.SecretKey:    "test-secret-key",
 		constants.KpRootKeyCRN: "test-kp-root-key-crn",
 		"mountOptions":         "\nkey1\nkey2=value2\nkey=val1=val2",
-		"tmpdir":             "test-tmpdir",
-		"use_cache":          "true",
-		"gid":                "test-gid",
-		"iamEndpoint":        "test-iamEndpoint",
+		"tmpdir":               "test-tmpdir",
+		"use_cache":            "true",
+		"gid":                  "test-gid",
+		"iamEndpoint":          "test-iamEndpoint",
 	}
 
 	mountOptions := []string{"opt1=val1", "opt2=val2", " ", "opt3"}
@@ -301,11 +301,11 @@ func TestRemoveS3FSCredFile_Negative(t *testing.T) {
 
 func TestAddMountParam_Integration(t *testing.T) {
 	tests := []struct {
-		name           string
-		defaultOpts    []string
-		secretOpts     string
-		wantUnknown    []string
-		wantEmpty      bool
+		name        string
+		defaultOpts []string
+		secretOpts  string
+		wantUnknown []string
+		wantEmpty   bool
 	}{
 		{"OnlyKnown", []string{"allow_other"}, "kernel_cache", nil, true},
 		{"OnlyUnknown", nil, "enable_content_md5\ncomplement_stat", []string{"enable_content_md5", "complement_stat"}, false},
@@ -390,7 +390,7 @@ func TestUpdateS3FSMountOptions_SpecialSecretFields(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			opts, _ := updateS3FSMountOptions(tt.defaultOpts, tt.secret, GetKnownS3FSOptions(), nil, "", false)
 			assert.NotNil(t, opts)
-			
+
 			optsStr := strings.Join(opts, " ")
 			if tt.wantUID {
 				assert.Contains(t, optsStr, "uid=")
@@ -407,9 +407,9 @@ func TestUpdateS3FSMountOptions_DefaultParams(t *testing.T) {
 		"cipher_suites": "AESGCM",
 		"empty_param":   "",
 	}
-	
+
 	opts, _ := updateS3FSMountOptions(nil, map[string]string{}, GetKnownS3FSOptions(), defaultParams, "", false)
-	
+
 	optsStr := strings.Join(opts, " ")
 	assert.Contains(t, optsStr, "cipher_suites=AESGCM")
 	assert.NotContains(t, optsStr, "empty_param")
@@ -448,11 +448,11 @@ func TestUpdateS3FSMountOptions_ReadOnly(t *testing.T) {
 
 func TestUpdateS3FSMountOptions_GidParam(t *testing.T) {
 	tests := []struct {
-		name        string
-		secret      map[string]string
-		gid         string
-		wantGID     string
-		wantUID     string
+		name    string
+		secret  map[string]string
+		gid     string
+		wantGID string
+		wantUID string
 	}{
 		{
 			name:    "gid param overrides secretMap gid",
@@ -511,44 +511,44 @@ func TestUpdateS3FSMountOptionsWithUnknownOptions(t *testing.T) {
 		expectAddMountParamContains string
 	}{
 		{
-			name:           "Known and unknown options",
-			defaultMountOp: []string{"allow_other", "enable_content_md5=true"},
-			secretMap:      map[string]string{"mountOptions": "cipher_suites=default"},
+			name:                        "Known and unknown options",
+			defaultMountOp:              []string{"allow_other", "enable_content_md5=true"},
+			secretMap:                   map[string]string{"mountOptions": "cipher_suites=default"},
 			expectAddMountParamPresent:  true,
 			expectAddMountParamContains: "enable_content_md5=true",
 		},
 		{
-			name:           "Only known options",
-			defaultMountOp: []string{"allow_other"},
-			secretMap:      map[string]string{},
+			name:                        "Only known options",
+			defaultMountOp:              []string{"allow_other"},
+			secretMap:                   map[string]string{},
 			expectAddMountParamPresent:  false,
 			expectAddMountParamContains: "",
 		},
 		{
-			name:           "Unknown option without value",
-			defaultMountOp: []string{"custom_flag"},
-			secretMap:      map[string]string{},
+			name:                        "Unknown option without value",
+			defaultMountOp:              []string{"custom_flag"},
+			secretMap:                   map[string]string{},
 			expectAddMountParamPresent:  true,
 			expectAddMountParamContains: "custom_flag",
 		},
 		{
-			name:           "Multiple unknown options from secretMap",
-			defaultMountOp: []string{},
-			secretMap:      map[string]string{"mountOptions": "unknown1=val1\nunknown2=val2"},
+			name:                        "Multiple unknown options from secretMap",
+			defaultMountOp:              []string{},
+			secretMap:                   map[string]string{"mountOptions": "unknown1=val1\nunknown2=val2"},
 			expectAddMountParamPresent:  true,
 			expectAddMountParamContains: "unknown1=val1",
 		},
 		{
-			name:           "Empty line in mountOptions",
-			defaultMountOp: []string{},
-			secretMap:      map[string]string{"mountOptions": "allow_other\n\nunknown_opt=test"},
+			name:                        "Empty line in mountOptions",
+			defaultMountOp:              []string{},
+			secretMap:                   map[string]string{"mountOptions": "allow_other\n\nunknown_opt=test"},
 			expectAddMountParamPresent:  true,
 			expectAddMountParamContains: "unknown_opt=test",
 		},
 		{
-			name:           "Invalid option in defaultMountOp",
-			defaultMountOp: []string{"", "allow_other"},
-			secretMap:      map[string]string{},
+			name:                        "Invalid option in defaultMountOp",
+			defaultMountOp:              []string{"", "allow_other"},
+			secretMap:                   map[string]string{},
 			expectAddMountParamPresent:  false,
 			expectAddMountParamContains: "",
 		},

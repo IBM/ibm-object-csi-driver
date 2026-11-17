@@ -27,6 +27,11 @@ func (m *MockMounterUtils) FuseUnmount(path string) error {
 	return argsCalled.Error(0)
 }
 
+func (m *MockMounterUtils) FuseMountWithEnv(path string, comm string, args []string, envVars []string) error {
+	argsCalled := m.Called(path, comm, args, envVars)
+	return argsCalled.Error(0)
+}
+
 type fakeListener struct{}
 
 func (d *fakeListener) Accept() (net.Conn, error) {
