@@ -195,6 +195,14 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		params["mounter"] = mounter
 	}
 
+	iamEndpoint := secretMap["iamEndpoint"]
+	if iamEndpoint == "" {
+		iamEndpoint = params["iamEndpoint"]
+	}
+	if iamEndpoint != "" {
+		params["iamEndpoint"] = iamEndpoint
+	}
+
 	bucketName = secretMap["bucketName"]
 
 	// Check for bucketVersioning parameter
