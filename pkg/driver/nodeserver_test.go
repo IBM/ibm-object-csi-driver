@@ -170,6 +170,41 @@ func TestNodePublishVolume(t *testing.T) {
 			expectedErr:  nil,
 		},
 		{
+			testCaseName: "Positive: Successful with parameters from VolumeContext (PV)",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:   testVolumeID,
+				TargetPath: testTargetPath,
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: volumeCapabilities[0],
+					},
+				},
+				VolumeContext: map[string]string{
+					"bucketName":         "pv-bucket",
+					"cosEndpoint":        "https://s3.direct.us-east.cloud-object-storage.appdomain.cloud",
+					"locationConstraint": "us-east-standard",
+					"iamEndpoint":        "https://private.iam.cloud.ibm.com",
+					"objectPath":         "pv-subfolder",
+					"client":             "awss3",
+					"mounter":            constants.RClone,
+				},
+				Secrets: map[string]string{
+					constants.ApiKey:    "testApiKey",
+					constants.ServiceId: "testServiceId",
+				},
+			},
+			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{
+				CheckMountFn: func(targetPath string) error {
+					return nil
+				},
+			}),
+			Mounter: &mounter.FakeMounterFactory{
+				Mounter: constants.RClone,
+			},
+			expectedResp: &csi.NodePublishVolumeResponse{},
+			expectedErr:  nil,
+		},
+		{
 			testCaseName:     "Negative: Volume ID is missing",
 			req:              &csi.NodePublishVolumeRequest{},
 			driverStatsUtils: utils.NewFakeStatsUtilsImpl(utils.FakeStatsUtilsFuncStruct{}),

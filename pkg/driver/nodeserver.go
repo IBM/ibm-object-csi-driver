@@ -126,41 +126,60 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 	if accessMode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY {
 		readOnly = true
 	}
-	attrib := req.GetVolumeContext()
+	volumeAttributes := req.GetVolumeContext()
 	mountFlags := req.GetVolumeCapability().GetMount().GetMountFlags()
-	klog.V(2).Infof("-NodePublishVolume-: targetPath: %v\ndeviceID: %v\nreadonly: %v\nvolumeId: %v\nattributes: %v\nmountFlags: %v\n",
-		targetPath, deviceID, readOnly, volumeID, attrib, mountFlags)
+	klog.V(2).Infof("-NodePublishVolume-: targetPath: %v\ndeviceID: %v\nreadonly: %v\nvolumeId: %v\nvolumeAttributes: %v\nmountFlags: %v\n",
+		targetPath, deviceID, readOnly, volumeID, volumeAttributes, mountFlags)
 
-	secretMap := req.GetSecrets()
-	klog.V(2).Infof("-NodePublishVolume-: length of req.GetSecrets() length: %v", len(secretMap))
-	secretMapCopy := make(map[string]string)
-	for k, v := range secretMap {
+	secrets := req.GetSecrets()
+	klog.V(2).Infof("-NodePublishVolume-: length of req.GetSecrets() length: %v", len(secrets))
+	secretsMasked := make(map[string]string)
+	for k, v := range secrets {
 		if k == constants.AccessKey || k == constants.SecretKey || k == constants.ApiKey || k == constants.KpRootKeyCRN || k == constants.ServiceId || k == constants.ResourceConfigApiKey {
-			secretMapCopy[k] = "xxxxxxx"
+			secretsMasked[k] = "xxxxxxx"
 			continue
 		}
-		secretMapCopy[k] = v
+		secretsMasked[k] = v
 	}
-	klog.V(2).Infof("-NodePublishVolume-: secretMap: %v", secretMapCopy)
+	klog.V(2).Infof("-NodePublishVolume-: secrets: %v", secretsMasked)
 
-	if len(secretMap["cosEndpoint"]) == 0 {
-		secretMap["cosEndpoint"] = attrib["cosEndpoint"]
-	}
-
-	if len(secretMap["locationConstraint"]) == 0 {
-		secretMap["locationConstraint"] = attrib["locationConstraint"]
+	// volumeParams holds the resolved configuration (from PV volumeAttributes, Secret, and driver defaults)
+	volumeParams := make(map[string]string)
+	for k, v := range secrets {
+		volumeParams[k] = v
 	}
 
-	if len(secretMap["cosEndpoint"]) == 0 {
+	cosEndpoint := volumeAttributes["cosEndpoint"]
+	if cosEndpoint == "" {
+		cosEndpoint = secrets["cosEndpoint"]
+	}
+	if cosEndpoint == "" {
 		return nil, status.Error(codes.InvalidArgument, "S3 Service endpoint not provided")
 	}
+	volumeParams["cosEndpoint"] = cosEndpoint
 
-	if len(secretMap["iamEndpoint"]) == 0 {
-		secretMap["iamEndpoint"] = ns.iamEndpoint
+	locationConstraint := volumeAttributes["locationConstraint"]
+	if locationConstraint == "" {
+		locationConstraint = secrets["locationConstraint"]
+	}
+	if locationConstraint != "" {
+		volumeParams["locationConstraint"] = locationConstraint
 	}
 
-	// If bucket name wasn't provided by user, we use temp bucket created for volume.
-	if secretMap["bucketName"] == "" {
+	iamEndpoint := volumeAttributes["iamEndpoint"]
+	if iamEndpoint == "" {
+		iamEndpoint = secrets["iamEndpoint"]
+	}
+	if iamEndpoint == "" {
+		iamEndpoint = ns.iamEndpoint
+	}
+	volumeParams["iamEndpoint"] = iamEndpoint
+
+	bucketName := volumeAttributes["bucketName"]
+	if bucketName == "" {
+		bucketName = secrets["bucketName"]
+	}
+	if bucketName == "" {
 		tempBucketName, err := ns.Stats.GetBucketNameFromPV(volumeID)
 		if err != nil {
 			klog.Errorf("Unable to fetch pv %v", err)
@@ -172,7 +191,32 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 			return nil, status.Error(codes.Internal, "unable to fetch bucket name from pv")
 		}
 
-		secretMap["bucketName"] = tempBucketName
+		bucketName = tempBucketName
+	}
+	volumeParams["bucketName"] = bucketName
+
+	objectPath := volumeAttributes["objectPath"]
+	if objectPath == "" {
+		objectPath = secrets["objectPath"]
+	}
+	if objectPath != "" {
+		volumeParams["objectPath"] = objectPath
+	}
+
+	client := volumeAttributes["client"]
+	if client == "" {
+		client = secrets["client"]
+	}
+	if client != "" {
+		volumeParams["client"] = client
+	}
+
+	mounterType := volumeAttributes["mounter"]
+	if mounterType == "" {
+		mounterType = secrets["mounter"]
+	}
+	if mounterType != "" {
+		volumeParams["mounter"] = mounterType
 	}
 
 	var defaultParamsMap = map[string]string{
@@ -180,8 +224,8 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 	}
 
 	mounterObj := ns.Mounter.NewMounter(mounter.MounterParams{
-		Attrib:           attrib,
-		SecretMap:        secretMap,
+		Attrib:           volumeAttributes,
+		SecretMap:        volumeParams,
 		MountFlags:       mountFlags,
 		KnownS3FSOptions: ns.KnownS3FSOptions,
 		DefaultMOMap:     defaultParamsMap,
@@ -195,7 +239,7 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		return nil, err
 	}
 
-	klog.Infof("s3: bucket %s successfully mounted to %s", secretMap["bucketName"], targetPath)
+	klog.Infof("s3: bucket %s successfully mounted to %s", volumeParams["bucketName"], targetPath)
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
