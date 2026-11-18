@@ -7,8 +7,10 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
@@ -188,6 +190,93 @@ func pathValidator(targetPath string) error {
 		}
 	}
 	return fmt.Errorf("bad value for target path \"%v\"", targetPath)
+}
+
+// s3BucketPattern matches standard S3 bucket names (3-63 chars, alphanumeric, ., -)
+var s3BucketPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9.-]{1,61}[a-zA-Z0-9]$`)
+var s3IPv4Pattern = regexp.MustCompile(`^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$`)
+
+func validateBucketName(bucketName string) error {
+	bucketName = strings.TrimSpace(bucketName)
+	if bucketName == "" {
+		return fmt.Errorf("bucket name cannot be empty")
+	}
+	if len(bucketName) < 3 || len(bucketName) > 63 {
+		return fmt.Errorf("bucket name %q length must be between 3 and 63 characters", bucketName)
+	}
+	if !s3BucketPattern.MatchString(bucketName) {
+		return fmt.Errorf("bucket name %q contains invalid characters", bucketName)
+	}
+	if strings.Contains(bucketName, "..") {
+		return fmt.Errorf("bucket name %q cannot contain consecutive periods", bucketName)
+	}
+	if strings.Contains(bucketName, ".-") || strings.Contains(bucketName, "-.") {
+		return fmt.Errorf("bucket name %q cannot contain adjacent period and hyphen", bucketName)
+	}
+	if s3IPv4Pattern.MatchString(bucketName) {
+		return fmt.Errorf("bucket name %q must not be formatted as an IP address", bucketName)
+	}
+	return nil
+}
+
+func validateObjectPath(objectPath string) error {
+	if objectPath == "" {
+		return nil
+	}
+	if strings.Contains(objectPath, "..") {
+		return fmt.Errorf("object path %q contains directory traversal (..)", objectPath)
+	}
+	cleaned := path.Clean("/" + objectPath)
+	if strings.HasPrefix(cleaned, "/..") {
+		return fmt.Errorf("object path %q resolves outside bucket boundary", objectPath)
+	}
+	if strings.ContainsRune(objectPath, 0) {
+		return fmt.Errorf("object path contains null character")
+	}
+	return nil
+}
+
+func validateBucketTarget(mounter, bucket string) error {
+	bucket = strings.TrimSpace(bucket)
+	if bucket == "" {
+		return fmt.Errorf("missing bucket in request")
+	}
+
+	switch mounter {
+	case constants.RClone:
+		if !strings.HasPrefix(bucket, "ibmcos:") {
+			return fmt.Errorf("invalid rclone remote prefix in bucket %q: expected 'ibmcos:<bucket>'", bucket)
+		}
+		raw := strings.TrimPrefix(bucket, "ibmcos:")
+		parts := strings.SplitN(raw, "/", 2)
+		bucketName := parts[0]
+		if err := validateBucketName(bucketName); err != nil {
+			return fmt.Errorf("invalid rclone bucket: %w", err)
+		}
+		if len(parts) == 2 && parts[1] != "" {
+			if err := validateObjectPath(parts[1]); err != nil {
+				return fmt.Errorf("invalid rclone object path: %w", err)
+			}
+		}
+		return nil
+
+	case constants.S3FS:
+		parts := strings.SplitN(bucket, ":", 2)
+		bucketName := parts[0]
+		if err := validateBucketName(bucketName); err != nil {
+			return fmt.Errorf("invalid s3fs bucket: %w", err)
+		}
+		if len(parts) == 2 && parts[1] != "" {
+			subPath := strings.TrimPrefix(parts[1], "/")
+			if err := validateObjectPath(subPath); err != nil {
+				return fmt.Errorf("invalid s3fs object path: %w", err)
+			}
+		}
+		return nil
+
+	default:
+		return fmt.Errorf("unknown mounter: %s", mounter)
+	}
 }
 
 // --- Parser for Mounter Arguments ---

@@ -3,11 +3,35 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"go.uber.org/zap"
 )
+
+// s3fsOptionPattern matches valid safe s3fs mount options: key or key=value
+var s3fsOptionPattern = regexp.MustCompile(`^[a-zA-Z0-9_.-]+(?:=[a-zA-Z0-9_./:-]+)?$`)
+
+var s3fsReservedOptions = jsonFieldNames(S3FSArgs{})
+
+func validateS3FSAddMountParam(extra string) error {
+	for _, token := range strings.Split(extra, ",") {
+		token = strings.TrimSpace(token)
+		if token == "" {
+			continue
+		}
+		if !s3fsOptionPattern.MatchString(token) {
+			return fmt.Errorf("invalid s3fs option %q in add-mount-param", token)
+		}
+		parts := strings.SplitN(token, "=", 2)
+		optName := strings.TrimSpace(parts[0])
+		if _, reserved := s3fsReservedOptions[optName]; reserved {
+			return fmt.Errorf("add-mount-param: option %q is already a known parameter and cannot be set via add-mount-param", optName)
+		}
+	}
+	return nil
+}
 
 type S3FSArgs struct {
 	AllowOther              string `json:"allow_other,omitempty"`
@@ -345,6 +369,13 @@ func (args S3FSArgs) Validate(targetPath string) error {
 			zap.String("url", args.URL))
 		return fmt.Errorf("bad value for url \"%v\": scheme is missing."+
 			" Must be of the form http://<hostname> or https://<hostname>", args.URL)
+	}
+
+	if args.AddMountParam != "" {
+		if err := validateS3FSAddMountParam(args.AddMountParam); err != nil {
+			logger.Error("invalid add-mount-param value for s3fs", zap.Error(err))
+			return err
+		}
 	}
 
 	return nil

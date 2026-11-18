@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 
@@ -23,6 +24,8 @@ var rcloneFlagPattern = regexp.MustCompile(`^--([a-z][a-z0-9-]*)(?:=(.*))?$`)
 // parameter (e.g. trying to override --config via add-mount-param).
 var rcloneKnownFlags = jsonFieldNames(RCloneArgs{})
 
+var ReadConfigFile = os.ReadFile
+
 // validateAddMountParam validates every comma-separated token in the add-mount-param
 // string. Each token must look like --flag or --flag=value (lowercase rclone
 // flag name format). Tokens whose flag name collides with a known RCloneArgs
@@ -42,6 +45,58 @@ func validateAddMountParam(extra string) error {
 			return fmt.Errorf("add-mount-param: flag %q is already a known parameter and cannot be set via add-mount-param", flagName)
 		}
 	}
+	return nil
+}
+
+func validateRcloneConfigFile(configPath string) error {
+	if configPath == "" {
+		return nil
+	}
+	content, err := ReadConfigFile(configPath)
+	if err != nil {
+		return fmt.Errorf("cannot read rclone config file: %w", err)
+	}
+
+	lines := strings.Split(string(content), "\n")
+	typeCount := 0
+	sectionCount := 0
+
+	for lineNum, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, ";") {
+			continue
+		}
+
+		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+			sectionCount++
+			section := strings.TrimSpace(line[1 : len(line)-1])
+			if section != "ibmcos" {
+				return fmt.Errorf("invalid section [%s] in rclone config at line %d; only [ibmcos] is permitted", section, lineNum+1)
+			}
+			continue
+		}
+
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			k := strings.ToLower(strings.TrimSpace(parts[0]))
+			v := strings.TrimSpace(parts[1])
+
+			if k == "type" {
+				typeCount++
+				if strings.ToLower(v) != "s3" {
+					return fmt.Errorf("invalid backend type %q in rclone config at line %d; only 's3' is permitted", v, lineNum+1)
+				}
+			}
+		}
+	}
+
+	if sectionCount != 1 {
+		return fmt.Errorf("expected exactly 1 section [ibmcos] in rclone config, found %d", sectionCount)
+	}
+	if typeCount != 1 {
+		return fmt.Errorf("expected exactly 1 'type = s3' entry in rclone config, found %d", typeCount)
+	}
+
 	return nil
 }
 
@@ -157,6 +212,11 @@ func (args RCloneArgs) Validate(targetPath string) error {
 	} else if !exists {
 		logger.Error("rclone config file not found")
 		return fmt.Errorf("rclone config file not found")
+	}
+
+	if err := validateRcloneConfigFile(args.ConfigPath); err != nil {
+		logger.Error("rclone config file validation failed", zap.Error(err))
+		return fmt.Errorf("rclone config validation failed: %w", err)
 	}
 
 	// Check if value of daemon parameter is boolean "true" or "false"

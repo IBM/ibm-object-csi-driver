@@ -132,6 +132,9 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 		klog.Info("custom secret parameters parsed successfully, length of custom secret: ", len(secretMapCustom))
 
 		if objectPath, exists := secretMapCustom["objectPath"]; exists {
+			if err := utils.ValidateObjectPath(objectPath); err != nil {
+				return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid objectPath in secret: %v", err))
+			}
 			klog.Infof("volume_id:%q objectPath found in secret: %q", volumeID, objectPath)
 			params["objectPath"] = objectPath
 		} else {
@@ -196,6 +199,11 @@ func (cs *controllerServer) CreateVolume(_ context.Context, req *csi.CreateVolum
 	}
 
 	bucketName = secretMap["bucketName"]
+	if bucketName != "" {
+		if err := utils.ValidateBucketName(bucketName); err != nil {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid bucketName %q: %v", bucketName, err))
+		}
+	}
 
 	// Check for bucketVersioning parameter
 	if val, ok := secretMap[constants.BucketVersioning]; ok && val != "" {
