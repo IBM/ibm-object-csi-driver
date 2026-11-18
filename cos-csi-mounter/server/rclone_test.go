@@ -229,3 +229,39 @@ func TestValidateAddMountParam_OnlyCommas(t *testing.T) {
 	err := validateAddMountParam(",,,")
 	assert.NoError(t, err)
 }
+
+func TestValidateRcloneConfigFile(t *testing.T) {
+	origRead := ReadConfigFile
+	defer func() { ReadConfigFile = origRead }()
+
+	// Valid config
+	ReadConfigFile = func(path string) ([]byte, error) {
+		return []byte("[ibmcos]\ntype = s3\nprovider = IBMCOS\nendpoint = https://s3.example.com\n"), nil
+	}
+	err := validateRcloneConfigFile("/fake/rclone.conf")
+	assert.NoError(t, err)
+
+	// Invalid: type = local (HackerOne #4135843)
+	ReadConfigFile = func(path string) ([]byte, error) {
+		return []byte("[ibmcos]\ntype = s3\nprovider = IBMCOS\ntype = local\n"), nil
+	}
+	err = validateRcloneConfigFile("/fake/rclone.conf")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "only 's3' is permitted")
+
+	// Invalid: section is [local]
+	ReadConfigFile = func(path string) ([]byte, error) {
+		return []byte("[local]\ntype = local\n"), nil
+	}
+	err = validateRcloneConfigFile("/fake/rclone.conf")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "only [ibmcos] is permitted")
+
+	// Invalid: duplicate type = s3
+	ReadConfigFile = func(path string) ([]byte, error) {
+		return []byte("[ibmcos]\ntype = s3\ntype = s3\n"), nil
+	}
+	err = validateRcloneConfigFile("/fake/rclone.conf")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "expected exactly 1 'type = s3' entry")
+}

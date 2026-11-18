@@ -175,9 +175,9 @@ func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser)
 			return
 		}
 
-		if request.Bucket == "" {
-			logger.Error("missing bucket in request")
-			c.JSON(http.StatusBadRequest, gin.H{"error": "missing bucket"})
+		if err := validateBucketTarget(request.Mounter, request.Bucket); err != nil {
+			logger.Error("invalid bucket target in request", zap.String("bucket", request.Bucket), zap.Error(err))
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid bucket target: %v", err)})
 			return
 		}
 

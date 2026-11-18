@@ -159,8 +159,13 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		secretMap["iamEndpoint"] = ns.iamEndpoint
 	}
 
-	// If bucket name wasn't provided by user, we use temp bucket created for volume.
-	if secretMap["bucketName"] == "" {
+	// Validate user-provided bucketName or fetch and validate temp bucket from PV.
+	if secretMap["bucketName"] != "" {
+		if err := utils.ValidateBucketName(secretMap["bucketName"]); err != nil {
+			klog.Errorf("Invalid bucketName in secret: %v", err)
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid bucketName %q in secret: %v", secretMap["bucketName"], err))
+		}
+	} else {
 		tempBucketName, err := ns.Stats.GetBucketNameFromPV(volumeID)
 		if err != nil {
 			klog.Errorf("Unable to fetch pv %v", err)
@@ -172,7 +177,19 @@ func (ns *nodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 			return nil, status.Error(codes.Internal, "unable to fetch bucket name from pv")
 		}
 
+		if err := utils.ValidateBucketName(tempBucketName); err != nil {
+			klog.Errorf("Invalid bucketName from PV: %v", err)
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid bucketName %q from PV: %v", tempBucketName, err))
+		}
+
 		secretMap["bucketName"] = tempBucketName
+	}
+
+	if objectPath := secretMap["objectPath"]; objectPath != "" {
+		if err := utils.ValidateObjectPath(objectPath); err != nil {
+			klog.Errorf("Invalid objectPath in secret: %v", err)
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid objectPath in secret: %v", err))
+		}
 	}
 
 	var defaultParamsMap = map[string]string{

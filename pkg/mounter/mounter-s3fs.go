@@ -131,6 +131,15 @@ func (s3fs *S3fsMounter) Mount(source string, target string) error {
 	klog.Info("-S3FSMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
 
+	if err := pkgutils.ValidateBucketName(s3fs.BucketName); err != nil {
+		klog.Errorf("S3FSMounter Mount: invalid bucket name %q: %v", s3fs.BucketName, err)
+		return err
+	}
+	if err := pkgutils.ValidateObjectPath(s3fs.ObjectPath); err != nil {
+		klog.Errorf("S3FSMounter Mount: invalid object path %q: %v", s3fs.ObjectPath, err)
+		return err
+	}
+
 	var s3fsCredDir string
 	if mountWorker {
 		s3fsCredDir = constants.MounterConfigPathOnHost

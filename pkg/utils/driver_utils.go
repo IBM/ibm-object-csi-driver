@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
+	"regexp"
 	"strings"
 
 	"github.com/IBM/go-sdk-core/v5/core"
@@ -352,6 +354,58 @@ func CreateK8sClient() (*kubernetes.Clientset, error) {
 	}
 
 	return clientset, nil
+}
+
+// s3BucketNameRegex defines the valid pattern for S3/COS bucket names:
+// - 3 to 63 characters long
+// - Lowercase letters, numbers, hyphens, and periods (case-insensitive for compatibility)
+// - Must start and end with a letter or number
+var s3BucketNameRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9.-]{1,61}[a-zA-Z0-9]$`)
+
+// ipv4Regex matches IPv4 address format (S3 buckets must not be formatted as an IP address)
+var ipv4Regex = regexp.MustCompile(`^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$`)
+
+// ValidateBucketName validates an S3/COS bucket name according to object storage naming rules.
+// Rejects path separators (/ and \), directory traversals (..), and invalid length or characters.
+func ValidateBucketName(bucketName string) error {
+	bucketName = strings.TrimSpace(bucketName)
+	if bucketName == "" {
+		return fmt.Errorf("bucket name cannot be empty")
+	}
+	if len(bucketName) < 3 || len(bucketName) > 63 {
+		return fmt.Errorf("bucket name %q length must be between 3 and 63 characters, got %d", bucketName, len(bucketName))
+	}
+	if !s3BucketNameRegex.MatchString(bucketName) {
+		return fmt.Errorf("bucket name %q is invalid: must start and end with an alphanumeric character and contain only alphanumeric characters, periods, and hyphens", bucketName)
+	}
+	if strings.Contains(bucketName, "..") {
+		return fmt.Errorf("bucket name %q cannot contain consecutive periods (..)", bucketName)
+	}
+	if strings.Contains(bucketName, ".-") || strings.Contains(bucketName, "-.") {
+		return fmt.Errorf("bucket name %q cannot contain adjacent period and hyphen", bucketName)
+	}
+	if ipv4Regex.MatchString(bucketName) {
+		return fmt.Errorf("bucket name %q must not be formatted as an IP address", bucketName)
+	}
+	return nil
+}
+
+// ValidateObjectPath validates that an object subpath within a bucket does not attempt directory traversal.
+func ValidateObjectPath(objectPath string) error {
+	if objectPath == "" {
+		return nil
+	}
+	if strings.Contains(objectPath, "..") {
+		return fmt.Errorf("object path %q contains invalid directory traversal (..)", objectPath)
+	}
+	cleaned := path.Clean("/" + objectPath)
+	if strings.HasPrefix(cleaned, "/..") {
+		return fmt.Errorf("object path %q resolves outside bucket boundary", objectPath)
+	}
+	if strings.ContainsRune(objectPath, 0) {
+		return fmt.Errorf("object path contains null character")
+	}
+	return nil
 }
 
 func fetchSecretUsingPV(volumeID string, su *DriverStatsUtils) (*v1.Secret, error) {

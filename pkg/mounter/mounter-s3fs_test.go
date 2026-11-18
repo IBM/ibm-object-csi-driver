@@ -91,6 +91,7 @@ func TestS3FSMount_NodeServer_Positive(t *testing.T) {
 	}
 
 	s3fs := &S3fsMounter{
+		BucketName: "testBucket",
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path, comm string, args []string) error {
 				return nil
@@ -119,6 +120,7 @@ func TestS3FSMount_WorkerNode_Positive(t *testing.T) {
 	}
 
 	s3fs := &S3fsMounter{
+		BucketName: "testBucket",
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseMountFn: func(path, comm string, args []string) error {
 				return nil
@@ -132,7 +134,9 @@ func TestS3FSMount_WorkerNode_Positive(t *testing.T) {
 }
 
 func TestMount_CreateDirFails_Negative(t *testing.T) {
-	s3fs := &S3fsMounter{}
+	s3fs := &S3fsMounter{
+		BucketName: "testBucket",
+	}
 
 	MakeDir = func(path string, perm os.FileMode) error {
 		return errors.New("failed to create directory")
@@ -151,7 +155,9 @@ func TestMount_FailedToCreatePassFile_Negative(t *testing.T) {
 		return errors.New("failed to create file")
 	}
 
-	s3fs := &S3fsMounter{}
+	s3fs := &S3fsMounter{
+		BucketName: "testBucket",
+	}
 
 	err := s3fs.Mount(source, target)
 	assert.Error(t, err)
@@ -171,7 +177,9 @@ func TestS3FSMount_WorkerNode_Negative(t *testing.T) {
 		return errors.New("failed to perform http request")
 	}
 
-	s3fs := &S3fsMounter{}
+	s3fs := &S3fsMounter{
+		BucketName: "testBucket",
+	}
 
 	err := s3fs.Mount(source, target)
 	assert.Error(t, err)
@@ -666,12 +674,6 @@ func TestS3FSMount_WorkerNode_InjectedBucketName_CannotOverridePath(t *testing.T
 	MakeDir = func(_ string, _ os.FileMode) error { return nil }
 	writePassWrap = func(_, _ string) error { return nil }
 
-	var capturedPayload string
-	mounterRequest = func(payload, _ string) error {
-		capturedPayload = payload
-		return nil
-	}
-
 	attackBucketName := `b","path":"/var/lib/kubelet/pods/victim/volumes/kubernetes.io~csi/pvc-victim/mount","z":"`
 	legitimateTarget := "/var/lib/kubelet/pods/legit/volumes/x"
 
@@ -684,20 +686,8 @@ func TestS3FSMount_WorkerNode_InjectedBucketName_CannotOverridePath(t *testing.T
 	}
 
 	err := s3fs.Mount("source", legitimateTarget)
-	assert.NoError(t, err)
-
-	// The payload MUST be valid JSON (no injection breakout).
-	var parsed map[string]interface{}
-	assert.NoError(t, json.Unmarshal([]byte(capturedPayload), &parsed),
-		"payload must remain valid JSON even with attacker-controlled bucket name: %s", capturedPayload)
-
-	// "path" must be the legitimate driver-chosen target, not the injected victim path.
-	assert.Equal(t, legitimateTarget, parsed["path"],
-		"injected bucket name must not override the legitimate mount path")
-
-	// The injected victim path must NOT appear as the value of "path".
-	assert.NotEqual(t, "/var/lib/kubelet/pods/victim/volumes/kubernetes.io~csi/pvc-victim/mount", parsed["path"],
-		"attacker-injected path must not become the mount path")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "length must be between 3 and 63 characters")
 }
 
 func TestS3FSMount_WorkerNode_InjectedTargetPath_PayloadIsValidJSON(t *testing.T) {

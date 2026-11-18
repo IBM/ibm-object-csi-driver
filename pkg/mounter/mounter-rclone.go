@@ -24,6 +24,7 @@ import (
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
+	driverutils "github.com/IBM/ibm-object-csi-driver/pkg/utils"
 	"k8s.io/klog/v2"
 )
 
@@ -104,6 +105,25 @@ var rcloneServerKnownFlags = map[string]struct{}{
 	"write-back-cache":          {},
 }
 
+// rcloneForbiddenConfigKeys is the set of config keys that are forbidden from
+// being specified in secret mountOptions (e.g., to prevent backend hijacking or credential tampering).
+var rcloneForbiddenConfigKeys = map[string]struct{}{
+	"type":                     {},
+	"provider":                 {},
+	"endpoint":                 {},
+	"access_key_id":            {},
+	"secret_access_key":        {},
+	"ibm_api_key":              {},
+	"ibm_resource_instance_id": {},
+	"ibm_iam_endpoint":         {},
+	"location_constraint":      {},
+	"env_auth":                 {},
+	"v2_auth":                  {},
+	"auth_type":                {},
+	"client":                   {},
+	"service_id":               {},
+}
+
 type RcloneMounterParams struct {
 	SecretMap    map[string]string
 	MountOptions []string
@@ -147,6 +167,11 @@ func classifyRcloneParams(options []string) (configOpts []string, cliFlags []str
 			cliFlags = append(cliFlags, opt)
 		} else {
 			// Contains "_" or has no leading dash → config file opt
+			normalizedKey := strings.ToLower(key)
+			if _, forbidden := rcloneForbiddenConfigKeys[normalizedKey]; forbidden {
+				klog.Warningf("Dropping forbidden config option in classifyRcloneParams: %s", key)
+				continue
+			}
 			configOpts = append(configOpts, opt)
 		}
 	}
@@ -285,6 +310,14 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 		}
 		parts := strings.SplitN(line, "=", 2)
 		key := strings.TrimSpace(parts[0])
+		normalizedKey := strings.ToLower(strings.TrimPrefix(strings.TrimPrefix(key, "--"), "-"))
+
+		// Drop forbidden config keys (e.g. type=local)
+		if _, forbidden := rcloneForbiddenConfigKeys[normalizedKey]; forbidden {
+			klog.Warningf("Dropping forbidden mountOptions key: %s", key)
+			continue
+		}
+
 		if len(parts) == 2 {
 			mountOptsMap[key] = strings.TrimSpace(parts[1])
 		} else {
@@ -311,6 +344,15 @@ func updateMountOptions(dafaultMountOptions []string, secretMap map[string]strin
 func (rclone *RcloneMounter) Mount(source string, target string) error {
 	klog.Info("-RcloneMounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
+
+	if err := driverutils.ValidateBucketName(rclone.BucketName); err != nil {
+		klog.Errorf("RcloneMounter Mount: invalid bucket name %q: %v", rclone.BucketName, err)
+		return err
+	}
+	if err := driverutils.ValidateObjectPath(rclone.ObjectPath); err != nil {
+		klog.Errorf("RcloneMounter Mount: invalid object path %q: %v", rclone.ObjectPath, err)
+		return err
+	}
 
 	var bucketName string
 	var err error
@@ -450,8 +492,21 @@ func createConfig(configPathWithVolID string, rclone *RcloneMounter, extraConfig
 		configParams = append(configParams, "location_constraint = "+rclone.LocConstraint)
 	}
 
-	// Append config-file lines classified from MountOptions (keys with "_" or no dash prefix)
-	configParams = append(configParams, extraConfigLines...)
+	// Append config-file lines classified from MountOptions (keys with "_" or no dash prefix),
+	// filtering out any attempts to inject duplicate/forbidden keys (e.g. type=local).
+	for _, extraLine := range extraConfigLines {
+		extraLine = strings.TrimSpace(extraLine)
+		if extraLine == "" {
+			continue
+		}
+		parts := strings.SplitN(extraLine, "=", 2)
+		k := strings.ToLower(strings.TrimSpace(parts[0]))
+		if _, forbidden := rcloneForbiddenConfigKeys[k]; forbidden {
+			klog.Warningf("createConfig: skipping forbidden config line %q", extraLine)
+			continue
+		}
+		configParams = append(configParams, extraLine)
+	}
 
 	if err := MakeDir(configPathWithVolID, 0755); // #nosec G301: used for rclone
 	err != nil {

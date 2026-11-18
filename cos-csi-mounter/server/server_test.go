@@ -186,6 +186,44 @@ func TestHandleCosMount_MissingBucket(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "missing bucket")
 }
 
+func TestHandleCosMount_InvalidBucketTarget_RcloneAndS3FS(t *testing.T) {
+	mockMounter := new(MockMounterUtils)
+	router := gin.Default()
+	router.POST("/mount", handleCosMount(mockMounter, &MockMounterArgsParser{}))
+
+	invalidCases := []struct {
+		mounter string
+		bucket  string
+	}{
+		{mounter: constants.RClone, bucket: "ibmcos:/etc"},
+		{mounter: constants.RClone, bucket: "/etc"},
+		{mounter: constants.RClone, bucket: "local:/etc"},
+		{mounter: constants.RClone, bucket: "ibmcos:../etc"},
+		{mounter: constants.S3FS, bucket: "/etc"},
+		{mounter: constants.S3FS, bucket: "../etc"},
+		{mounter: constants.S3FS, bucket: "invalid..bucket"},
+	}
+
+	for _, tc := range invalidCases {
+		reqBody := map[string]interface{}{
+			"mounter": tc.mounter,
+			"bucket":  tc.bucket,
+			"path":    "/mnt/data",
+			"args":    json.RawMessage(`{"endpoint": "s3.test"}`),
+		}
+		body, _ := json.Marshal(reqBody)
+
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/mount", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code, "expected 400 for bucket %s (%s)", tc.bucket, tc.mounter)
+		assert.Contains(t, w.Body.String(), "invalid bucket target")
+	}
+}
+
 func TestHandleCosMount_InvalidMounterArgs(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

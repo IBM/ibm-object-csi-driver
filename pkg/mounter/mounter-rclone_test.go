@@ -167,7 +167,9 @@ func TestRcloneMount_NodeServer_Positive(t *testing.T) {
 }
 
 func TestRcloneMount_CreateConfigFails_Negative(t *testing.T) {
-	rclone := &RcloneMounter{}
+	rclone := &RcloneMounter{
+		BucketName: "testBucket",
+	}
 
 	createConfigWrap = func(_ string, _ *RcloneMounter, _ []string) error {
 		return errors.New("failed to create config file")
@@ -655,12 +657,6 @@ func TestRcloneMount_WorkerNode_InjectedBucketName_CannotOverridePath(t *testing
 
 	createConfigWrap = func(_ string, _ *RcloneMounter, _ []string) error { return nil }
 
-	var capturedPayload string
-	mounterRequest = func(payload, _ string) error {
-		capturedPayload = payload
-		return nil
-	}
-
 	attackBucketName := `ibmcos:b","path":"/var/lib/kubelet/pods/victim/volumes/kubernetes.io~csi/pvc-victim/mount","z":"`
 	legitimateTarget := "/var/lib/kubelet/pods/legit/volumes/x"
 
@@ -673,17 +669,8 @@ func TestRcloneMount_WorkerNode_InjectedBucketName_CannotOverridePath(t *testing
 	}
 
 	err := rclone.Mount("source", legitimateTarget)
-	assert.NoError(t, err)
-
-	var parsed map[string]interface{}
-	assert.NoError(t, json.Unmarshal([]byte(capturedPayload), &parsed),
-		"payload must remain valid JSON even with attacker-controlled bucket name: %s", capturedPayload)
-
-	assert.Equal(t, legitimateTarget, parsed["path"],
-		"injected bucket name must not override the legitimate mount path")
-
-	assert.NotEqual(t, "/var/lib/kubelet/pods/victim/volumes/kubernetes.io~csi/pvc-victim/mount", parsed["path"],
-		"attacker-injected path must not become the mount path")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "length must be between 3 and 63 characters")
 }
 
 func TestRcloneUnmount_WorkerNode_PayloadIsValidJSON(t *testing.T) {
