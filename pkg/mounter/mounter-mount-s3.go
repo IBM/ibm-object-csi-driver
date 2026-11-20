@@ -29,8 +29,9 @@ type MountS3Mounter struct {
 	UID string
 	GID string
 
-	LogLevel string
-	CacheDir string
+	LogLevel     string
+	LogDirectory string
+	CacheDir     string
 
 	ReadOnly          bool
 	AllowDelete       bool
@@ -270,8 +271,10 @@ func parseMountS3Options(mounter *MountS3Mounter, opts []string) []string {
 				mounter.LogLevel = value
 			}
 		case "log-directory":
-			// Hardcoded — user-supplied value is ignored.
+			// Hardcoded — user-supplied value is ignored; the struct field is set
+			// to the fixed path so callers can read it back consistently.
 			klog.Warningf("parseMountS3Options: 'log-directory' is hardcoded to %q and cannot be overridden. Ignoring.", s3MountLogDirectory)
+			mounter.LogDirectory = s3MountLogDirectory
 		case "force-path-style":
 			// Hardcoded — always enabled for IBM COS compatibility.
 			klog.Warningf("parseMountS3Options: 'force-path-style' is hardcoded and cannot be overridden. Ignoring.")
@@ -320,7 +323,7 @@ func (s3 *MountS3Mounter) Mount(source string, target string) error {
 	}
 
 	// NOTE: No directory validation or creation here.
-	// The log directory (hardcoded) and CacheDir are forwarded to the worker via workerNodeOp.
+	// LogDirectory and CacheDir are forwarded to the worker via workerNodeOp.
 	// The worker's Validate() calls ensureDir() which creates them if missing.
 
 	var configPath string
@@ -348,18 +351,26 @@ func (s3 *MountS3Mounter) Mount(source string, target string) error {
 	if mountWorker {
 		klog.Info("Mount on Worker started...")
 
-		jsonData, err := json.Marshal(wnOp)
+		mountReq := struct {
+			Path    string        `json:"path"`
+			Bucket  string        `json:"bucket"`
+			Mounter string        `json:"mounter"`
+			Args    s3MounterArgs `json:"args"`
+		}{
+			Path:    target,
+			Bucket:  bucketName,
+			Mounter: constants.AMAZONS3MOUNTER,
+			Args:    wnOp,
+		}
+		payloadBytes, err := json.Marshal(mountReq)
 		if err != nil {
-			klog.Errorf("Error marshalling mount args: %v", err)
+			klog.Errorf("Error marshalling mount request: %v", err)
 			return err
 		}
 
-		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`,
-			target, bucketName, constants.AMAZONS3MOUNTER, jsonData)
+		klog.Infof("MountS3Mounter: worker payload: %s", payloadBytes)
 
-		klog.Infof("MountS3Mounter: worker payload: %s", payload)
-
-		err = mounterRequest(payload, "http://unix/api/cos/mount")
+		err = mounterRequest(string(payloadBytes), "http://unix/api/cos/mount")
 		if err != nil {
 			klog.Errorf("failed to mount on worker: %v", err)
 			return err
@@ -379,9 +390,18 @@ func (s3 *MountS3Mounter) Unmount(target string) error {
 	if mountWorker {
 		klog.Info("Unmount on Worker started...")
 
-		payload := fmt.Sprintf(`{"path":"%s"}`, target)
+		unmountReq := struct {
+			Path string `json:"path"`
+		}{
+			Path: target,
+		}
+		payloadBytes, err := json.Marshal(unmountReq)
+		if err != nil {
+			klog.Errorf("Error marshalling unmount request: %v", err)
+			return err
+		}
 
-		err := mounterRequest(payload, "http://unix/api/cos/unmount")
+		err = mounterRequest(string(payloadBytes), "http://unix/api/cos/unmount")
 		if err != nil {
 			klog.Errorf("failed to unmount on worker: %v", err)
 			return err

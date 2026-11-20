@@ -728,10 +728,12 @@ func TestParseMountS3Options(t *testing.T) {
 		},
 		{
 			name: "Parse log-directory",
-			// log-directory is hardcoded — any user-supplied value is ignored and
-			// not forwarded as a passthrough flag.
-			opts:              []string{"--log-directory=/some/custom/path"},
-			expectedMounter:   &MountS3Mounter{},
+			// log-directory is now hardcoded — any user-supplied value is ignored and
+			// the struct is always set to the fixed path s3MountLogDirectory.
+			opts: []string{"--log-directory=/some/custom/path"},
+			expectedMounter: &MountS3Mounter{
+				LogDirectory: s3MountLogDirectory,
+			},
 			expectedRemaining: []string{},
 		},
 		{
@@ -758,6 +760,7 @@ func TestParseMountS3Options(t *testing.T) {
 			assert.Equal(t, tt.expectedMounter.UID, mounter.UID)
 			assert.Equal(t, tt.expectedMounter.GID, mounter.GID)
 			assert.Equal(t, tt.expectedMounter.LogLevel, mounter.LogLevel)
+			assert.Equal(t, tt.expectedMounter.LogDirectory, mounter.LogDirectory)
 			assert.Equal(t, tt.expectedMounter.CacheDir, mounter.CacheDir)
 			assert.Equal(t, tt.expectedMounter.ReadOnly, mounter.ReadOnly)
 			assert.Equal(t, tt.expectedMounter.AllowOverwrite, mounter.AllowOverwrite)
