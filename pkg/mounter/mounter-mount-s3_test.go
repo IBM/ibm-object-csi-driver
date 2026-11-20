@@ -2,10 +2,11 @@ package mounter
 
 import (
 	"errors"
-	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
+
+	mounterUtils "github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -24,8 +25,8 @@ cache=/tmp/cache`,
 	s3MounterMountOptions = []string{"--dir-mode=0755", "--file-mode=0644"}
 )
 
-func TestNewMountpointS3Mounter_Success(t *testing.T) {
-	mounter := NewMountpointS3Mounter(MountpointS3MounterParams{
+func TestNewMountS3Mounter_Success(t *testing.T) {
+	mounter := NewMountS3Mounter(MountS3MounterParams{
 		SecretMap:    s3MounterSecretMap,
 		MountOptions: s3MounterMountOptions,
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
@@ -33,7 +34,7 @@ func TestNewMountpointS3Mounter_Success(t *testing.T) {
 		ReadOnly:     true,
 	})
 
-	s3Mounter, ok := mounter.(*MountpointS3Mounter)
+	s3Mounter, ok := mounter.(*MountS3Mounter)
 	assert.True(t, ok)
 
 	assert.Equal(t, s3MounterSecretMap["bucketName"], s3Mounter.BucketName)
@@ -53,41 +54,41 @@ func TestNewMountpointS3Mounter_Success(t *testing.T) {
 	assert.Contains(t, s3Mounter.MountOptions, "--file-mode=0644")
 }
 
-func TestNewMountpointS3Mounter_GidWithoutUid(t *testing.T) {
+func TestNewMountS3Mounter_GidWithoutUid(t *testing.T) {
 	secretMap := map[string]string{}
 
-	mounter := NewMountpointS3Mounter(MountpointS3MounterParams{
+	mounter := NewMountS3Mounter(MountS3MounterParams{
 		SecretMap:    secretMap,
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
 		Gid:          "2000",
 	})
 
-	s3Mounter, ok := mounter.(*MountpointS3Mounter)
+	s3Mounter, ok := mounter.(*MountS3Mounter)
 	assert.True(t, ok)
 	// When gid is set and no uid in secretMap, UID is also set to gid value.
 	assert.Equal(t, "2000", s3Mounter.UID)
 	assert.Equal(t, "2000", s3Mounter.GID)
 }
 
-func TestNewMountpointS3Mounter_UidOverridesGid(t *testing.T) {
+func TestNewMountS3Mounter_UidOverridesGid(t *testing.T) {
 	secretMap := map[string]string{
 		"uid": "1000",
 	}
 
-	mounter := NewMountpointS3Mounter(MountpointS3MounterParams{
+	mounter := NewMountS3Mounter(MountS3MounterParams{
 		SecretMap:    secretMap,
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
 		Gid:          "2000",
 	})
 
-	s3Mounter, ok := mounter.(*MountpointS3Mounter)
+	s3Mounter, ok := mounter.(*MountS3Mounter)
 	assert.True(t, ok)
 	// uid from secretMap takes precedence over gid param for the UID field.
 	assert.Equal(t, "1000", s3Mounter.UID)
 	assert.Equal(t, "2000", s3Mounter.GID)
 }
 
-func TestMountpointS3Mount_NodeServer_Positive(t *testing.T) {
+func TestMountS3Mount_NodeServer_Positive(t *testing.T) {
 	mountWorker = false
 
 	MakeDir = func(path string, perm os.FileMode) error {
@@ -103,7 +104,7 @@ func TestMountpointS3Mount_NodeServer_Positive(t *testing.T) {
 		},
 	})
 
-	s3Mounter := &MountpointS3Mounter{
+	s3Mounter := &MountS3Mounter{
 		MounterUtils:  mockUtils,
 		BucketName:    "test-bucket",
 		ObjectPath:    "test-path",
@@ -122,7 +123,7 @@ func TestMountpointS3Mount_NodeServer_Positive(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestMountpointS3Mount_NodeServer_WithEnvMounter(t *testing.T) {
+func TestMountS3Mount_NodeServer_WithEnvMounter(t *testing.T) {
 	mountWorker = false
 
 	MakeDir = func(path string, perm os.FileMode) error {
@@ -138,7 +139,7 @@ func TestMountpointS3Mount_NodeServer_WithEnvMounter(t *testing.T) {
 		},
 	})
 
-	s3Mounter := &MountpointS3Mounter{
+	s3Mounter := &MountS3Mounter{
 		MounterUtils:  mockUtils,
 		BucketName:    "test-bucket",
 		EndPoint:      "https://s3.us-east.cloud-object-storage.appdomain.cloud",
@@ -152,7 +153,7 @@ func TestMountpointS3Mount_NodeServer_WithEnvMounter(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestMountpointS3Mount_WorkerNode_Positive(t *testing.T) {
+func TestMountS3Mount_WorkerNode_Positive(t *testing.T) {
 	mountWorker = true
 
 	MakeDir = func(path string, perm os.FileMode) error {
@@ -165,7 +166,7 @@ func TestMountpointS3Mount_WorkerNode_Positive(t *testing.T) {
 		return nil
 	}
 
-	s3Mounter := &MountpointS3Mounter{
+	s3Mounter := &MountS3Mounter{
 		MounterUtils:  mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
 		BucketName:    "test-bucket",
 		EndPoint:      "https://s3.us-east.cloud-object-storage.appdomain.cloud",
@@ -178,14 +179,14 @@ func TestMountpointS3Mount_WorkerNode_Positive(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestMountpointS3Mount_CreateDirFails_Negative(t *testing.T) {
+func TestMountS3Mount_CreateDirFails_Negative(t *testing.T) {
 	mountWorker = false
 
 	MakeDir = func(path string, perm os.FileMode) error {
 		return errors.New("failed to create directory")
 	}
 
-	s3Mounter := &MountpointS3Mounter{
+	s3Mounter := &MountS3Mounter{
 		BucketName: "test-bucket",
 		AccessKey:  "test-access-key",
 		SecretKey:  "test-secret-key",
@@ -196,7 +197,7 @@ func TestMountpointS3Mount_CreateDirFails_Negative(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to create directory")
 }
 
-func TestMountpointS3Mount_CreateCredFileFails_Negative(t *testing.T) {
+func TestMountS3Mount_CreateCredFileFails_Negative(t *testing.T) {
 	mountWorker = false
 
 	MakeDir = func(path string, perm os.FileMode) error {
@@ -206,7 +207,7 @@ func TestMountpointS3Mount_CreateCredFileFails_Negative(t *testing.T) {
 		return nil, errors.New("failed to create file")
 	}
 
-	s3Mounter := &MountpointS3Mounter{
+	s3Mounter := &MountS3Mounter{
 		BucketName: "test-bucket",
 		AccessKey:  "test-access-key",
 		SecretKey:  "test-secret-key",
@@ -217,7 +218,7 @@ func TestMountpointS3Mount_CreateCredFileFails_Negative(t *testing.T) {
 	assert.Contains(t, err.Error(), "cannot create file")
 }
 
-func TestMountpointS3Mount_WorkerNode_Negative(t *testing.T) {
+func TestMountS3Mount_WorkerNode_Negative(t *testing.T) {
 	mountWorker = true
 
 	MakeDir = func(path string, perm os.FileMode) error {
@@ -230,7 +231,7 @@ func TestMountpointS3Mount_WorkerNode_Negative(t *testing.T) {
 		return errors.New("failed to perform http request")
 	}
 
-	s3Mounter := &MountpointS3Mounter{
+	s3Mounter := &MountS3Mounter{
 		BucketName: "test-bucket",
 		AccessKey:  "test-access-key",
 		SecretKey:  "test-secret-key",
@@ -241,12 +242,12 @@ func TestMountpointS3Mount_WorkerNode_Negative(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to perform http request")
 }
 
-func TestMountpointS3Unmount_NodeServer(t *testing.T) {
+func TestMountS3Unmount_NodeServer(t *testing.T) {
 	mountWorker = false
 
 	removeS3ConfigFile = func(configPath, target string) {}
 
-	s3Mounter := &MountpointS3Mounter{
+	s3Mounter := &MountS3Mounter{
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseUnmountFn: func(path string) error {
 				return nil
@@ -258,7 +259,7 @@ func TestMountpointS3Unmount_NodeServer(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestMountpointS3Unmount_WorkerNode(t *testing.T) {
+func TestMountS3Unmount_WorkerNode(t *testing.T) {
 	mountWorker = true
 
 	removeS3ConfigFile = func(configPath, target string) {}
@@ -267,7 +268,7 @@ func TestMountpointS3Unmount_WorkerNode(t *testing.T) {
 		return nil
 	}
 
-	s3Mounter := &MountpointS3Mounter{
+	s3Mounter := &MountS3Mounter{
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseUnmountFn: func(path string) error {
 				return nil
@@ -279,14 +280,14 @@ func TestMountpointS3Unmount_WorkerNode(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestMountpointS3Unmount_WorkerNode_Negative(t *testing.T) {
+func TestMountS3Unmount_WorkerNode_Negative(t *testing.T) {
 	mountWorker = true
 
 	mounterRequest = func(payload, url string) error {
 		return errors.New("failed to create http request")
 	}
 
-	s3Mounter := &MountpointS3Mounter{
+	s3Mounter := &MountS3Mounter{
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseUnmountFn: func(path string) error {
 				return nil
@@ -299,12 +300,12 @@ func TestMountpointS3Unmount_WorkerNode_Negative(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to create http request")
 }
 
-func TestMountpointS3Unmount_NodeServer_Negative(t *testing.T) {
+func TestMountS3Unmount_NodeServer_Negative(t *testing.T) {
 	mountWorker = false
 
 	removeS3ConfigFile = func(configPath, target string) {}
 
-	s3Mounter := &MountpointS3Mounter{
+	s3Mounter := &MountS3Mounter{
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{
 			FuseUnmountFn: func(path string) error {
 				return errors.New("failed to unmount")
@@ -371,7 +372,7 @@ func TestRemoveS3MountConfigFile_Negative(t *testing.T) {
 }
 
 func TestFormulateMountOptions_AllOptions(t *testing.T) {
-	s3Mounter := &MountpointS3Mounter{
+	s3Mounter := &MountS3Mounter{
 		BucketName:    "test-bucket",
 		ObjectPath:    "test-path",
 		EndPoint:      "https://s3.us-east.cloud-object-storage.appdomain.cloud",
@@ -422,7 +423,7 @@ func TestFormulateMountOptions_AllOptions(t *testing.T) {
 }
 
 func TestFormulateMountOptions_LogLevelDebugCrt(t *testing.T) {
-	s3Mounter := &MountpointS3Mounter{
+	s3Mounter := &MountS3Mounter{
 		LogLevel: "debug-crt",
 	}
 
@@ -433,7 +434,7 @@ func TestFormulateMountOptions_LogLevelDebugCrt(t *testing.T) {
 }
 
 func TestFormulateMountOptions_LogLevelNoLog(t *testing.T) {
-	s3Mounter := &MountpointS3Mounter{
+	s3Mounter := &MountS3Mounter{
 		LogLevel: "no-log",
 	}
 
@@ -444,7 +445,7 @@ func TestFormulateMountOptions_LogLevelNoLog(t *testing.T) {
 }
 
 func TestFormulateMountOptions_InvalidLogLevel(t *testing.T) {
-	s3Mounter := &MountpointS3Mounter{
+	s3Mounter := &MountS3Mounter{
 		LogLevel: "invalid-level",
 	}
 
@@ -458,7 +459,7 @@ func TestFormulateMountOptions_InvalidLogLevel(t *testing.T) {
 }
 
 func TestFormulateMountOptions_MinimalConfig(t *testing.T) {
-	s3Mounter := &MountpointS3Mounter{
+	s3Mounter := &MountS3Mounter{
 		MountOptions: []string{},
 	}
 
@@ -484,7 +485,7 @@ func TestCreateS3MountConfig_Success(t *testing.T) {
 		return os.CreateTemp("", "test")
 	}
 
-	s3Mounter := &MountpointS3Mounter{
+	s3Mounter := &MountS3Mounter{
 		AccessKey:     "test-access-key",
 		SecretKey:     "test-secret-key",
 		LocConstraint: "us-east",
@@ -500,7 +501,7 @@ func TestCreateS3MountConfig_MakeDirFails(t *testing.T) {
 		return errors.New("failed to create directory")
 	}
 
-	s3Mounter := &MountpointS3Mounter{
+	s3Mounter := &MountS3Mounter{
 		AccessKey: "test-access-key",
 		SecretKey: "test-secret-key",
 	}
@@ -518,7 +519,7 @@ func TestCreateS3MountConfig_CreateFileFails(t *testing.T) {
 		return nil, errors.New("failed to create file")
 	}
 
-	s3Mounter := &MountpointS3Mounter{
+	s3Mounter := &MountS3Mounter{
 		AccessKey: "test-access-key",
 		SecretKey: "test-secret-key",
 	}
@@ -686,18 +687,18 @@ cache=/tmp/cache`,
 	}
 }
 
-// Test parseMountpointS3Options function
-func TestParseMountpointS3Options(t *testing.T) {
+// Test parseMountS3Options function
+func TestParseMountS3Options(t *testing.T) {
 	tests := []struct {
 		name              string
 		opts              []string
-		expectedMounter   *MountpointS3Mounter
+		expectedMounter   *MountS3Mounter
 		expectedRemaining []string
 	}{
 		{
 			name: "Parse structured options",
 			opts: []string{"--uid=1000", "--gid=2000", "--log-level=debug", "--cache=/tmp/cache", "--read-only"},
-			expectedMounter: &MountpointS3Mounter{
+			expectedMounter: &MountS3Mounter{
 				UID:      "1000",
 				GID:      "2000",
 				LogLevel: "debug",
@@ -710,7 +711,7 @@ func TestParseMountpointS3Options(t *testing.T) {
 		{
 			name: "Parse with passthrough options",
 			opts: []string{"--uid=1000", "--max-threads=32", "--dir-mode=0755"},
-			expectedMounter: &MountpointS3Mounter{
+			expectedMounter: &MountS3Mounter{
 				UID: "1000",
 			},
 			expectedRemaining: []string{"--max-threads=32", "--dir-mode=0755"},
@@ -718,7 +719,7 @@ func TestParseMountpointS3Options(t *testing.T) {
 		{
 			name: "Parse allow-overwrite and incremental-upload",
 			opts: []string{"--allow-overwrite", "--incremental-upload"},
-			expectedMounter: &MountpointS3Mounter{
+			expectedMounter: &MountS3Mounter{
 				// allow-overwrite is now hardcoded — parsed value is ignored.
 				AllowOverwrite:    false,
 				IncrementalUpload: true,
@@ -727,18 +728,16 @@ func TestParseMountpointS3Options(t *testing.T) {
 		},
 		{
 			name: "Parse log-directory",
-			// log-directory is now hardcoded — any user-supplied value is ignored and
-			// the struct is always set to the fixed path s3MountLogDirectory.
-			opts: []string{"--log-directory=/some/custom/path"},
-			expectedMounter: &MountpointS3Mounter{
-				LogDirectory: s3MountLogDirectory,
-			},
+			// log-directory is hardcoded — any user-supplied value is ignored and
+			// not forwarded as a passthrough flag.
+			opts:              []string{"--log-directory=/some/custom/path"},
+			expectedMounter:   &MountS3Mounter{},
 			expectedRemaining: []string{},
 		},
 		{
 			name: "Ignore allow-other",
 			opts: []string{"--allow-other", "--uid=1000"},
-			expectedMounter: &MountpointS3Mounter{
+			expectedMounter: &MountS3Mounter{
 				UID: "1000",
 			},
 			expectedRemaining: []string{},
@@ -746,20 +745,19 @@ func TestParseMountpointS3Options(t *testing.T) {
 		{
 			name:              "Add double dash to options without it",
 			opts:              []string{"max-threads=32", "dir-mode=0755"},
-			expectedMounter:   &MountpointS3Mounter{},
+			expectedMounter:   &MountS3Mounter{},
 			expectedRemaining: []string{"--max-threads=32", "--dir-mode=0755"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mounter := &MountpointS3Mounter{}
-			remaining := parseMountpointS3Options(mounter, tt.opts)
+			mounter := &MountS3Mounter{}
+			remaining := parseMountS3Options(mounter, tt.opts)
 
 			assert.Equal(t, tt.expectedMounter.UID, mounter.UID)
 			assert.Equal(t, tt.expectedMounter.GID, mounter.GID)
 			assert.Equal(t, tt.expectedMounter.LogLevel, mounter.LogLevel)
-			assert.Equal(t, tt.expectedMounter.LogDirectory, mounter.LogDirectory)
 			assert.Equal(t, tt.expectedMounter.CacheDir, mounter.CacheDir)
 			assert.Equal(t, tt.expectedMounter.ReadOnly, mounter.ReadOnly)
 			assert.Equal(t, tt.expectedMounter.AllowOverwrite, mounter.AllowOverwrite)
@@ -770,7 +768,7 @@ func TestParseMountpointS3Options(t *testing.T) {
 }
 
 // Test incremental-upload blocking
-func TestNewMountpointS3Mounter_IncrementalUploadBlocked(t *testing.T) {
+func TestNewMountS3Mounter_IncrementalUploadBlocked(t *testing.T) {
 	secretMap := map[string]string{
 		"bucketName": "test-bucket",
 		"accessKey":  "test-access-key",
@@ -779,12 +777,12 @@ func TestNewMountpointS3Mounter_IncrementalUploadBlocked(t *testing.T) {
 allow-overwrite`,
 	}
 
-	mounter := NewMountpointS3Mounter(MountpointS3MounterParams{
+	mounter := NewMountS3Mounter(MountS3MounterParams{
 		SecretMap:    secretMap,
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
 	})
 
-	s3Mounter, ok := mounter.(*MountpointS3Mounter)
+	s3Mounter, ok := mounter.(*MountS3Mounter)
 	assert.True(t, ok)
 
 	// incremental-upload should be blocked (set to false)
@@ -794,7 +792,7 @@ allow-overwrite`,
 }
 
 // Test SC and secret mount options precedence
-func TestNewMountpointS3Mounter_MountOptionsPrecedence(t *testing.T) {
+func TestNewMountS3Mounter_MountOptionsPrecedence(t *testing.T) {
 	secretMap := map[string]string{
 		"bucketName": "test-bucket",
 		"accessKey":  "test-access-key",
@@ -806,13 +804,13 @@ maximum-throughput-gbps=25`,
 	// --allow-delete is now hardcoded — it must not appear in passthrough MountOptions.
 	scMountOptions := []string{"--max-threads=32", "--maximum-throughput-gbps=10", "--allow-delete"}
 
-	mounter := NewMountpointS3Mounter(MountpointS3MounterParams{
+	mounter := NewMountS3Mounter(MountS3MounterParams{
 		SecretMap:    secretMap,
 		MountOptions: scMountOptions,
 		MounterUtils: mounterUtils.NewFakeMounterUtilsImpl(mounterUtils.FakeMounterUtilsFuncStruct{}),
 	})
 
-	s3Mounter, ok := mounter.(*MountpointS3Mounter)
+	s3Mounter, ok := mounter.(*MountS3Mounter)
 	assert.True(t, ok)
 
 	// Secret options should override SC options for same keys.
@@ -828,7 +826,7 @@ maximum-throughput-gbps=25`,
 }
 
 // Test read-only priority resolution in Mount
-func TestMountpointS3Mount_ReadOnlyPriority(t *testing.T) {
+func TestMountS3Mount_ReadOnlyPriority(t *testing.T) {
 	mountWorker = false
 
 	MakeDir = func(path string, perm os.FileMode) error {
@@ -844,7 +842,7 @@ func TestMountpointS3Mount_ReadOnlyPriority(t *testing.T) {
 		},
 	})
 
-	s3Mounter := &MountpointS3Mounter{
+	s3Mounter := &MountS3Mounter{
 		MounterUtils:   mockUtils,
 		BucketName:     "test-bucket",
 		AccessKey:      "test-access-key",

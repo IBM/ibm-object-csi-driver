@@ -106,7 +106,7 @@ func (s *CSIMounterFactory) NewMounter(params MounterParams) Mounter {
 			ReadOnly:     params.ReadOnly,
 		})
 	case constants.AMAZONS3MOUNTER:
-		return NewMountpointS3Mounter(MountpointS3MounterParams{
+		return NewMountS3Mounter(MountS3MounterParams{
 			SecretMap:    secretMap,
 			MountOptions: mountFlags,
 			MounterUtils: mounterUtils,

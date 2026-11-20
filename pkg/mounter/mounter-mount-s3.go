@@ -16,8 +16,8 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// MountpointS3Mounter implements Mounter for AWS Mountpoint S3.
-type MountpointS3Mounter struct {
+// MountS3Mounter implements Mounter for AWS Mountpoint S3.
+type MountS3Mounter struct {
 	BucketName    string
 	ObjectPath    string
 	EndPoint      string
@@ -29,9 +29,8 @@ type MountpointS3Mounter struct {
 	UID string
 	GID string
 
-	LogLevel     string
-	LogDirectory string
-	CacheDir     string
+	LogLevel string
+	CacheDir string
 
 	ReadOnly          bool
 	AllowDelete       bool
@@ -48,6 +47,14 @@ const (
 	// s3MountLogDirectory is the hardcoded log directory for mount-s3, matching
 	// the same convention as rclone's hardcoded --log-file=/var/log/rclone.log.
 	s3MountLogDirectory = "/var/log/mount-s3"
+
+	s3MountCredentialsFile = "credentials"
+	s3MountConfigFile      = "config"
+	s3MountAwsProfile      = "default"
+)
+
+var (
+	removeS3ConfigFile = removeS3MountConfigFile
 )
 
 // s3MounterArgs holds the args sent to the worker node daemon for mount-s3.
@@ -81,17 +88,7 @@ type s3MounterArgs struct {
 	Args []string `json:"args,omitempty"`
 }
 
-const (
-	s3MountCredentialsFile = "credentials"
-	s3MountConfigFile      = "config"
-	s3MountAwsProfile      = "default"
-)
-
-var (
-	removeS3ConfigFile = removeS3MountConfigFile
-)
-
-type MountpointS3MounterParams struct {
+type MountS3MounterParams struct {
 	SecretMap    map[string]string
 	MountOptions []string
 	MounterUtils utils.MounterUtils
@@ -99,7 +96,7 @@ type MountpointS3MounterParams struct {
 	ReadOnly     bool
 }
 
-// NewMountpointS3Mounter creates a new MountpointS3Mounter from the unified
+// NewMountS3Mounter creates a new MountS3Mounter from the unified
 // secret format.
 //
 // Precedence (lowest → highest):
@@ -109,16 +106,16 @@ type MountpointS3MounterParams struct {
 //
 // For passthrough flags, deduplication is applied: if the same flag key appears
 // in both SC and secret, the SC entry is dropped and the secret entry is kept.
-func NewMountpointS3Mounter(params MountpointS3MounterParams) Mounter {
+func NewMountS3Mounter(params MountS3MounterParams) Mounter {
 	secretMap := params.SecretMap
 	mountOptions := params.MountOptions
 	mounterUtils := params.MounterUtils
 	gid := params.Gid
 	readOnly := params.ReadOnly
 
-	klog.Info("-newMountpointS3Mounter-")
+	klog.Info("-newMountS3Mounter-")
 
-	mounter := &MountpointS3Mounter{}
+	mounter := &MountS3Mounter{}
 
 	if val, ok := secretMap["accessKey"]; ok {
 		mounter.AccessKey = val
@@ -155,11 +152,11 @@ func NewMountpointS3Mounter(params MountpointS3MounterParams) Mounter {
 	mounter.AuthType = "hmac"
 
 	// Step 1: parse SC options.
-	scRemainder := parseMountpointS3Options(mounter, mountOptions)
+	scRemainder := parseMountS3Options(mounter, mountOptions)
 
 	// Step 2: parse secret options (structured fields set by secret override SC).
 	secretOpts := splitSecretMountOptions(secretMap["mountOptions"])
-	secretRemainder := parseMountpointS3Options(mounter, secretOpts)
+	secretRemainder := parseMountS3Options(mounter, secretOpts)
 
 	// Step 3: deduplicate passthroughs — secret wins over SC on same key.
 	mounter.MountOptions = deduplicatePassthrough(scRemainder, secretRemainder)
@@ -179,9 +176,9 @@ func NewMountpointS3Mounter(params MountpointS3MounterParams) Mounter {
 
 	mounter.MounterUtils = mounterUtils
 
-	klog.Infof("newMountpointS3Mounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
+	klog.Infof("newMountS3Mounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
 		mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType)
-	klog.Infof("newMountpointS3Mounter: SC mountOptions=%v secretMountOptions=%v deduplicated passthrough=%v",
+	klog.Infof("newMountS3Mounter: SC mountOptions=%v secretMountOptions=%v deduplicated passthrough=%v",
 		mountOptions, secretOpts, mounter.MountOptions)
 
 	return mounter
@@ -246,8 +243,8 @@ func splitSecretMountOptions(raw string) []string {
 	return opts
 }
 
-// parseMountpointS3Options parses mount-s3 options from the provided slice.
-func parseMountpointS3Options(mounter *MountpointS3Mounter, opts []string) []string {
+// parseMountS3Options parses mount-s3 options from the provided slice.
+func parseMountS3Options(mounter *MountS3Mounter, opts []string) []string {
 	var remaining []string
 
 	for _, opt := range opts {
@@ -256,9 +253,9 @@ func parseMountpointS3Options(mounter *MountpointS3Mounter, opts []string) []str
 
 		switch key {
 		case "allow-other":
-			klog.Infof("parseMountpointS3Options: 'allow-other' is always enabled and cannot be overridden.")
+			klog.Infof("parseMountS3Options: 'allow-other' is always enabled and cannot be overridden.")
 		case "umask":
-			klog.Warningf("parseMountpointS3Options: 'umask' is not supported by mount-s3. " +
+			klog.Warningf("parseMountS3Options: 'umask' is not supported by mount-s3. " +
 				"Use --dir-mode / --file-mode instead. Ignoring.")
 		case "uid":
 			if hasValue {
@@ -273,26 +270,24 @@ func parseMountpointS3Options(mounter *MountpointS3Mounter, opts []string) []str
 				mounter.LogLevel = value
 			}
 		case "log-directory":
-			// Hardcoded — user-supplied value is ignored; the struct field is set
-			// to the fixed path so callers can read it back consistently.
-			klog.Warningf("parseMountpointS3Options: 'log-directory' is hardcoded to %q and cannot be overridden. Ignoring.", s3MountLogDirectory)
-			mounter.LogDirectory = s3MountLogDirectory
+			// Hardcoded — user-supplied value is ignored.
+			klog.Warningf("parseMountS3Options: 'log-directory' is hardcoded to %q and cannot be overridden. Ignoring.", s3MountLogDirectory)
 		case "force-path-style":
 			// Hardcoded — always enabled for IBM COS compatibility.
-			klog.Warningf("parseMountpointS3Options: 'force-path-style' is hardcoded and cannot be overridden. Ignoring.")
+			klog.Warningf("parseMountS3Options: 'force-path-style' is hardcoded and cannot be overridden. Ignoring.")
 		case "cache":
 			if hasValue {
 				mounter.CacheDir = value
 			}
 		case "read-only":
 			// read-only is now set directly from MounterParams.ReadOnly — ignore if passed via flags.
-			klog.Warningf("parseMountpointS3Options: 'read-only' is set via MounterParams and cannot be overridden via mount options. Ignoring.")
+			klog.Warningf("parseMountS3Options: 'read-only' is set via MounterParams and cannot be overridden via mount options. Ignoring.")
 		case "allow-delete":
 			// Hardcoded — always enabled unless read-only. User override ignored.
-			klog.Warningf("parseMountpointS3Options: 'allow-delete' is hardcoded and cannot be overridden. Ignoring.")
+			klog.Warningf("parseMountS3Options: 'allow-delete' is hardcoded and cannot be overridden. Ignoring.")
 		case "allow-overwrite":
 			// Hardcoded — always enabled unless read-only. User override ignored.
-			klog.Warningf("parseMountpointS3Options: 'allow-overwrite' is hardcoded and cannot be overridden. Ignoring.")
+			klog.Warningf("parseMountS3Options: 'allow-overwrite' is hardcoded and cannot be overridden. Ignoring.")
 		case "incremental-upload":
 			mounter.IncrementalUpload = true
 		default:
@@ -308,24 +303,24 @@ func parseMountpointS3Options(mounter *MountpointS3Mounter, opts []string) []str
 }
 
 // Mount mounts the S3 bucket using mountpoint-s3.
-func (s3 *MountpointS3Mounter) Mount(source string, target string) error {
-	klog.Info("-MountpointS3Mounter Mount-")
+func (s3 *MountS3Mounter) Mount(source string, target string) error {
+	klog.Info("-MountS3Mounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
 
 	// Read-only priority resolution: suppress write-enabling flags.
 	if s3.ReadOnly {
 		if s3.AllowDelete {
-			klog.Infof("MountpointS3Mounter: read-only set — clearing allow-delete")
+			klog.Infof("MountS3Mounter: read-only set — clearing allow-delete")
 			s3.AllowDelete = false
 		}
 		if s3.AllowOverwrite {
-			klog.Infof("MountpointS3Mounter: read-only set — clearing allow-overwrite")
+			klog.Infof("MountS3Mounter: read-only set — clearing allow-overwrite")
 			s3.AllowOverwrite = false
 		}
 	}
 
 	// NOTE: No directory validation or creation here.
-	// LogDirectory and CacheDir are forwarded to the worker via workerNodeOp.
+	// The log directory (hardcoded) and CacheDir are forwarded to the worker via workerNodeOp.
 	// The worker's Validate() calls ensureDir() which creates them if missing.
 
 	var configPath string
@@ -338,7 +333,7 @@ func (s3 *MountpointS3Mounter) Mount(source string, target string) error {
 	configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
 
 	if err := createS3MountConfig(configPathWithVolID, s3); err != nil {
-		klog.Errorf("MountpointS3Mounter Mount: Cannot create config file: %v", err)
+		klog.Errorf("MountS3Mounter Mount: Cannot create config file: %v", err)
 		return err
 	}
 
@@ -362,7 +357,7 @@ func (s3 *MountpointS3Mounter) Mount(source string, target string) error {
 		payload := fmt.Sprintf(`{"path":"%s","bucket":"%s","mounter":"%s","args":%s}`,
 			target, bucketName, constants.AMAZONS3MOUNTER, jsonData)
 
-		klog.Infof("MountpointS3Mounter: worker payload: %s", payload)
+		klog.Infof("MountS3Mounter: worker payload: %s", payload)
 
 		err = mounterRequest(payload, "http://unix/api/cos/mount")
 		if err != nil {
@@ -374,12 +369,12 @@ func (s3 *MountpointS3Mounter) Mount(source string, target string) error {
 
 	klog.Info("NodeServer Mounting...")
 
-	return s3.MounterUtils.FuseMountWithEnv(target, constants.MountpointS3BinaryPath, args, envVars)
+	return s3.MounterUtils.FuseMountWithEnv(target, constants.MountS3BinaryPath, args, envVars)
 }
 
 // Unmount unmounts the S3 bucket.
-func (s3 *MountpointS3Mounter) Unmount(target string) error {
-	klog.Info("-MountpointS3Mounter Unmount-")
+func (s3 *MountS3Mounter) Unmount(target string) error {
+	klog.Info("-MountS3Mounter Unmount-")
 
 	if mountWorker {
 		klog.Info("Unmount on Worker started...")
@@ -407,9 +402,9 @@ func (s3 *MountpointS3Mounter) Unmount(target string) error {
 }
 
 // createS3MountConfig creates the AWS credentials and config files.
-func createS3MountConfig(configPathWithVolID string, s3 *MountpointS3Mounter) error {
+func createS3MountConfig(configPathWithVolID string, s3 *MountS3Mounter) error {
 	if err := MakeDir(configPathWithVolID, 0755); err != nil { // #nosec G301 -- config directory needs to be readable by mount-s3 process
-		klog.Errorf("MountpointS3Mounter: Cannot create config dir %s: %v", configPathWithVolID, err)
+		klog.Errorf("MountS3Mounter: Cannot create config dir %s: %v", configPathWithVolID, err)
 		return err
 	}
 
@@ -420,7 +415,7 @@ func createS3MountConfig(configPathWithVolID string, s3 *MountpointS3Mounter) er
 		"aws_secret_access_key = " + s3.SecretKey,
 	}
 	if err := writeConfigFile(credFile, credParams); err != nil {
-		klog.Errorf("MountpointS3Mounter: Cannot write credentials file: %v", err)
+		klog.Errorf("MountS3Mounter: Cannot write credentials file: %v", err)
 		return err
 	}
 
@@ -434,11 +429,11 @@ func createS3MountConfig(configPathWithVolID string, s3 *MountpointS3Mounter) er
 	}
 	cfgFile := path.Join(configPathWithVolID, s3MountConfigFile)
 	if err := writeConfigFile(cfgFile, configParams); err != nil {
-		klog.Errorf("MountpointS3Mounter: Cannot write config file: %v", err)
+		klog.Errorf("MountS3Mounter: Cannot write config file: %v", err)
 		return err
 	}
 
-	klog.Infof("MountpointS3Mounter: Created config files at %s", configPathWithVolID)
+	klog.Infof("MountS3Mounter: Created config files at %s", configPathWithVolID)
 	return nil
 }
 
@@ -464,7 +459,7 @@ func writeConfigFile(filePath string, lines []string) error {
 }
 
 // formulateMountOptions builds the CLI args, env vars, and worker payload for mount-s3.
-func (s3 *MountpointS3Mounter) formulateMountOptions(bucket, target, configPathWithVolID string) (nodeServerOp []string, envVars []string, workerNodeOp s3MounterArgs) {
+func (s3 *MountS3Mounter) formulateMountOptions(bucket, target, configPathWithVolID string) (nodeServerOp []string, envVars []string, workerNodeOp s3MounterArgs) {
 	nodeServerOp = []string{bucket, target, "--allow-other"}
 
 	credFilePath := path.Join(configPathWithVolID, s3MountCredentialsFile)
@@ -509,7 +504,7 @@ func (s3 *MountpointS3Mounter) formulateMountOptions(bucket, target, configPathW
 		workerNodeOp.LogLevel = "no-log"
 	default:
 		if s3.LogLevel != "" {
-			klog.Warningf("MountpointS3Mounter: unsupported log-level %q. "+
+			klog.Warningf("MountS3Mounter: unsupported log-level %q. "+
 				"Supported: 'debug', 'debug-crt', 'no-log'. Ignoring.", s3.LogLevel)
 		}
 	}
@@ -550,8 +545,8 @@ func (s3 *MountpointS3Mounter) formulateMountOptions(bucket, target, configPathW
 	nodeServerOp = append(nodeServerOp, s3.MountOptions...)
 	workerNodeOp.Args = s3.MountOptions
 
-	klog.Infof("MountpointS3 nodeServerOp: %v", nodeServerOp)
-	klog.Infof("MountpointS3 workerNodeOp: %+v", workerNodeOp)
+	klog.Infof("MountS3 nodeServerOp: %v", nodeServerOp)
+	klog.Infof("MountS3 workerNodeOp: %+v", workerNodeOp)
 
 	return nodeServerOp, envVars, workerNodeOp
 }

@@ -91,7 +91,7 @@ func TestNewMounter(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name:   "MountpointS3 Mounter",
+			name:   "MountS3 Mounter",
 			attrib: map[string]string{"mounter": constants.AMAZONS3MOUNTER},
 			secretMap: map[string]string{
 				"cosEndpoint":        "test-endpoint",
@@ -104,7 +104,7 @@ func TestNewMounter(t *testing.T) {
 				"gid":                "2000",
 			},
 			mountOptions: []string{"--dir-mode=0755", "--file-mode=0644"},
-			expected: &MountpointS3Mounter{
+			expected: &MountS3Mounter{
 				BucketName:     "test-bucket-name",
 				ObjectPath:     "test-obj-path",
 				EndPoint:       "test-endpoint",
@@ -176,8 +176,8 @@ func TestNewMounter(t *testing.T) {
 				rclone.MountOptions = nil
 				expected.MountOptions = nil
 			}
-			if s3mounter, ok := result.(*MountpointS3Mounter); ok {
-				expected := test.expected.(*MountpointS3Mounter)
+			if s3mounter, ok := result.(*MountS3Mounter); ok {
+				expected := test.expected.(*MountS3Mounter)
 				if !stringSlicesEqualIgnoreOrder(s3mounter.MountOptions, expected.MountOptions) {
 					t.Errorf("MountOptions mismatch.\nGot:  %v\nWant: %v", s3mounter.MountOptions, expected.MountOptions)
 				}
