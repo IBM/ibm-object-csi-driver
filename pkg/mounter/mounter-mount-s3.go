@@ -32,10 +32,7 @@ type MountS3Mounter struct {
 	LogDirectory string
 	CacheDir     string
 
-	ReadOnly          bool
-	AllowDelete       bool
-	AllowOverwrite    bool
-	IncrementalUpload bool
+	ReadOnly bool
 
 	// MountOptions holds deduplicated passthrough flags.
 	// SC flags are overridden by secret flags when the same key appears in both.
@@ -75,10 +72,9 @@ type s3MounterArgs struct {
 
 	CacheDir string `json:"cache,omitempty"`
 
-	ReadOnly          string `json:"read-only,omitempty"`
-	AllowDelete       string `json:"allow-delete,omitempty"`
-	AllowOverwrite    string `json:"allow-overwrite,omitempty"`
-	IncrementalUpload string `json:"incremental-upload,omitempty"`
+	ReadOnly       string `json:"read-only,omitempty"`
+	AllowDelete    string `json:"allow-delete,omitempty"`
+	AllowOverwrite string `json:"allow-overwrite,omitempty"`
 
 	// ForcePathStyle is always true for IBM COS compatibility.
 	ForcePathStyle string `json:"force-path-style,omitempty"`
@@ -161,19 +157,8 @@ func NewMountS3Mounter(params MountS3MounterParams) Mounter {
 	// Step 3: deduplicate passthroughs — secret wins over SC on same key.
 	mounter.MountOptions = deduplicatePassthrough(scRemainder, secretRemainder)
 
-	// Step 4: Block incremental-upload flag (causes data loss with IBM COS).
-	// This flag uses multiple PutObject calls that overwrite each other instead of
-	// using proper multipart upload, resulting in ~75% data loss.
-	if mounter.IncrementalUpload {
-		klog.Info("mount-s3: --incremental-upload is not supported ")
-		mounter.IncrementalUpload = false
-	}
-
-	// Step 5: allow-delete and allow-overwrite are hardcoded defaults.
-	// They are suppressed later in Mount() when read-only is set.
-	mounter.AllowDelete = true
-	mounter.AllowOverwrite = true
-
+	// allow-delete and allow-overwrite are hardcoded defaults, derived from
+	// ReadOnly in formulateMountOptions (suppressed when read-only is set).
 	mounter.MounterUtils = mounterUtils
 
 	klog.Infof("newMountS3Mounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
@@ -194,36 +179,30 @@ func NewMountS3Mounter(params MountS3MounterParams) Mounter {
 //	Secret: [--max-threads=128, --maximum-throughput-gbps=25]
 //	Result: [--allow-delete, --max-threads=128, --maximum-throughput-gbps=25]
 func deduplicatePassthrough(scFlags, secretFlags []string) []string {
+	// flagKey extracts the key portion of a flag:
+	// "--max-threads=128" → "max-threads", "--allow-delete" → "allow-delete".
+	flagKey := func(flag string) string {
+		key, _, _ := strings.Cut(strings.TrimPrefix(flag, "--"), "=")
+		return key
+	}
+
 	// Build a set of keys present in secret flags.
 	secretKeys := make(map[string]struct{}, len(secretFlags))
 	for _, flag := range secretFlags {
-		key := flagKey(flag)
-		secretKeys[key] = struct{}{}
+		secretKeys[flagKey(flag)] = struct{}{}
 	}
 
-	// Keep SC flags whose key does NOT appear in secret flags.
-	var result []string
+	// Keep SC flags whose key does NOT appear in secret flags, then append
+	// all secret flags last.
+	result := make([]string, 0, len(scFlags)+len(secretFlags))
 	for _, flag := range scFlags {
-		key := flagKey(flag)
-		if _, overridden := secretKeys[key]; overridden {
+		if _, overridden := secretKeys[flagKey(flag)]; overridden {
 			klog.Infof("deduplicatePassthrough: SC flag %q overridden by secret", flag)
-		} else {
-			result = append(result, flag)
+			continue
 		}
+		result = append(result, flag)
 	}
-
-	// Append all secret flags last.
-	result = append(result, secretFlags...)
-	return result
-}
-
-// flagKey extracts the key portion from a passthrough flag.
-// "--max-threads=128" → "max-threads"
-// "--allow-delete"    → "allow-delete"
-func flagKey(flag string) string {
-	trimmed := strings.TrimPrefix(flag, "--")
-	key, _, _ := strings.Cut(trimmed, "=")
-	return key
+	return append(result, secretFlags...)
 }
 
 // splitSecretMountOptions splits the multiline mountOptions string from the secret.
@@ -291,7 +270,10 @@ func parseMountS3Options(mounter *MountS3Mounter, opts []string) []string {
 			// Hardcoded — always enabled unless read-only. User override ignored.
 			klog.Warningf("parseMountS3Options: 'allow-overwrite' is hardcoded and cannot be overridden. Ignoring.")
 		case "incremental-upload":
-			mounter.IncrementalUpload = true
+			// Blocked: appends to existing objects in place, which needs the AWS-only
+			// S3 Express One Zone APIs. On IBM COS it issues repeated PutObject calls
+			// that overwrite each other (~75% data loss) instead of a multipart upload.
+			klog.Warningf("parseMountS3Options: 'incremental-upload' requires AWS S3 Express One Zone and causes data loss on IBM COS. Ignoring.")
 		default:
 			if strings.HasPrefix(opt, "--") {
 				remaining = append(remaining, opt)
@@ -308,18 +290,6 @@ func parseMountS3Options(mounter *MountS3Mounter, opts []string) []string {
 func (s3 *MountS3Mounter) Mount(source string, target string) error {
 	klog.Info("-MountS3Mounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
-
-	// Read-only priority resolution: suppress write-enabling flags.
-	if s3.ReadOnly {
-		if s3.AllowDelete {
-			klog.Infof("MountS3Mounter: read-only set — clearing allow-delete")
-			s3.AllowDelete = false
-		}
-		if s3.AllowOverwrite {
-			klog.Infof("MountS3Mounter: read-only set — clearing allow-overwrite")
-			s3.AllowOverwrite = false
-		}
-	}
 
 	// NOTE: No directory validation or creation here.
 	// LogDirectory and CacheDir are forwarded to the worker via workerNodeOp.
@@ -541,22 +511,15 @@ func (s3 *MountS3Mounter) formulateMountOptions(bucket, target, configPathWithVo
 	nodeServerOp = append(nodeServerOp, "--force-path-style")
 	workerNodeOp.ForcePathStyle = "true"
 
-	// allow-delete and allow-overwrite are hardcoded defaults, suppressed when read-only.
-	if s3.AllowDelete {
-		nodeServerOp = append(nodeServerOp, "--allow-delete")
-		workerNodeOp.AllowDelete = "true"
-	}
-	if s3.AllowOverwrite {
-		nodeServerOp = append(nodeServerOp, "--allow-overwrite")
-		workerNodeOp.AllowOverwrite = "true"
-	}
-	if s3.IncrementalUpload {
-		nodeServerOp = append(nodeServerOp, "--incremental-upload")
-		workerNodeOp.IncrementalUpload = "true"
-	}
+	// allow-delete and allow-overwrite are hardcoded defaults; read-only takes
+	// priority and suppresses these write-enabling flags.
 	if s3.ReadOnly {
 		nodeServerOp = append(nodeServerOp, "--read-only")
 		workerNodeOp.ReadOnly = "true"
+	} else {
+		nodeServerOp = append(nodeServerOp, "--allow-delete", "--allow-overwrite")
+		workerNodeOp.AllowDelete = "true"
+		workerNodeOp.AllowOverwrite = "true"
 	}
 
 	// Passthrough — deduplicated so secret wins over SC.

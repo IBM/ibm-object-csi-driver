@@ -56,11 +56,11 @@ type s3MounterArgs struct {
 func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, error) {
 	result := []string{bucket, targetPath}
 
-	// Block incremental-upload flag (causes data loss with IBM COS).
-	// This flag uses multiple PutObject calls that overwrite each other,
-	// resulting in ~75% data loss.
+	// Block incremental-upload: appends to existing objects in place, which needs the
+	// AWS-only S3 Express One Zone APIs. On IBM COS it issues repeated PutObject calls
+	// that overwrite each other (~75% data loss) instead of a multipart upload.
 	if args.IncrementalUpload == "true" {
-		logger.Warn("incremental-upload is not supported with IBM Cloud Object Storage, disabling")
+		logger.Warn("incremental-upload requires AWS S3 Express One Zone and causes data loss on IBM COS, disabling")
 		args.IncrementalUpload = ""
 	}
 

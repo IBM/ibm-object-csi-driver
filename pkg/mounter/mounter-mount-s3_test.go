@@ -520,49 +520,30 @@ func TestDeduplicatePassthrough(t *testing.T) {
 			secretFlags: []string{},
 			expected:    []string{},
 		},
+		{
+			name:        "Flag without double dash matches flag with double dash",
+			scFlags:     []string{"--max-threads=32"},
+			secretFlags: []string{"max-threads=128"},
+			expected:    []string{"max-threads=128"},
+		},
+		{
+			name:        "Value containing equals does not affect the key",
+			scFlags:     []string{"--endpoint-url=https://a.example.com?x=1", "--dir-mode=0755"},
+			secretFlags: []string{"--endpoint-url=https://b.example.com"},
+			expected:    []string{"--dir-mode=0755", "--endpoint-url=https://b.example.com"},
+		},
+		{
+			name:        "Boolean flag in SC overridden by value flag with same key",
+			scFlags:     []string{"--allow-delete"},
+			secretFlags: []string{"--allow-delete=true"},
+			expected:    []string{"--allow-delete=true"},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := deduplicatePassthrough(tt.scFlags, tt.secretFlags)
 			assert.ElementsMatch(t, tt.expected, result)
-		})
-	}
-}
-
-// Test flagKey function
-func TestFlagKey(t *testing.T) {
-	tests := []struct {
-		name     string
-		flag     string
-		expected string
-	}{
-		{
-			name:     "Flag with value",
-			flag:     "--max-threads=128",
-			expected: "max-threads",
-		},
-		{
-			name:     "Flag without value",
-			flag:     "--allow-delete",
-			expected: "allow-delete",
-		},
-		{
-			name:     "Flag without double dash",
-			flag:     "max-threads=128",
-			expected: "max-threads",
-		},
-		{
-			name:     "Complex flag with multiple equals",
-			flag:     "--endpoint-url=https://s3.example.com",
-			expected: "endpoint-url",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := flagKey(tt.flag)
-			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -664,13 +645,11 @@ func TestParseMountS3Options(t *testing.T) {
 			expectedRemaining: []string{"--max-threads=32", "--dir-mode=0755"},
 		},
 		{
-			name: "Parse allow-overwrite and incremental-upload",
+			name: "Ignore allow-overwrite and incremental-upload",
 			opts: []string{"--allow-overwrite", "--incremental-upload"},
-			expectedMounter: &MountS3Mounter{
-				// allow-overwrite is now hardcoded — parsed value is ignored.
-				AllowOverwrite:    false,
-				IncrementalUpload: true,
-			},
+			// allow-overwrite is hardcoded and incremental-upload is blocked —
+			// both are dropped and never reach the passthrough slice.
+			expectedMounter:   &MountS3Mounter{},
 			expectedRemaining: []string{},
 		},
 		{
@@ -710,8 +689,6 @@ func TestParseMountS3Options(t *testing.T) {
 			assert.Equal(t, tt.expectedMounter.LogDirectory, mounter.LogDirectory)
 			assert.Equal(t, tt.expectedMounter.CacheDir, mounter.CacheDir)
 			assert.Equal(t, tt.expectedMounter.ReadOnly, mounter.ReadOnly)
-			assert.Equal(t, tt.expectedMounter.AllowOverwrite, mounter.AllowOverwrite)
-			assert.Equal(t, tt.expectedMounter.IncrementalUpload, mounter.IncrementalUpload)
 			assert.ElementsMatch(t, tt.expectedRemaining, remaining)
 		})
 	}
@@ -735,10 +712,17 @@ allow-overwrite`,
 	s3Mounter, ok := mounter.(*MountS3Mounter)
 	assert.True(t, ok)
 
-	// incremental-upload should be blocked (set to false)
-	assert.False(t, s3Mounter.IncrementalUpload, "incremental-upload should be blocked due to data loss issues")
-	// allow-overwrite should still be set
-	assert.True(t, s3Mounter.AllowOverwrite)
+	// incremental-upload should be blocked due to data loss issues.
+	assert.NotContains(t, s3Mounter.MountOptions, "--incremental-upload")
+	// allow-overwrite is hardcoded, so it must not leak into passthrough options.
+	assert.NotContains(t, s3Mounter.MountOptions, "--allow-overwrite")
+
+	// allow-overwrite is emitted by formulateMountOptions since read-only is not set.
+	nodeServerOp, _, workerNodeOp := s3Mounter.formulateMountOptions("b", target, "/config/path")
+	assert.Contains(t, nodeServerOp, "--allow-overwrite")
+	assert.Equal(t, "true", workerNodeOp.AllowOverwrite)
+	assert.NotContains(t, nodeServerOp, "--incremental-upload")
+	assert.Empty(t, workerNodeOp.Args)
 }
 
 // Test SC and secret mount options precedence
@@ -771,8 +755,10 @@ maximum-throughput-gbps=25`,
 
 	// allow-delete is now hardcoded — it must NOT appear in the passthrough slice.
 	assert.NotContains(t, s3Mounter.MountOptions, "--allow-delete")
-	// But it is always enabled via the struct field.
-	assert.True(t, s3Mounter.AllowDelete)
+	// But it is always enabled by formulateMountOptions when not read-only.
+	nodeServerOp, _, workerNodeOp := s3Mounter.formulateMountOptions("b", target, "/config/path")
+	assert.Contains(t, nodeServerOp, "--allow-delete")
+	assert.Equal(t, "true", workerNodeOp.AllowDelete)
 }
 
 // Test read-only priority resolution in Mount
@@ -793,22 +779,24 @@ func TestMountS3Mount_ReadOnlyPriority(t *testing.T) {
 	})
 
 	s3Mounter := &MountS3Mounter{
-		MounterUtils:   mockUtils,
-		BucketName:     "test-bucket",
-		AccessKey:      "test-access-key",
-		SecretKey:      "test-secret-key",
-		ReadOnly:       true,
-		AllowDelete:    true, // Should be cleared by read-only
-		AllowOverwrite: true, // Should be cleared by read-only
-		MountOptions:   []string{"--max-threads=32"},
+		MounterUtils: mockUtils,
+		BucketName:   "test-bucket",
+		AccessKey:    "test-access-key",
+		SecretKey:    "test-secret-key",
+		ReadOnly:     true,
+		MountOptions: []string{"--max-threads=32"},
 	}
 
 	err := s3Mounter.Mount(source, target)
 	assert.NoError(t, err)
 
-	// Verify read-only priority cleared all write-enabling flags.
-	assert.False(t, s3Mounter.AllowDelete)
-	assert.False(t, s3Mounter.AllowOverwrite)
+	// Verify read-only priority suppresses all write-enabling flags.
+	nodeServerOp, _, workerNodeOp := s3Mounter.formulateMountOptions("test-bucket", target, "/config/path")
+	assert.Contains(t, nodeServerOp, "--read-only")
+	assert.NotContains(t, nodeServerOp, "--allow-delete")
+	assert.NotContains(t, nodeServerOp, "--allow-overwrite")
+	assert.Empty(t, workerNodeOp.AllowDelete)
+	assert.Empty(t, workerNodeOp.AllowOverwrite)
 	// Passthrough options unrelated to write-access are preserved.
 	assert.Contains(t, s3Mounter.MountOptions, "--max-threads=32")
 }
