@@ -318,59 +318,6 @@ func TestMountS3Unmount_NodeServer_Negative(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to unmount")
 }
 
-func TestRemoveS3MountConfigFile_PathNotExists(t *testing.T) {
-	Stat = func(path string) (os.FileInfo, error) {
-		return nil, os.ErrNotExist
-	}
-	removeS3MountConfigFile("/test", target)
-}
-
-func TestRemoveS3MountConfigFile_StatRetryThenSuccess(t *testing.T) {
-	attempt := 0
-	Stat = func(_ string) (os.FileInfo, error) {
-		if attempt == 0 {
-			attempt++
-			return nil, errors.New("stat error")
-		}
-		return nil, nil
-	}
-	RemoveAll = func(_ string) error {
-		return nil
-	}
-
-	removeS3MountConfigFile("/test", target)
-}
-
-func TestRemoveS3MountConfigFile_RemoveRetryThenSuccess(t *testing.T) {
-	Stat = func(_ string) (os.FileInfo, error) {
-		return nil, nil
-	}
-	attempt := 0
-	RemoveAll = func(_ string) error {
-		if attempt == 0 {
-			attempt++
-			return errors.New("remove error")
-		}
-		return nil
-	}
-
-	removeS3MountConfigFile("/test", target)
-}
-
-func TestRemoveS3MountConfigFile_Negative(t *testing.T) {
-	called := 0
-	Stat = func(_ string) (os.FileInfo, error) {
-		return nil, nil
-	}
-	RemoveAll = func(_ string) error {
-		called++
-		return errors.New("remove failed")
-	}
-
-	removeS3MountConfigFile("/test", target)
-	assert.Equal(t, maxRetries, called)
-}
-
 func TestFormulateMountOptions_AllOptions(t *testing.T) {
 	s3Mounter := &MountS3Mounter{
 		BucketName:    "test-bucket",

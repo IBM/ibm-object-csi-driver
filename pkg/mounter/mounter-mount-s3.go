@@ -9,7 +9,6 @@ import (
 	"os"
 	"path"
 	"strings"
-	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
@@ -55,7 +54,7 @@ const (
 )
 
 var (
-	removeS3ConfigFile = removeS3MountConfigFile
+	removeS3ConfigFile = removeConfigDir
 )
 
 // s3MounterArgs holds the args sent to the worker node daemon for mount-s3.
@@ -569,30 +568,4 @@ func (s3 *MountS3Mounter) formulateMountOptions(bucket, target, configPathWithVo
 	klog.Infof("MountS3 workerNodeOp: %+v", workerNodeOp)
 
 	return nodeServerOp, envVars, workerNodeOp
-}
-
-// removeS3MountConfigFile removes the config directory for the given volume target.
-func removeS3MountConfigFile(configPath, target string) {
-	configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
-
-	for retry := 1; retry <= maxRetries; retry++ {
-		_, err := Stat(configPathWithVolID)
-		if err != nil {
-			if os.IsNotExist(err) {
-				klog.Infof("removeS3MountConfigFile: Config dir does not exist: %s", configPathWithVolID)
-				return
-			}
-			klog.Errorf("removeS3MountConfigFile: Attempt %d - Failed to stat path %s: %v", retry, configPathWithVolID, err)
-			time.Sleep(constants.Interval)
-			continue
-		}
-		if err = RemoveAll(configPathWithVolID); err != nil {
-			klog.Errorf("removeS3MountConfigFile: Attempt %d - Failed to remove config dir %s: %v", retry, configPathWithVolID, err)
-			time.Sleep(constants.Interval)
-			continue
-		}
-		klog.Infof("removeS3MountConfigFile: Successfully removed config dir: %s", configPathWithVolID)
-		return
-	}
-	klog.Errorf("removeS3MountConfigFile: Failed to remove config dir after %d attempts", maxRetries)
 }

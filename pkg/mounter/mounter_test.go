@@ -1,6 +1,8 @@
 package mounter
 
 import (
+	"errors"
+	"os"
 	"reflect"
 	"sort"
 	"testing"
@@ -21,6 +23,73 @@ func stringSlicesEqualIgnoreOrder(a, b []string) bool {
 	sort.Strings(aCopy)
 	sort.Strings(bCopy)
 	return reflect.DeepEqual(aCopy, bCopy)
+}
+
+func TestRemoveConfigDir_PathNotExists(t *testing.T) {
+	Stat = func(path string) (os.FileInfo, error) {
+		return nil, os.ErrNotExist
+	}
+	defer func() { Stat = os.Stat }()
+
+	removeConfigDir("/test", target)
+}
+
+func TestRemoveConfigDir_StatRetryThenSuccess(t *testing.T) {
+	attempt := 0
+	Stat = func(_ string) (os.FileInfo, error) {
+		if attempt == 0 {
+			attempt++
+			return nil, errors.New("stat error")
+		}
+		return nil, nil
+	}
+	RemoveAll = func(_ string) error {
+		return nil
+	}
+	defer func() {
+		Stat = os.Stat
+		RemoveAll = os.RemoveAll
+	}()
+
+	removeConfigDir("/test", target)
+}
+
+func TestRemoveConfigDir_RemoveRetryThenSuccess(t *testing.T) {
+	Stat = func(_ string) (os.FileInfo, error) {
+		return nil, nil
+	}
+	attempt := 0
+	RemoveAll = func(_ string) error {
+		if attempt == 0 {
+			attempt++
+			return errors.New("remove error")
+		}
+		return nil
+	}
+	defer func() {
+		Stat = os.Stat
+		RemoveAll = os.RemoveAll
+	}()
+
+	removeConfigDir("/test", target)
+}
+
+func TestRemoveConfigDir_Negative(t *testing.T) {
+	called := 0
+	Stat = func(_ string) (os.FileInfo, error) {
+		return nil, nil
+	}
+	RemoveAll = func(_ string) error {
+		called++
+		return errors.New("remove failed")
+	}
+	defer func() {
+		Stat = os.Stat
+		RemoveAll = os.RemoveAll
+	}()
+
+	removeConfigDir("/test", target)
+	assert.Equal(t, maxRetries, called)
 }
 
 func TestNewMounter(t *testing.T) {
