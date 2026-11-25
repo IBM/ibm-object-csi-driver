@@ -327,7 +327,6 @@ func TestFormulateMountOptions_AllOptions(t *testing.T) {
 		UID:           "1000",
 		GID:           "2000",
 		LogLevel:      "debug",
-		LogDirectory:  "/var/log/mount-s3",
 		CacheDir:      "/tmp/cache",
 		ReadOnly:      true,
 		MountOptions:  []string{"--dir-mode=0755", "--max-threads=32"},
@@ -653,13 +652,12 @@ func TestParseMountS3Options(t *testing.T) {
 			expectedRemaining: []string{},
 		},
 		{
-			name: "Parse log-directory",
-			// log-directory is now hardcoded — any user-supplied value is ignored and
-			// the struct is always set to the fixed path s3MountLogDirectory.
-			opts: []string{"--log-directory=/some/custom/path"},
-			expectedMounter: &MountS3Mounter{
-				LogDirectory: s3MountLogDirectory,
-			},
+			name: "Ignore log-directory",
+			// log-directory is hardcoded — any user-supplied value is dropped and
+			// never reaches the passthrough slice. formulateMountOptions always
+			// passes s3MountLogDirectory (see TestFormulateMountOptions_AllOptions).
+			opts:              []string{"--log-directory=/some/custom/path"},
+			expectedMounter:   &MountS3Mounter{},
 			expectedRemaining: []string{},
 		},
 		{
@@ -686,11 +684,27 @@ func TestParseMountS3Options(t *testing.T) {
 			assert.Equal(t, tt.expectedMounter.UID, mounter.UID)
 			assert.Equal(t, tt.expectedMounter.GID, mounter.GID)
 			assert.Equal(t, tt.expectedMounter.LogLevel, mounter.LogLevel)
-			assert.Equal(t, tt.expectedMounter.LogDirectory, mounter.LogDirectory)
 			assert.Equal(t, tt.expectedMounter.CacheDir, mounter.CacheDir)
 			assert.Equal(t, tt.expectedMounter.ReadOnly, mounter.ReadOnly)
 			assert.ElementsMatch(t, tt.expectedRemaining, remaining)
 		})
+	}
+}
+
+// Test that every driver-managed or unsupported flag is dropped, with or
+// without the leading "--" and with or without a value, and never reaches
+// the passthrough slice or changes the mounter.
+func TestParseMountS3Options_IgnoredOptions(t *testing.T) {
+	for key := range s3MountIgnoredOptions {
+		for _, opt := range []string{"--" + key, key, "--" + key + "=value"} {
+			t.Run(opt, func(t *testing.T) {
+				mounter := &MountS3Mounter{}
+				remaining := parseMountS3Options(mounter, []string{opt, "--max-threads=32"})
+
+				assert.Equal(t, []string{"--max-threads=32"}, remaining)
+				assert.Equal(t, &MountS3Mounter{}, mounter)
+			})
+		}
 	}
 }
 

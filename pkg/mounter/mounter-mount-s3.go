@@ -1,3 +1,13 @@
+/*******************************************************************************
+ * IBM Confidential
+ * OCO Source Materials
+ * IBM Cloud Kubernetes Service, 5737-D43
+ * (C) Copyright IBM Corp. 2026 All Rights Reserved.
+ * The source code for this program is not published or otherwise divested of
+ * its trade secrets, irrespective of what has been deposited with
+ * the U.S. Copyright Office.
+ ******************************************************************************/
+
 // Package mounter
 package mounter
 
@@ -28,9 +38,8 @@ type MountS3Mounter struct {
 	UID string
 	GID string
 
-	LogLevel     string
-	LogDirectory string
-	CacheDir     string
+	LogLevel string
+	CacheDir string
 
 	ReadOnly bool
 
@@ -52,6 +61,22 @@ const (
 
 var (
 	removeS3ConfigFile = removeConfigDir
+
+	// s3MountIgnoredOptions maps user-supplied mount-s3 flags that are hardcoded,
+	// managed by the driver, or unsupported to the reason they are dropped.
+	s3MountIgnoredOptions = map[string]string{
+		"allow-other":      "is always enabled and cannot be overridden",
+		"umask":            "is not supported by mount-s3, use --dir-mode / --file-mode instead",
+		"log-directory":    fmt.Sprintf("is hardcoded to %q and cannot be overridden", s3MountLogDirectory),
+		"force-path-style": "is hardcoded (required for IBM COS) and cannot be overridden",
+		"read-only":        "is set via MounterParams and cannot be overridden via mount options",
+		"allow-delete":     "is hardcoded (enabled unless read-only) and cannot be overridden",
+		"allow-overwrite":  "is hardcoded (enabled unless read-only) and cannot be overridden",
+		// incremental-upload appends to existing objects in place, which needs the
+		// AWS-only S3 Express One Zone APIs. On IBM COS it issues repeated PutObject
+		// calls that overwrite each other (~75% data loss) instead of a multipart upload.
+		"incremental-upload": "requires AWS S3 Express One Zone and causes data loss on IBM COS",
+	}
 )
 
 // s3MounterArgs holds the args sent to the worker node daemon for mount-s3.
@@ -112,6 +137,7 @@ func NewMountS3Mounter(params MountS3MounterParams) Mounter {
 	klog.Info("-newMountS3Mounter-")
 
 	mounter := &MountS3Mounter{}
+	mounter.MounterUtils = mounterUtils
 
 	if val, ok := secretMap["accessKey"]; ok {
 		mounter.AccessKey = val
@@ -156,10 +182,6 @@ func NewMountS3Mounter(params MountS3MounterParams) Mounter {
 
 	// Step 3: deduplicate passthroughs — secret wins over SC on same key.
 	mounter.MountOptions = deduplicatePassthrough(scRemainder, secretRemainder)
-
-	// allow-delete and allow-overwrite are hardcoded defaults, derived from
-	// ReadOnly in formulateMountOptions (suppressed when read-only is set).
-	mounter.MounterUtils = mounterUtils
 
 	klog.Infof("newMountS3Mounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
 		mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType)
@@ -230,12 +252,12 @@ func parseMountS3Options(mounter *MountS3Mounter, opts []string) []string {
 		trimmed := strings.TrimPrefix(opt, "--")
 		key, value, hasValue := strings.Cut(trimmed, "=")
 
+		if reason, ignored := s3MountIgnoredOptions[key]; ignored {
+			klog.Warningf("parseMountS3Options: '%s' %s. Ignoring.", key, reason)
+			continue
+		}
+
 		switch key {
-		case "allow-other":
-			klog.Infof("parseMountS3Options: 'allow-other' is always enabled and cannot be overridden.")
-		case "umask":
-			klog.Warningf("parseMountS3Options: 'umask' is not supported by mount-s3. " +
-				"Use --dir-mode / --file-mode instead. Ignoring.")
 		case "uid":
 			if hasValue {
 				mounter.UID = value
@@ -248,32 +270,10 @@ func parseMountS3Options(mounter *MountS3Mounter, opts []string) []string {
 			if hasValue {
 				mounter.LogLevel = value
 			}
-		case "log-directory":
-			// Hardcoded — user-supplied value is ignored; the struct field is set
-			// to the fixed path so callers can read it back consistently.
-			klog.Warningf("parseMountS3Options: 'log-directory' is hardcoded to %q and cannot be overridden. Ignoring.", s3MountLogDirectory)
-			mounter.LogDirectory = s3MountLogDirectory
-		case "force-path-style":
-			// Hardcoded — always enabled for IBM COS compatibility.
-			klog.Warningf("parseMountS3Options: 'force-path-style' is hardcoded and cannot be overridden. Ignoring.")
 		case "cache":
 			if hasValue {
 				mounter.CacheDir = value
 			}
-		case "read-only":
-			// read-only is now set directly from MounterParams.ReadOnly — ignore if passed via flags.
-			klog.Warningf("parseMountS3Options: 'read-only' is set via MounterParams and cannot be overridden via mount options. Ignoring.")
-		case "allow-delete":
-			// Hardcoded — always enabled unless read-only. User override ignored.
-			klog.Warningf("parseMountS3Options: 'allow-delete' is hardcoded and cannot be overridden. Ignoring.")
-		case "allow-overwrite":
-			// Hardcoded — always enabled unless read-only. User override ignored.
-			klog.Warningf("parseMountS3Options: 'allow-overwrite' is hardcoded and cannot be overridden. Ignoring.")
-		case "incremental-upload":
-			// Blocked: appends to existing objects in place, which needs the AWS-only
-			// S3 Express One Zone APIs. On IBM COS it issues repeated PutObject calls
-			// that overwrite each other (~75% data loss) instead of a multipart upload.
-			klog.Warningf("parseMountS3Options: 'incremental-upload' requires AWS S3 Express One Zone and causes data loss on IBM COS. Ignoring.")
 		default:
 			if strings.HasPrefix(opt, "--") {
 				remaining = append(remaining, opt)
