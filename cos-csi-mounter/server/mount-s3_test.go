@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
@@ -244,6 +246,32 @@ func TestS3MounterValidate_ValidUIDAndGID(t *testing.T) {
 	}
 	err := args.Validate(testTargetPath)
 	assert.NoError(t, err)
+}
+func TestS3MounterValidate_LogDirectory(t *testing.T) {
+	// A log directory inside the safe base is accepted and NOT created by Validate
+	// (mount-s3 creates it itself).
+	t.Run("inside safe base is not created", func(t *testing.T) {
+		missing := filepath.Join(s3MounterSafeLogDir, "validate-test-should-not-exist")
+		args := s3MounterArgs{
+			AwsCredentialsFile: testCredFile,
+			AwsConfigFile:      testCfgFile,
+			LogDirectory:       missing,
+		}
+		assert.NoError(t, args.Validate(testTargetPath))
+		_, err := os.Stat(missing)
+		assert.True(t, os.IsNotExist(err))
+	})
+
+	t.Run("outside safe base is rejected", func(t *testing.T) {
+		args := s3MounterArgs{
+			AwsCredentialsFile: testCredFile,
+			AwsConfigFile:      testCfgFile,
+			LogDirectory:       "/etc/mount-s3",
+		}
+		err := args.Validate(testTargetPath)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid log directory")
+	})
 }
 
 // --- ParseMounterArgs with AMAZONS3MOUNTER tests (N2) ---

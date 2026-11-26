@@ -209,10 +209,11 @@ func (args s3MounterArgs) Validate(targetPath string) error {
 			return fmt.Errorf("failed to create cache directory '%s': %w", args.CacheDir, err)
 		}
 	}
+	// mount-s3 creates the log directory itself, so only confine it to the safe base.
 	if args.LogDirectory != "" {
-		if err := ensureDir(args.LogDirectory, s3MounterSafeLogDir); err != nil {
-			logger.Error("failed to create log directory", zap.String("log-dir", args.LogDirectory), zap.Error(err))
-			return fmt.Errorf("failed to create log directory '%s': %w", args.LogDirectory, err)
+		if _, err := resolveUnderBase(args.LogDirectory, s3MounterSafeLogDir); err != nil {
+			logger.Error("invalid log directory", zap.String("log-dir", args.LogDirectory), zap.Error(err))
+			return fmt.Errorf("invalid log directory '%s': %w", args.LogDirectory, err)
 		}
 	}
 

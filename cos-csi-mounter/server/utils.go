@@ -260,16 +260,25 @@ func fileExists(path string) (bool, error) {
 	return !info.IsDir(), nil
 }
 
-// ensureDir creates the directory at path if it doesn't exist.
-// It first resolves the absolute path and verifies it is within safeBase
-// to prevent path-traversal attacks before creating the directory.
-func ensureDir(path, safeBase string) error {
-	absPath, err := absPathResolver(path) // #nosec G304 -- path is validated against safeBase below to prevent traversal
+// resolveUnderBase resolves path to an absolute path and verifies it is within
+// safeBase to prevent path-traversal attacks. It does not touch the filesystem.
+func resolveUnderBase(path, safeBase string) (string, error) {
+	absPath, err := absPathResolver(path)
 	if err != nil {
-		return fmt.Errorf("failed to resolve absolute path: %v", err)
+		return "", fmt.Errorf("failed to resolve absolute path: %v", err)
 	}
 	if !strings.HasPrefix(absPath, safeBase) {
-		return fmt.Errorf("path %v is outside the safe directory", absPath)
+		return "", fmt.Errorf("path %v is outside the safe directory", absPath)
+	}
+	return absPath, nil
+}
+
+// ensureDir creates the directory at path if it doesn't exist.
+// The path is first verified to be within safeBase.
+func ensureDir(path, safeBase string) error {
+	absPath, err := resolveUnderBase(path, safeBase)
+	if err != nil {
+		return err
 	}
 
 	// Check if directory already exists
