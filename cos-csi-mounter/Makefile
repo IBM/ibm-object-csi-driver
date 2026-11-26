@@ -58,6 +58,7 @@ rpm-build: build-linux
 	echo 'License: $(LICENSE)' >>  $(REDHAT_SPEC)
 	echo "BuildArch: $(RPM_ARCH)" >>  $(REDHAT_SPEC)
 	echo "%global _build_id_links none" >> $(REDHAT_SPEC)
+	echo "%global debug_package %{nil}" >> $(REDHAT_SPEC)
 	echo "%define _rpmfilename $(NAME)-$(APP_VERSION).rpm" >> $(REDHAT_SPEC)
 	echo "%build" >> $(REDHAT_SPEC)
 
