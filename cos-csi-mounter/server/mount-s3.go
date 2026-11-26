@@ -103,7 +103,6 @@ func (args s3MounterArgs) Validate(targetPath string) error {
 		return errors.New("incremental-upload is not supported: it requires AWS S3 Express One Zone and causes data loss on IBM COS")
 	}
 
-	// read-only must not be combined with write-enabling flags.
 	if isTrue(args.ReadOnly) && (isTrue(args.AllowDelete) || isTrue(args.AllowOverwrite)) {
 		logger.Error("read-only cannot be combined with allow-delete or allow-overwrite")
 		return errors.New("read-only cannot be combined with allow-delete or allow-overwrite")

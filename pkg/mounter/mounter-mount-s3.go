@@ -60,13 +60,13 @@ var (
 
 	// User-supplied flags that are hardcoded, driver-managed or unsupported, with the reason.
 	s3MountIgnoredOptions = map[string]string{
-		"allow-other":      "is always enabled and cannot be overridden",
-		"umask":            "is not supported by mount-s3, use --dir-mode / --file-mode instead",
-		"log-directory":    fmt.Sprintf("is hardcoded to %q and cannot be overridden", s3MountLogDirectory),
-		"force-path-style": "is hardcoded (required for IBM COS) and cannot be overridden",
-		"read-only":        "is set via MounterParams and cannot be overridden via mount options",
-		"allow-delete":     "is hardcoded (enabled unless read-only) and cannot be overridden",
-		"allow-overwrite":  "is hardcoded (enabled unless read-only) and cannot be overridden",
+		"allow-other":        "is always enabled and cannot be overridden",
+		"umask":              "is not supported by mount-s3, use --dir-mode / --file-mode instead",
+		"log-directory":      fmt.Sprintf("is hardcoded to %q and cannot be overridden", s3MountLogDirectory),
+		"force-path-style":   "is hardcoded (required for IBM COS) and cannot be overridden",
+		"read-only":          "is set via MounterParams and cannot be overridden via mount options",
+		"allow-delete":       "is hardcoded (enabled unless read-only) and cannot be overridden",
+		"allow-overwrite":    "is hardcoded (enabled unless read-only) and cannot be overridden",
 		"incremental-upload": "requires AWS S3 Express One Zone and causes data loss on IBM COS",
 	}
 )
@@ -106,16 +106,8 @@ type MountS3MounterParams struct {
 	ReadOnly     bool
 }
 
-// NewMountS3Mounter creates a new MountS3Mounter from the unified
-// secret format.
-//
-// Precedence (lowest → highest):
-//  1. secretMap identity keys
-//  2. StorageClass mountOptions — parsed first
-//  3. Secret mountOptions — parsed second, wins over SC on any overlapping flag
-//
-// For passthrough flags, deduplication is applied: if the same flag key appears
-// in both SC and secret, the SC entry is dropped and the secret entry is kept.
+// NewMountS3Mounter builds the mounter. Precedence (lowest to highest): secretMap
+// keys, StorageClass mountOptions, secret mountOptions.
 func NewMountS3Mounter(params MountS3MounterParams) Mounter {
 	secretMap := params.SecretMap
 	mountOptions := params.MountOptions
@@ -162,14 +154,9 @@ func NewMountS3Mounter(params MountS3MounterParams) Mounter {
 
 	mounter.AuthType = "hmac"
 
-	// Step 1: parse SC options.
 	scRemainder := parseMountS3Options(mounter, mountOptions)
-
-	// Step 2: parse secret options (structured fields set by secret override SC).
 	secretOpts := splitSecretMountOptions(secretMap["mountOptions"])
 	secretRemainder := parseMountS3Options(mounter, secretOpts)
-
-	// Step 3: deduplicate passthroughs — secret wins over SC on same key.
 	mounter.MountOptions = deduplicatePassthrough(scRemainder, secretRemainder)
 
 	klog.Infof("newMountS3Mounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
@@ -180,31 +167,18 @@ func NewMountS3Mounter(params MountS3MounterParams) Mounter {
 	return mounter
 }
 
-// deduplicatePassthrough merges SC and secret passthrough flags.
-// If the same flag key appears in both, the SC entry is dropped and the
-// secret entry is kept (secret wins).
-//
-// Examples:
-//
-//	SC:     [--max-threads=32, --maximum-throughput-gbps=10, --allow-delete]
-//	Secret: [--max-threads=128, --maximum-throughput-gbps=25]
-//	Result: [--allow-delete, --max-threads=128, --maximum-throughput-gbps=25]
+// deduplicatePassthrough merges SC and secret flags; on the same key the secret wins.
 func deduplicatePassthrough(scFlags, secretFlags []string) []string {
-	// flagKey extracts the key portion of a flag:
-	// "--max-threads=128" → "max-threads", "--allow-delete" → "allow-delete".
 	flagKey := func(flag string) string {
 		key, _, _ := strings.Cut(strings.TrimPrefix(flag, "--"), "=")
 		return key
 	}
 
-	// Build a set of keys present in secret flags.
 	secretKeys := make(map[string]struct{}, len(secretFlags))
 	for _, flag := range secretFlags {
 		secretKeys[flagKey(flag)] = struct{}{}
 	}
 
-	// Keep SC flags whose key does NOT appear in secret flags, then append
-	// all secret flags last.
 	result := make([]string, 0, len(scFlags)+len(secretFlags))
 	for _, flag := range scFlags {
 		if _, overridden := secretKeys[flagKey(flag)]; overridden {
@@ -336,7 +310,6 @@ func (s3 *MountS3Mounter) Mount(source string, target string) error {
 	return s3.MounterUtils.FuseMountWithEnv(target, constants.MountS3BinaryPath, args, envVars)
 }
 
-// Unmount unmounts the S3 bucket.
 func (s3 *MountS3Mounter) Unmount(target string) error {
 	klog.Info("-MountS3Mounter Unmount-")
 
@@ -374,7 +347,6 @@ func (s3 *MountS3Mounter) Unmount(target string) error {
 	return nil
 }
 
-// createS3MountConfig creates the AWS credentials and config files.
 func createS3MountConfig(configPathWithVolID string, s3 *MountS3Mounter) error {
 	if err := MakeDir(configPathWithVolID, 0755); err != nil { // #nosec G301 -- config directory needs to be readable by mount-s3 process
 		klog.Errorf("MountS3Mounter: Cannot create config dir %s: %v", configPathWithVolID, err)
@@ -410,7 +382,6 @@ func createS3MountConfig(configPathWithVolID string, s3 *MountS3Mounter) error {
 	return nil
 }
 
-// writeConfigFile writes lines to a file with 0600 permissions.
 func writeConfigFile(filePath string, lines []string) error {
 	f, err := OpenFile(filePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600) // #nosec G304 -- file path is constructed from controlled configPathWithVolID and constant filename
 	if err != nil {
@@ -431,7 +402,6 @@ func writeConfigFile(filePath string, lines []string) error {
 	return w.Flush()
 }
 
-// formulateMountOptions builds the CLI args, env vars, and worker payload for mount-s3.
 func (s3 *MountS3Mounter) formulateMountOptions(bucket, target, configPathWithVolID string) (nodeServerOp []string, envVars []string, workerNodeOp s3MounterArgs) {
 	nodeServerOp = []string{bucket, target, "--allow-other"}
 
