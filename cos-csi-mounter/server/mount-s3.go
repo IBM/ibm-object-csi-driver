@@ -9,56 +9,32 @@ import (
 )
 
 var (
-	// Safe base directory for mount-s3 log files.
-	s3MounterSafeLogDir = "/var/log/mount-s3"
-	// Safe base directory for mount-s3 cache files.
+	s3MounterSafeLogDir   = "/var/log/mount-s3"
 	s3MounterSafeCacheDir = "/tmp"
 )
 
-// s3MounterArgs holds the args sent from the node server for mount-s3.
-// This struct must match the s3MounterArgs in pkg/mounter/mounter-mount-s3.go
+// s3MounterArgs must match s3MounterArgs in pkg/mounter/mounter-mount-s3.go.
 type s3MounterArgs struct {
-	// Always set.
 	AllowOther         string `json:"allow-other,omitempty"`
 	AwsCredentialsFile string `json:"aws-credentials-file,omitempty"`
 	AwsConfigFile      string `json:"aws-config-file,omitempty"`
-
-	// SecretMap-sourced.
-	EndpointURL string `json:"endpoint-url,omitempty"`
-	Region      string `json:"region,omitempty"`
-
-	// Identity.
-	UID string `json:"uid,omitempty"`
-	GID string `json:"gid,omitempty"`
-
-	// Logging (translated from LogLevel).
-	LogLevel     string `json:"log-level,omitempty"`
-	LogDirectory string `json:"log-directory,omitempty"`
-
-	// Cache.
-	CacheDir string `json:"cache,omitempty"`
-
-	// Write operations. The node server never sends allow-delete or
-	// allow-overwrite together with read-only; Validate rejects that combination.
-	ReadOnly       string `json:"read-only,omitempty"`
-	AllowDelete    string `json:"allow-delete,omitempty"`
-	AllowOverwrite string `json:"allow-overwrite,omitempty"`
-
-	// IncrementalUpload is never sent by the node server. It is kept only so
-	// that Validate can reject it explicitly instead of failing as an unknown field.
+	EndpointURL        string `json:"endpoint-url,omitempty"`
+	Region             string `json:"region,omitempty"`
+	UID                string `json:"uid,omitempty"`
+	GID                string `json:"gid,omitempty"`
+	LogLevel           string `json:"log-level,omitempty"`
+	LogDirectory       string `json:"log-directory,omitempty"`
+	CacheDir           string `json:"cache,omitempty"`
+	ReadOnly           string `json:"read-only,omitempty"`
+	AllowDelete        string `json:"allow-delete,omitempty"`
+	AllowOverwrite     string `json:"allow-overwrite,omitempty"`
+	// Never sent by the node; kept so Validate can reject it.
 	IncrementalUpload string `json:"incremental-upload,omitempty"`
-
-	// ForcePathStyle is always true for IBM COS compatibility.
-	ForcePathStyle string `json:"force-path-style,omitempty"`
-
-	// Passthrough flags — user-supplied flags not handled by structured fields.
-	// Secret flags override SC flags when the same key appears in both.
-	// These are already deduplicated by the node server before being sent here.
+	ForcePathStyle    string `json:"force-path-style,omitempty"`
+	// Passthrough flags, already deduplicated by the node.
 	Args []string `json:"args,omitempty"`
 }
 
-// PopulateArgsSlice builds the CLI args slice for mount-s3.
-// It only translates fields into flags; all value checks are done in Validate.
 func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, error) {
 	result := []string{bucket, targetPath}
 
@@ -87,16 +63,13 @@ func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string
 		}
 	}
 
-	// log-level values (debug, debug-crt, no-log) are the flag names themselves.
 	if args.LogLevel != "" {
 		result = append(result, "--"+args.LogLevel)
 	}
 
-	// Passthrough flags appended last — already deduplicated by node server.
 	return append(result, args.Args...), nil
 }
 
-// Validate checks that required fields are present and values are valid.
 func (args s3MounterArgs) Validate(targetPath string) error {
 	if err := pathValidator(targetPath); err != nil {
 		return err
@@ -124,8 +97,7 @@ func (args s3MounterArgs) Validate(targetPath string) error {
 		return errors.New("aws-config-file is required for mount-s3")
 	}
 
-	// incremental-upload needs the AWS-only S3 Express One Zone APIs. On IBM COS it
-	// issues repeated PutObject calls that overwrite each other (~75% data loss).
+	// AWS-only (S3 Express One Zone); causes data loss on IBM COS.
 	if isTrue(args.IncrementalUpload) {
 		logger.Error("incremental-upload requires AWS S3 Express One Zone and causes data loss on IBM COS")
 		return errors.New("incremental-upload is not supported: it requires AWS S3 Express One Zone and causes data loss on IBM COS")
@@ -157,14 +129,13 @@ func (args s3MounterArgs) Validate(targetPath string) error {
 		return fmt.Errorf("unsupported log-level %q for mount-s3, supported: debug, debug-crt, no-log", args.LogLevel)
 	}
 
-	// ensureDir creates the directory if it does not exist, confined to its safe base.
 	if args.CacheDir != "" {
 		if err := ensureDir(args.CacheDir, s3MounterSafeCacheDir); err != nil {
 			logger.Error("failed to create cache directory", zap.String("cache-dir", args.CacheDir), zap.Error(err))
 			return fmt.Errorf("failed to create cache directory '%s': %w", args.CacheDir, err)
 		}
 	}
-	// mount-s3 creates the log directory itself, so only confine it to the safe base.
+	// mount-s3 creates the log directory itself.
 	if args.LogDirectory != "" {
 		if _, err := resolveUnderBase(args.LogDirectory, s3MounterSafeLogDir); err != nil {
 			logger.Error("invalid log directory", zap.String("log-dir", args.LogDirectory), zap.Error(err))

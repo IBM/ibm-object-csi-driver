@@ -25,7 +25,6 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// MountS3Mounter implements Mounter for AWS Mountpoint S3.
 type MountS3Mounter struct {
 	BucketName    string
 	ObjectPath    string
@@ -43,15 +42,12 @@ type MountS3Mounter struct {
 
 	ReadOnly bool
 
-	// MountOptions holds deduplicated passthrough flags.
-	// SC flags are overridden by secret flags when the same key appears in both.
+	// Deduplicated passthrough flags; secret flags override SC flags.
 	MountOptions []string
 	MounterUtils utils.MounterUtils
 }
 
 const (
-	// s3MountLogDirectory is the hardcoded log directory for mount-s3, matching
-	// the same convention as rclone's hardcoded --log-file=/var/log/rclone.log.
 	s3MountLogDirectory = "/var/log/mount-s3"
 
 	s3MountCredentialsFile = "credentials"
@@ -62,8 +58,7 @@ const (
 var (
 	removeS3ConfigFile = removeConfigDir
 
-	// s3MountIgnoredOptions maps user-supplied mount-s3 flags that are hardcoded,
-	// managed by the driver, or unsupported to the reason they are dropped.
+	// User-supplied flags that are hardcoded, driver-managed or unsupported, with the reason.
 	s3MountIgnoredOptions = map[string]string{
 		"allow-other":      "is always enabled and cannot be overridden",
 		"umask":            "is not supported by mount-s3, use --dir-mode / --file-mode instead",
@@ -72,15 +67,11 @@ var (
 		"read-only":        "is set via MounterParams and cannot be overridden via mount options",
 		"allow-delete":     "is hardcoded (enabled unless read-only) and cannot be overridden",
 		"allow-overwrite":  "is hardcoded (enabled unless read-only) and cannot be overridden",
-		// incremental-upload appends to existing objects in place, which needs the
-		// AWS-only S3 Express One Zone APIs. On IBM COS it issues repeated PutObject
-		// calls that overwrite each other (~75% data loss) instead of a multipart upload.
 		"incremental-upload": "requires AWS S3 Express One Zone and causes data loss on IBM COS",
 	}
 )
 
-// s3MounterArgs holds the args sent to the worker node daemon for mount-s3.
-// This struct must stay in sync with s3MounterArgs in the worker (cos-csi-mounter).
+// s3MounterArgs must stay in sync with s3MounterArgs in cos-csi-mounter.
 type s3MounterArgs struct {
 	AllowOther         string `json:"allow-other,omitempty"`
 	AwsCredentialsFile string `json:"aws-credentials-file,omitempty"`
@@ -101,11 +92,9 @@ type s3MounterArgs struct {
 	AllowDelete    string `json:"allow-delete,omitempty"`
 	AllowOverwrite string `json:"allow-overwrite,omitempty"`
 
-	// ForcePathStyle is always true for IBM COS compatibility.
 	ForcePathStyle string `json:"force-path-style,omitempty"`
 
-	// Passthrough flags — user-supplied flags not handled by structured fields.
-	// Secret flags override SC flags when the same key appears in both.
+	// Passthrough flags not handled by the fields above.
 	Args []string `json:"args,omitempty"`
 }
 
@@ -286,14 +275,9 @@ func parseMountS3Options(mounter *MountS3Mounter, opts []string) []string {
 	return remaining
 }
 
-// Mount mounts the S3 bucket using mountpoint-s3.
 func (s3 *MountS3Mounter) Mount(source string, target string) error {
 	klog.Info("-MountS3Mounter Mount-")
 	klog.Infof("Mount args:\n\tsource: <%s>\n\ttarget: <%s>", source, target)
-
-	// NOTE: No directory validation or creation here.
-	// LogDirectory and CacheDir are forwarded to the worker via workerNodeOp.
-	// The worker's Validate() calls ensureDir() which creates them if missing.
 
 	var configPath string
 	if mountWorker {
@@ -498,7 +482,6 @@ func (s3 *MountS3Mounter) formulateMountOptions(bucket, target, configPathWithVo
 		}
 	}
 
-	// log-directory is hardcoded — always passed, never user-configurable.
 	nodeServerOp = append(nodeServerOp, "--log-directory="+s3MountLogDirectory)
 	workerNodeOp.LogDirectory = s3MountLogDirectory
 
@@ -507,12 +490,10 @@ func (s3 *MountS3Mounter) formulateMountOptions(bucket, target, configPathWithVo
 		workerNodeOp.CacheDir = s3.CacheDir
 	}
 
-	// force-path-style is hardcoded — required for IBM COS compatibility.
 	nodeServerOp = append(nodeServerOp, "--force-path-style")
 	workerNodeOp.ForcePathStyle = "true"
 
-	// allow-delete and allow-overwrite are hardcoded defaults; read-only takes
-	// priority and suppresses these write-enabling flags.
+	// read-only suppresses allow-delete and allow-overwrite.
 	if s3.ReadOnly {
 		nodeServerOp = append(nodeServerOp, "--read-only")
 		workerNodeOp.ReadOnly = "true"
@@ -522,8 +503,6 @@ func (s3 *MountS3Mounter) formulateMountOptions(bucket, target, configPathWithVo
 		workerNodeOp.AllowOverwrite = "true"
 	}
 
-	// Passthrough — deduplicated so secret wins over SC.
-	// Set on BOTH paths so the worker daemon receives them too.
 	nodeServerOp = append(nodeServerOp, s3.MountOptions...)
 	workerNodeOp.Args = s3.MountOptions
 
