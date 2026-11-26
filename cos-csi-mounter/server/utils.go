@@ -241,6 +241,20 @@ func isBoolString(s string) bool {
 	return s == "true" || s == "false"
 }
 
+// isTrue reports whether s is "true" (case-insensitive), matching what isBoolString accepts.
+func isTrue(s string) bool {
+	return strings.EqualFold(strings.TrimSpace(s), "true")
+}
+
+// validateBool returns an error if value is set but is not a boolean string.
+func validateBool(name, value string) error {
+	if value != "" && !isBoolString(value) {
+		logger.Error(fmt.Sprintf("cannot convert value of %s into boolean", name), zap.String(name, value))
+		return fmt.Errorf("cannot convert value of %s into boolean: %v", name, value)
+	}
+	return nil
+}
+
 // fileExists checks whether the given file path exists and is not a directory.
 func fileExists(path string) (bool, error) {
 	absPath, err := absPathResolver(path)

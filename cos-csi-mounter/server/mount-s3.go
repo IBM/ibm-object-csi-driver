@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -37,10 +38,14 @@ type s3MounterArgs struct {
 	// Cache.
 	CacheDir string `json:"cache,omitempty"`
 
-	// Write operations - conflict resolution applied when read-only is set.
-	ReadOnly          string `json:"read-only,omitempty"`
-	AllowDelete       string `json:"allow-delete,omitempty"`
-	AllowOverwrite    string `json:"allow-overwrite,omitempty"`
+	// Write operations. The node server never sends allow-delete or
+	// allow-overwrite together with read-only; Validate rejects that combination.
+	ReadOnly       string `json:"read-only,omitempty"`
+	AllowDelete    string `json:"allow-delete,omitempty"`
+	AllowOverwrite string `json:"allow-overwrite,omitempty"`
+
+	// IncrementalUpload is never sent by the node server. It is kept only so
+	// that Validate can reject it explicitly instead of failing as an unknown field.
 	IncrementalUpload string `json:"incremental-upload,omitempty"`
 
 	// ForcePathStyle is always true for IBM COS compatibility.
@@ -53,87 +58,42 @@ type s3MounterArgs struct {
 }
 
 // PopulateArgsSlice builds the CLI args slice for mount-s3.
+// It only translates fields into flags; all value checks are done in Validate.
 func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, error) {
 	result := []string{bucket, targetPath}
 
-	// Block incremental-upload: appends to existing objects in place, which needs the
-	// AWS-only S3 Express One Zone APIs. On IBM COS it issues repeated PutObject calls
-	// that overwrite each other (~75% data loss) instead of a multipart upload.
-	if args.IncrementalUpload == "true" {
-		logger.Warn("incremental-upload requires AWS S3 Express One Zone and causes data loss on IBM COS, disabling")
-		args.IncrementalUpload = ""
-	}
-
-	// Read-only priority resolution: suppress write-enabling flags.
-	if args.ReadOnly == "true" {
-		if args.AllowDelete == "true" {
-			logger.Warn("read-only is set, clearing allow-delete")
-			args.AllowDelete = ""
-		}
-		if args.AllowOverwrite == "true" {
-			logger.Warn("read-only is set, clearing allow-overwrite")
-			args.AllowOverwrite = ""
+	for _, f := range []struct{ value, flag string }{
+		{args.AllowOther, "--allow-other"},
+		{args.ReadOnly, "--read-only"},
+		{args.AllowDelete, "--allow-delete"},
+		{args.AllowOverwrite, "--allow-overwrite"},
+		{args.ForcePathStyle, "--force-path-style"},
+	} {
+		if isTrue(f.value) {
+			result = append(result, f.flag)
 		}
 	}
 
-	if args.AllowOther == "true" {
-		result = append(result, "--allow-other")
-	}
-	if args.ReadOnly == "true" {
-		result = append(result, "--read-only")
-	}
-	if args.AllowDelete == "true" {
-		result = append(result, "--allow-delete")
-	}
-	if args.AllowOverwrite == "true" {
-		result = append(result, "--allow-overwrite")
-	}
-	if args.IncrementalUpload == "true" {
-		result = append(result, "--incremental-upload")
-	}
-	if args.UID != "" {
-		result = append(result, "--uid="+args.UID)
-	}
-	if args.GID != "" {
-		result = append(result, "--gid="+args.GID)
-	}
-	if args.EndpointURL != "" {
-		result = append(result, "--endpoint-url="+args.EndpointURL)
-	}
-	if args.Region != "" {
-		result = append(result, "--region="+args.Region)
-	}
-
-	switch args.LogLevel {
-	case "debug":
-		result = append(result, "--debug")
-	case "debug-crt":
-		result = append(result, "--debug-crt")
-	case "no-log":
-		result = append(result, "--no-log")
-	default:
-		if args.LogLevel != "" {
-			logger.Warn("unsupported log level for mount-s3, ignoring",
-				zap.String("log-level", args.LogLevel),
-				zap.String("supported", "debug, debug-crt, no-log"),
-			)
+	for _, f := range []struct{ value, flag string }{
+		{args.UID, "--uid="},
+		{args.GID, "--gid="},
+		{args.EndpointURL, "--endpoint-url="},
+		{args.Region, "--region="},
+		{args.LogDirectory, "--log-directory="},
+		{args.CacheDir, "--cache="},
+	} {
+		if f.value != "" {
+			result = append(result, f.flag+f.value)
 		}
 	}
 
-	if args.LogDirectory != "" {
-		result = append(result, "--log-directory="+args.LogDirectory)
-	}
-	if args.CacheDir != "" {
-		result = append(result, "--cache="+args.CacheDir)
-	}
-	if args.ForcePathStyle == "true" {
-		result = append(result, "--force-path-style")
+	// log-level values (debug, debug-crt, no-log) are the flag names themselves.
+	if args.LogLevel != "" {
+		result = append(result, "--"+args.LogLevel)
 	}
 
 	// Passthrough flags appended last — already deduplicated by node server.
-	result = append(result, args.Args...)
-
-	return result, nil
+	return append(result, args.Args...), nil
 }
 
 // Validate checks that required fields are present and values are valid.
@@ -142,64 +102,59 @@ func (args s3MounterArgs) Validate(targetPath string) error {
 		return err
 	}
 
-	if args.AllowOther != "" {
-		if isBool := isBoolString(args.AllowOther); !isBool {
-			logger.Error("cannot convert value of allow-other into boolean", zap.Any("allow-other", args.AllowOther))
-			return fmt.Errorf("cannot convert value of allow-other into boolean: %v", args.AllowOther)
+	for _, f := range []struct{ name, value string }{
+		{"allow-other", args.AllowOther},
+		{"read-only", args.ReadOnly},
+		{"allow-delete", args.AllowDelete},
+		{"allow-overwrite", args.AllowOverwrite},
+		{"incremental-upload", args.IncrementalUpload},
+		{"force-path-style", args.ForcePathStyle},
+	} {
+		if err := validateBool(f.name, f.value); err != nil {
+			return err
 		}
 	}
 
 	if args.AwsCredentialsFile == "" {
 		logger.Error("aws-credentials-file is required for mount-s3")
-		return fmt.Errorf("aws-credentials-file is required for mount-s3")
+		return errors.New("aws-credentials-file is required for mount-s3")
 	}
 	if args.AwsConfigFile == "" {
 		logger.Error("aws-config-file is required for mount-s3")
-		return fmt.Errorf("aws-config-file is required for mount-s3")
+		return errors.New("aws-config-file is required for mount-s3")
 	}
 
-	if args.ReadOnly != "" {
-		if isBool := isBoolString(args.ReadOnly); !isBool {
-			logger.Error("cannot convert value of read-only into boolean", zap.Any("read-only", args.ReadOnly))
-			return fmt.Errorf("cannot convert value of read-only into boolean: %v", args.ReadOnly)
-		}
+	// incremental-upload needs the AWS-only S3 Express One Zone APIs. On IBM COS it
+	// issues repeated PutObject calls that overwrite each other (~75% data loss).
+	if isTrue(args.IncrementalUpload) {
+		logger.Error("incremental-upload requires AWS S3 Express One Zone and causes data loss on IBM COS")
+		return errors.New("incremental-upload is not supported: it requires AWS S3 Express One Zone and causes data loss on IBM COS")
 	}
-	if args.AllowDelete != "" {
-		if isBool := isBoolString(args.AllowDelete); !isBool {
-			logger.Error("cannot convert value of allow-delete into boolean", zap.Any("allow-delete", args.AllowDelete))
-			return fmt.Errorf("cannot convert value of allow-delete into boolean: %v", args.AllowDelete)
-		}
+
+	// read-only must not be combined with write-enabling flags.
+	if isTrue(args.ReadOnly) && (isTrue(args.AllowDelete) || isTrue(args.AllowOverwrite)) {
+		logger.Error("read-only cannot be combined with allow-delete or allow-overwrite")
+		return errors.New("read-only cannot be combined with allow-delete or allow-overwrite")
 	}
-	if args.AllowOverwrite != "" {
-		if isBool := isBoolString(args.AllowOverwrite); !isBool {
-			logger.Error("cannot convert value of allow-overwrite into boolean", zap.Any("allow-overwrite", args.AllowOverwrite))
-			return fmt.Errorf("cannot convert value of allow-overwrite into boolean: %v", args.AllowOverwrite)
+
+	for _, f := range []struct{ name, value string }{
+		{"uid", args.UID},
+		{"gid", args.GID},
+	} {
+		if f.value == "" {
+			continue
 		}
-	}
-	if args.IncrementalUpload != "" {
-		if isBool := isBoolString(args.IncrementalUpload); !isBool {
-			logger.Error("cannot convert value of incremental-upload into boolean", zap.Any("incremental-upload", args.IncrementalUpload))
-			return fmt.Errorf("cannot convert value of incremental-upload into boolean: %v", args.IncrementalUpload)
+		if _, err := strconv.Atoi(f.value); err != nil {
+			logger.Error(f.name+" must be a valid integer", zap.String(f.name, f.value))
+			return fmt.Errorf("%s must be a valid integer: %v", f.name, f.value)
 		}
 	}
 
-	if args.UID != "" {
-		if _, err := strconv.Atoi(args.UID); err != nil {
-			logger.Error("uid must be a valid integer", zap.String("uid", args.UID))
-			return fmt.Errorf("uid must be a valid integer: %v", args.UID)
-		}
-	}
-	if args.GID != "" {
-		if _, err := strconv.Atoi(args.GID); err != nil {
-			logger.Error("gid must be a valid integer", zap.String("gid", args.GID))
-			return fmt.Errorf("gid must be a valid integer: %v", args.GID)
-		}
-	}
-	if args.ForcePathStyle != "" {
-		if isBool := isBoolString(args.ForcePathStyle); !isBool {
-			logger.Error("cannot convert value of force-path-style into boolean", zap.Any("force-path-style", args.ForcePathStyle))
-			return fmt.Errorf("cannot convert value of force-path-style into boolean: %v", args.ForcePathStyle)
-		}
+	switch args.LogLevel {
+	case "", "debug", "debug-crt", "no-log":
+	default:
+		logger.Error("unsupported log-level for mount-s3", zap.String("log-level", args.LogLevel))
+		return fmt.Errorf("unsupported log-level %q for mount-s3, supported: debug, debug-crt, no-log", args.LogLevel)
 	}
 
 	// ensureDir creates the directory if it does not exist, confined to its safe base.

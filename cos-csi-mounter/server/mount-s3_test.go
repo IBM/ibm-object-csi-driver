@@ -43,12 +43,10 @@ func TestS3MounterPopulateArgsSlice_BasicArgs(t *testing.T) {
 	assert.Contains(t, result, "--force-path-style")
 }
 
-func TestS3MounterPopulateArgsSlice_ReadOnlyClearsWriteFlags(t *testing.T) {
+func TestS3MounterPopulateArgsSlice_ReadOnly(t *testing.T) {
 	args := s3MounterArgs{
-		AllowOther:     "true",
-		ReadOnly:       "true",
-		AllowDelete:    "true",
-		AllowOverwrite: "true",
+		AllowOther: "true",
+		ReadOnly:   "TRUE",
 	}
 
 	result, err := args.PopulateArgsSlice(testBucket, testTargetPath)
@@ -58,14 +56,14 @@ func TestS3MounterPopulateArgsSlice_ReadOnlyClearsWriteFlags(t *testing.T) {
 	assert.NotContains(t, result, "--allow-overwrite")
 }
 
-func TestS3MounterPopulateArgsSlice_IncrementalUploadBlocked(t *testing.T) {
-	args := s3MounterArgs{
-		IncrementalUpload: "true",
-	}
+// Validate accepts any casing of "true"/"false", so PopulateArgsSlice must too.
+func TestS3MounterPopulateArgsSlice_BoolIsCaseInsensitive(t *testing.T) {
+	args := s3MounterArgs{AllowOther: "TRUE", ForcePathStyle: " True "}
 
 	result, err := args.PopulateArgsSlice(testBucket, testTargetPath)
 	assert.NoError(t, err)
-	assert.NotContains(t, result, "--incremental-upload")
+	assert.Contains(t, result, "--allow-other")
+	assert.Contains(t, result, "--force-path-style")
 }
 
 func TestS3MounterPopulateArgsSlice_UIDAndGID(t *testing.T) {
@@ -87,14 +85,6 @@ func TestS3MounterPopulateArgsSlice_LogLevels(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, result, "--"+level)
 	}
-}
-
-func TestS3MounterPopulateArgsSlice_UnsupportedLogLevel(t *testing.T) {
-	args := s3MounterArgs{LogLevel: "verbose"}
-	result, err := args.PopulateArgsSlice(testBucket, testTargetPath)
-	assert.NoError(t, err)
-	// unsupported log level is silently ignored
-	assert.NotContains(t, result, "--verbose")
 }
 
 func TestS3MounterPopulateArgsSlice_PassthroughArgs(t *testing.T) {
@@ -235,6 +225,52 @@ func TestS3MounterValidate_InvalidForcePathStyle(t *testing.T) {
 	err := args.Validate(testTargetPath)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot convert value of force-path-style into boolean")
+}
+
+func TestS3MounterValidate_IncrementalUploadRejected(t *testing.T) {
+	args := s3MounterArgs{
+		AwsCredentialsFile: testCredFile,
+		AwsConfigFile:      testCfgFile,
+		IncrementalUpload:  "true",
+	}
+	err := args.Validate(testTargetPath)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "incremental-upload is not supported")
+}
+
+func TestS3MounterValidate_ReadOnlyWithWriteFlagsRejected(t *testing.T) {
+	for name, apply := range map[string]func(*s3MounterArgs){
+		"allow-delete":    func(a *s3MounterArgs) { a.AllowDelete = "true" },
+		"allow-overwrite": func(a *s3MounterArgs) { a.AllowOverwrite = "true" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			args := s3MounterArgs{
+				AwsCredentialsFile: testCredFile,
+				AwsConfigFile:      testCfgFile,
+				ReadOnly:           "true",
+			}
+			apply(&args)
+			err := args.Validate(testTargetPath)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "read-only cannot be combined")
+		})
+	}
+}
+
+func TestS3MounterValidate_LogLevel(t *testing.T) {
+	base := s3MounterArgs{AwsCredentialsFile: testCredFile, AwsConfigFile: testCfgFile}
+
+	for _, level := range []string{"", "debug", "debug-crt", "no-log"} {
+		args := base
+		args.LogLevel = level
+		assert.NoError(t, args.Validate(testTargetPath), level)
+	}
+
+	args := base
+	args.LogLevel = "verbose"
+	err := args.Validate(testTargetPath)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported log-level")
 }
 
 func TestS3MounterValidate_ValidUIDAndGID(t *testing.T) {
