@@ -33,18 +33,13 @@ type MountS3Mounter struct {
 	AuthType      string
 	AccessKey     string
 	SecretKey     string
-
-	UID string
-	GID string
-
-	LogLevel string
-	CacheDir string
-
-	ReadOnly bool
-
-	// Deduplicated passthrough flags; secret flags override SC flags.
-	MountOptions []string
-	MounterUtils utils.MounterUtils
+	UID           string
+	GID           string
+	LogLevel      string
+	CacheDir      string
+	ReadOnly      bool
+	MountOptions  []string
+	MounterUtils  utils.MounterUtils
 }
 
 const (
@@ -70,33 +65,6 @@ var (
 		"incremental-upload": "requires AWS S3 Express One Zone and causes data loss on IBM COS",
 	}
 )
-
-// s3MounterArgs must stay in sync with s3MounterArgs in cos-csi-mounter.
-type s3MounterArgs struct {
-	AllowOther         string `json:"allow-other,omitempty"`
-	AwsCredentialsFile string `json:"aws-credentials-file,omitempty"`
-	AwsConfigFile      string `json:"aws-config-file,omitempty"`
-
-	EndpointURL string `json:"endpoint-url,omitempty"`
-	Region      string `json:"region,omitempty"`
-
-	UID string `json:"uid,omitempty"`
-	GID string `json:"gid,omitempty"`
-
-	LogLevel     string `json:"log-level,omitempty"`
-	LogDirectory string `json:"log-directory,omitempty"`
-
-	CacheDir string `json:"cache,omitempty"`
-
-	ReadOnly       string `json:"read-only,omitempty"`
-	AllowDelete    string `json:"allow-delete,omitempty"`
-	AllowOverwrite string `json:"allow-overwrite,omitempty"`
-
-	ForcePathStyle string `json:"force-path-style,omitempty"`
-
-	// Passthrough flags not handled by the fields above.
-	Args []string `json:"args,omitempty"`
-}
 
 type MountS3MounterParams struct {
 	SecretMap    map[string]string
@@ -151,102 +119,68 @@ func NewMountS3Mounter(params MountS3MounterParams) Mounter {
 	}
 
 	mounter.ReadOnly = readOnly
-
 	mounter.AuthType = "hmac"
 
-	scRemainder := parseMountS3Options(mounter, mountOptions)
-	secretOpts := splitSecretMountOptions(secretMap["mountOptions"])
-	secretRemainder := parseMountS3Options(mounter, secretOpts)
-	mounter.MountOptions = deduplicatePassthrough(scRemainder, secretRemainder)
+	mounter.MountOptions = updateMountS3Options(mounter, mountOptions, secretMap)
 
 	klog.Infof("newMountS3Mounter args:\n\tbucketName: [%s]\n\tobjectPath: [%s]\n\tendPoint: [%s]\n\tlocationConstraint: [%s]\n\tauthType: [%s]",
 		mounter.BucketName, mounter.ObjectPath, mounter.EndPoint, mounter.LocConstraint, mounter.AuthType)
-	klog.Infof("newMountS3Mounter: SC mountOptions=%v secretMountOptions=%v deduplicated passthrough=%v",
-		mountOptions, secretOpts, mounter.MountOptions)
 
 	return mounter
 }
 
-// deduplicatePassthrough merges SC and secret flags; on the same key the secret wins.
-func deduplicatePassthrough(scFlags, secretFlags []string) []string {
-	flagKey := func(flag string) string {
-		key, _, _ := strings.Cut(strings.TrimPrefix(flag, "--"), "=")
-		return key
-	}
+// updateMountS3Options merges StorageClass and secret mountOptions into one map keyed by
+// flag name (secret wins on the same key).
+// uid, gid, log-level and cache are applied to the mounter, driver-managed flags are
+// dropped, and the rest is returned as "--key[=value]" passthrough flags.
+func updateMountS3Options(mounter *MountS3Mounter, scOptions []string, secretMap map[string]string) []string {
+	mountOptsMap := make(map[string]string)
 
-	secretKeys := make(map[string]struct{}, len(secretFlags))
-	for _, flag := range secretFlags {
-		secretKeys[flagKey(flag)] = struct{}{}
-	}
-
-	result := make([]string, 0, len(scFlags)+len(secretFlags))
-	for _, flag := range scFlags {
-		if _, overridden := secretKeys[flagKey(flag)]; overridden {
-			klog.Infof("deduplicatePassthrough: SC flag %q overridden by secret", flag)
-			continue
+	addOptions := func(opts []string) {
+		for _, opt := range opts {
+			opt = strings.TrimRight(strings.TrimSpace(opt), ",")
+			if opt == "" || strings.HasPrefix(opt, "#") {
+				continue
+			}
+			key, value, _ := strings.Cut(strings.TrimPrefix(opt, "--"), "=")
+			mountOptsMap[strings.TrimSpace(key)] = strings.TrimSpace(value)
 		}
-		result = append(result, flag)
 	}
-	return append(result, secretFlags...)
-}
 
-// splitSecretMountOptions splits the multiline mountOptions string from the secret.
-func splitSecretMountOptions(raw string) []string {
-	if raw == "" {
-		return nil
+	addOptions(scOptions)
+	if stringData, ok := secretMap["mountOptions"]; ok {
+		addOptions(strings.Split(stringData, "\n"))
+	} else {
+		klog.Infof("No new mountOptions found. Using default mountOptions: %v", scOptions)
 	}
-	var opts []string
-	for _, line := range strings.Split(raw, "\n") {
-		line = strings.TrimSpace(line)
-		line = strings.TrimRight(line, ",")
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		opts = append(opts, line)
-	}
-	return opts
-}
 
-// parseMountS3Options parses mount-s3 options from the provided slice.
-func parseMountS3Options(mounter *MountS3Mounter, opts []string) []string {
-	var remaining []string
-
-	for _, opt := range opts {
-		trimmed := strings.TrimPrefix(opt, "--")
-		key, value, hasValue := strings.Cut(trimmed, "=")
-
+	updatedOptions := make([]string, 0, len(mountOptsMap))
+	for key, value := range mountOptsMap {
 		if reason, ignored := s3MountIgnoredOptions[key]; ignored {
-			klog.Warningf("parseMountS3Options: '%s' %s. Ignoring.", key, reason)
+			klog.Warningf("updateMountS3Options: '%s' %s. Ignoring.", key, reason)
 			continue
 		}
 
-		switch key {
-		case "uid":
-			if hasValue {
-				mounter.UID = value
-			}
-		case "gid":
-			if hasValue {
-				mounter.GID = value
-			}
-		case "log-level":
-			if hasValue {
-				mounter.LogLevel = value
-			}
-		case "cache":
-			if hasValue {
-				mounter.CacheDir = value
-			}
+		switch {
+		case key == "uid" && value != "":
+			mounter.UID = value
+		case key == "gid" && value != "":
+			mounter.GID = value
+		case key == "log-level" && value != "":
+			mounter.LogLevel = value
+		case key == "cache" && value != "":
+			mounter.CacheDir = value
+		case key == "uid" || key == "gid" || key == "log-level" || key == "cache":
+			klog.Warningf("updateMountS3Options: '%s' requires a value. Ignoring.", key)
+		case value == "":
+			updatedOptions = append(updatedOptions, "--"+key)
 		default:
-			if strings.HasPrefix(opt, "--") {
-				remaining = append(remaining, opt)
-			} else {
-				remaining = append(remaining, "--"+opt)
-			}
+			updatedOptions = append(updatedOptions, "--"+key+"="+value)
 		}
 	}
 
-	return remaining
+	klog.Infof("Updated mount-s3 Options: %v", updatedOptions)
+	return updatedOptions
 }
 
 func (s3 *MountS3Mounter) Mount(source string, target string) error {
@@ -279,10 +213,10 @@ func (s3 *MountS3Mounter) Mount(source string, target string) error {
 		klog.Info("Mount on Worker started...")
 
 		mountReq := struct {
-			Path    string        `json:"path"`
-			Bucket  string        `json:"bucket"`
-			Mounter string        `json:"mounter"`
-			Args    s3MounterArgs `json:"args"`
+			Path    string            `json:"path"`
+			Bucket  string            `json:"bucket"`
+			Mounter string            `json:"mounter"`
+			Args    map[string]string `json:"args"`
 		}{
 			Path:    target,
 			Bucket:  bucketName,
@@ -402,7 +336,7 @@ func writeConfigFile(filePath string, lines []string) error {
 	return w.Flush()
 }
 
-func (s3 *MountS3Mounter) formulateMountOptions(bucket, target, configPathWithVolID string) (nodeServerOp []string, envVars []string, workerNodeOp s3MounterArgs) {
+func (s3 *MountS3Mounter) formulateMountOptions(bucket, target, configPathWithVolID string) (nodeServerOp []string, envVars []string, workerNodeOp map[string]string) {
 	nodeServerOp = []string{bucket, target, "--allow-other"}
 
 	credFilePath := path.Join(configPathWithVolID, s3MountCredentialsFile)
@@ -412,39 +346,39 @@ func (s3 *MountS3Mounter) formulateMountOptions(bucket, target, configPathWithVo
 		"AWS_CONFIG_FILE=" + cfgFilePath,
 	}
 
-	workerNodeOp = s3MounterArgs{
-		AllowOther:         "true",
-		AwsCredentialsFile: credFilePath,
-		AwsConfigFile:      cfgFilePath,
+	workerNodeOp = map[string]string{
+		"allow-other":          "true",
+		"aws-credentials-file": credFilePath,
+		"aws-config-file":      cfgFilePath,
 	}
 
 	if s3.EndPoint != "" {
 		nodeServerOp = append(nodeServerOp, "--endpoint-url="+s3.EndPoint)
-		workerNodeOp.EndpointURL = s3.EndPoint
+		workerNodeOp["endpoint-url"] = s3.EndPoint
 	}
 	if s3.LocConstraint != "" {
 		nodeServerOp = append(nodeServerOp, "--region="+s3.LocConstraint)
-		workerNodeOp.Region = s3.LocConstraint
+		workerNodeOp["region"] = s3.LocConstraint
 	}
 	if s3.UID != "" {
 		nodeServerOp = append(nodeServerOp, "--uid="+s3.UID)
-		workerNodeOp.UID = s3.UID
+		workerNodeOp["uid"] = s3.UID
 	}
 	if s3.GID != "" {
 		nodeServerOp = append(nodeServerOp, "--gid="+s3.GID)
-		workerNodeOp.GID = s3.GID
+		workerNodeOp["gid"] = s3.GID
 	}
 
 	switch s3.LogLevel {
 	case "debug":
 		nodeServerOp = append(nodeServerOp, "--debug")
-		workerNodeOp.LogLevel = "debug"
+		workerNodeOp["log-level"] = "debug"
 	case "debug-crt":
 		nodeServerOp = append(nodeServerOp, "--debug-crt")
-		workerNodeOp.LogLevel = "debug-crt"
+		workerNodeOp["log-level"] = "debug-crt"
 	case "no-log":
 		nodeServerOp = append(nodeServerOp, "--no-log")
-		workerNodeOp.LogLevel = "no-log"
+		workerNodeOp["log-level"] = "no-log"
 	default:
 		if s3.LogLevel != "" {
 			klog.Warningf("MountS3Mounter: unsupported log-level %q. "+
@@ -453,28 +387,36 @@ func (s3 *MountS3Mounter) formulateMountOptions(bucket, target, configPathWithVo
 	}
 
 	nodeServerOp = append(nodeServerOp, "--log-directory="+s3MountLogDirectory)
-	workerNodeOp.LogDirectory = s3MountLogDirectory
+	workerNodeOp["log-directory"] = s3MountLogDirectory
 
 	if s3.CacheDir != "" {
 		nodeServerOp = append(nodeServerOp, "--cache="+s3.CacheDir)
-		workerNodeOp.CacheDir = s3.CacheDir
+		workerNodeOp["cache"] = s3.CacheDir
 	}
 
 	nodeServerOp = append(nodeServerOp, "--force-path-style")
-	workerNodeOp.ForcePathStyle = "true"
+	workerNodeOp["force-path-style"] = "true"
 
 	// read-only suppresses allow-delete and allow-overwrite.
 	if s3.ReadOnly {
 		nodeServerOp = append(nodeServerOp, "--read-only")
-		workerNodeOp.ReadOnly = "true"
+		workerNodeOp["read-only"] = "true"
 	} else {
 		nodeServerOp = append(nodeServerOp, "--allow-delete", "--allow-overwrite")
-		workerNodeOp.AllowDelete = "true"
-		workerNodeOp.AllowOverwrite = "true"
+		workerNodeOp["allow-delete"] = "true"
+		workerNodeOp["allow-overwrite"] = "true"
 	}
 
-	nodeServerOp = append(nodeServerOp, s3.MountOptions...)
-	workerNodeOp.Args = s3.MountOptions
+	for _, opt := range s3.MountOptions {
+		nodeServerOp = append(nodeServerOp, opt)
+
+		key, value, hasValue := strings.Cut(strings.TrimPrefix(opt, "--"), "=")
+		if hasValue {
+			workerNodeOp[key] = value
+		} else {
+			workerNodeOp[key] = "true"
+		}
+	}
 
 	klog.Infof("MountS3 nodeServerOp: %v", nodeServerOp)
 	klog.Infof("MountS3 workerNodeOp: %+v", workerNodeOp)

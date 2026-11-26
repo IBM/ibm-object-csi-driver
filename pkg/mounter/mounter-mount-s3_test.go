@@ -355,17 +355,19 @@ func TestFormulateMountOptions_AllOptions(t *testing.T) {
 	assert.Contains(t, envVars[1], "AWS_CONFIG_FILE=")
 
 	// Check worker node options
-	assert.Equal(t, "true", workerNodeOp.AllowOther)
-	assert.Equal(t, "https://s3.us-east.cloud-object-storage.appdomain.cloud", workerNodeOp.EndpointURL)
-	assert.Equal(t, "us-east", workerNodeOp.Region)
-	assert.Equal(t, "1000", workerNodeOp.UID)
-	assert.Equal(t, "2000", workerNodeOp.GID)
-	assert.Equal(t, "debug", workerNodeOp.LogLevel)
-	assert.Equal(t, "/var/log/mount-s3", workerNodeOp.LogDirectory)
-	assert.Equal(t, "/tmp/cache", workerNodeOp.CacheDir)
-	assert.Equal(t, "true", workerNodeOp.ReadOnly)
-	assert.Contains(t, workerNodeOp.Args, "--dir-mode=0755")
-	assert.Contains(t, workerNodeOp.Args, "--max-threads=32")
+	assert.Equal(t, "/config/path/credentials", workerNodeOp["aws-credentials-file"])
+	assert.Equal(t, "/config/path/config", workerNodeOp["aws-config-file"])
+	assert.Equal(t, "true", workerNodeOp["allow-other"])
+	assert.Equal(t, "https://s3.us-east.cloud-object-storage.appdomain.cloud", workerNodeOp["endpoint-url"])
+	assert.Equal(t, "us-east", workerNodeOp["region"])
+	assert.Equal(t, "1000", workerNodeOp["uid"])
+	assert.Equal(t, "2000", workerNodeOp["gid"])
+	assert.Equal(t, "debug", workerNodeOp["log-level"])
+	assert.Equal(t, "/var/log/mount-s3", workerNodeOp["log-directory"])
+	assert.Equal(t, "/tmp/cache", workerNodeOp["cache"])
+	assert.Equal(t, "true", workerNodeOp["read-only"])
+	assert.Equal(t, "0755", workerNodeOp["dir-mode"])
+	assert.Equal(t, "32", workerNodeOp["max-threads"])
 }
 
 func TestFormulateMountOptions_LogLevelDebugCrt(t *testing.T) {
@@ -376,7 +378,7 @@ func TestFormulateMountOptions_LogLevelDebugCrt(t *testing.T) {
 	nodeServerOp, _, workerNodeOp := s3Mounter.formulateMountOptions("test-bucket", target, "/config/path")
 
 	assert.Contains(t, nodeServerOp, "--debug-crt")
-	assert.Equal(t, "debug-crt", workerNodeOp.LogLevel)
+	assert.Equal(t, "debug-crt", workerNodeOp["log-level"])
 }
 
 func TestFormulateMountOptions_LogLevelNoLog(t *testing.T) {
@@ -387,7 +389,7 @@ func TestFormulateMountOptions_LogLevelNoLog(t *testing.T) {
 	nodeServerOp, _, workerNodeOp := s3Mounter.formulateMountOptions("test-bucket", target, "/config/path")
 
 	assert.Contains(t, nodeServerOp, "--no-log")
-	assert.Equal(t, "no-log", workerNodeOp.LogLevel)
+	assert.Equal(t, "no-log", workerNodeOp["log-level"])
 }
 
 func TestFormulateMountOptions_InvalidLogLevel(t *testing.T) {
@@ -401,7 +403,7 @@ func TestFormulateMountOptions_InvalidLogLevel(t *testing.T) {
 	assert.NotContains(t, nodeServerOp, "--debug")
 	assert.NotContains(t, nodeServerOp, "--debug-crt")
 	assert.NotContains(t, nodeServerOp, "--no-log")
-	assert.Empty(t, workerNodeOp.LogLevel)
+	assert.Empty(t, workerNodeOp["log-level"])
 }
 
 func TestFormulateMountOptions_MinimalConfig(t *testing.T) {
@@ -420,7 +422,7 @@ func TestFormulateMountOptions_MinimalConfig(t *testing.T) {
 	assert.Len(t, envVars, 2)
 
 	// Check worker node options
-	assert.Equal(t, "true", workerNodeOp.AllowOther)
+	assert.Equal(t, "true", workerNodeOp["allow-other"])
 }
 
 func TestCreateS3MountConfig_Success(t *testing.T) {
@@ -475,231 +477,120 @@ func TestCreateS3MountConfig_CreateFileFails(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to create file")
 }
 
-// Test deduplicatePassthrough function
-func TestDeduplicatePassthrough(t *testing.T) {
-	tests := []struct {
-		name        string
-		scFlags     []string
-		secretFlags []string
-		expected    []string
-	}{
-		{
-			name:        "No overlap - all flags kept",
-			scFlags:     []string{"--allow-delete", "--dir-mode=0755"},
-			secretFlags: []string{"--max-threads=128"},
-			expected:    []string{"--allow-delete", "--dir-mode=0755", "--max-threads=128"},
-		},
-		{
-			name:        "Complete overlap - secret wins",
-			scFlags:     []string{"--max-threads=32", "--maximum-throughput-gbps=10"},
-			secretFlags: []string{"--max-threads=128", "--maximum-throughput-gbps=25"},
-			expected:    []string{"--max-threads=128", "--maximum-throughput-gbps=25"},
-		},
-		{
-			name:        "Partial overlap - secret wins on duplicates",
-			scFlags:     []string{"--max-threads=32", "--maximum-throughput-gbps=10", "--allow-delete"},
-			secretFlags: []string{"--max-threads=128", "--maximum-throughput-gbps=25"},
-			expected:    []string{"--allow-delete", "--max-threads=128", "--maximum-throughput-gbps=25"},
-		},
-		{
-			name:        "Empty SC flags",
-			scFlags:     []string{},
-			secretFlags: []string{"--max-threads=128"},
-			expected:    []string{"--max-threads=128"},
-		},
-		{
-			name:        "Empty secret flags",
-			scFlags:     []string{"--max-threads=32"},
-			secretFlags: []string{},
-			expected:    []string{"--max-threads=32"},
-		},
-		{
-			name:        "Both empty",
-			scFlags:     []string{},
-			secretFlags: []string{},
-			expected:    []string{},
-		},
-		{
-			name:        "Flag without double dash matches flag with double dash",
-			scFlags:     []string{"--max-threads=32"},
-			secretFlags: []string{"max-threads=128"},
-			expected:    []string{"max-threads=128"},
-		},
-		{
-			name:        "Value containing equals does not affect the key",
-			scFlags:     []string{"--endpoint-url=https://a.example.com?x=1", "--dir-mode=0755"},
-			secretFlags: []string{"--endpoint-url=https://b.example.com"},
-			expected:    []string{"--dir-mode=0755", "--endpoint-url=https://b.example.com"},
-		},
-		{
-			name:        "Boolean flag in SC overridden by value flag with same key",
-			scFlags:     []string{"--allow-delete"},
-			secretFlags: []string{"--allow-delete=true"},
-			expected:    []string{"--allow-delete=true"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := deduplicatePassthrough(tt.scFlags, tt.secretFlags)
-			assert.ElementsMatch(t, tt.expected, result)
-		})
-	}
-}
-
-// Test splitSecretMountOptions function
-func TestSplitSecretMountOptions(t *testing.T) {
-	tests := []struct {
-		name     string
-		raw      string
-		expected []string
-	}{
-		{
-			name: "Basic multiline options",
-			raw: `log-level=debug
-read-only
-cache=/tmp/cache`,
-			expected: []string{"log-level=debug", "read-only", "cache=/tmp/cache"},
-		},
-		{
-			name: "Options with trailing commas",
-			raw: `log-level=debug,
-read-only,
-cache=/tmp/cache,`,
-			expected: []string{"log-level=debug", "read-only", "cache=/tmp/cache"},
-		},
-		{
-			name: "Options with comments",
-			raw: `log-level=debug
-# This is a comment
-read-only
-cache=/tmp/cache`,
-			expected: []string{"log-level=debug", "read-only", "cache=/tmp/cache"},
-		},
-		{
-			name: "Options with empty lines",
-			raw: `log-level=debug
-
-read-only
-
-cache=/tmp/cache`,
-			expected: []string{"log-level=debug", "read-only", "cache=/tmp/cache"},
-		},
-		{
-			name: "Options with whitespace",
-			raw: `  log-level=debug  
-  read-only  
-  cache=/tmp/cache  `,
-			expected: []string{"log-level=debug", "read-only", "cache=/tmp/cache"},
-		},
-		{
-			name:     "Empty string",
-			raw:      "",
-			expected: nil,
-		},
-		{
-			name: "Only comments and empty lines",
-			raw: `# Comment 1
-
-# Comment 2`,
-			expected: nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := splitSecretMountOptions(tt.raw)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-// Test parseMountS3Options function
-func TestParseMountS3Options(t *testing.T) {
+// Test updateMountS3Options function
+func TestUpdateMountS3Options(t *testing.T) {
 	tests := []struct {
 		name              string
-		opts              []string
-		expectedMounter   *MountS3Mounter
+		scOptions         []string
+		secretMap         map[string]string
+		expectedMounter   MountS3Mounter
 		expectedRemaining []string
 	}{
 		{
-			name: "Parse structured options",
-			opts: []string{"--uid=1000", "--gid=2000", "--log-level=debug", "--cache=/tmp/cache", "--read-only"},
-			expectedMounter: &MountS3Mounter{
-				UID:      "1000",
-				GID:      "2000",
-				LogLevel: "debug",
-				CacheDir: "/tmp/cache",
-				// read-only is now set via MounterParams.ReadOnly, not parsed from flags.
-				ReadOnly: false,
+			name:      "Structured options are applied to the mounter",
+			scOptions: []string{"--uid=1000", "--gid=2000", "--log-level=debug", "--cache=/tmp/cache"},
+			secretMap: map[string]string{},
+			expectedMounter: MountS3Mounter{
+				UID: "1000", GID: "2000", LogLevel: "debug", CacheDir: "/tmp/cache",
 			},
 			expectedRemaining: []string{},
 		},
 		{
-			name: "Parse with passthrough options",
-			opts: []string{"--uid=1000", "--max-threads=32", "--dir-mode=0755"},
-			expectedMounter: &MountS3Mounter{
-				UID: "1000",
-			},
+			name:              "Passthrough options keep their form",
+			scOptions:         []string{"--max-threads=32", "--dir-mode=0755", "--auto-unmount"},
+			secretMap:         map[string]string{},
+			expectedRemaining: []string{"--max-threads=32", "--dir-mode=0755", "--auto-unmount"},
+		},
+		{
+			name:              "Options without double dash get one",
+			scOptions:         []string{"max-threads=32", "dir-mode=0755"},
+			secretMap:         map[string]string{},
 			expectedRemaining: []string{"--max-threads=32", "--dir-mode=0755"},
 		},
 		{
-			name: "Ignore allow-overwrite and incremental-upload",
-			opts: []string{"--allow-overwrite", "--incremental-upload"},
-			// allow-overwrite is hardcoded and incremental-upload is blocked —
-			// both are dropped and never reach the passthrough slice.
-			expectedMounter:   &MountS3Mounter{},
-			expectedRemaining: []string{},
+			name:              "Secret overrides SC on the same key",
+			scOptions:         []string{"--max-threads=32", "--maximum-throughput-gbps=10", "--dir-mode=0755"},
+			secretMap:         map[string]string{"mountOptions": "max-threads=128\nmaximum-throughput-gbps=25"},
+			expectedRemaining: []string{"--dir-mode=0755", "--max-threads=128", "--maximum-throughput-gbps=25"},
 		},
 		{
-			name: "Ignore log-directory",
-			// log-directory is hardcoded — any user-supplied value is dropped and
-			// never reaches the passthrough slice. formulateMountOptions always
-			// passes s3MountLogDirectory (see TestFormulateMountOptions_AllOptions).
-			opts:              []string{"--log-directory=/some/custom/path"},
-			expectedMounter:   &MountS3Mounter{},
-			expectedRemaining: []string{},
+			name:              "Secret key without double dash overrides SC key with it",
+			scOptions:         []string{"--max-threads=32"},
+			secretMap:         map[string]string{"mountOptions": "max-threads=128"},
+			expectedRemaining: []string{"--max-threads=128"},
 		},
 		{
-			name: "Ignore allow-other",
-			opts: []string{"--allow-other", "--uid=1000"},
-			expectedMounter: &MountS3Mounter{
-				UID: "1000",
-			},
-			expectedRemaining: []string{},
+			name:              "Duplicate keys within one source collapse to the last",
+			scOptions:         []string{"--max-threads=32", "--max-threads=64"},
+			secretMap:         map[string]string{},
+			expectedRemaining: []string{"--max-threads=64"},
 		},
 		{
-			name:              "Add double dash to options without it",
-			opts:              []string{"max-threads=32", "dir-mode=0755"},
-			expectedMounter:   &MountS3Mounter{},
+			name:              "Value containing equals is kept intact",
+			scOptions:         []string{"--prefix=a=b"},
+			secretMap:         map[string]string{},
+			expectedRemaining: []string{"--prefix=a=b"},
+		},
+		{
+			name:              "Secret options with commas, comments, blanks and whitespace",
+			secretMap:         map[string]string{"mountOptions": "  max-threads=32,  \n# comment\n\n--dir-mode=0755\n"},
 			expectedRemaining: []string{"--max-threads=32", "--dir-mode=0755"},
+		},
+		{
+			name:      "Structured option without a value is ignored",
+			scOptions: []string{"--uid", "--gid", "--log-level", "--cache"},
+			secretMap: map[string]string{},
+
+			expectedRemaining: []string{},
+		},
+		{
+			name:              "Empty input",
+			secretMap:         map[string]string{},
+			expectedRemaining: []string{},
+		},
+		{
+			name:              "Nil secret map",
+			scOptions:         []string{"--max-threads=32"},
+			secretMap:         nil,
+			expectedRemaining: []string{"--max-threads=32"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mounter := &MountS3Mounter{}
-			remaining := parseMountS3Options(mounter, tt.opts)
+			remaining := updateMountS3Options(mounter, tt.scOptions, tt.secretMap)
 
 			assert.Equal(t, tt.expectedMounter.UID, mounter.UID)
 			assert.Equal(t, tt.expectedMounter.GID, mounter.GID)
 			assert.Equal(t, tt.expectedMounter.LogLevel, mounter.LogLevel)
 			assert.Equal(t, tt.expectedMounter.CacheDir, mounter.CacheDir)
-			assert.Equal(t, tt.expectedMounter.ReadOnly, mounter.ReadOnly)
 			assert.ElementsMatch(t, tt.expectedRemaining, remaining)
 		})
 	}
 }
 
+// Test that structured options from the secret override the ones from the SC.
+func TestUpdateMountS3Options_SecretOverridesStructured(t *testing.T) {
+	mounter := &MountS3Mounter{}
+	remaining := updateMountS3Options(mounter,
+		[]string{"--uid=1", "--log-level=debug"},
+		map[string]string{"mountOptions": "uid=2\nlog-level=no-log"})
+
+	assert.Empty(t, remaining)
+	assert.Equal(t, "2", mounter.UID)
+	assert.Equal(t, "no-log", mounter.LogLevel)
+}
+
 // Test that every driver-managed or unsupported flag is dropped, with or
 // without the leading "--" and with or without a value, and never reaches
 // the passthrough slice or changes the mounter.
-func TestParseMountS3Options_IgnoredOptions(t *testing.T) {
+func TestUpdateMountS3Options_IgnoredOptions(t *testing.T) {
 	for key := range s3MountIgnoredOptions {
 		for _, opt := range []string{"--" + key, key, "--" + key + "=value"} {
 			t.Run(opt, func(t *testing.T) {
 				mounter := &MountS3Mounter{}
-				remaining := parseMountS3Options(mounter, []string{opt, "--max-threads=32"})
+				remaining := updateMountS3Options(mounter, []string{opt, "--max-threads=32"}, nil)
 
 				assert.Equal(t, []string{"--max-threads=32"}, remaining)
 				assert.Equal(t, &MountS3Mounter{}, mounter)
@@ -734,9 +625,9 @@ allow-overwrite`,
 	// allow-overwrite is emitted by formulateMountOptions since read-only is not set.
 	nodeServerOp, _, workerNodeOp := s3Mounter.formulateMountOptions("b", target, "/config/path")
 	assert.Contains(t, nodeServerOp, "--allow-overwrite")
-	assert.Equal(t, "true", workerNodeOp.AllowOverwrite)
+	assert.Equal(t, "true", workerNodeOp["allow-overwrite"])
 	assert.NotContains(t, nodeServerOp, "--incremental-upload")
-	assert.Empty(t, workerNodeOp.Args)
+	assert.NotContains(t, workerNodeOp, "incremental-upload")
 }
 
 // Test SC and secret mount options precedence
@@ -772,7 +663,7 @@ maximum-throughput-gbps=25`,
 	// But it is always enabled by formulateMountOptions when not read-only.
 	nodeServerOp, _, workerNodeOp := s3Mounter.formulateMountOptions("b", target, "/config/path")
 	assert.Contains(t, nodeServerOp, "--allow-delete")
-	assert.Equal(t, "true", workerNodeOp.AllowDelete)
+	assert.Equal(t, "true", workerNodeOp["allow-delete"])
 }
 
 // Test read-only priority resolution in Mount
@@ -809,8 +700,8 @@ func TestMountS3Mount_ReadOnlyPriority(t *testing.T) {
 	assert.Contains(t, nodeServerOp, "--read-only")
 	assert.NotContains(t, nodeServerOp, "--allow-delete")
 	assert.NotContains(t, nodeServerOp, "--allow-overwrite")
-	assert.Empty(t, workerNodeOp.AllowDelete)
-	assert.Empty(t, workerNodeOp.AllowOverwrite)
+	assert.Empty(t, workerNodeOp["allow-delete"])
+	assert.Empty(t, workerNodeOp["allow-overwrite"])
 	// Passthrough options unrelated to write-access are preserved.
 	assert.Contains(t, s3Mounter.MountOptions, "--max-threads=32")
 }
