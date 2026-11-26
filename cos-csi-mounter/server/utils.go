@@ -287,35 +287,15 @@ func resolveUnderBase(path, safeBase string) (string, error) {
 	return absPath, nil
 }
 
-// ensureDir creates the directory at path if it doesn't exist.
-// The path is first verified to be within safeBase.
+// ensureDir creates the directory at path (with parents) if it doesn't exist.
+// The path is first verified to be within safeBase. MkdirAll is a no-op for an
+// existing directory and fails if a non-directory is in the way.
 func ensureDir(path, safeBase string) error {
 	absPath, err := resolveUnderBase(path, safeBase)
 	if err != nil {
 		return err
 	}
-
-	// Check if directory already exists
-	info, err := os.Stat(absPath) // #nosec G304 -- absPath is validated against safeBase above
-	if err == nil {
-		// Path exists, verify it's a directory
-		if !info.IsDir() {
-			return fmt.Errorf("path exists but is not a directory: %s", absPath)
-		}
-		return nil
-	}
-
-	// If error is not "not exist", return it
-	if !os.IsNotExist(err) {
-		return fmt.Errorf("failed to stat directory: %w", err)
-	}
-
-	// Directory doesn't exist, create it with parent directories
-	if err := os.MkdirAll(absPath, 0750); err != nil { // #nosec G301 -- directory permissions set to 0750 for security
-		return fmt.Errorf("failed to create directory: %w", err)
-	}
-
-	return nil
+	return os.MkdirAll(absPath, 0750) // #nosec G301 -- directory permissions set to 0750 for security
 }
 
 // redactArgsForLog returns a copy of the raw Args JSON with the value of
