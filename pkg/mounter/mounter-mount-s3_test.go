@@ -366,8 +366,7 @@ func TestFormulateMountOptions_AllOptions(t *testing.T) {
 	assert.Equal(t, "/var/log/mount-s3", workerNodeOp["log-directory"])
 	assert.Equal(t, "/tmp/cache", workerNodeOp["cache"])
 	assert.Equal(t, "true", workerNodeOp["read-only"])
-	assert.Equal(t, "0755", workerNodeOp["dir-mode"])
-	assert.Equal(t, "32", workerNodeOp["max-threads"])
+	assert.Equal(t, "--dir-mode=0755,--max-threads=32", workerNodeOp["add-mount-param"])
 }
 
 func TestFormulateMountOptions_LogLevelDebugCrt(t *testing.T) {
@@ -628,6 +627,7 @@ allow-overwrite`,
 	assert.Equal(t, "true", workerNodeOp["allow-overwrite"])
 	assert.NotContains(t, nodeServerOp, "--incremental-upload")
 	assert.NotContains(t, workerNodeOp, "incremental-upload")
+	assert.NotContains(t, workerNodeOp, "add-mount-param")
 }
 
 // Test SC and secret mount options precedence

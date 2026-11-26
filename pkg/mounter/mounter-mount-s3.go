@@ -407,15 +407,11 @@ func (s3 *MountS3Mounter) formulateMountOptions(bucket, target, configPathWithVo
 		workerNodeOp["allow-overwrite"] = "true"
 	}
 
-	for _, opt := range s3.MountOptions {
-		nodeServerOp = append(nodeServerOp, opt)
-
-		key, value, hasValue := strings.Cut(strings.TrimPrefix(opt, "--"), "=")
-		if hasValue {
-			workerNodeOp[key] = value
-		} else {
-			workerNodeOp[key] = "true"
-		}
+	// Passthrough flags have no typed field on the server, so the worker receives
+	// them as a comma-separated "add-mount-param" string.
+	nodeServerOp = append(nodeServerOp, s3.MountOptions...)
+	if len(s3.MountOptions) > 0 {
+		workerNodeOp["add-mount-param"] = strings.Join(s3.MountOptions, ",")
 	}
 
 	klog.Infof("MountS3 nodeServerOp: %v", nodeServerOp)
