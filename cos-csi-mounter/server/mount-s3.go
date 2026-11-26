@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"go.uber.org/zap"
 )
@@ -31,8 +32,10 @@ type s3MounterArgs struct {
 	// Never sent by the node; kept so Validate can reject it.
 	IncrementalUpload string `json:"incremental-upload,omitempty"`
 	ForcePathStyle    string `json:"force-path-style,omitempty"`
-	// Passthrough flags, already deduplicated by the node.
-	Args []string `json:"args,omitempty"`
+	// AddMountParam carries additional mount-s3 flags not covered by the fields above,
+	// as a comma-separated list of --flag or --flag=value tokens.
+	// Example: "--max-threads=32,--dir-mode=0755"
+	AddMountParam string `json:"add-mount-param,omitempty"`
 }
 
 func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string, error) {
@@ -67,7 +70,13 @@ func (args s3MounterArgs) PopulateArgsSlice(bucket, targetPath string) ([]string
 		result = append(result, "--"+args.LogLevel)
 	}
 
-	return append(result, args.Args...), nil
+	for _, token := range strings.Split(args.AddMountParam, ",") {
+		if token = strings.TrimSpace(token); token != "" {
+			result = append(result, token)
+		}
+	}
+
+	return result, nil
 }
 
 func (args s3MounterArgs) Validate(targetPath string) error {
@@ -88,13 +97,22 @@ func (args s3MounterArgs) Validate(targetPath string) error {
 		}
 	}
 
-	if args.AwsCredentialsFile == "" {
-		logger.Error("aws-credentials-file is required for mount-s3")
-		return errors.New("aws-credentials-file is required for mount-s3")
-	}
-	if args.AwsConfigFile == "" {
-		logger.Error("aws-config-file is required for mount-s3")
-		return errors.New("aws-config-file is required for mount-s3")
+	// Both files are required, must live under the safe mounter config dir and must exist.
+	for _, f := range []struct{ name, value string }{
+		{"aws-credentials-file", args.AwsCredentialsFile},
+		{"aws-config-file", args.AwsConfigFile},
+	} {
+		if f.value == "" {
+			logger.Error(f.name + " is required for mount-s3")
+			return fmt.Errorf("%s is required for mount-s3", f.name)
+		}
+		if exists, err := FileExists(f.value); err != nil {
+			logger.Error("error checking "+f.name+" existence", zap.String(f.name, f.value), zap.Error(err))
+			return fmt.Errorf("error checking %s existence", f.name)
+		} else if !exists {
+			logger.Error(f.name+" not found", zap.String(f.name, f.value))
+			return fmt.Errorf("%s not found", f.name)
+		}
 	}
 
 	// AWS-only (S3 Express One Zone); causes data loss on IBM COS.

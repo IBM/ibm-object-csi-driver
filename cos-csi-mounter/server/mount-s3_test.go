@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,6 +17,14 @@ var (
 	testEndpoint = "https://s3.us-south.cloud-object-storage.appdomain.cloud"
 	testRegion   = "us-south-standard"
 )
+
+// mockS3FileExists replaces FileExists for the duration of the test.
+func mockS3FileExists(t *testing.T, exists bool, err error) {
+	t.Helper()
+	orig := FileExists
+	FileExists = func(string) (bool, error) { return exists, err }
+	t.Cleanup(func() { FileExists = orig })
+}
 
 // --- PopulateArgsSlice tests ---
 
@@ -87,15 +96,20 @@ func TestS3MounterPopulateArgsSlice_LogLevels(t *testing.T) {
 	}
 }
 
-func TestS3MounterPopulateArgsSlice_PassthroughArgs(t *testing.T) {
+func TestS3MounterPopulateArgsSlice_AddMountParam(t *testing.T) {
 	args := s3MounterArgs{
-		Args: []string{"--max-threads=32", "--read-part-size=16777216"},
+		AddMountParam: "--max-threads=32, --read-part-size=16777216,,--auto-unmount",
 	}
 
 	result, err := args.PopulateArgsSlice(testBucket, testTargetPath)
 	assert.NoError(t, err)
 	assert.Contains(t, result, "--max-threads=32")
 	assert.Contains(t, result, "--read-part-size=16777216")
+	assert.Contains(t, result, "--auto-unmount")
+	// the transport key itself must not be emitted as a flag
+	for _, v := range result {
+		assert.NotContains(t, v, "add-mount-param")
+	}
 }
 
 func TestS3MounterPopulateArgsSlice_CacheAndLogDir(t *testing.T) {
@@ -113,6 +127,7 @@ func TestS3MounterPopulateArgsSlice_CacheAndLogDir(t *testing.T) {
 // --- Validate tests ---
 
 func TestS3MounterValidate_Success(t *testing.T) {
+	mockS3FileExists(t, true, nil)
 	args := s3MounterArgs{
 		AllowOther:         "true",
 		AwsCredentialsFile: testCredFile,
@@ -145,6 +160,7 @@ func TestS3MounterValidate_MissingCredentialsFile(t *testing.T) {
 }
 
 func TestS3MounterValidate_MissingConfigFile(t *testing.T) {
+	mockS3FileExists(t, true, nil)
 	args := s3MounterArgs{
 		AwsCredentialsFile: testCredFile,
 	}
@@ -152,6 +168,46 @@ func TestS3MounterValidate_MissingConfigFile(t *testing.T) {
 	err := args.Validate(testTargetPath)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "aws-config-file is required")
+}
+
+func TestS3MounterValidate_FilesNotFound(t *testing.T) {
+	mockS3FileExists(t, false, nil)
+
+	err := s3MounterArgs{AwsCredentialsFile: testCredFile, AwsConfigFile: testCfgFile}.Validate(testTargetPath)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "aws-credentials-file not found")
+}
+
+func TestS3MounterValidate_ConfigFileNotFound(t *testing.T) {
+	orig := FileExists
+	t.Cleanup(func() { FileExists = orig })
+	FileExists = func(path string) (bool, error) { return path == testCredFile, nil }
+
+	err := s3MounterArgs{AwsCredentialsFile: testCredFile, AwsConfigFile: testCfgFile}.Validate(testTargetPath)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "aws-config-file not found")
+}
+
+func TestS3MounterValidate_FileCheckError(t *testing.T) {
+	mockS3FileExists(t, false, errors.New("stat failed"))
+
+	err := s3MounterArgs{AwsCredentialsFile: testCredFile, AwsConfigFile: testCfgFile}.Validate(testTargetPath)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "error checking aws-credentials-file existence")
+}
+
+// Uses the real FileExists: paths outside the safe mounter config dir are rejected.
+func TestS3MounterValidate_FileOutsideSafeDir(t *testing.T) {
+	orig := FileExists
+	FileExists = fileExists
+	t.Cleanup(func() { FileExists = orig })
+
+	err := s3MounterArgs{AwsCredentialsFile: "/etc/passwd", AwsConfigFile: testCfgFile}.Validate(testTargetPath)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "error checking aws-credentials-file existence")
+
+	err = s3MounterArgs{AwsCredentialsFile: testCredFile, AwsConfigFile: "/etc/passwd"}.Validate(testTargetPath)
+	assert.Error(t, err)
 }
 
 func TestS3MounterValidate_InvalidAllowOther(t *testing.T) {
@@ -195,6 +251,7 @@ func TestS3MounterValidate_InvalidBoolFields(t *testing.T) {
 }
 
 func TestS3MounterValidate_InvalidUID(t *testing.T) {
+	mockS3FileExists(t, true, nil)
 	args := s3MounterArgs{
 		AwsCredentialsFile: testCredFile,
 		AwsConfigFile:      testCfgFile,
@@ -206,6 +263,7 @@ func TestS3MounterValidate_InvalidUID(t *testing.T) {
 }
 
 func TestS3MounterValidate_InvalidGID(t *testing.T) {
+	mockS3FileExists(t, true, nil)
 	args := s3MounterArgs{
 		AwsCredentialsFile: testCredFile,
 		AwsConfigFile:      testCfgFile,
@@ -228,6 +286,7 @@ func TestS3MounterValidate_InvalidForcePathStyle(t *testing.T) {
 }
 
 func TestS3MounterValidate_IncrementalUploadRejected(t *testing.T) {
+	mockS3FileExists(t, true, nil)
 	args := s3MounterArgs{
 		AwsCredentialsFile: testCredFile,
 		AwsConfigFile:      testCfgFile,
@@ -239,6 +298,7 @@ func TestS3MounterValidate_IncrementalUploadRejected(t *testing.T) {
 }
 
 func TestS3MounterValidate_ReadOnlyWithWriteFlagsRejected(t *testing.T) {
+	mockS3FileExists(t, true, nil)
 	for name, apply := range map[string]func(*s3MounterArgs){
 		"allow-delete":    func(a *s3MounterArgs) { a.AllowDelete = "true" },
 		"allow-overwrite": func(a *s3MounterArgs) { a.AllowOverwrite = "true" },
@@ -258,6 +318,7 @@ func TestS3MounterValidate_ReadOnlyWithWriteFlagsRejected(t *testing.T) {
 }
 
 func TestS3MounterValidate_LogLevel(t *testing.T) {
+	mockS3FileExists(t, true, nil)
 	base := s3MounterArgs{AwsCredentialsFile: testCredFile, AwsConfigFile: testCfgFile}
 
 	for _, level := range []string{"", "debug", "debug-crt", "no-log"} {
@@ -274,6 +335,7 @@ func TestS3MounterValidate_LogLevel(t *testing.T) {
 }
 
 func TestS3MounterValidate_ValidUIDAndGID(t *testing.T) {
+	mockS3FileExists(t, true, nil)
 	args := s3MounterArgs{
 		AwsCredentialsFile: testCredFile,
 		AwsConfigFile:      testCfgFile,
@@ -284,6 +346,7 @@ func TestS3MounterValidate_ValidUIDAndGID(t *testing.T) {
 	assert.NoError(t, err)
 }
 func TestS3MounterValidate_LogDirectory(t *testing.T) {
+	mockS3FileExists(t, true, nil)
 	// A log directory inside the safe base is accepted and NOT created by Validate
 	// (mount-s3 creates it itself).
 	t.Run("inside safe base is not created", func(t *testing.T) {
@@ -313,6 +376,7 @@ func TestS3MounterValidate_LogDirectory(t *testing.T) {
 // --- ParseMounterArgs with AMAZONS3MOUNTER tests (N2) ---
 
 func TestParseMounterArgs_AmazonS3_Valid(t *testing.T) {
+	mockS3FileExists(t, true, nil)
 	argsStruct := s3MounterArgs{
 		AllowOther:         "true",
 		AwsCredentialsFile: testCredFile,
@@ -338,6 +402,28 @@ func TestParseMounterArgs_AmazonS3_Valid(t *testing.T) {
 	assert.Contains(t, args, testBucket)
 	assert.Contains(t, args, "--allow-other")
 	assert.Contains(t, args, "--endpoint-url="+testEndpoint)
+}
+
+func TestParseMounterArgs_AmazonS3_AddMountParam(t *testing.T) {
+	mockS3FileExists(t, true, nil)
+	argsStruct := s3MounterArgs{
+		AwsCredentialsFile: testCredFile,
+		AwsConfigFile:      testCfgFile,
+		AddMountParam:      "--max-threads=32,--dir-mode=0755",
+	}
+	b, _ := json.Marshal(argsStruct)
+
+	req := MountRequest{
+		Path:    testTargetPath,
+		Bucket:  testBucket,
+		Mounter: constants.AMAZONS3MOUNTER,
+		Args:    b,
+	}
+
+	args, err := req.ParseMounterArgs()
+	assert.NoError(t, err)
+	assert.Contains(t, args, "--max-threads=32")
+	assert.Contains(t, args, "--dir-mode=0755")
 }
 
 func TestParseMounterArgs_AmazonS3_InvalidJSON(t *testing.T) {
