@@ -124,11 +124,6 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
-        with:
-          languages: "go"
-        
       - name: Build Debian and RPM packages for cos-csi-mounter systemd service
         run: |
           cd ${{ matrix.package_dir }}
@@ -150,6 +145,3 @@ jobs:
             ## 🚀 What's New
             - Add support to accept additional rclone CLI flags.
           prerelease: ${{ env.IS_LATEST_RELEASE != 'true' }}
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
