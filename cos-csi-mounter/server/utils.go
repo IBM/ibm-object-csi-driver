@@ -241,6 +241,20 @@ func isBoolString(s string) bool {
 	return s == "true" || s == "false"
 }
 
+// isTrue reports whether s is "true" (case-insensitive), matching what isBoolString accepts.
+func isTrue(s string) bool {
+	return strings.EqualFold(strings.TrimSpace(s), "true")
+}
+
+// validateBool returns an error if value is set but is not a boolean string.
+func validateBool(name, value string) error {
+	if value != "" && !isBoolString(value) {
+		logger.Error(fmt.Sprintf("cannot convert value of %s into boolean", name), zap.String(name, value))
+		return fmt.Errorf("cannot convert value of %s into boolean: %v", name, value)
+	}
+	return nil
+}
+
 // fileExists checks whether the given file path exists and is not a directory.
 func fileExists(path string) (bool, error) {
 	absPath, err := absPathResolver(path)
@@ -260,39 +274,28 @@ func fileExists(path string) (bool, error) {
 	return !info.IsDir(), nil
 }
 
-// ensureDir creates the directory at path if it doesn't exist.
-// It first resolves the absolute path and verifies it is within safeBase
-// to prevent path-traversal attacks before creating the directory.
-func ensureDir(path, safeBase string) error {
-	absPath, err := absPathResolver(path) // #nosec G304 -- path is validated against safeBase below to prevent traversal
+// resolveUnderBase resolves path to an absolute path and verifies it is within
+// safeBase to prevent path-traversal attacks. It does not touch the filesystem.
+func resolveUnderBase(path, safeBase string) (string, error) {
+	absPath, err := absPathResolver(path)
 	if err != nil {
-		return fmt.Errorf("failed to resolve absolute path: %v", err)
+		return "", fmt.Errorf("failed to resolve absolute path: %v", err)
 	}
 	if !strings.HasPrefix(absPath, safeBase) {
-		return fmt.Errorf("path %v is outside the safe directory", absPath)
+		return "", fmt.Errorf("path %v is outside the safe directory", absPath)
 	}
+	return absPath, nil
+}
 
-	// Check if directory already exists
-	info, err := os.Stat(absPath) // #nosec G304 -- absPath is validated against safeBase above
-	if err == nil {
-		// Path exists, verify it's a directory
-		if !info.IsDir() {
-			return fmt.Errorf("path exists but is not a directory: %s", absPath)
-		}
-		return nil
+// ensureDir creates the directory at path (with parents) if it doesn't exist.
+// The path is first verified to be within safeBase. MkdirAll is a no-op for an
+// existing directory and fails if a non-directory is in the way.
+func ensureDir(path, safeBase string) error {
+	absPath, err := resolveUnderBase(path, safeBase)
+	if err != nil {
+		return err
 	}
-
-	// If error is not "not exist", return it
-	if !os.IsNotExist(err) {
-		return fmt.Errorf("failed to stat directory: %w", err)
-	}
-
-	// Directory doesn't exist, create it with parent directories
-	if err := os.MkdirAll(absPath, 0750); err != nil { // #nosec G301 -- directory permissions set to 0750 for security
-		return fmt.Errorf("failed to create directory: %w", err)
-	}
-
-	return nil
+	return os.MkdirAll(absPath, 0750) // #nosec G301 -- directory permissions set to 0750 for security
 }
 
 // redactArgsForLog returns a copy of the raw Args JSON with the value of

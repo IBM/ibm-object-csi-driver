@@ -1,6 +1,8 @@
 package mounter
 
 import (
+	"errors"
+	"os"
 	"reflect"
 	"sort"
 	"testing"
@@ -21,6 +23,73 @@ func stringSlicesEqualIgnoreOrder(a, b []string) bool {
 	sort.Strings(aCopy)
 	sort.Strings(bCopy)
 	return reflect.DeepEqual(aCopy, bCopy)
+}
+
+func TestRemoveConfigDir_PathNotExists(t *testing.T) {
+	Stat = func(path string) (os.FileInfo, error) {
+		return nil, os.ErrNotExist
+	}
+	defer func() { Stat = os.Stat }()
+
+	removeConfigDir("/test", target)
+}
+
+func TestRemoveConfigDir_StatRetryThenSuccess(t *testing.T) {
+	attempt := 0
+	Stat = func(_ string) (os.FileInfo, error) {
+		if attempt == 0 {
+			attempt++
+			return nil, errors.New("stat error")
+		}
+		return nil, nil
+	}
+	RemoveAll = func(_ string) error {
+		return nil
+	}
+	defer func() {
+		Stat = os.Stat
+		RemoveAll = os.RemoveAll
+	}()
+
+	removeConfigDir("/test", target)
+}
+
+func TestRemoveConfigDir_RemoveRetryThenSuccess(t *testing.T) {
+	Stat = func(_ string) (os.FileInfo, error) {
+		return nil, nil
+	}
+	attempt := 0
+	RemoveAll = func(_ string) error {
+		if attempt == 0 {
+			attempt++
+			return errors.New("remove error")
+		}
+		return nil
+	}
+	defer func() {
+		Stat = os.Stat
+		RemoveAll = os.RemoveAll
+	}()
+
+	removeConfigDir("/test", target)
+}
+
+func TestRemoveConfigDir_Negative(t *testing.T) {
+	called := 0
+	Stat = func(_ string) (os.FileInfo, error) {
+		return nil, nil
+	}
+	RemoveAll = func(_ string) error {
+		called++
+		return errors.New("remove failed")
+	}
+	defer func() {
+		Stat = os.Stat
+		RemoveAll = os.RemoveAll
+	}()
+
+	removeConfigDir("/test", target)
+	assert.Equal(t, maxRetries, called)
 }
 
 func TestNewMounter(t *testing.T) {
@@ -91,7 +160,7 @@ func TestNewMounter(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name:   "MountpointS3 Mounter",
+			name:   "MountS3 Mounter",
 			attrib: map[string]string{"mounter": constants.AMAZONS3MOUNTER},
 			secretMap: map[string]string{
 				"cosEndpoint":        "test-endpoint",
@@ -104,20 +173,18 @@ func TestNewMounter(t *testing.T) {
 				"gid":                "2000",
 			},
 			mountOptions: []string{"--dir-mode=0755", "--file-mode=0644"},
-			expected: &MountpointS3Mounter{
-				BucketName:     "test-bucket-name",
-				ObjectPath:     "test-obj-path",
-				EndPoint:       "test-endpoint",
-				LocConstraint:  "test-loc-constraint",
-				AccessKey:      "test-access-key",
-				SecretKey:      "test-secret-key",
-				AuthType:       "hmac",
-				UID:            "1000",
-				GID:            "2000",
-				AllowDelete:    true,
-				AllowOverwrite: true,
-				MountOptions:   []string{"--dir-mode=0755", "--file-mode=0644"},
-				MounterUtils:   &mounterUtils.MounterOptsUtils{},
+			expected: &MountS3Mounter{
+				BucketName:    "test-bucket-name",
+				ObjectPath:    "test-obj-path",
+				EndPoint:      "test-endpoint",
+				LocConstraint: "test-loc-constraint",
+				AccessKey:     "test-access-key",
+				SecretKey:     "test-secret-key",
+				AuthType:      "hmac",
+				UID:           "1000",
+				GID:           "2000",
+				MountOptions:  []string{"--dir-mode=0755", "--file-mode=0644"},
+				MounterUtils:  &mounterUtils.MounterOptsUtils{},
 			},
 			expectedErr: nil,
 		},
@@ -176,8 +243,8 @@ func TestNewMounter(t *testing.T) {
 				rclone.MountOptions = nil
 				expected.MountOptions = nil
 			}
-			if s3mounter, ok := result.(*MountpointS3Mounter); ok {
-				expected := test.expected.(*MountpointS3Mounter)
+			if s3mounter, ok := result.(*MountS3Mounter); ok {
+				expected := test.expected.(*MountS3Mounter)
 				if !stringSlicesEqualIgnoreOrder(s3mounter.MountOptions, expected.MountOptions) {
 					t.Errorf("MountOptions mismatch.\nGot:  %v\nWant: %v", s3mounter.MountOptions, expected.MountOptions)
 				}

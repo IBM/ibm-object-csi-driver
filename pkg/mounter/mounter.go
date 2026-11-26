@@ -2,12 +2,15 @@ package mounter
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"strings"
 	"syscall"
 	"time"
@@ -31,6 +34,33 @@ var (
 	Stat       = os.Stat
 	RemoveAll  = os.RemoveAll
 )
+
+// removeConfigDir removes the per-volume config directory (credentials/config
+// files) of a mounter for the given target, retrying on transient failures.
+func removeConfigDir(configPath, target string) {
+	configPathWithVolID := path.Join(configPath, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
+
+	for retry := 1; retry <= maxRetries; retry++ {
+		_, err := Stat(configPathWithVolID)
+		if err != nil {
+			if os.IsNotExist(err) {
+				klog.Infof("removeConfigDir: Config dir does not exist: %s", configPathWithVolID)
+				return
+			}
+			klog.Errorf("removeConfigDir: Attempt %d - Failed to stat path %s: %v", retry, configPathWithVolID, err)
+			time.Sleep(constants.Interval)
+			continue
+		}
+		if err = RemoveAll(configPathWithVolID); err != nil {
+			klog.Errorf("removeConfigDir: Attempt %d - Failed to remove config dir %s: %v", retry, configPathWithVolID, err)
+			time.Sleep(constants.Interval)
+			continue
+		}
+		klog.Infof("removeConfigDir: Successfully removed config dir: %s", configPathWithVolID)
+		return
+	}
+	klog.Errorf("removeConfigDir: Failed to remove config dir %s after %d attempts", configPathWithVolID, maxRetries)
+}
 
 type Mounter interface {
 	Mount(source string, target string) error
@@ -106,7 +136,7 @@ func (s *CSIMounterFactory) NewMounter(params MounterParams) Mounter {
 			ReadOnly:     params.ReadOnly,
 		})
 	case constants.AMAZONS3MOUNTER:
-		return NewMountpointS3Mounter(MountpointS3MounterParams{
+		return NewMountS3Mounter(MountS3MounterParams{
 			SecretMap:    secretMap,
 			MountOptions: mountFlags,
 			MounterUtils: mounterUtils,

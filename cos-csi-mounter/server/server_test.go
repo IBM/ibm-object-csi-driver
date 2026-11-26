@@ -16,6 +16,7 @@ import (
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestSetupSocket_CreatesSocket(t *testing.T) {
@@ -144,7 +145,7 @@ func TestHandleCosMount_InvalidJSON(t *testing.T) {
 func TestHandleCosMount_InvalidMounter(t *testing.T) {
 	mockMounter := new(MockMounterUtils)
 	router := gin.Default()
-	router.POST("/mount", handleCosMount(mockMounter, &MockMounterArgsParser{}))
+	router.POST("/mount", handleCosMount(mockMounter, &DefaultMounterArgsParser{}))
 
 	reqBody := map[string]interface{}{
 		"mounter": "invalid",
@@ -161,7 +162,10 @@ func TestHandleCosMount_InvalidMounter(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Contains(t, w.Body.String(), "invalid mounter")
+	assert.Contains(t, w.Body.String(), "invalid args for mounter")
+	assert.Contains(t, w.Body.String(), "unknown mounter: invalid")
+	mockMounter.AssertNotCalled(t, "FuseMount", mock.Anything, mock.Anything, mock.Anything)
+	mockMounter.AssertNotCalled(t, "FuseMountWithEnv", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestHandleCosMount_MissingBucket(t *testing.T) {
@@ -282,6 +286,164 @@ func TestHandleCosMount_Success(t *testing.T) {
 
 	mockMounter.AssertExpectations(t)
 	mockParser.AssertExpectations(t)
+}
+
+func newS3MountRequest() MountRequest {
+	return MountRequest{
+		Bucket:  "my-bucket",
+		Path:    "/mnt/test",
+		Mounter: constants.AMAZONS3MOUNTER,
+		Args:    json.RawMessage(`{"aws-credentials-file":"/var/lib/coscsi-config/x/credentials","aws-config-file":"/var/lib/coscsi-config/x/config"}`),
+	}
+}
+
+func serveMount(t *testing.T, mockMounter *MockMounterUtils, mockParser *MockMounterArgsParser, request MountRequest) *httptest.ResponseRecorder {
+	t.Helper()
+	router := gin.Default()
+	router.POST("/mount", handleCosMount(mockMounter, mockParser))
+
+	body, _ := json.Marshal(request)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/mount", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+	return w
+}
+
+// mount-s3 must be started through FuseMountWithEnv with the AWS credential
+// and config file paths from the request args, and never through FuseMount.
+func TestHandleCosMount_MountS3_Success(t *testing.T) {
+	mockMounter := new(MockMounterUtils)
+	mockParser := new(MockMounterArgsParser)
+
+	request := newS3MountRequest()
+	expectedArgs := []string{"my-bucket", "/mnt/test", "--allow-other"}
+	expectedEnv := []string{
+		"AWS_SHARED_CREDENTIALS_FILE=/var/lib/coscsi-config/x/credentials",
+		"AWS_CONFIG_FILE=/var/lib/coscsi-config/x/config",
+	}
+
+	mockParser.On("Parse", request).Return(expectedArgs, nil)
+	mockMounter.On("FuseMountWithEnv", request.Path, request.Mounter, expectedArgs, expectedEnv).Return(nil)
+
+	w := serveMount(t, mockMounter, mockParser, request)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "success")
+	mockMounter.AssertExpectations(t)
+	mockMounter.AssertNotCalled(t, "FuseMount", mock.Anything, mock.Anything, mock.Anything)
+	mockParser.AssertExpectations(t)
+}
+
+func TestHandleCosMount_MountS3_FuseMountWithEnvFails(t *testing.T) {
+	mockMounter := new(MockMounterUtils)
+	mockParser := new(MockMounterArgsParser)
+
+	request := newS3MountRequest()
+	expectedArgs := []string{"my-bucket", "/mnt/test"}
+	expectedEnv := []string{
+		"AWS_SHARED_CREDENTIALS_FILE=/var/lib/coscsi-config/x/credentials",
+		"AWS_CONFIG_FILE=/var/lib/coscsi-config/x/config",
+	}
+
+	mockParser.On("Parse", request).Return(expectedArgs, nil)
+	mockMounter.On("FuseMountWithEnv", request.Path, request.Mounter, expectedArgs, expectedEnv).Return(fmt.Errorf("mount error"))
+
+	w := serveMount(t, mockMounter, mockParser, request)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Contains(t, w.Body.String(), "mount failed: mount error")
+	mockMounter.AssertExpectations(t)
+	mockMounter.AssertNotCalled(t, "FuseMount", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// s3fs and rclone must keep using FuseMount without env vars.
+func TestHandleCosMount_NonS3_DoesNotUseFuseMountWithEnv(t *testing.T) {
+	for _, mounter := range []string{constants.S3FS, constants.RClone} {
+		t.Run(mounter, func(t *testing.T) {
+			mockMounter := new(MockMounterUtils)
+			mockParser := new(MockMounterArgsParser)
+
+			request := newS3MountRequest()
+			request.Mounter = mounter
+			expectedArgs := []string{"my-bucket", "/mnt/test"}
+
+			mockParser.On("Parse", request).Return(expectedArgs, nil)
+			mockMounter.On("FuseMount", request.Path, request.Mounter, expectedArgs).Return(nil)
+
+			w := serveMount(t, mockMounter, mockParser, request)
+
+			assert.Equal(t, http.StatusOK, w.Code)
+			mockMounter.AssertExpectations(t)
+			mockMounter.AssertNotCalled(t, "FuseMountWithEnv", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}
+
+func TestBuildS3EnvVars(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     string
+		expected []string
+	}{
+		{
+			name: "both files",
+			args: `{"aws-credentials-file":"/c/credentials","aws-config-file":"/c/config"}`,
+			expected: []string{
+				"AWS_SHARED_CREDENTIALS_FILE=/c/credentials",
+				"AWS_CONFIG_FILE=/c/config",
+			},
+		},
+		{
+			name:     "only credentials file",
+			args:     `{"aws-credentials-file":"/c/credentials"}`,
+			expected: []string{"AWS_SHARED_CREDENTIALS_FILE=/c/credentials"},
+		},
+		{
+			name:     "only config file",
+			args:     `{"aws-config-file":"/c/config"}`,
+			expected: []string{"AWS_CONFIG_FILE=/c/config"},
+		},
+		{
+			name:     "empty values are skipped",
+			args:     `{"aws-credentials-file":"","aws-config-file":""}`,
+			expected: nil,
+		},
+		{
+			name:     "non-string values are skipped",
+			args:     `{"aws-credentials-file":true,"aws-config-file":5}`,
+			expected: nil,
+		},
+		{
+			name: "non-string fields elsewhere do not drop the credential vars",
+			args: `{"log-metrics":true,"aws-credentials-file":"/c/credentials","aws-config-file":"/c/config"}`,
+			expected: []string{
+				"AWS_SHARED_CREDENTIALS_FILE=/c/credentials",
+				"AWS_CONFIG_FILE=/c/config",
+			},
+		},
+		{
+			name:     "no file fields",
+			args:     `{"allow-other":"true"}`,
+			expected: nil,
+		},
+		{
+			name:     "invalid JSON",
+			args:     `{"aws-credentials-file"`,
+			expected: nil,
+		},
+		{
+			name:     "empty args",
+			args:     ``,
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, buildS3EnvVars(json.RawMessage(tt.args)))
+		})
+	}
 }
 
 func TestHandleCosUnmount_InvalidJSON(t *testing.T) {

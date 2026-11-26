@@ -686,6 +686,39 @@ func TestPathValidator_AbsResolverFails_ReturnsError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to resolve absolute mount path")
 }
+func TestResolveUnderBase(t *testing.T) {
+	t.Run("inside base, does not create", func(t *testing.T) {
+		dir := filepath.Join(t.TempDir(), "missing")
+		abs, err := resolveUnderBase(dir, filepath.Dir(dir))
+		assert.NoError(t, err)
+		assert.Equal(t, dir, abs)
+		_, statErr := os.Stat(dir)
+		assert.True(t, os.IsNotExist(statErr))
+	})
+
+	t.Run("outside base", func(t *testing.T) {
+		_, err := resolveUnderBase("/etc/passwd", "/tmp")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "outside the safe directory")
+	})
+
+	t.Run("path traversal", func(t *testing.T) {
+		_, err := resolveUnderBase("/tmp/../../etc", "/tmp")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "outside the safe directory")
+	})
+
+	t.Run("abs fails", func(t *testing.T) {
+		originalAbs := absPathResolver
+		defer func() { absPathResolver = originalAbs }()
+		absPathResolver = func(path string) (string, error) {
+			return "", errors.New("abs error")
+		}
+		_, err := resolveUnderBase("some-path", "/tmp")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to resolve absolute path")
+	})
+}
 
 func TestEnsureDir_OutsideSafeDirectory(t *testing.T) {
 	err := ensureDir("/etc/passwd", "/tmp")

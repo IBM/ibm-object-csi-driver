@@ -15,10 +15,8 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path"
 	"strings"
-	"time"
 
 	"github.com/IBM/ibm-object-csi-driver/pkg/constants"
 	"github.com/IBM/ibm-object-csi-driver/pkg/mounter/utils"
@@ -49,7 +47,7 @@ const (
 
 var (
 	writePassWrap = writePass
-	removeFile    = removeS3FSCredFile
+	removeFile    = removeConfigDir
 )
 
 type S3fsMounterParams struct {
@@ -457,30 +455,4 @@ func (s3fs *S3fsMounter) formulateMountOptions(bucket, target, passwdFile string
 	}
 
 	return
-}
-
-func removeS3FSCredFile(credDir, target string) {
-	metaPath := path.Join(credDir, fmt.Sprintf("%x", sha256.Sum256([]byte(target))))
-
-	for retry := 1; retry <= maxRetries; retry++ {
-		_, err := Stat(metaPath)
-		if err != nil {
-			if os.IsNotExist(err) {
-				klog.Infof("removeS3FSCredFile: Password file directory does not exist: %s", metaPath)
-				return
-			}
-			klog.Errorf("removeS3FSCredFile: Attempt %d - Failed to stat path %s: %v", retry, metaPath, err)
-			time.Sleep(constants.Interval)
-			continue
-		}
-		err = RemoveAll(metaPath)
-		if err != nil {
-			klog.Errorf("removeS3FSCredFile: Attempt %d - Failed to remove password file path %s: %v", retry, metaPath, err)
-			time.Sleep(constants.Interval)
-			continue
-		}
-		klog.Infof("removeS3FSCredFile: Successfully removed password file path: %s", metaPath)
-		return
-	}
-	klog.Errorf("removeS3FSCredFile: Failed to remove password file after %d attempts", maxRetries)
 }

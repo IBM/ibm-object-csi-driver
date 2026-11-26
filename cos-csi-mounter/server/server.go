@@ -170,12 +170,6 @@ func handleCosMount(mounter mounterUtils.MounterUtils, parser MounterArgsParser)
 
 		logger.Info("New mount request with values:", zap.String("Bucket", request.Bucket), zap.String("Path", request.Path), zap.String("Mounter", request.Mounter), zap.Any("Args", redactArgsForLog(request.Args)))
 
-		if request.Mounter != constants.S3FS && request.Mounter != constants.RClone && request.Mounter != constants.AMAZONS3MOUNTER {
-			logger.Error("invalid mounter", zap.Any("mounter", request.Mounter))
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid mounter"})
-			return
-		}
-
 		if request.Bucket == "" {
 			logger.Error("missing bucket in request")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "missing bucket"})
